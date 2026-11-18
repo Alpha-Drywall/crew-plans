@@ -418,16 +418,76 @@ function bindJobs(){
 }
 async function jobMenu(){
   const j=S.job;
-  const m=modal('<h2>'+esc(j.name)+'</h2><div style="display:grid;gap:10px"><button class="btn primary" data-a="people">People & invite links</button><button class="btn" data-a="scope">Scope items</button><button class="btn" data-a="edit">Rename / edit address</button><button class="btn danger" data-a="del">Delete job</button><button class="btn" data-a="x">Close</button></div>');
+  const m=modal('<h2>'+esc(j.name)+'</h2><div style="display:grid;gap:10px"><button class="btn primary" data-a="people">People & invite links</button><button class="btn" data-a="scope">Scope items</button><button class="btn" data-a="dl">Download job (save to OneDrive)</button><button class="btn" data-a="edit">Rename / edit address</button><button class="btn danger" data-a="del">Delete job</button><button class="btn" data-a="x">Close</button></div>');
   $('[data-a=x]',m).onclick=()=>m.close();
   $('[data-a=people]',m).onclick=()=>{m.close();peoplePanel()};
   $('[data-a=scope]',m).onclick=()=>{m.close();scopeEditor()};
+  $('[data-a=dl]',m).onclick=()=>{m.close();downloadJob()};
   $('[data-a=edit]',m).onclick=async()=>{m.close();const v=await formBox('Edit job',[{k:'name',label:'Job name',value:j.name,req:true},{k:'addr',label:'Address or GC',value:j.addr}]);if(v&&await run(sb.from('jobs').update({name:v.name.slice(0,120),addr:v.addr.slice(0,160)}).eq('id',j.id)))loadJobs()};
   $('[data-a=del]',m).onclick=async()=>{
     m.close();if(!await confirmBox('Delete "'+(j.name||'this job')+'" with all its sheets, markups, progress and logs, for everyone?'))return;
     try{const files=[];for(const f of ['sheets','photos']){const {data}=await sb.storage.from(BUCKET).list(j.id+'/'+f,{limit:1000});(data||[]).forEach(o=>files.push(j.id+'/'+f+'/'+o.name))}if(files.length)await sb.storage.from(BUCKET).remove(files)}catch(e){}
     if(await run(sb.from('jobs').delete().eq('id',j.id))){toast('Job deleted.');S.jobs=S.jobs.filter(x=>x.id!==j.id);closeJob()}
   };
+}
+
+/* download a whole job as one ZIP (for filing in OneDrive) */
+const csvCell=v=>{v=v==null?'':String(v);return /[",\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
+const toCsv=rows=>'\ufeff'+rows.map(r=>r.map(csvCell).join(',')).join('\r\n');
+const fileSafe=t=>String(t||'').replace(/[\\/:*?"<>|]+/g,'-').replace(/\s+/g,' ').trim().slice(0,80)||'file';
+const fmtDate=v=>{const d=new Date(v);return isNaN(d)?'':d.toLocaleString()};
+function loadImg(url){return new Promise((res,rej)=>{const i=new Image();i.crossOrigin='anonymous';i.onload=()=>res(i);i.onerror=()=>rej(new Error('image'));i.src=url})}
+function drawSheet(img,marks,pins){
+  const W=img.naturalWidth,H=img.naturalHeight,M=Math.max(W,H);const c=document.createElement('canvas');c.width=W;c.height=H;const g=c.getContext('2d');
+  g.fillStyle='#fff';g.fillRect(0,0,W,H);g.drawImage(img,0,0);g.globalCompositeOperation='multiply';
+  for(const m of marks){const col=phase(m.phase).c;const sw=clamp(num(m.w,.006),.001,.03)*M;const {kind,p}=markGeom(m);
+    if(kind==='box'&&p.length>=4){g.globalAlpha=.28;g.fillStyle=col;g.fillRect(p[0]*W,p[1]*H,(p[2]-p[0])*W,(p[3]-p[1])*H);g.globalAlpha=.85;g.strokeStyle=col;g.lineWidth=sw/2;g.strokeRect(p[0]*W,p[1]*H,(p[2]-p[0])*W,(p[3]-p[1])*H)}
+    else if(p.length>=4){g.globalAlpha=.6;g.strokeStyle=col;g.lineWidth=sw;g.lineCap='round';g.lineJoin='round';g.beginPath();g.moveTo(p[0]*W,p[1]*H);for(let i=2;i+1<p.length;i+=2)g.lineTo(p[i]*W,p[i+1]*H);g.stroke()}}
+  g.globalCompositeOperation='source-over';g.globalAlpha=1;const r=M*.009;
+  pins.forEach((pn,i)=>{const x=clamp(num(pn.x),0,1)*W,y=clamp(num(pn.y),0,1)*H;const col=pn.status==='done'?'#2e7d32':({issue:'#d32f2f',question:'#f59e0b',extra:'#0f766e',note:'#475569'})[pinKind(pn.kind).k];
+    g.beginPath();g.arc(x,y-r*1.4,r,0,Math.PI*2);g.fillStyle=col;g.fill();g.lineWidth=r*.18;g.strokeStyle='#fff';g.stroke();
+    g.fillStyle='#fff';g.font='bold '+Math.round(r*1.1)+'px sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText(String(i+1),x,y-r*1.4)});
+  return c;
+}
+async function downloadJob(){
+  const job=S.job;const pb=progressBox('Getting ready…');
+  try{
+    pb.set('Loading tools…');
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+    pb.set('Collecting job data…');
+    const [sheets,marks,pins,areas,logs,members]=await Promise.all([
+      q(sb.from('sheets').select('*').eq('job_id',job.id).order('sort')),
+      q(sb.from('marks').select('*').eq('job_id',job.id).order('created_at')),
+      q(sb.from('pins').select('*').eq('job_id',job.id).order('created_at')),
+      q(sb.from('areas').select('*').eq('job_id',job.id).order('created_at')),
+      q(sb.from('logs').select('*').eq('job_id',job.id).order('date')),
+      q(sb.from('members').select('*').eq('job_id',job.id))]);
+    members.forEach(m=>S.people[m.user_id]=m.name);
+    const base=fileSafe(job.name);const zip=new window.JSZip();const top=zip.folder(base+' - Crew Plans '+today());
+    const {jsPDF}=window.jspdf;let pdf=null;const pinRows=[['Sheet','Pin #','Type','Status','Note','Added by','Added','Done by','Done','Photos']];
+    const photosDir=top.folder('Photos');
+    for(let i=0;i<sheets.length;i++){
+      const sh=sheets[i];pb.set('Drawing sheet '+(i+1)+' of '+sheets.length+'…');
+      const sm=marks.filter(m=>m.sheet_id===sh.id),sp=pins.filter(p=>p.sheet_id===sh.id);
+      let canvas=null;try{const [u]=await urlsFor([sh.path]);const img=await loadImg(u);canvas=drawSheet(img,sm,sp)}catch(e){}
+      if(canvas){const W=canvas.width,H=canvas.height;const pw=W/5,ph=H/5;const data=canvas.toDataURL('image/jpeg',.85);
+        if(!pdf)pdf=new jsPDF({orientation:pw>ph?'landscape':'portrait',unit:'pt',format:[pw,ph]});else pdf.addPage([pw,ph],pw>ph?'landscape':'portrait');
+        pdf.addImage(data,'JPEG',0,0,pw,ph,undefined,'FAST');pdf.setFontSize(9);pdf.setTextColor(90);pdf.text(job.name+' · '+sh.name,8,ph-6);canvas.width=canvas.height=0}
+      for(let k=0;k<sp.length;k++){const pn=sp[k];const names=[];const ph=Array.isArray(pn.photos)?pn.photos:[];
+        for(let j=0;j<ph.length;j++){try{const [u]=await urlsFor([ph[j]]);const b=await (await fetch(u)).blob();const nm=fileSafe(sh.name+' pin '+(k+1)+(ph.length>1?' ('+(j+1)+')':''))+'.jpg';photosDir.file(nm,b);names.push(nm)}catch(e){}}
+        pinRows.push([sh.name,k+1,pinKind(pn.kind).n,pn.status==='done'?'Done':'Open',pn.text,who(pn.created_by),fmtDate(pn.created_at),pn.done_by?who(pn.done_by):'',pn.done_at?fmtDate(pn.done_at):'',names.join('; ')])}
+    }
+    pb.set('Writing the files…');
+    if(pdf)top.file(base+' - Marked-up plans.pdf',pdf.output('blob'));
+    top.file(base+' - Pins.csv',toCsv(pinRows));
+    const sc=PHASES;top.file(base+' - Progress.csv',toCsv([['Area'].concat(sc.map(p=>p.n+' %')).concat(['Last updated','Updated by'])].concat(areas.map(a=>[a.name].concat(sc.map(p=>areaPct(a,p.k))).concat([a.updated_at?fmtDate(a.updated_at):'',a.updated_by?who(a.updated_by):''])))));
+    top.file(base+' - Daily logs.csv',toCsv([['Date','Foreman','Crew on site','Man-hours','Work done','Material delivered','Delays / notes']].concat(logs.map(l=>[l.date,who(l.user_id),num(l.crew),num(l.hours),l.work,l.deliveries,l.notes]))));
+    top.file('README.txt','Crew Plans export for '+job.name+(job.addr?' ('+job.addr+')':'')+'\r\nExported '+new Date().toLocaleString()+'\r\n\r\nMarked-up plans.pdf - every sheet with crew markups; numbered pins match Pins.csv.\r\nScope colors: '+sc.map(p=>p.n).join(', ')+'\r\nPhotos - pin photos, named by sheet and pin number.\r\n');
+    const blob=await zip.generateAsync({type:'blob'},m=>pb.set('Zipping… '+Math.round(m.percent)+'%'));
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=base+' - Crew Plans '+today()+'.zip';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},60000);
+    pb.close();toast('Downloaded. Save it to the job\'s OneDrive folder.');
+  }catch(e){pb.close();toast("Couldn't build the download: "+errMsg(e))}
 }
 
 /* scope items */
