@@ -51,6 +51,12 @@ main{padding:14px 14px calc(30px + env(safe-area-inset-bottom));max-width:860px;
 .sheet img{display:block;width:100%;aspect-ratio:3/2;object-fit:contain;background:#fafafa;border-bottom:1px solid var(--line)}
 .sheet .sname{padding:8px 34px 8px 10px;font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sheet .ico{position:absolute;right:2px;bottom:2px;font-size:15px}
+.revb{position:absolute;left:6px;top:6px;background:#475569;color:#fff;font-size:11px;font-weight:800;padding:3px 7px;border-radius:6px;letter-spacing:.3px;pointer-events:none}
+.revb.new{background:#ea580c}
+.supbar{background:#b91c1c;color:#fff;font-weight:700;font-size:14px;padding:8px 12px;text-align:center;cursor:pointer}
+.revnote{position:absolute;left:50%;top:50px;transform:translateX(-50%);z-index:6;background:#ea580c;color:#fff;font-size:13px;font-weight:600;padding:7px 12px;border-radius:12px;max-width:92%;text-align:center;box-shadow:0 2px 8px #0004;cursor:pointer}
+.verrow{display:flex;align-items:center;gap:10px;width:100%;text-align:left;margin-bottom:8px}
+.verrow .grow{flex:1}
 .bar{height:10px;background:#e6e9ed;border-radius:6px;overflow:hidden}
 .bar>i{display:block;height:100%;border-radius:6px}
 .prow{display:grid;grid-template-columns:96px 1fr 46px;align-items:center;gap:10px;margin:8px 0}
@@ -380,6 +386,11 @@ function harmonizeNums(items){
     it.num=p+sep+q.rest});
   return items;
 }
+const gid=s=>s.group_id||s.id;
+const curSheets=()=>S.sheets.filter(s=>s.is_current!==false);
+const versionsOf=s=>S.sheets.filter(x=>gid(x)===gid(s)).sort((a,b)=>num(b.rev,1)-num(a.rev,1));
+const sheetNum=n=>String(n||'').split(' – ')[0].trim().toUpperCase().replace(/\s+/g,'');
+const recentRev=s=>num(s.rev,1)>1&&s.revised_at&&(Date.now()-new Date(s.revised_at).getTime())<14*864e5;
 function sheetLabel(num,title){title=title?String(title).replace(/\s+/g,' ').trim():'';return num?(title?num+' – '+title:num):(title||'')}
 /* fast path: PDFs that still have a text layer */
 async function nameFromText(page,vp){
@@ -671,7 +682,7 @@ async function downloadJob(){
     await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
     pb.set('Collecting job data…');
     const [sheets,marks,pins,areas,logs,members]=await Promise.all([
-      q(sb.from('sheets').select('*').eq('job_id',job.id).order('sort')),
+      q(sb.from('sheets').select('*').eq('job_id',job.id).eq('is_current',true).order('sort')),
       q(sb.from('marks').select('*').eq('job_id',job.id).order('created_at')),
       q(sb.from('pins').select('*').eq('job_id',job.id).order('created_at')),
       q(sb.from('areas').select('*').eq('job_id',job.id).order('created_at')),
@@ -822,20 +833,22 @@ function shareLink(inv,email){
 /* plans tab */
 function renderPlans(){
   let h='';const admin=isAdminRole();
-  if(admin)h+='<label class="btn primary block" style="margin-bottom:6px">+ Add plans (PDF or photos)<input type="file" id="planFile" accept="application/pdf,image/*" multiple hidden></label><p class="muted small" style="margin:0 0 10px;text-align:center">Each PDF page becomes a sheet and gets named from its title block.</p>'+(S.sheets.length?'<button class="btn block" id="autoName" style="margin-bottom:14px">Auto-name sheets from title blocks</button>':'');
+  if(admin)h+='<label class="btn primary block" style="margin-bottom:6px">+ Add plans (PDF or photos)<input type="file" id="planFile" accept="application/pdf,image/*" multiple hidden></label><p class="muted small" style="margin:0 0 10px;text-align:center">Each PDF page becomes a sheet and gets named from its title block.</p>'+(S.sheets.length?'<label class="btn block" style="margin-bottom:6px">↻ Upload revised sheets<input type="file" id="revFile" accept="application/pdf,image/*" multiple hidden></label><p class="muted small" style="margin:0 0 10px;text-align:center">Revised pages replace the matching sheet. Old versions are kept.</p><button class="btn block" id="autoName" style="margin-bottom:14px">Auto-name sheets from title blocks</button>':'');
   if(!S.loaded.sheets)return h+'<div class="empty">Loading sheets…</div>';
-  if(!S.sheets.length)return h+'<div class="empty"><b>No sheets yet</b>'+(admin?'Upload the plan set PDF to get started.':'The office hasn\'t uploaded plans for this job yet.')+'</div>';
-  const sv=offSaved(S.job.id);const stale=sv&&sv.sig&&sv.sig!==offSig(S.sheets);
+  const cs=curSheets();
+  if(!cs.length)return h+'<div class="empty"><b>No sheets yet</b>'+(admin?'Upload the plan set PDF to get started.':'The office hasn\'t uploaded plans for this job yet.')+'</div>';
+  const sv=offSaved(S.job.id);const stale=sv&&sv.sig&&sv.sig!==offSig(cs);
   h+='<div class="offrow">'+(!sv?'<button class="btn sm" id="saveOff">⬇ Save for offline</button><span class="muted small">Save before going where there\'s no signal.</span>'
     :stale?'<button class="btn sm primary" id="saveOff">⬇ Update offline copy</button><button class="btn sm" id="rmOff">Remove</button><span class="muted small" style="flex-basis:100%;margin-top:-4px">Plans changed since you saved them.</span>'
     :'<span class="offok"><b>✓</b> Saved on this device<span style="font-weight:400">· '+esc(new Date(sv.at).toLocaleDateString(undefined,{month:'short',day:'numeric'}))+'</span></span><button class="btn sm" id="rmOff">Remove</button>')+'</div>';
-  return h+'<div class="grid">'+S.sheets.map(s=>'<div class="sheet" data-id="'+esc(s.id)+'"><img loading="lazy" alt="" data-path="'+esc(s.thumb_path||s.path)+'"><div class="sname">'+esc(s.name||'Sheet')+'</div>'+(admin?'<button class="ico" data-edit aria-label="Edit sheet">✎</button>':'')+'</div>').join('')+'</div>';
+  return h+'<div class="grid">'+cs.map(s=>'<div class="sheet" data-id="'+esc(s.id)+'"><img loading="lazy" alt="" data-path="'+esc(s.thumb_path||s.path)+'">'+(num(s.rev,1)>1?'<span class="revb'+(recentRev(s)?' new':'')+'">'+(recentRev(s)?'UPDATED · ':'')+'REV '+num(s.rev,1)+'</span>':'')+'<div class="sname">'+esc(s.name||'Sheet')+'</div>'+(admin?'<button class="ico" data-edit aria-label="Edit sheet">✎</button>':'')+'</div>').join('')+'</div>';
 }
 function bindPlans(){
   const an=$('#autoName');if(an)an.onclick=autoNameSheets;
   const so=$('#saveOff');if(so)so.onclick=saveJobOffline;
   const ro=$('#rmOff');if(ro)ro.onclick=removeJobOffline;
   const f=$('#planFile');if(f)f.onchange=()=>{const files=[...f.files];f.value='';if(files.length)addPlans(files)};
+  const rf=$('#revFile');if(rf)rf.onchange=()=>{const files=[...rf.files];rf.value='';if(files.length)addPlans(files,{rev:true})};
   $$('.sheet').forEach(el=>{el.onclick=e=>{if(e.target.closest('[data-edit]'))return;openSheet(el.dataset.id)};const b=$('[data-edit]',el);if(b)b.onclick=()=>editSheet(el.dataset.id)});
 }
 function offSig(list){return (list||[]).map(s=>s.id+':'+s.path).sort().join('|')}
@@ -861,7 +874,7 @@ async function saveJobOffline(){
   try{
     try{if(navigator.storage&&navigator.storage.persist)await navigator.storage.persist()}catch(e){}
     await Promise.all([loadSheets(),loadAreas(),loadLogs(),loadMembers()]);
-    const list=S.sheets.slice();const photos=[];let bad=0;
+    const list=curSheets();const photos=[];let bad=0;
     for(let i=0;i<list.length;i++){const s=list[i];pb.set('Saving sheet '+(i+1)+' of '+list.length+'…');
       try{const [,pn]=await Promise.all([q(marksQ(s.id)),q(pinsQ(s.id))]);(pn||[]).forEach(p=>(Array.isArray(p.photos)?p.photos:[]).forEach(x=>photos.push(x)))}catch(e){bad++}
       const us=await urlsFor([s.path,s.thumb_path].filter(Boolean),true);if(!us[0]||!us[0].startsWith('blob:'))bad++}
@@ -874,7 +887,7 @@ async function saveJobOffline(){
   }catch(e){pb.close();toast(errMsg(e))}
 }
 async function autoNameSheets(){
-  const list=S.sheets.slice();if(!list.length)return;
+  const list=curSheets();if(!list.length)return;
   const pb=progressBox('Loading the text reader…');const found=[];
   try{await loadOcr()}catch(e){pb.close();toast("Couldn't load the text reader. Check your signal.");return}
   for(let i=0;i<list.length;i++){
@@ -899,10 +912,17 @@ async function editSheet(id){
   const m=modal('<h2>Sheet '+esc(s.name)+'</h2><form><label class="field"><span>Sheet name</span><input name="n" value="'+esc(s.name)+'"></label><label class="field"><span>Order (lower shows first)</span><input name="o" type="number" value="'+esc(Math.round(num(s.sort)))+'"></label><div class="mbtns"><button type="button" class="btn danger" data-del>Delete sheet</button><button type="button" class="btn" data-x>Cancel</button><button class="btn primary">Save</button></div></form>');
   $('[data-x]',m).onclick=()=>m.close();
   $('form',m).onsubmit=async e=>{e.preventDefault();const n=$('[name=n]',m).value.trim().slice(0,80);const o=num($('[name=o]',m).value,num(s.sort));m.close();if(n&&await run(sb.from('sheets').update({name:n,sort:o}).eq('id',id)))loadSheets()};
-  $('[data-del]',m).onclick=async()=>{m.close();if(await confirmBox('Delete sheet '+s.name+' and its markups for everyone?')){if(await run(sb.from('sheets').delete().eq('id',id))){sb.storage.from(BUCKET).remove([s.path,s.thumb_path].filter(Boolean));loadSheets()}}};
+  $('[data-del]',m).onclick=async()=>{m.close();const vs=versionsOf(s);const prev=vs.filter(v=>v.id!==s.id)[0];
+    const msg=vs.length>1&&s.is_current!==false?'Delete Rev '+num(s.rev,1)+' of '+s.name+' and its markups for everyone? Rev '+num(prev.rev,1)+' becomes the current version again.':'Delete sheet '+s.name+(vs.length>1?' (all '+vs.length+' versions)':'')+' and its markups for everyone?';
+    if(!await confirmBox(msg))return;
+    const del=vs.length>1&&s.is_current!==false?[s]:vs;
+    for(const d of del){if(await run(sb.from('sheets').delete().eq('id',d.id)))sb.storage.from(BUCKET).remove([d.path,d.thumb_path].filter(Boolean))}
+    if(del.length===1&&prev)await run(sb.from('sheets').update({is_current:true}).eq('id',prev.id));
+    loadSheets()};
 }
-async function addPlans(files){
+async function addPlans(files,opt){
   const jid=S.job.id;let order=S.sheets.reduce((a,s)=>Math.max(a,num(s.sort)),0);
+  const revMode=!!(opt&&opt.rev);const allMade=[];
   const pb=progressBox('Starting…');let added=0;
   try{
     for(const file of files){
@@ -922,20 +942,52 @@ async function addPlans(files){
           let nm=await nameFromText(page,vp1);
           if(!nm.num){pb.set('Reading sheet name, page '+i+' of '+pdf.numPages+'…');try{const o=await nameFromImage(c);nm={num:o.num||nm.num,title:nm.title||o.title,cands:o.cands}}catch(e){}}
           const name=sheetLabel(nm.num,nm.title)||(pdf.numPages>1?base+' p'+i:base);
-          const sid=await storeSheet(jid,c,name,++order);added++;page.cleanup();c.width=c.height=0;
-          made.push({id:sid,num:nm.num,title:nm.title,cands:nm.cands,name});
+          const sid=await storeSheet(jid,c,name,++order,revMode);added++;page.cleanup();c.width=c.height=0;
+          const rec={id:sid,num:nm.num,title:nm.title,cands:nm.cands,name};made.push(rec);allMade.push(rec);
         }
         const before=made.map(x=>x.num);harmonizeNums(made);
-        for(let k=0;k<made.length;k++){if(made[k].num&&made[k].num!==before[k])await run(sb.from('sheets').update({name:sheetLabel(made[k].num,made[k].title)}).eq('id',made[k].id))}
+        for(let k=0;k<made.length;k++){if(made[k].num&&made[k].num!==before[k]){made[k].name=sheetLabel(made[k].num,made[k].title);await run(sb.from('sheets').update({name:made[k].name}).eq('id',made[k].id))}}
         try{pdf.destroy()}catch(e){}
       }else if(/^image\//.test(file.type)){
         pb.set('Processing '+file.name+'…');const img=await loadImageFile(file);const c=scaledCanvas(img,img.naturalWidth,img.naturalHeight,4000);URL.revokeObjectURL(img.src);
-        let name=base;try{pb.set('Reading sheet name ('+file.name+')…');const o=await nameFromImage(c);name=sheetLabel(o.num,o.title)||base}catch(e){}
-        await storeSheet(jid,c,name,++order);added++;c.width=c.height=0;
+        let name=base,inum=null;try{pb.set('Reading sheet name ('+file.name+')…');const o=await nameFromImage(c);inum=o.num;name=sheetLabel(o.num,o.title)||base}catch(e){}
+        const sid=await storeSheet(jid,c,name,++order,revMode);added++;c.width=c.height=0;allMade.push({id:sid,num:inum,name});
       }else toast(file.name+' is not a PDF or image.');
     }
   }catch(e){toast(errMsg(e))}
-  pb.close();if(added){toast('Added '+added+' sheet'+(added>1?'s':'')+'.');loadSheets()}
+  pb.close();
+  if(revMode){if(allMade.length)await reviseDialog(allMade);return}
+  if(added){toast('Added '+added+' sheet'+(added>1?'s':'')+'.');loadSheets()}
+}
+async function discardPending(list){for(const x of list){try{await q(sb.from('sheets').delete().eq('id',x.id))}catch(e){}try{await sb.storage.from(BUCKET).remove([S.job.id+'/sheets/'+x.id+'.jpg',S.job.id+'/sheets/'+x.id+'_t.jpg'])}catch(e){}}}
+function reviseDialog(made){
+  const cur=curSheets();const byNum={};cur.forEach(s=>{const k=sheetNum(s.name);if(k&&!byNum[k])byNum[k]=s});
+  made.forEach(x=>{const k=sheetNum(x.num||x.name);x.match=k&&byNum[k]?byNum[k].id:'__new'});
+  return new Promise(res=>{let done=false;
+    const m=modal('<h2>Match the revised sheets</h2><p class="muted" style="margin-top:0">Each page replaces the sheet picked for it. The old version is kept and its markups are copied onto the new one. Nothing changes until you tap Save.</p>'+
+      made.map((x,i)=>'<label class="field"><span>'+esc(x.name||'Page '+(i+1))+'</span><select data-i="'+i+'"><option value="__new">Add as a new sheet</option>'+cur.map(s=>'<option value="'+esc(s.id)+'"'+(s.id===x.match?' selected':'')+'>Replaces '+esc(s.name)+(num(s.rev,1)>1?' (Rev '+num(s.rev,1)+')':'')+'</option>').join('')+'<option value="__skip">Don\'t add this page</option></select></label>').join('')+
+      '<div class="mbtns"><button class="btn" data-x>Cancel</button><button class="btn primary" data-ok>Save revisions</button></div>',
+      ()=>{if(!done){done=true;discardPending(made).then(()=>{toast('Revision upload cancelled.');res(false)})}});
+    $('[data-x]',m).onclick=()=>m.close();
+    $('[data-ok]',m).onclick=async()=>{
+      const picks=$$('select[data-i]',m).map(sel=>sel.value);done=true;m.close();
+      const pb=progressBox('Saving revisions…');let rv=0,nw=0,carried=0;const now=new Date().toISOString();
+      let order=S.sheets.reduce((a,s)=>Math.max(a,num(s.sort)),0);const used=new Set();
+      try{
+        for(let i=0;i<made.length;i++){const x=made[i];let pick=picks[i];
+          if(pick==='__skip'){await discardPending([x]);continue}
+          const old=pick!=='__new'&&!used.has(pick)?S.sheets.find(s=>s.id===pick):null;
+          if(!old){await q(sb.from('sheets').update({is_current:true,sort:++order}).eq('id',x.id));nw++;continue}
+          used.add(old.id);pb.set('Updating '+old.name+'…');
+          await q(sb.from('sheets').update({group_id:gid(old),rev:Math.max(...versionsOf(old).map(v=>num(v.rev,1)))+1,sort:num(old.sort),is_current:true,revised_at:now}).eq('id',x.id));
+          await q(sb.from('sheets').update({is_current:false}).eq('id',old.id));
+          carried+=num(await q(sb.rpc('carry_markups',{old_sheet:old.id,new_sheet:x.id})));rv++;
+        }
+        pb.close();toast((rv?'Updated '+rv+' sheet'+(rv>1?'s':''):'')+(rv&&nw?', ':'')+(nw?'added '+nw+' new':'')+(rv||nw?'.':'No changes.')+(carried?' '+carried+' markup'+(carried>1?'s':'')+' carried over.':''));
+      }catch(e){pb.close();toast(errMsg(e))}
+      loadSheets();res(true);
+    };
+  });
 }
 /* pick which PDF pages to upload (thumbnails + a page-range box) */
 function parsePages(t,n){const out=new Set();String(t||'').split(/[,\s]+/).forEach(part=>{const m=/^(\d+)(?:-(\d+))?$/.exec(part.trim());if(!m)return;let a=+m[1],b=m[2]?+m[2]:a;if(a>b)[a,b]=[b,a];for(let i=Math.max(1,a);i<=Math.min(n,b);i++)out.add(i)});return [...out].sort((x,y)=>x-y)}
@@ -960,10 +1012,10 @@ function pickPages(pdf,fname){
       const t=await nameFromText(page,v1);const nm=$('[data-nm="'+i+'"]',m);if(nm&&(t.num||t.title))nm.textContent=sheetLabel(t.num,t.title)}catch(e){}}})();
   });
 }
-async function storeSheet(jid,canvas,name,order){
+async function storeSheet(jid,canvas,name,order,pending){
   const id=uuid();const big=await toBlob(canvas,.82);const th=scaledCanvas(canvas,canvas.width,canvas.height,480);const small=await toBlob(th,.75);th.width=th.height=0;
   const p1=await putFile(jid+'/sheets/'+id+'.jpg',big);const p2=await putFile(jid+'/sheets/'+id+'_t.jpg',small);
-  await q(sb.from('sheets').insert({id,job_id:jid,name:String(name).slice(0,80),path:p1,thumb_path:p2,w:canvas.width,h:canvas.height,sort:order}));
+  await q(sb.from('sheets').insert({id,job_id:jid,name:String(name).slice(0,80),path:p1,thumb_path:p2,w:canvas.width,h:canvas.height,sort:order,group_id:id,rev:1,is_current:!pending}));
   return id;
 }
 
@@ -1059,10 +1111,12 @@ function renderLogList(){
 let V=null;
 async function openSheet(id){
   const sh=S.sheets.find(s=>s.id===id);if(!sh)return;
-  const cw=canWrite();
+  const sup=sh.is_current===false;const vers=versionsOf(sh);const curV=vers.find(v=>v.is_current!==false);
+  const cw=canWrite()&&!sup;
   V={id,sh,W:0,H:0,t:{x:0,y:0,s:1},minS:.05,mode:'pan',phase:PHASES[0].k,pen:'thin',pts:new Map(),g:null,marks:[],pins:[],mine:[]};
   const el=$('#viewer');el.hidden=false;document.body.classList.add('noscroll');
-  el.innerHTML='<div class="vbar"><button id="vBack">‹ Sheets</button><div class="vt">'+esc(sh.name||'Sheet')+'</div><button id="vLayers">Layers</button></div>'+
+  el.innerHTML='<div class="vbar"><button id="vBack">‹ Sheets</button><div class="vt">'+esc(sh.name||'Sheet')+'</div>'+(vers.length>1?'<button id="vVer">Rev '+num(sh.rev,1)+' ▾</button>':'')+'<button id="vLayers">Layers</button></div>'+
+    (sup?'<div class="supbar" id="vSup">SUPERSEDED · Rev '+num(sh.rev,1)+(curV?' — tap to open current (Rev '+num(curV.rev,1)+')':'')+'</div>':'')+
     '<div id="stage"><div id="board"><img id="planImg" alt="" draggable="false"><svg id="ink" xmlns="http://www.w3.org/2000/svg"><g id="marksG"></g><g id="liveG"></g></svg></div><div id="pinLayer"></div><div class="hint" id="hint">Loading sheet…</div></div>'+
     '<div class="vtools">'+(cw?'<div class="trow" id="phaseRow">'+PHASES.map(p=>'<button class="pc" data-ph="'+p.k+'" style="background:'+p.c+'">'+p.n+'</button>').join('')+'<button class="tb" id="penBtn">Pen: Thin</button></div>':'')+
     '<div class="trow" id="modeRow"><button class="tb" data-mode="pan">✋ Move</button>'+(cw?'<button class="tb" data-mode="straight">📏 Straight</button><button class="tb" data-mode="line">🖍 Highlight</button><button class="tb" data-mode="box">▭ Area</button><button class="tb" data-mode="pin">📍 Pin</button><button class="tb" data-mode="erase">⌫ Erase</button><button class="tb" id="undoBtn">↶ Undo</button>':'')+
@@ -1070,6 +1124,8 @@ async function openSheet(id){
   V.stage=$('#stage');V.board=$('#board');V.img=$('#planImg');
   $('#vBack').onclick=()=>{if(location.hash==='#sheet')history.back();else closeSheet()};
   $('#vLayers').onclick=layersPanel;$('#fitBtn').onclick=fit;
+  if($('#vVer'))$('#vVer').onclick=()=>versionsPanel(sh);
+  if($('#vSup')&&curV)$('#vSup').onclick=()=>switchSheet(curV.id);
   $$('#modeRow [data-mode]').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
   $$('#phaseRow [data-ph]').forEach(b=>b.onclick=()=>{V.phase=b.dataset.ph;if(V.mode==='pan'||V.mode==='pin'||V.mode==='erase')setMode('line');else syncTools()});
   if($('#penBtn'))$('#penBtn').onclick=()=>{V.pen=V.pen==='thin'?'thick':'thin';syncTools()};
@@ -1088,9 +1144,24 @@ const pinsQ=id=>sb.from('pins').select('*').eq('sheet_id',id).order('created_at'
 async function loadSheetData(){
   if(!V)return;const id=V.id;
   try{const [mk,pn]=await Promise.all([q(marksQ(id)),q(pinsQ(id))]);
-    if(!V||V.id!==id)return;V.marks=mk;V.pins=pn;drawMarks();buildPins()}catch(e){toast(errMsg(e))}
+    if(!V||V.id!==id)return;V.marks=mk;V.pins=pn;drawMarks();buildPins();carryNote()}catch(e){toast(errMsg(e))}
 }
 function onResize(){if(V&&V.W)placePins()}
+function switchSheet(id){closeSheet();openSheet(id)}
+function versionsPanel(sh){
+  const vs=versionsOf(sh);
+  const m=modal('<h2>Versions of '+esc(sh.name)+'</h2>'+vs.map(v=>'<button class="btn verrow" data-v="'+esc(v.id)+'"'+(v.id===sh.id?' disabled':'')+'><b>Rev '+num(v.rev,1)+'</b><span class="grow">'+(v.is_current!==false?'Current':'Superseded')+'</span><span class="muted small">'+esc(new Date(v.revised_at||v.created_at).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}))+'</span></button>').join('')+'<div class="mbtns"><button class="btn" data-x>Close</button></div>');
+  $('[data-x]',m).onclick=()=>m.close();
+  $$('[data-v]',m).forEach(b=>b.onclick=()=>{m.close();switchSheet(b.dataset.v)});
+}
+function carryNote(){
+  const old=$('#revNote');if(old)old.remove();
+  if(!V||V.sh.is_current===false||lsGet('acv.carryok.'+V.id))return;
+  const n=V.marks.filter(m=>m.from_rev).length+V.pins.filter(p=>p.from_rev).length;if(!n)return;
+  const r=Math.min(...V.marks.concat(V.pins).filter(x=>x.from_rev).map(x=>num(x.from_rev,1)));
+  const d=document.createElement('div');d.id='revNote';d.className='revnote';d.textContent=n+' markup'+(n>1?'s':'')+' (dashed) carried over from Rev '+r+'. Check they still line up, erase any that don\'t. Tap to hide.';
+  d.onclick=()=>{lsSet('acv.carryok.'+V.id,'1');d.remove()};const st=$('#stage');if(st)st.appendChild(d);
+}
 function closeSheet(){
   V=null;window.removeEventListener('resize',onResize);
   if(location.hash==='#sheet')try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}
@@ -1165,9 +1236,10 @@ function drawMarks(){
   const g=$('#marksG');if(!g||!V.W)return;const M=Math.max(V.W,V.H);
   g.innerHTML=V.marks.filter(m=>!S.hidden.has(phase(m.phase).k)).map(m=>{
     const c=phase(m.phase).c;const sw=clamp(num(m.w,.006),.001,.03)*M;const {kind,p}=markGeom(m);
-    if(kind==='box'){if(p.length<4)return '';return '<rect x="'+p[0]*V.W+'" y="'+p[1]*V.H+'" width="'+Math.max(0,(p[2]-p[0])*V.W)+'" height="'+Math.max(0,(p[3]-p[1])*V.H)+'" fill="'+c+'" fill-opacity=".28" stroke="'+c+'" stroke-opacity=".85" stroke-width="'+(sw/2)+'"/>'}
+    const dash=m.from_rev?' stroke-dasharray="'+(sw*2.2).toFixed(1)+' '+(sw*1.6).toFixed(1)+'"':'';
+    if(kind==='box'){if(p.length<4)return '';return '<rect x="'+p[0]*V.W+'" y="'+p[1]*V.H+'" width="'+Math.max(0,(p[2]-p[0])*V.W)+'" height="'+Math.max(0,(p[3]-p[1])*V.H)+'" fill="'+c+'" fill-opacity="'+(m.from_rev?'.14':'.28')+'" stroke="'+c+'" stroke-opacity=".85" stroke-width="'+(sw/2)+'"'+dash+'/>'}
     if(p.length<4)return '';let s='';for(let i=0;i+1<p.length;i+=2)s+=(p[i]*V.W).toFixed(1)+','+(p[i+1]*V.H).toFixed(1)+' ';
-    return '<polyline points="'+s+'" fill="none" stroke="'+c+'" stroke-opacity=".6" stroke-width="'+sw+'" stroke-linecap="round" stroke-linejoin="round"/>';
+    return '<polyline points="'+s+'" fill="none" stroke="'+c+'" stroke-opacity="'+(m.from_rev?'.45':'.6')+'" stroke-width="'+sw+'" stroke-linecap="'+(m.from_rev?'butt':'round')+'" stroke-linejoin="round"'+dash+'/>';
   }).join('');
 }
 function segDist(px,py,ax,ay,bx,by){const dx=bx-ax,dy=by-ay;const l=dx*dx+dy*dy;let t=l?((px-ax)*dx+(py-ay)*dy)/l:0;t=clamp(t,0,1);return Math.hypot(px-(ax+t*dx),py-(ay+t*dy))}
@@ -1188,7 +1260,7 @@ async function tap(cx,cy){
 function visiblePins(){return V.pins.filter(p=>S.pinFilter==='all'||(S.pinFilter==='open'&&p.status!=='done'))}
 function buildPins(){
   const L=$('#pinLayer');if(!L||!V||!V.W)return;
-  L.innerHTML=visiblePins().map(p=>{const k=pinKind(p.kind);return '<button class="pin '+k.k+(p.status==='done'?' done':'')+'" data-id="'+esc(p.id)+'" aria-label="'+esc(k.n)+'">'+(p.status==='done'?'✓':k.i)+'</button>'}).join('');
+  L.innerHTML=visiblePins().map(p=>{const k=pinKind(p.kind);return '<button class="pin '+k.k+(p.status==='done'?' done':'')+'" data-id="'+esc(p.id)+'" aria-label="'+esc(k.n)+'"'+(p.from_rev?' style="outline:2px dashed #ea580c;outline-offset:2px" title="From Rev '+num(p.from_rev,1)+'"':'')+'>'+(p.status==='done'?'✓':k.i)+'</button>'}).join('');
   $$('.pin',L).forEach(b=>b.onclick=()=>{const p=V.pins.find(x=>x.id===b.dataset.id);if(p)pinDialog(p)});placePins();
 }
 function placePins(){if(!V||!V.W)return;$$('#pinLayer .pin').forEach(b=>{const p=V.pins.find(x=>x.id===b.dataset.id);if(!p)return;const x=clamp(num(p.x),0,1)*V.W*V.t.s+V.t.x,y=clamp(num(p.y),0,1)*V.H*V.t.s+V.t.y;b.style.transform='translate('+x+'px,'+y+'px)'})}
@@ -1203,7 +1275,7 @@ function layersPanel(){
   $('[data-x]',m).onclick=()=>m.close();
 }
 function pinDialog(pin,at){
-  const isNew=!pin;const jid=S.job.id,sheetId=V.id;const ro=!canWrite();
+  const isNew=!pin;const jid=S.job.id,sheetId=V.id;const ro=!canWrite()||V.sh.is_current===false;
   let kind=isNew?'issue':pinKind(pin.kind).k;let photos=isNew?[]:(Array.isArray(pin.photos)?pin.photos.filter(p=>typeof p==='string'):[]);
   const m=modal('<h2>'+(isNew?'New pin':esc(pinKind(pin.kind).n))+'</h2><div class="chips">'+PIN_KINDS.map(k=>'<button class="chip" data-k="'+k.k+'" '+(ro?'disabled':'')+'>'+k.n+'</button>').join('')+'</div>'+
     '<label class="field"><span>Note</span><textarea data-text '+(ro?'readonly':'')+' placeholder="What\'s going on here?">'+esc(isNew?'':pin.text||'')+'</textarea></label>'+
