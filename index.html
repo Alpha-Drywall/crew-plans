@@ -347,9 +347,9 @@ function confirmBox(msg,okLabel='Delete',danger=true){
     $('[data-x]',m).onclick=()=>m.close();$('[data-ok]',m).onclick=()=>{res(true);m.close()};
   });
 }
-function formBox(title,fields,okLabel='Save'){
+function formBox(title,fields,okLabel='Save',note){
   return new Promise(res=>{
-    const html='<h2>'+esc(title)+'</h2><form>'+fields.map(f=>'<label class="field"><span>'+esc(f.label)+'</span>'+
+    const html='<h2>'+esc(title)+'</h2>'+(note?'<p class="small muted" style="margin:-4px 0 10px">'+esc(note)+'</p>':'')+'<form>'+fields.map(f=>'<label class="field"><span>'+esc(f.label)+'</span>'+
       (f.type==='textarea'?'<textarea name="'+f.k+'" placeholder="'+esc(f.ph||'')+'">'+esc(f.value||'')+'</textarea>'
       :f.type==='select'?'<select name="'+f.k+'">'+f.options.map(o=>'<option value="'+esc(o[0])+'"'+(o[0]===f.value?' selected':'')+'>'+esc(o[1])+'</option>').join('')+'</select>'
       :'<input name="'+f.k+'" type="'+(f.type||'text')+'"'+(f.type==='number'?' step="any" inputmode="decimal"':'')+' value="'+esc(f.value||'')+'" placeholder="'+esc(f.ph||'')+'" '+(f.req?'required':'')+'>')+'</label>').join('')+
@@ -640,7 +640,7 @@ function renderLabor(){
   if(!S.loaded.labor)return '<div class="empty">Loading labor…</div>';
   const C=laborCalc();const noBudget=!C.t.bh;
   let h='<div class="card"><div class="row"><div class="grow"><b style="font-size:17px">Labor</b><div class="muted small">'+(C.jobNo?'Job # '+esc(C.jobNo)+' · ':'')+C.hpd+' hrs per day · from daily logs · office only</div></div></div>'+
-    '<div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><button class="btn sm" id="labBudget">Budget hours ✎</button><button class="btn sm primary" id="labDl">⬇ Download labor workbook</button></div></div>';
+    '<div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><button class="btn sm" id="labBudget">Budget hours ✎</button><button class="btn sm" id="labImp">⬆ Import from bid sheet</button><input type="file" id="labFile" accept=".xlsx,.xlsm" hidden><button class="btn sm primary" id="labDl">⬇ Download labor workbook</button></div></div>';
   if(noBudget)h+='<div class="card" style="background:#fff8e6"><b>No budget hours yet.</b><div class="muted small" style="margin-top:4px">Tap <b>Budget hours</b> and enter the HOURS column from the bid sheet\'s LABOR tab.</div></div>';
   h+='<div class="card lscroll"><table class="ltab"><thead><tr><th>Code</th><th>Budget hrs</th><th>Man days</th><th>Used</th><th>Left</th><th>% left</th></tr></thead><tbody>'+
     C.rows.map(r=>'<tr><td>'+esc(r.c.n)+'</td><td>'+f1(r.bh)+'</td><td>'+f1(r.md)+'</td><td class="used">'+f1(r.used)+'</td><td'+(r.left<0?' class="over"':'')+'>'+f1(r.left)+'</td><td'+(r.left<0?' class="over"':'')+'>'+(r.md?pctS(r.pct):'–')+'</td></tr>').join('')+
@@ -653,12 +653,44 @@ function renderLabor(){
   return h;
 }
 function bindLabor(){
-  const b=$('#labBudget');if(b)b.onclick=laborBudgetEditor;
+  const b=$('#labBudget');if(b)b.onclick=()=>laborBudgetEditor();
+  const im=$('#labImp'),lf=$('#labFile');if(im&&lf){im.onclick=()=>lf.click();lf.onchange=()=>{const f=lf.files[0];lf.value='';if(f)importLaborFile(f)}}
   const d=$('#labDl');if(d)d.onclick=downloadLabor;
 }
-async function laborBudgetEditor(){
-  const L=S.labor||{};const H=L.hours||{};
-  const v=await formBox('Budget hours for '+S.job.name,[{k:'job_no',label:'Job #',value:L.job_no||((S.job.name.match(/^\s*(\d{3,})/)||[])[1]||'')},{k:'hpd',label:'Hours per man-day',type:'number',value:String(num(L.hpd)||10)}].concat(LABOR_CODES.map(c=>({k:'c'+c.k,label:c.n+' – budget hours',type:'number',value:H[c.k]?String(num(H[c.k])):''}))),'Save');
+function xlVal(c){let v=c&&c.value;if(v&&typeof v==='object'&&!(v instanceof Date)){if('result' in v||'formula' in v||'sharedFormula' in v)v=v.result;else if(v.richText)v=v.richText.map(t=>t.text).join('');else if('text' in v)v=v.text;else if(v.error)v=null}if(v&&typeof v==='object'&&v.error)v=null;return v==null?'':v}
+function parseLaborSheet(wb){
+  const sheets=wb.worksheets.slice().sort((a,b)=>(/^\s*labor\s*$/i.test(b.name)?1:0)-(/^\s*labor\s*$/i.test(a.name)?1:0));
+  for(const ws of sheets){
+    let hoursCol=0,jobNo='',hpd=0;const hours={};let found=0,combined=false,missing=0;
+    ws.eachRow({includeEmpty:false},(row,rn)=>{if(rn>60)return;row.eachCell({includeEmpty:false},(c,cn)=>{const t=String(xlVal(c)).trim().toUpperCase();
+      if(!hoursCol&&t==='HOURS')hoursCol=cn;
+      if(!jobNo&&/^JOB\s*#/.test(t)){for(let k=cn+1;k<cn+4;k++){const x=String(xlVal(row.getCell(k))).trim();if(x){jobNo=x;break}}}
+      if(!hpd&&/HRS PER DAY|HOURS PER DAY/.test(t)){for(let k=cn+1;k<cn+4;k++){const x=num(xlVal(row.getCell(k)));if(x>0){hpd=x;break}}}})});
+    if(!hoursCol)continue;
+    ws.eachRow({includeEmpty:false},(row,rn)=>{if(rn>60)return;let lab='';for(let k=1;k<hoursCol;k++){const x=String(xlVal(row.getCell(k))).trim();if(x){lab=x.toUpperCase();break}}
+      const m=lab.match(/^(112|122|132|142|161|172)\b/);if(!m)return;
+      const cell=row.getCell(hoursCol);const raw=cell.value;const v=num(xlVal(cell));
+      if(raw&&typeof raw==='object'&&('formula' in raw||'sharedFormula' in raw)&&raw.result==null)missing++;
+      let k=m[1];if(k==='142'){if(/SUPERVIS/.test(lab)&&/CLEAN|LAYOUT/.test(lab)){k='142c';combined=true}else k=/SUPERVIS/.test(lab)?'142s':'142c'}
+      found++;if(v>0)hours[k]=(hours[k]||0)+Math.round(v*100)/100});
+    if(found)return {sheet:ws.name,hours,jobNo,hpd,combined,missing};
+  }
+  return null;
+}
+async function importLaborFile(f){
+  if(!/\.(xlsx|xlsm)$/i.test(f.name)){toast('Pick the bid sheet .xlsx file.');return}
+  const pb=progressBox('Reading '+f.name+'…');let r;
+  try{await loadExcel();const wb=new window.ExcelJS.Workbook();await wb.xlsx.load(await f.arrayBuffer());r=parseLaborSheet(wb)}
+  catch(e){pb.close();toast('Couldn\'t read that file: '+errMsg(e));return}
+  pb.close();
+  if(!r){toast('No LABOR tab with HOURS and cost codes found in that file.');return}
+  if(!Object.keys(r.hours).length){toast(r.missing?'The LABOR tab hours aren\'t calculated in that file. Open it in Excel, save, and try again.':'The LABOR tab has no hours yet.');return}
+  const notes=[];if(r.combined)notes.push('142 is one line on this bid sheet, so it all went into 142-Cleanup.');if(r.missing)notes.push(r.missing+' row(s) had no saved value – open the file in Excel, save, and import again.');
+  laborBudgetEditor({hours:r.hours,hpd:r.hpd||undefined,job_no:r.jobNo||undefined,note:'From '+f.name+' ('+r.sheet+' tab). Check and Save.'+(notes.length?' '+notes.join(' '):'')});
+}
+async function laborBudgetEditor(pre){
+  const L0=S.labor||{};const L=pre?{job_no:pre.job_no||L0.job_no,hpd:pre.hpd||L0.hpd,hours:pre.hours}:L0;const H=L.hours||{};
+  const v=await formBox('Budget hours for '+S.job.name,[{k:'job_no',label:'Job #',value:L.job_no||((S.job.name.match(/^\s*(\d{3,})/)||[])[1]||'')},{k:'hpd',label:'Hours per man-day',type:'number',value:String(num(L.hpd)||10)}].concat(LABOR_CODES.map(c=>({k:'c'+c.k,label:c.n+' – budget hours',type:'number',value:H[c.k]?String(num(H[c.k])):''}))),'Save',pre&&pre.note);
   if(!v)return;const hours={};LABOR_CODES.forEach(c=>{const x=num(v['c'+c.k]);if(x>0)hours[c.k]=x});
   const labor={hours,hpd:num(v.hpd)>0?num(v.hpd):10,job_no:String(v.job_no||'').slice(0,20)};
   if(await run(sb.from('job_budget').upsert({job_id:S.job.id,labor},{onConflict:'job_id'}),'Budget hours saved.')){S.labor=labor;render()}
