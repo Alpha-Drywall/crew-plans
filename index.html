@@ -57,6 +57,13 @@ main{padding:14px 14px calc(30px + env(safe-area-inset-bottom));max-width:860px;
 .prow label{font-size:14px;font-weight:600}
 .prow .val{text-align:right;font-variant-numeric:tabular-nums;font-weight:700}
 input[type=range]{width:100%;height:32px}
+.sl{position:relative;height:36px;touch-action:pan-y}
+.sl .tr{position:absolute;left:14px;right:14px;top:15px;height:6px;border-radius:3px;background:#dde1e6}
+.sl .fi{position:absolute;left:0;top:0;bottom:0;border-radius:3px}
+.sl .kn{position:absolute;top:-12px;width:30px;height:30px;margin-left:-15px;border-radius:50%;background:#fff;border:4px solid;box-shadow:0 1px 4px #0005;touch-action:none;cursor:grab}
+.sl .kn::before{content:'';position:absolute;inset:-10px;border-radius:50%}
+.sl.drag .kn{transform:scale(1.15);cursor:grabbing}
+.sl.off .kn{display:none}
 .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:0}
 .field{display:block;margin-bottom:12px}
 .field>span{display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:4px}
@@ -165,6 +172,8 @@ const S={me:null,isAdmin:false,jobs:[],jobsLoaded:false,job:null,role:null,tab:'
   hidden:new Set(),pinFilter:'all',sliding:false,pendingRender:false,chan:null,jobsChan:null};
 const canWrite=()=>S.role==='admin'||S.role==='editor';
 const isAdminRole=()=>S.role==='admin';
+function myName(){return (S.me&&S.people[S.me.id])||''}
+function logName(l){return l.name||(S.people[l.user_id])||(S.me&&l.user_id===S.me.id?'You':'Crew member')}
 function who(id){if(!id)return 'Someone';if(S.me&&id===S.me.id)return 'You';return S.people[id]||'Crew member'}
 
 /* ===== modal helpers ===== */
@@ -771,11 +780,11 @@ function renderProgress(){
   let h='<div class="card"><div class="row"><div class="grow"><b style="font-size:17px">Job progress</b><div class="muted small">'+(S.areas.length>1?'Average across '+S.areas.length+' areas':'All scope items')+(weighted()?' · weighted by Schedule of Values':'')+(bt?'<br><b>'+money(PHASES.reduce((a,p)=>a+num(B[p.k])*avg(p.k)/100,0))+'</b> of '+money(bt)+' earned':'')+'</div></div><div style="font-size:26px;font-weight:800">'+overall+'%</div></div>'+
     PHASES.map(p=>{const v=avg(p.k);return '<div class="prow"><label><span class="dot" style="background:'+p.c+'"></span>'+p.n+(bt&&num(B[p.k])?'<div class="muted small" style="font-weight:400">'+money(num(B[p.k])*v/100)+' / '+money(B[p.k])+'</div>':'')+'</label><div class="bar"><i style="width:'+v+'%;background:'+p.c+'"></i></div><div class="val">'+v+'%</div></div>'}).join('')+'</div>';
   if(isAdminRole())h+='<div class="row" style="margin-bottom:10px;align-items:stretch"><button class="btn grow" id="editScope">Scope items ✎</button><button class="btn grow" id="editSov">SOV values ($) ✎</button></div>';
-  if(cw)h+='<p class="muted small" style="margin:4px 2px 10px">Drag a slider as work gets done, or tap the % to type it.</p>';
+  if(cw)h+='<p class="muted small" style="margin:4px 2px 10px">Drag the ball as work gets done, or tap the % to type it.</p>';
   const list=S.areas.length?S.areas:(cw?[{id:'__new',name:'Whole job',pct:{}}]:[]);
   if(!list.length)h+='<div class="empty"><b>No progress entered yet</b>The foreman or office will update this as work gets done.</div>';
   h+=list.map(a=>'<div class="card" data-area="'+esc(a.id)+'"><div class="row"><b class="grow" style="font-size:16px">'+esc(a.name||'Area')+'</b>'+(cw&&a.id!=='__new'?'<button class="ico" data-amenu aria-label="Area menu">⋯</button>':'')+'</div>'+
-    PHASES.map(p=>{const v=areaPct(a,p.k);return '<div class="prow"><label><span class="dot" style="background:'+p.c+'"></span>'+p.n+'</label><input type="range" min="0" max="100" step="5" value="'+v+'" data-ph="'+p.k+'" '+(cw?'':'disabled')+' style="accent-color:'+p.c+'"><div class="val"'+(cw?' data-type="'+p.k+'" style="cursor:pointer;text-decoration:underline dotted"':'')+'>'+v+'%</div></div>'}).join('')+
+    PHASES.map(p=>{const v=areaPct(a,p.k);return '<div class="prow"><label><span class="dot" style="background:'+p.c+'"></span>'+p.n+'</label><div class="sl'+(cw?'':' off')+'" data-ph="'+p.k+'" data-v="'+v+'"><div class="tr"><i class="fi" style="width:'+v+'%;background:'+p.c+'"></i><span class="kn" style="left:'+v+'%;border-color:'+p.c+'" aria-label="Drag to change '+esc(p.n)+'"></span></div></div><div class="val"'+(cw?' data-type="'+p.k+'" style="cursor:pointer;text-decoration:underline dotted"':'')+'>'+v+'%</div></div>'}).join('')+
     (a.updated_at?'<div class="progress-note">Updated '+esc(fmtWhen(a.updated_at))+' by '+esc(who(a.updated_by))+'</div>':'')+'</div>').join('');
   if(cw)h+='<button class="btn block" id="addArea" style="margin:4px 0 12px">+ '+(S.areas.length?'Add another area':'Track by area instead (floor, wing, unit…)')+'</button>';
   return h;
@@ -789,19 +798,19 @@ function bindProgress(){
   const setPct=async(id,k,v)=>{const rid=await areaId(id);if(rid)await run(sb.rpc('set_area_pct',{a:rid,k,v}));S.pendingRender=false;loadAreas()};
   $$('[data-area]').forEach(card=>{
     const id=card.dataset.area;const mb=$('[data-amenu]',card);if(mb)mb.onclick=()=>areaMenu(id);
-    $$('[data-type]',card).forEach(el=>el.onclick=async()=>{const p=phase(el.dataset.type);const cur=parseInt(el.textContent)||0;const v=await formBox(p.n+' – percent complete',[{k:'v',label:'Percent (0–100)',type:'number',value:String(cur),req:true}]);if(!v)return;const n=clamp(Math.round(num(v.v,cur)),0,100);el.textContent=n+'%';const r=el.parentElement.querySelector('input[type=range]');if(r)r.value=n;setPct(id,p.k,n)});
-    $$('input[type=range]',card).forEach(r=>{
-      const lab=r.parentElement.querySelector('.val');
-      r.addEventListener('pointerdown',()=>{S.sliding=true});
-      r.addEventListener('input',()=>{lab.textContent=r.value+'%'});
-      r.addEventListener('change',async()=>{
-        S.sliding=false;
-        await setPct(id,r.dataset.ph,Number(r.value));
-      });
-      r.addEventListener('blur',()=>{if(S.sliding){S.sliding=false;if(S.pendingRender){S.pendingRender=false;render()}}});
+    $$('[data-type]',card).forEach(el=>el.onclick=async()=>{const p=phase(el.dataset.type);const cur=parseInt(el.textContent)||0;const v=await formBox(p.n+' – percent complete',[{k:'v',label:'Percent (0–100)',type:'number',value:String(cur),req:true}]);if(!v)return;const n=clamp(Math.round(num(v.v,cur)),0,100);el.textContent=n+'%';const r=el.parentElement.querySelector('.sl');if(r)setSl(r,n);setPct(id,p.k,n)});
+    $$('.sl:not(.off)',card).forEach(sl=>{
+      const kn=$('.kn',sl),tr=$('.tr',sl),lab=sl.parentElement.querySelector('.val');let start=null;
+      const at=x=>{const b=tr.getBoundingClientRect();return clamp(Math.round((x-b.left)/b.width*20)*5,0,100)};
+      kn.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();start=Number(sl.dataset.v);S.sliding=true;sl.classList.add('drag');try{kn.setPointerCapture(e.pointerId)}catch(_){}});
+      kn.addEventListener('pointermove',e=>{if(start===null)return;const v=at(e.clientX);if(v!==Number(sl.dataset.v)){setSl(sl,v);lab.textContent=v+'%'}});
+      const end=async()=>{if(start===null)return;const v=Number(sl.dataset.v),was=start;start=null;sl.classList.remove('drag');S.sliding=false;
+        if(v!==was)await setPct(id,sl.dataset.ph,v);else if(S.pendingRender){S.pendingRender=false;render()}};
+      kn.addEventListener('pointerup',end);kn.addEventListener('pointercancel',end);kn.addEventListener('lostpointercapture',end);
     });
   });
 }
+function setSl(sl,v){sl.dataset.v=v;const f=$('.fi',sl),k=$('.kn',sl);if(f)f.style.width=v+'%';if(k)k.style.left=v+'%'}
 async function areaMenu(id){
   const a=S.areas.find(x=>x.id===id);if(!a)return;
   const m=modal('<h2>'+esc(a.name)+'</h2><div style="display:grid;gap:10px"><button class="btn" data-a="r">Rename</button><button class="btn danger" data-a="d">Delete area</button><button class="btn" data-a="x">Close</button></div>');
@@ -815,7 +824,7 @@ function renderLogForm(){
   const box=$('#logForm');if(!box)return;
   if(!canWrite()){box.innerHTML='';return}
   box.innerHTML='<div class="card"><b style="font-size:17px">Your daily log</b><form style="margin-top:10px">'+
-    '<label class="field"><span>Date</span><input type="date" name="date" value="'+today()+'"></label>'+
+    '<div class="two"><label class="field"><span>Filled out by</span><input name="who" required maxlength="60" autocomplete="name" placeholder="Your name"></label><label class="field"><span>Date</span><input type="date" name="date" value="'+today()+'"></label></div>'+
     '<div class="two"><label class="field"><span>Crew on site</span><input type="number" inputmode="numeric" min="0" name="crew" placeholder="0"></label><label class="field"><span>Total man-hours</span><input type="number" inputmode="decimal" min="0" step="0.5" name="hours" placeholder="0"></label></div>'+
     '<label class="field"><span>Work done today</span><textarea name="work" placeholder="e.g. Framed corridor 2nd floor, hung lids in 201–204"></textarea></label>'+
     '<label class="field"><span>Material delivered</span><input name="deliveries" placeholder="e.g. 120 sheets 5/8 Type X"></label>'+
@@ -823,12 +832,12 @@ function renderLogForm(){
     '<button class="btn primary block" type="submit">Save log</button><div class="muted small" data-st style="text-align:center;margin-top:6px"></div></form></div>';
   const form=$('form',box);let touched=false;
   const mine=d=>S.logs.find(l=>l.date===d&&l.user_id===S.me.id);
-  const fill=()=>{const e=mine(form.date.value);['crew','hours','work','deliveries','notes'].forEach(k=>{form[k].value=!e?'':(k==='crew'||k==='hours')?num(e[k]):(e[k]||'')});$('[data-st]',form).textContent=e?'Editing your saved log for this day.':'';touched=false};
+  const fill=()=>{const e=mine(form.date.value);form.who.value=(e&&e.name)||lsGet('crewplans.logName')||myName();['crew','hours','work','deliveries','notes'].forEach(k=>{form[k].value=!e?'':(k==='crew'||k==='hours')?num(e[k]):(e[k]||'')});$('[data-st]',form).textContent=e?'Editing your saved log for this day.':'';touched=false};
   form.date.onchange=fill;form.addEventListener('input',e=>{if(e.target!==form.date)touched=true});fill();
   box._fillIfEmpty=()=>{if(!touched)fill()};
   box._edit=d=>{form.date.value=d;fill();$('[data-st]',form).textContent='Editing your saved log for this day. Change it and tap Save log.';box.scrollIntoView({behavior:'smooth',block:'start'})};
-  form.onsubmit=async e=>{e.preventDefault();const d=form.date.value||today();
-    const o={job_id:S.job.id,user_id:S.me.id,date:d,crew:num(form.crew.value),hours:num(form.hours.value),work:form.work.value.trim().slice(0,2000),deliveries:form.deliveries.value.trim().slice(0,500),notes:form.notes.value.trim().slice(0,2000),updated_at:new Date().toISOString()};
+  form.onsubmit=async e=>{e.preventDefault();const d=form.date.value||today();const nm=form.who.value.trim().slice(0,60);if(!nm){toast('Enter who filled out the log.');form.who.focus();return}lsSet('crewplans.logName',nm);
+    const o={job_id:S.job.id,user_id:S.me.id,name:nm,date:d,crew:num(form.crew.value),hours:num(form.hours.value),work:form.work.value.trim().slice(0,2000),deliveries:form.deliveries.value.trim().slice(0,500),notes:form.notes.value.trim().slice(0,2000),updated_at:new Date().toISOString()};
     if(await run(sb.from('logs').upsert(o,{onConflict:'job_id,user_id,date'}),'Log saved.')){touched=false;$('[data-st]',form).textContent='Editing your saved log for this day.';loadLogs()}};
 }
 function renderLogList(){
@@ -838,13 +847,13 @@ function renderLogList(){
   const byDay={};S.logs.forEach(l=>{(byDay[l.date]=byDay[l.date]||[]).push(l)});
   box.innerHTML=Object.keys(byDay).sort().reverse().map(d=>{const ls=byDay[d];const crew=ls.reduce((a,l)=>a+num(l.crew),0);const hrs=ls.reduce((a,l)=>a+num(l.hours),0);
     return '<div class="logday"><span>'+fmtDay(d)+'</span><span class="muted">'+crew+' crew · '+hrs+' hrs</span></div>'+ls.map(l=>
-      '<div class="card"><div class="row"><b class="grow">'+esc(who(l.user_id))+'</b><span class="muted small">'+num(l.crew)+' crew · '+num(l.hours)+' hrs</span></div>'+
+      '<div class="card"><div class="row"><b class="grow">'+esc(logName(l))+'</b><span class="muted small">'+num(l.crew)+' crew · '+num(l.hours)+' hrs</span></div>'+
       (l.work?'<div class="kv"><b>Work:</b> '+esc(l.work)+'</div>':'')+(l.deliveries?'<div class="kv"><b>Delivered:</b> '+esc(l.deliveries)+'</div>':'')+(l.notes?'<div class="kv"><b>Notes:</b> '+esc(l.notes)+'</div>':'')+
-      (l.updated_at?'<div class="progress-note">Saved '+esc(fmtWhen(l.updated_at))+'</div>':'')+
+      (l.updated_at?'<div class="progress-note">Saved '+esc(fmtWhen(l.updated_at))+' by '+esc(logName(l))+'</div>':'')+
       ((l.user_id===S.me.id&&canWrite())||isAdminRole()?'<div class="row" style="margin-top:8px;justify-content:flex-end">'+(l.user_id===S.me.id&&canWrite()?'<button class="btn sm" data-ledit="'+esc(l.id)+'">✎ Edit</button>':'')+'<button class="btn sm" data-ldel="'+esc(l.id)+'" style="color:var(--danger)">Delete</button></div>':'')+'</div>').join('')}).join('');
   $$('[data-ledit]',box).forEach(b=>b.onclick=()=>{const l=S.logs.find(x=>x.id===b.dataset.ledit);const f=$('#logForm');if(l&&f&&f._edit)f._edit(l.date)});
   $$('[data-ldel]',box).forEach(b=>b.onclick=async()=>{const l=S.logs.find(x=>x.id===b.dataset.ldel);if(!l)return;
-    if(!await confirmBox('Delete '+(l.user_id===S.me.id?'your':who(l.user_id)+'\'s')+' log for '+fmtDay(l.date)+'?'))return;
+    if(!await confirmBox('Delete '+(l.user_id===S.me.id?'your':logName(l)+'\'s')+' log for '+fmtDay(l.date)+'?'))return;
     if(await run(sb.from('logs').delete().eq('id',l.id),'Log deleted.')){S.logs=S.logs.filter(x=>x.id!==l.id);renderLogList();const f=$('#logForm');if(f&&f._fillIfEmpty)f._fillIfEmpty()}});
 }
 
