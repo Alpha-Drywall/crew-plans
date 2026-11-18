@@ -619,8 +619,10 @@ async function addPlans(files){
         pb.set('Opening '+file.name+'…');
         const made=[];
         const pdf=await lib.getDocument({data:new Uint8Array(await file.arrayBuffer()),isEvalSupported:false}).promise;
-        for(let i=1;i<=pdf.numPages;i++){
-          pb.set('Processing page '+i+' of '+pdf.numPages+' ('+file.name+')…');
+        let pages=[];for(let i=1;i<=pdf.numPages;i++)pages.push(i);
+        if(pdf.numPages>1){pb.style.display='none';pages=await pickPages(pdf,file.name);pb.style.display='';if(!pages){try{pdf.destroy()}catch(e){}continue}}
+        for(let pi=0;pi<pages.length;pi++){const i=pages[pi];
+          pb.set('Processing page '+i+' ('+(pi+1)+' of '+pages.length+', '+file.name+')…');
           const page=await pdf.getPage(i);const vp1=page.getViewport({scale:1});const scale=Math.min(5,3600/Math.max(vp1.width,vp1.height));const vp=page.getViewport({scale});
           const c=document.createElement('canvas');c.width=Math.floor(vp.width);c.height=Math.floor(vp.height);const cx=c.getContext('2d');cx.fillStyle='#fff';cx.fillRect(0,0,c.width,c.height);
           await page.render({canvasContext:cx,viewport:vp}).promise;
@@ -641,6 +643,29 @@ async function addPlans(files){
     }
   }catch(e){toast(errMsg(e))}
   pb.close();if(added){toast('Added '+added+' sheet'+(added>1?'s':'')+'.');loadSheets()}
+}
+/* pick which PDF pages to upload (thumbnails + a page-range box) */
+function parsePages(t,n){const out=new Set();String(t||'').split(/[,\s]+/).forEach(part=>{const m=/^(\d+)(?:-(\d+))?$/.exec(part.trim());if(!m)return;let a=+m[1],b=m[2]?+m[2]:a;if(a>b)[a,b]=[b,a];for(let i=Math.max(1,a);i<=Math.min(n,b);i++)out.add(i)});return [...out].sort((x,y)=>x-y)}
+function fmtPages(arr){const r=[];for(let i=0;i<arr.length;i++){let j=i;while(j+1<arr.length&&arr[j+1]===arr[j]+1)j++;r.push(j>i?arr[i]+'-'+arr[j]:''+arr[i]);i=j}return r.join(', ')}
+function pickPages(pdf,fname){
+  return new Promise(res=>{
+    const n=pdf.numPages;let done=false;
+    const m=modal('<h2>Pick the sheets to upload</h2><p class="muted" style="margin-top:0">'+esc(fname)+' has '+n+' pages. Untick civil, MEP, landscape and anything else the crews don\'t need.</p>'+
+      '<label class="field"><span>Pages to upload</span><input id="pgInput" value="1-'+n+'" placeholder="e.g. 1-4, 7, 9-12"></label>'+
+      '<div class="row" style="margin-bottom:10px"><button class="btn sm" data-all>All</button><button class="btn sm" data-none>None</button><span class="muted small grow" data-cnt></span></div>'+
+      '<div class="grid" id="pgGrid" style="grid-template-columns:repeat(auto-fill,minmax(120px,1fr))">'+Array.from({length:n},(_,k)=>'<label class="sheet" style="cursor:pointer"><canvas data-pg="'+(k+1)+'" style="display:block;width:100%;aspect-ratio:3/2;background:#fafafa;border-bottom:1px solid var(--line)"></canvas><div class="sname" style="padding-right:8px"><input type="checkbox" data-ck="'+(k+1)+'" checked style="width:18px;height:18px;vertical-align:-3px"> p'+(k+1)+' <span class="muted small" data-nm="'+(k+1)+'"></span></div></label>').join('')+'</div>'+
+      '<div class="mbtns"><button class="btn" data-x>Cancel</button><button class="btn primary" data-ok>Upload selected</button></div>',()=>{if(!done){done=true;res(null)}});
+    const inp=$('#pgInput',m),cks=$$('[data-ck]',m);
+    const fromChecks=()=>{const sel=cks.filter(c=>c.checked).map(c=>+c.dataset.ck);inp.value=fmtPages(sel);$('[data-cnt]',m).textContent=sel.length+' of '+n+' selected'};
+    const fromInput=()=>{const sel=new Set(parsePages(inp.value,n));cks.forEach(c=>c.checked=sel.has(+c.dataset.ck));$('[data-cnt]',m).textContent=sel.size+' of '+n+' selected'};
+    cks.forEach(c=>c.onchange=fromChecks);inp.oninput=fromInput;fromInput();
+    $('[data-all]',m).onclick=()=>{cks.forEach(c=>c.checked=true);fromChecks()};
+    $('[data-none]',m).onclick=()=>{cks.forEach(c=>c.checked=false);fromChecks()};
+    $('[data-x]',m).onclick=()=>m.close();
+    $('[data-ok]',m).onclick=()=>{const sel=parsePages(inp.value,n);if(!sel.length){toast('Pick at least one page.');return}done=true;m.close();res(sel)};
+    (async()=>{for(let i=1;i<=n&&!done;i++){try{const page=await pdf.getPage(i);const v1=page.getViewport({scale:1});const vp=page.getViewport({scale:240/Math.max(v1.width,v1.height)});const cv=$('[data-pg="'+i+'"]',m);if(!cv||done)break;cv.width=Math.floor(vp.width);cv.height=Math.floor(vp.height);const g=cv.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,cv.width,cv.height);await page.render({canvasContext:g,viewport:vp}).promise;
+      const t=await nameFromText(page,v1);const nm=$('[data-nm="'+i+'"]',m);if(nm&&(t.num||t.title))nm.textContent=sheetLabel(t.num,t.title)}catch(e){}}})();
+  });
 }
 async function storeSheet(jid,canvas,name,order){
   const id=uuid();const big=await toBlob(canvas,.82);const th=scaledCanvas(canvas,canvas.width,canvas.height,480);const small=await toBlob(th,.75);th.width=th.height=0;
