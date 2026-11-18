@@ -49,7 +49,7 @@ main{padding:14px 14px calc(30px + env(safe-area-inset-bottom));max-width:860px;
 .sheet .ico{position:absolute;right:2px;bottom:2px;font-size:15px}
 .bar{height:10px;background:#e6e9ed;border-radius:6px;overflow:hidden}
 .bar>i{display:block;height:100%;border-radius:6px}
-.prow{display:grid;grid-template-columns:72px 1fr 46px;align-items:center;gap:10px;margin:8px 0}
+.prow{display:grid;grid-template-columns:96px 1fr 46px;align-items:center;gap:10px;margin:8px 0}
 .prow label{font-size:14px;font-weight:600}
 .prow .val{text-align:right;font-variant-numeric:tabular-nums;font-weight:700}
 input[type=range]{width:100%;height:32px}
@@ -104,7 +104,7 @@ input[type=range]{width:100%;height:32px}
 .trow+.trow{margin-top:6px}
 .tb{flex:0 0 auto;border:2px solid var(--line);background:#fff;border-radius:10px;padding:7px 11px;font-weight:600;font-size:14px;min-height:42px;white-space:nowrap}
 .tb.on{background:var(--head);border-color:var(--head);color:#fff}
-.pc{flex:0 0 auto;border:3px solid transparent;border-radius:999px;padding:6px 12px;font-weight:700;font-size:14px;color:#fff;min-height:40px;white-space:nowrap}
+.pc{flex:0 0 auto;border:3px solid transparent;border-radius:999px;padding:6px 12px;font-weight:700;font-size:14px;color:#fff;text-shadow:0 1px 1px #0005;min-height:40px;white-space:nowrap}
 .pc.on{border-color:var(--ink);box-shadow:0 0 0 2px #fff inset}
 .hint{position:absolute;left:50%;top:10px;transform:translateX(-50%);background:#1d232bdd;color:#fff;font-size:13px;padding:6px 12px;border-radius:999px;pointer-events:none;white-space:nowrap;max-width:94%;overflow:hidden;text-overflow:ellipsis}
 .lrow{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
@@ -126,7 +126,11 @@ const SB_URL='https://fgdjqhkrpbxjsuobyhwl.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnZGpxaGtycGJ4anN1b2J5aHdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ5NzA5NjYsImV4cCI6MjExMDU0Njk2Nn0.-K_MLnctOyAvjZ9F5Zkw_MW9CfMZt3m_cocrLk4G9ik';
 
 /* ===== constants & helpers ===== */
-const PHASES=[{k:'framing',n:'Framing',c:'#2563eb'},{k:'board',n:'Board',c:'#ea580c'},{k:'tape',n:'Tape',c:'#9333ea'},{k:'finish',n:'Finish',c:'#16a34a'}];
+const SCOPE_CATALOG=[{k:'framing',n:'Framing',c:'#2563eb'},{k:'blocking',n:'Blocking',c:'#92400e'},{k:'insulation',n:'Insulation',c:'#db2777'},{k:'sheathing',n:'Sheathing',c:'#65a30d'},{k:'board',n:'Board',c:'#ea580c'},{k:'tape',n:'Tape',c:'#9333ea'},{k:'finish',n:'Finish',c:'#16a34a'},{k:'act',n:'ACT',c:'#0891b2'},{k:'frames',n:'Doors & Frames',c:'#475569'}];
+const CUSTOM_COLORS=['#ca8a04','#be123c','#4f46e5','#0d9488','#7c3aed','#a16207','#0369a1','#15803d'];
+const DEFAULT_SCOPE=['framing','board','tape','finish'].map(k=>SCOPE_CATALOG.find(x=>x.k===k));
+function normScope(sc){if(!Array.isArray(sc)||!sc.length)return DEFAULT_SCOPE;const out=[];const seen=new Set();sc.forEach((x,i)=>{if(!x||typeof x.k!=='string'||!/^[a-z0-9_-]{1,30}$/.test(x.k)||seen.has(x.k))return;seen.add(x.k);const cat=SCOPE_CATALOG.find(c=>c.k===x.k);const col=/^#[0-9a-fA-F]{6}$/.test(x.c||'')?x.c:(cat?cat.c:CUSTOM_COLORS[i%CUSTOM_COLORS.length]);out.push({k:x.k,n:String(x.n||(cat&&cat.n)||x.k).slice(0,24),c:col})});return out.length?out:DEFAULT_SCOPE}
+let PHASES=DEFAULT_SCOPE;
 const PIN_KINDS=[{k:'issue',n:'Issue',i:'!'},{k:'question',n:'Question',i:'?'},{k:'extra',n:'Extra work',i:'$'},{k:'note',n:'Note',i:'i'}];
 const PDFJS='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
 const BUCKET='files';
@@ -135,7 +139,8 @@ const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num=(v,d=0)=>{const n=Number(v);return Number.isFinite(n)?n:d};
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
-const phase=k=>PHASES.find(p=>p.k===k)||PHASES[0];
+const phase=k=>PHASES.find(p=>p.k===k)||{k:String(k||'other'),n:String(k||'Other'),c:'#64748b'};
+const areaPct=(a,k)=>clamp(num(a&&a.pct&&a.pct[k]!=null?a.pct[k]:a&&a[k]),0,100);
 const pinKind=k=>PIN_KINDS.find(p=>p.k===k)||PIN_KINDS[3];
 const uuid=()=>(crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;return (c==='x'?r:(r&3|8)).toString(16)}));
 function today(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
@@ -328,7 +333,7 @@ async function afterLogin(openId){
 async function loadJobs(){
   try{S.jobs=await q(sb.from('jobs').select('*').order('created_at',{ascending:false}));S.jobsLoaded=true}
   catch(e){toast(errMsg(e));S.jobsLoaded=true}
-  if(S.job){const j=S.jobs.find(x=>x.id===S.job.id);if(!j){toast("You no longer have access to this job.");closeJob();return}S.job=j;
+  if(S.job){const j=S.jobs.find(x=>x.id===S.job.id);if(!j){toast("You no longer have access to this job.");closeJob();return}S.job=j;PHASES=normScope(j.scope);
     if(!S.isAdmin){try{const m=await q(sb.from('members').select('role').eq('job_id',j.id).eq('user_id',S.me.id).maybeSingle());const nr=m?m.role:null;if(nr!==S.role){S.role=nr;if(V)closeSheet();render();return}}catch(e){}}}
   if(S.view!=='job'||S.job)render();
 }
@@ -338,7 +343,7 @@ function debounce(k,fn,ms=350){clearTimeout(timers[k]);timers[k]=setTimeout(fn,m
 /* ===== job loading ===== */
 async function openJob(id){
   const j=S.jobs.find(x=>x.id===id);if(!j)return;
-  S.job=j;S.view='job';S.tab=S.tab||'plans';S.sheets=[];S.areas=[];S.logs=[];S.members=[];S.invites=[];S.loaded={};
+  S.job=j;PHASES=normScope(j.scope);S.view='job';S.tab=S.tab||'plans';S.sheets=[];S.areas=[];S.logs=[];S.members=[];S.invites=[];S.loaded={};
   if(S.isAdmin)S.role='admin';
   else{try{const m=await q(sb.from('members').select('role').eq('job_id',id).eq('user_id',S.me.id).maybeSingle());S.role=m?m.role:null}catch(e){S.role=null}}
   if(!S.role){toast("You don't have access to that job.");S.job=null;S.view='jobs';render();return}
@@ -413,15 +418,40 @@ function bindJobs(){
 }
 async function jobMenu(){
   const j=S.job;
-  const m=modal('<h2>'+esc(j.name)+'</h2><div style="display:grid;gap:10px"><button class="btn primary" data-a="people">People & invite links</button><button class="btn" data-a="edit">Rename / edit address</button><button class="btn danger" data-a="del">Delete job</button><button class="btn" data-a="x">Close</button></div>');
+  const m=modal('<h2>'+esc(j.name)+'</h2><div style="display:grid;gap:10px"><button class="btn primary" data-a="people">People & invite links</button><button class="btn" data-a="scope">Scope items</button><button class="btn" data-a="edit">Rename / edit address</button><button class="btn danger" data-a="del">Delete job</button><button class="btn" data-a="x">Close</button></div>');
   $('[data-a=x]',m).onclick=()=>m.close();
   $('[data-a=people]',m).onclick=()=>{m.close();peoplePanel()};
+  $('[data-a=scope]',m).onclick=()=>{m.close();scopeEditor()};
   $('[data-a=edit]',m).onclick=async()=>{m.close();const v=await formBox('Edit job',[{k:'name',label:'Job name',value:j.name,req:true},{k:'addr',label:'Address or GC',value:j.addr}]);if(v&&await run(sb.from('jobs').update({name:v.name.slice(0,120),addr:v.addr.slice(0,160)}).eq('id',j.id)))loadJobs()};
   $('[data-a=del]',m).onclick=async()=>{
     m.close();if(!await confirmBox('Delete "'+(j.name||'this job')+'" with all its sheets, markups, progress and logs, for everyone?'))return;
     try{const files=[];for(const f of ['sheets','photos']){const {data}=await sb.storage.from(BUCKET).list(j.id+'/'+f,{limit:1000});(data||[]).forEach(o=>files.push(j.id+'/'+f+'/'+o.name))}if(files.length)await sb.storage.from(BUCKET).remove(files)}catch(e){}
     if(await run(sb.from('jobs').delete().eq('id',j.id))){toast('Job deleted.');S.jobs=S.jobs.filter(x=>x.id!==j.id);closeJob()}
   };
+}
+
+/* scope items */
+function scopeEditor(){
+  const cur=normScope(S.job.scope);let custom=cur.filter(x=>!SCOPE_CATALOG.some(c=>c.k===x.k));
+  const draw=()=>'<h2>Scope items for '+esc(S.job.name)+'</h2><p class="muted" style="margin-top:0">These are the colors crews mark up with and the progress bars on this job.</p>'+
+    SCOPE_CATALOG.map(c=>'<label class="lrow"><input type="checkbox" data-k="'+c.k+'" '+(cur.some(x=>x.k===c.k)?'checked':'')+'><span class="dot" style="background:'+c.c+'"></span><span class="grow">'+esc(c.n)+'</span></label>').join('')+
+    custom.map(c=>'<label class="lrow"><input type="checkbox" data-k="'+esc(c.k)+'" checked><span class="dot" style="background:'+c.c+'"></span><span class="grow">'+esc(c.n)+'</span></label>').join('')+
+    '<div class="row" style="margin-top:10px"><input class="grow" data-new placeholder="Add another item (e.g. FRP, Shaft wall)" style="border:1px solid var(--line);border-radius:10px;padding:10px;min-height:44px"><button class="btn" data-add>Add</button></div>'+
+    '<div class="mbtns"><button class="btn" data-x>Cancel</button><button class="btn primary" data-ok>Save</button></div>';
+  const m=modal(draw());
+  const bind=()=>{
+    $('[data-x]',m).onclick=()=>m.close();
+    $('[data-add]',m).onclick=()=>{const n=$('[data-new]',m).value.trim().slice(0,24);if(!n)return;const k=n.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,30)||'item';if(SCOPE_CATALOG.some(c=>c.k===k)||custom.some(c=>c.k===k)){toast('That item is already on the list.');return}
+      const checked=new Set($$('[data-k]',m).filter(x=>x.checked).map(x=>x.dataset.k));custom.push({k,n,c:CUSTOM_COLORS[custom.length%CUSTOM_COLORS.length]});
+      $('.mcard',m).innerHTML=draw();$$('[data-k]',m).forEach(x=>x.checked=checked.has(x.dataset.k)||x.dataset.k===k);bind()};
+    $('[data-ok]',m).onclick=async()=>{
+      const on=new Set($$('[data-k]',m).filter(x=>x.checked).map(x=>x.dataset.k));
+      const sc=SCOPE_CATALOG.filter(c=>on.has(c.k)).concat(custom.filter(c=>on.has(c.k)));
+      if(!sc.length){toast('Pick at least one item.');return}
+      if(await run(sb.from('jobs').update({scope:sc}).eq('id',S.job.id),'Scope saved.')){S.job.scope=sc;PHASES=normScope(sc);m.close();render();loadJobs()}
+    };
+  };
+  bind();
 }
 
 /* people & invites */
@@ -555,20 +585,22 @@ async function storeSheet(jid,canvas,name,order){
 }
 
 /* progress tab */
-function avg(k){if(!S.areas.length)return 0;return Math.round(S.areas.reduce((a,p)=>a+clamp(num(p[k]),0,100),0)/S.areas.length)}
+function avg(k){if(!S.areas.length)return 0;return Math.round(S.areas.reduce((a,p)=>a+areaPct(p,k),0)/S.areas.length)}
 function renderProgress(){
   if(!S.loaded.areas)return '<div class="empty">Loading progress…</div>';
   const cw=canWrite();const overall=Math.round(PHASES.reduce((a,p)=>a+avg(p.k),0)/PHASES.length);
   let h='<div class="card"><div class="row"><div class="grow"><b style="font-size:17px">Job progress</b><div class="muted small">Average across '+S.areas.length+' area'+(S.areas.length===1?'':'s')+'</div></div><div style="font-size:26px;font-weight:800">'+overall+'%</div></div>'+
     PHASES.map(p=>{const v=avg(p.k);return '<div class="prow"><label><span class="dot" style="background:'+p.c+'"></span>'+p.n+'</label><div class="bar"><i style="width:'+v+'%;background:'+p.c+'"></i></div><div class="val">'+v+'%</div></div>'}).join('')+'</div>';
+  if(isAdminRole())h+='<button class="btn block" id="editScope" style="margin-bottom:10px">Scope items: '+esc(PHASES.map(p=>p.n).join(', '))+' ✎</button>';
   if(cw)h+='<button class="btn block" id="addArea" style="margin-bottom:12px">+ Add area (floor, wing, unit…)</button>';
   if(!S.areas.length)h+='<div class="empty"><b>No areas yet</b>Break the job into areas like "Level 1 East" or "Units 101–110", then slide each phase as work gets done.</div>';
   h+=S.areas.map(a=>'<div class="card" data-area="'+esc(a.id)+'"><div class="row"><b class="grow" style="font-size:16px">'+esc(a.name||'Area')+'</b>'+(cw?'<button class="ico" data-amenu aria-label="Area menu">⋯</button>':'')+'</div>'+
-    PHASES.map(p=>{const v=clamp(num(a[p.k]),0,100);return '<div class="prow"><label><span class="dot" style="background:'+p.c+'"></span>'+p.n+'</label><input type="range" min="0" max="100" step="5" value="'+v+'" data-ph="'+p.k+'" '+(cw?'':'disabled')+' style="accent-color:'+p.c+'"><div class="val">'+v+'%</div></div>'}).join('')+
+    PHASES.map(p=>{const v=areaPct(a,p.k);return '<div class="prow"><label><span class="dot" style="background:'+p.c+'"></span>'+p.n+'</label><input type="range" min="0" max="100" step="5" value="'+v+'" data-ph="'+p.k+'" '+(cw?'':'disabled')+' style="accent-color:'+p.c+'"><div class="val">'+v+'%</div></div>'}).join('')+
     (a.updated_at?'<div class="progress-note">Updated '+esc(fmtWhen(a.updated_at))+' by '+esc(who(a.updated_by))+'</div>':'')+'</div>').join('');
   return h;
 }
 function bindProgress(){
+  const es=$('#editScope');if(es)es.onclick=scopeEditor;
   const add=$('#addArea');if(add)add.onclick=async()=>{const v=await formBox('New area',[{k:'name',label:'Area name',req:true,ph:'e.g. Level 2 – West'}],'Add');if(v&&await run(sb.from('areas').insert({job_id:S.job.id,name:v.name.slice(0,80)})))loadAreas()};
   $$('[data-area]').forEach(card=>{
     const id=card.dataset.area;const mb=$('[data-amenu]',card);if(mb)mb.onclick=()=>areaMenu(id);
@@ -578,7 +610,7 @@ function bindProgress(){
       r.addEventListener('input',()=>{lab.textContent=r.value+'%'});
       r.addEventListener('change',async()=>{
         S.sliding=false;
-        await run(sb.from('areas').update({[r.dataset.ph]:Number(r.value),updated_by:S.me.id,updated_at:new Date().toISOString()}).eq('id',id));
+        await run(sb.rpc('set_area_pct',{a:id,k:r.dataset.ph,v:Number(r.value)}));
         S.pendingRender=false;loadAreas();
       });
       r.addEventListener('blur',()=>{if(S.sliding){S.sliding=false;if(S.pendingRender){S.pendingRender=false;render()}}});
@@ -629,7 +661,7 @@ let V=null;
 async function openSheet(id){
   const sh=S.sheets.find(s=>s.id===id);if(!sh)return;
   const cw=canWrite();
-  V={id,sh,W:0,H:0,t:{x:0,y:0,s:1},minS:.05,mode:'pan',phase:'framing',pen:'thin',pts:new Map(),g:null,marks:[],pins:[],mine:[]};
+  V={id,sh,W:0,H:0,t:{x:0,y:0,s:1},minS:.05,mode:'pan',phase:PHASES[0].k,pen:'thin',pts:new Map(),g:null,marks:[],pins:[],mine:[]};
   const el=$('#viewer');el.hidden=false;document.body.classList.add('noscroll');
   el.innerHTML='<div class="vbar"><button id="vBack">‹ Sheets</button><div class="vt">'+esc(sh.name||'Sheet')+'</div><button id="vLayers">Layers</button></div>'+
     '<div id="stage"><div id="board"><img id="planImg" alt="" draggable="false"><svg id="ink" xmlns="http://www.w3.org/2000/svg"><g id="marksG"></g><g id="liveG"></g></svg></div><div id="pinLayer"></div><div class="hint" id="hint">Loading sheet…</div></div>'+
