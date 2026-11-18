@@ -126,6 +126,8 @@ input[type=range]{width:100%;height:32px}
 .netpill.wait{background:#b45309}
 body.noscroll .netpill{bottom:auto;top:calc(56px + env(safe-area-inset-top))}
 .offrow{display:flex;align-items:center;gap:10px;margin:0 0 10px;flex-wrap:wrap}
+.offok{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:6px 12px;border-radius:10px;background:#e7ebef;color:#5d6670;font-size:14px;font-weight:600}
+.offok b{color:var(--ok)}
 .progress-note{font-size:13px;color:var(--muted);margin-top:4px}
 .welcome{max-width:420px;margin:30px auto}
 </style>
@@ -823,15 +825,35 @@ function renderPlans(){
   if(admin)h+='<label class="btn primary block" style="margin-bottom:6px">+ Add plans (PDF or photos)<input type="file" id="planFile" accept="application/pdf,image/*" multiple hidden></label><p class="muted small" style="margin:0 0 10px;text-align:center">Each PDF page becomes a sheet and gets named from its title block.</p>'+(S.sheets.length?'<button class="btn block" id="autoName" style="margin-bottom:14px">Auto-name sheets from title blocks</button>':'');
   if(!S.loaded.sheets)return h+'<div class="empty">Loading sheets…</div>';
   if(!S.sheets.length)return h+'<div class="empty"><b>No sheets yet</b>'+(admin?'Upload the plan set PDF to get started.':'The office hasn\'t uploaded plans for this job yet.')+'</div>';
-  const sv=lsGet('acv.saved.'+S.job.id);
-  h+='<div class="offrow"><button class="btn sm" id="saveOff">⬇ Save for offline</button><span class="muted small">'+(sv?'Saved on this device '+esc(fmtWhen(sv)):'Save before going where there\'s no signal.')+'</span></div>';
+  const sv=offSaved(S.job.id);const stale=sv&&sv.sig&&sv.sig!==offSig(S.sheets);
+  h+='<div class="offrow">'+(!sv?'<button class="btn sm" id="saveOff">⬇ Save for offline</button><span class="muted small">Save before going where there\'s no signal.</span>'
+    :stale?'<button class="btn sm primary" id="saveOff">⬇ Update offline copy</button><button class="btn sm" id="rmOff">Remove</button><span class="muted small" style="flex-basis:100%;margin-top:-4px">Plans changed since you saved them.</span>'
+    :'<span class="offok"><b>✓</b> Saved on this device<span style="font-weight:400">· '+esc(new Date(sv.at).toLocaleDateString(undefined,{month:'short',day:'numeric'}))+'</span></span><button class="btn sm" id="rmOff">Remove</button>')+'</div>';
   return h+'<div class="grid">'+S.sheets.map(s=>'<div class="sheet" data-id="'+esc(s.id)+'"><img loading="lazy" alt="" data-path="'+esc(s.thumb_path||s.path)+'"><div class="sname">'+esc(s.name||'Sheet')+'</div>'+(admin?'<button class="ico" data-edit aria-label="Edit sheet">✎</button>':'')+'</div>').join('')+'</div>';
 }
 function bindPlans(){
   const an=$('#autoName');if(an)an.onclick=autoNameSheets;
   const so=$('#saveOff');if(so)so.onclick=saveJobOffline;
+  const ro=$('#rmOff');if(ro)ro.onclick=removeJobOffline;
   const f=$('#planFile');if(f)f.onchange=()=>{const files=[...f.files];f.value='';if(files.length)addPlans(files)};
   $$('.sheet').forEach(el=>{el.onclick=e=>{if(e.target.closest('[data-edit]'))return;openSheet(el.dataset.id)};const b=$('[data-edit]',el);if(b)b.onclick=()=>editSheet(el.dataset.id)});
+}
+function offSig(list){return (list||[]).map(s=>s.id+':'+s.path).sort().join('|')}
+function offSaved(id){const v=lsGet('acv.saved.'+id);if(!v)return null;try{const o=JSON.parse(v);if(o&&o.at)return o}catch(e){}return {at:v,sig:null}}
+async function idbDelWhere(store,pred){try{await idbDo(store,'readwrite',st=>{const r=st.openCursor();r.onsuccess=()=>{const c=r.result;if(!c)return;if(pred(c.key))c.delete();c.continue()}})}catch(e){}}
+async function removeJobOffline(){
+  const job=S.job;if(!job)return;
+  const waiting=myOps().filter(o=>(o.body&&typeof o.body==='string'&&o.body.includes(job.id))||(o.path&&o.path.startsWith(job.id+'/'))||o.kind==='rpc').length;
+  if(waiting){toast(waiting+' change'+(waiting>1?'s':'')+' on this job still need to upload. Get signal, let them sync, then remove.');return}
+  if(!await confirmBox('Remove the saved plans for '+job.name+' from this device? You can save them again any time you have signal.','Remove'))return;
+  let before=0;try{before=(await navigator.storage.estimate()).usage}catch(e){}
+  const ids=new Set([job.id].concat(S.sheets.map(x=>x.id)));
+  await idbDelWhere('img',k=>String(k).startsWith(job.id+'/'));
+  await idbDelWhere('resp',k=>{const m=String(k).match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi)||[];return m.some(x=>ids.has(x))&&!/\/rest\/v1\/jobs\?/.test(k)});
+  Object.keys(S.urls).forEach(p=>{if(p.startsWith(job.id+'/')){if(S.urls[p].startsWith('blob:'))try{URL.revokeObjectURL(S.urls[p])}catch(e){}delete S.urls[p]}});
+  lsSet('acv.saved.'+job.id,null);
+  let freed='';try{const after=(await navigator.storage.estimate()).usage;if(before>after)freed=' Freed about '+Math.max(1,Math.round((before-after)/1048576))+' MB.'}catch(e){}
+  toast('Removed from this device.'+freed);render();
 }
 async function saveJobOffline(){
   if(navigator.onLine===false){toast('Connect to Wi-Fi or signal first, then save the job.');return}
@@ -846,7 +868,7 @@ async function saveJobOffline(){
     if(photos.length){pb.set('Saving '+photos.length+' pin photo'+(photos.length>1?'s':'')+'…');await urlsFor(photos,true)}
     pb.close();
     if(bad){toast("Some sheets didn't save. Check your signal and tap Save for offline again.");return}
-    lsSet('acv.saved.'+job.id,new Date().toISOString());
+    lsSet('acv.saved.'+job.id,JSON.stringify({at:new Date().toISOString(),sig:offSig(list)}));
     let mb='';try{const e=await navigator.storage.estimate();mb=' About '+Math.round(e.usage/1048576)+' MB used on this device.'}catch(e){}
     toast('Saved for offline: '+list.length+' sheet'+(list.length===1?'':'s')+'.'+mb);if(S.tab==='plans')render();
   }catch(e){pb.close();toast(errMsg(e))}
