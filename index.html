@@ -763,6 +763,7 @@ function renderLogForm(){
   const fill=()=>{const e=mine(form.date.value);['crew','hours','work','deliveries','notes'].forEach(k=>{form[k].value=!e?'':(k==='crew'||k==='hours')?num(e[k]):(e[k]||'')});$('[data-st]',form).textContent=e?'Editing your saved log for this day.':'';touched=false};
   form.date.onchange=fill;form.addEventListener('input',e=>{if(e.target!==form.date)touched=true});fill();
   box._fillIfEmpty=()=>{if(!touched)fill()};
+  box._edit=d=>{form.date.value=d;fill();$('[data-st]',form).textContent='Editing your saved log for this day. Change it and tap Save log.';box.scrollIntoView({behavior:'smooth',block:'start'})};
   form.onsubmit=async e=>{e.preventDefault();const d=form.date.value||today();
     const o={job_id:S.job.id,user_id:S.me.id,date:d,crew:num(form.crew.value),hours:num(form.hours.value),work:form.work.value.trim().slice(0,2000),deliveries:form.deliveries.value.trim().slice(0,500),notes:form.notes.value.trim().slice(0,2000),updated_at:new Date().toISOString()};
     if(await run(sb.from('logs').upsert(o,{onConflict:'job_id,user_id,date'}),'Log saved.')){touched=false;$('[data-st]',form).textContent='Editing your saved log for this day.';loadLogs()}};
@@ -770,12 +771,18 @@ function renderLogForm(){
 function renderLogList(){
   const box=$('#logList');if(!box)return;
   if(!S.loaded.logs){box.innerHTML='<div class="empty">Loading logs…</div>';return}
-  if(!S.logs.length){box.innerHTML='<div class="empty"><b>No logs yet</b>Each foreman saves one log per day. They show up here for everyone on the job.</div>';return}
+  if(!S.logs.length){box.innerHTML='<div class="empty"><b>No logs yet</b>Each foreman saves one log per day. Saved logs show up here, newest first, for everyone on the job.</div>';return}
   const byDay={};S.logs.forEach(l=>{(byDay[l.date]=byDay[l.date]||[]).push(l)});
   box.innerHTML=Object.keys(byDay).sort().reverse().map(d=>{const ls=byDay[d];const crew=ls.reduce((a,l)=>a+num(l.crew),0);const hrs=ls.reduce((a,l)=>a+num(l.hours),0);
     return '<div class="logday"><span>'+fmtDay(d)+'</span><span class="muted">'+crew+' crew · '+hrs+' hrs</span></div>'+ls.map(l=>
       '<div class="card"><div class="row"><b class="grow">'+esc(who(l.user_id))+'</b><span class="muted small">'+num(l.crew)+' crew · '+num(l.hours)+' hrs</span></div>'+
-      (l.work?'<div class="kv"><b>Work:</b> '+esc(l.work)+'</div>':'')+(l.deliveries?'<div class="kv"><b>Delivered:</b> '+esc(l.deliveries)+'</div>':'')+(l.notes?'<div class="kv"><b>Notes:</b> '+esc(l.notes)+'</div>':'')+'</div>').join('')}).join('');
+      (l.work?'<div class="kv"><b>Work:</b> '+esc(l.work)+'</div>':'')+(l.deliveries?'<div class="kv"><b>Delivered:</b> '+esc(l.deliveries)+'</div>':'')+(l.notes?'<div class="kv"><b>Notes:</b> '+esc(l.notes)+'</div>':'')+
+      (l.updated_at?'<div class="progress-note">Saved '+esc(fmtWhen(l.updated_at))+'</div>':'')+
+      ((l.user_id===S.me.id&&canWrite())||isAdminRole()?'<div class="row" style="margin-top:8px;justify-content:flex-end">'+(l.user_id===S.me.id&&canWrite()?'<button class="btn sm" data-ledit="'+esc(l.id)+'">✎ Edit</button>':'')+'<button class="btn sm" data-ldel="'+esc(l.id)+'" style="color:var(--danger)">Delete</button></div>':'')+'</div>').join('')}).join('');
+  $$('[data-ledit]',box).forEach(b=>b.onclick=()=>{const l=S.logs.find(x=>x.id===b.dataset.ledit);const f=$('#logForm');if(l&&f&&f._edit)f._edit(l.date)});
+  $$('[data-ldel]',box).forEach(b=>b.onclick=async()=>{const l=S.logs.find(x=>x.id===b.dataset.ldel);if(!l)return;
+    if(!await confirmBox('Delete '+(l.user_id===S.me.id?'your':who(l.user_id)+'\'s')+' log for '+fmtDay(l.date)+'?'))return;
+    if(await run(sb.from('logs').delete().eq('id',l.id),'Log deleted.')){S.logs=S.logs.filter(x=>x.id!==l.id);renderLogList();const f=$('#logForm');if(f&&f._fillIfEmpty)f._fillIfEmpty()}});
 }
 
 /* ===== sheet viewer ===== */
