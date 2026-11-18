@@ -296,6 +296,7 @@ async function nameFromImage(src){
   if(SB_URL.startsWith('__')){fatal('This app has not been connected to its database yet.');return}
   if(!window.supabase){fatal("Couldn't load. Check your signal and reload the page.");return}
   sb=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,storageKey:'crewplans-auth'}});
+  sb.auth.onAuthStateChange(ev=>{if(ev==='PASSWORD_RECOVERY')setTimeout(()=>setPasswordBox('Set a new password'),300)});
   const params=new URLSearchParams(location.search);const inv=params.get('invite');
   let session=null;try{session=(await sb.auth.getSession()).data.session}catch(e){}
   if(inv){
@@ -312,17 +313,43 @@ async function nameFromImage(src){
 function fatal(msg){$('#app').innerHTML='<div class="top"><h1><span class="brand"></span>Crew Plans</h1></div><main><div class="empty"><b>Can\'t open Crew Plans</b>'+esc(msg)+'</div></main>'}
 function renderWelcome(){
   $('#app').innerHTML='<div class="top"><h1><span class="brand"></span>Crew Plans</h1></div><main><div class="welcome">'+
-    '<div class="card"><b style="font-size:18px">Office sign in</b><form style="margin-top:12px"><label class="field"><span>Email</span><input name="email" type="email" autocomplete="username" required></label><label class="field"><span>Password</span><input name="pw" type="password" autocomplete="current-password" required></label><button class="btn primary block">Sign in</button></form></div>'+
+    '<div class="card"><b style="font-size:18px">Office sign in</b><form id="signin" style="margin-top:12px"><label class="field"><span>Email</span><input name="email" type="email" autocomplete="username" required></label><label class="field"><span>Password</span><input name="pw" type="password" autocomplete="current-password" required></label><button class="btn primary block">Sign in</button></form>'+
+    '<div class="row" style="margin-top:12px;justify-content:space-between;flex-wrap:wrap"><button class="btn sm" id="firstTime">First time? Set up your office login</button><button class="btn sm" id="forgot">Forgot password?</button></div></div>'+
     '<div class="card"><b style="font-size:18px">Crew members</b><p class="muted" style="margin:6px 0 0">Open the invite link the office sent you. You don\'t need an account or password.</p></div></div></main>';
-  $('form').onsubmit=async e=>{e.preventDefault();const f=e.target;const b=$('button',f);b.disabled=true;
+  $('#signin').onsubmit=async e=>{e.preventDefault();const f=e.target;const b=$('button',f);b.disabled=true;
     const r=await sb.auth.signInWithPassword({email:f.email.value.trim(),password:f.pw.value});
-    if(r.error){b.disabled=false;toast(/Invalid login/i.test(r.error.message)?'Wrong email or password.':errMsg(r.error));return}
+    if(r.error){b.disabled=false;toast(/Invalid login/i.test(r.error.message)?'Wrong email or password.':/not confirmed/i.test(r.error.message)?'Check your email and tap the confirm link first.':errMsg(r.error));return}
     afterLogin(null)};
+  $('#firstTime').onclick=async()=>{
+    const v=await formBox('Set up your office login',[{k:'email',label:'Your work email (the one a PM added to the office list)',type:'email',req:true},{k:'pw',label:'Choose a password (8+ characters)',type:'password',req:true},{k:'pw2',label:'Type it again',type:'password',req:true}],'Create login');
+    if(!v)return;if(v.pw.length<8){toast('Use at least 8 characters.');return}if(v.pw!==v.pw2){toast('The passwords don\'t match.');return}
+    const r=await sb.auth.signUp({email:v.email,password:v.pw,options:{emailRedirectTo:location.origin+location.pathname+'?office'}});
+    if(r.error){toast(/rate limit/i.test(r.error.message)?'Too many emails sent this hour. Try again in an hour.':errMsg(r.error));return}
+    modal('<h2>Check your email</h2><p>We sent a confirm link to <b>'+esc(v.email)+'</b>. Tap it, and you\'ll come back here signed in.</p><p class="muted small">No email after a few minutes? Check junk, or try again in an hour.</p><div class="mbtns"><button class="btn primary" onclick="this.closest(\'.mwrap\').close()">OK</button></div>');
+  };
+  $('#forgot').onclick=async()=>{
+    const v=await formBox('Reset your password',[{k:'email',label:'Your work email',type:'email',req:true}],'Send reset link');if(!v)return;
+    const r=await sb.auth.resetPasswordForEmail(v.email,{redirectTo:location.origin+location.pathname+'?office'});
+    if(r.error){toast(/rate limit/i.test(r.error.message)?'Too many emails sent this hour. Try again in an hour.':errMsg(r.error));return}
+    toast('If that email has an office login, a reset link is on its way.');
+  };
+}
+async function setPasswordBox(title){
+  const v=await formBox(title||'Change password',[{k:'pw',label:'New password (8+ characters)',type:'password',req:true},{k:'pw2',label:'Type it again',type:'password',req:true}],'Save password');
+  if(!v)return;if(v.pw.length<8){toast('Use at least 8 characters.');return}if(v.pw!==v.pw2){toast('The passwords don\'t match.');return}
+  const r=await sb.auth.updateUser({password:v.pw});if(r.error){toast(errMsg(r.error));return}toast('Password saved.');
+  if(!S.me)afterLogin(null);
 }
 async function afterLogin(openId){
   try{S.me=(await sb.auth.getUser()).data.user}catch(e){}
   if(!S.me){renderWelcome();return}
-  try{const adm=await q(sb.from('admins').select('user_id,name'));adm.forEach(a=>S.people[a.user_id]=a.name||'Office');S.isAdmin=adm.some(a=>a.user_id===S.me.id)}catch(e){}
+  S.isAdmin=false;
+  if(!S.me.is_anonymous){try{S.isAdmin=!!(await q(sb.rpc('claim_office')))}catch(e){}}
+  await loadOffice();
+  if(!S.me.is_anonymous&&!S.isAdmin){
+    $('#app').innerHTML='<div class="top"><h1><span class="brand"></span>Crew Plans</h1></div><main><div class="empty"><b>Not on the office list yet</b>'+esc(S.me.email||'This login')+' isn\'t on the office list. Ask a PM to add you under ☰ → Office users, then sign in again.<div style="margin-top:14px"><button class="btn" id="so">Sign out</button></div></div></main>';
+    $('#so').onclick=async()=>{await sb.auth.signOut();location.href=location.pathname+'?office'};return;
+  }
   await loadJobs();
   S.jobsChan=sb.channel('jobs-list').on('postgres_changes',{event:'*',schema:'public',table:'jobs'},()=>debounce('jobs',loadJobs))
     .on('postgres_changes',{event:'*',schema:'public',table:'members'},()=>debounce('jobs',loadJobs)).subscribe();
@@ -331,6 +358,8 @@ async function afterLogin(openId){
   if(target&&S.jobs.some(j=>j.id===target)){openJob(target);return}
   render();
 }
+async function loadOffice(){try{S.office=await q(sb.rpc('office_names'))||[];S.office.forEach(o=>{if(o.user_id)S.people[o.user_id]=o.name||'Office'});const me=S.me&&S.office.find(o=>o.user_id===S.me.id);S.myOfficeId=me?me.id:null}catch(e){S.office=S.office||[]}}
+const pmName=id=>{const o=(S.office||[]).find(x=>x.id===id);return o?o.name:''};
 async function loadJobs(){
   try{S.jobs=await q(sb.from('jobs').select('*').order('created_at',{ascending:false}));S.jobsLoaded=true}
   catch(e){toast(errMsg(e));S.jobsLoaded=true}
@@ -388,7 +417,7 @@ function render(){
     if($('#jmenu'))$('#jmenu').onclick=jobMenu;
     if(S.tab==='log'){$('#tabBody').innerHTML='<div id="logForm"></div><div id="logList"></div>';renderLogForm()}
   }
-  $('#jt').innerHTML=esc(j.name||'Job')+'<div class="sub">'+(j.addr?esc(j.addr)+' · ':'')+(S.role==='viewer'?'View only':S.role==='editor'?'Editor':'Office')+'</div>';
+  $('#jt').innerHTML=esc(j.name||'Job')+'<div class="sub">'+(j.addr?esc(j.addr)+' · ':'')+(pmName(j.pm)?'PM '+esc(pmName(j.pm))+' · ':'')+(S.role==='viewer'?'View only':S.role==='editor'?'Editor':'Office')+'</div>';
   $$('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===S.tab));
   if(S.tab==='plans'){$('#tabBody').innerHTML=renderPlans();bindPlans();fillImgs($('#tabBody'))}
   else if(S.tab==='progress'){$('#tabBody').innerHTML=renderProgress();bindProgress()}
@@ -401,32 +430,44 @@ function renderJobs(){
   if(S.isAdmin)h+='<button class="btn primary block" id="newJob" style="margin-bottom:14px">+ New job</button>';
   if(!S.jobsLoaded)h+='<div class="empty">Loading jobs…</div>';
   else if(!S.jobs.length)h+='<div class="empty"><b>No jobs yet</b>'+(S.isAdmin?'Add a job, upload its plan PDF, then invite your foreman from the job\'s ⋯ menu.':'Open the invite link the office texted you to get access to a job.')+'</div>';
-  else h+=S.jobs.map(j=>'<div class="card job" data-id="'+esc(j.id)+'"><div class="grow"><div class="name">'+esc(j.name||'Untitled job')+'</div>'+(j.addr?'<div class="muted">'+esc(j.addr)+'</div>':'')+'</div><span class="chev">›</span></div>').join('');
+  else{
+    const card=j=>'<div class="card job" data-id="'+esc(j.id)+'"><div class="grow"><div class="name">'+esc(j.name||'Untitled job')+'</div>'+(j.addr?'<div class="muted">'+esc(j.addr)+'</div>':'')+'</div><span class="chev">›</span></div>';
+    if(S.isAdmin){
+      const mode=lsGet('crewplans.jobView')||'mine';
+      h+='<div class="chips"><button class="chip'+(mode==='mine'?' on':'')+'" data-view="mine">My jobs</button><button class="chip'+(mode==='all'?' on':'')+'" data-view="all">All jobs</button></div>';
+      if(mode==='mine'){const mine=S.jobs.filter(j=>j.pm&&j.pm===S.myOfficeId);h+=mine.length?mine.map(card).join(''):'<div class="empty"><b>No jobs with you as PM</b>Tap All jobs to see everyone\'s.</div>'}
+      else{const groups={};S.jobs.forEach(j=>{const k=pmName(j.pm)||'No PM';(groups[k]=groups[k]||[]).push(j)});
+        Object.keys(groups).sort((a,b)=>a==='No PM'?1:b==='No PM'?-1:a.localeCompare(b)).forEach(k=>{h+='<div class="logday"><span>'+esc(k)+'</span><span class="muted">'+groups[k].length+' job'+(groups[k].length===1?'':'s')+'</span></div>'+groups[k].map(card).join('')})}
+    }else h+=S.jobs.map(card).join('');
+  }
   return h+'</main>';
 }
 function bindJobs(){
   if($('#newJob'))$('#newJob').onclick=async()=>{
-    const v=await formBox('New job',[{k:'name',label:'Job name',req:true,ph:'e.g. Riverside Medical Office'},{k:'addr',label:'Address or GC (optional)',ph:'e.g. 120 Main St / Turner'}],'Create job');
-    if(!v)return;const d=await run(sb.from('jobs').insert({name:v.name.slice(0,120),addr:v.addr.slice(0,160)}).select().single());
+    const v=await formBox('New job',[{k:'name',label:'Job name',req:true,ph:'e.g. Riverside Medical Office'},{k:'addr',label:'Address or GC (optional)',ph:'e.g. 120 Main St / Turner'},{k:'pm',label:'PM',type:'select',value:S.myOfficeId||'',options:(S.office||[]).map(o=>[o.id,o.name]).concat([['','No PM']])}],'Create job');
+    if(!v)return;const d=await run(sb.from('jobs').insert({name:v.name.slice(0,120),addr:v.addr.slice(0,160),pm:v.pm||null}).select().single());
     if(d&&d.id){S.jobs.unshift(d);openJob(d.id)}
   };
   $$('.job').forEach(el=>el.onclick=()=>openJob(el.dataset.id));
+  $$('[data-view]').forEach(b=>b.onclick=()=>{lsSet('crewplans.jobView',b.dataset.view);render()});
   $('#acct').onclick=()=>{
     const m=modal('<h2>Account</h2><p class="muted">'+(S.isAdmin?'Signed in as office: '+esc(S.me.email||who(S.me.id)):'Crew access on this phone. Your access comes from invite links; signing out would remove it from this phone.')+'</p><div style="display:grid;gap:10px;margin-top:12px">'+
-      (S.isAdmin?'<button class="btn" data-out>Sign out</button>':'<button class="btn" data-off>Office sign in on this device</button>')+'<button class="btn" data-x>Close</button></div>');
+      (S.isAdmin?'<button class="btn" data-users>Office users</button><button class="btn" data-pw>Change password</button><button class="btn" data-out>Sign out</button>':'<button class="btn" data-off>Office sign in on this device</button>')+'<button class="btn" data-x>Close</button></div>');
     $('[data-x]',m).onclick=()=>m.close();
-    const o=$('[data-out]',m);if(o)o.onclick=async()=>{await sb.auth.signOut();lsSet('crewplans.lastJob',null);location.reload()};
+    const o=$('[data-out]',m);if(o)o.onclick=async()=>{await sb.auth.signOut();lsSet('crewplans.lastJob',null);location.href=location.pathname+'?office'};
+    const ou=$('[data-users]',m);if(ou)ou.onclick=()=>{m.close();officeUsers()};
+    const pw=$('[data-pw]',m);if(pw)pw.onclick=()=>{m.close();setPasswordBox('Change password')};
     const of=$('[data-off]',m);if(of)of.onclick=async()=>{m.close();if(!await confirmBox('This phone or computer will stop being signed in as crew. You\'d need a new invite link to get crew access back here. Continue to office sign in?','Continue',false))return;location.href=location.pathname+'?office'};
   };
 }
 async function jobMenu(){
   const j=S.job;
-  const m=modal('<h2>'+esc(j.name)+'</h2><div style="display:grid;gap:10px"><button class="btn primary" data-a="people">People & invite links</button><button class="btn" data-a="scope">Scope items</button><button class="btn" data-a="dl">Download job (save to OneDrive)</button><button class="btn" data-a="edit">Rename / edit address</button><button class="btn danger" data-a="del">Delete job</button><button class="btn" data-a="x">Close</button></div>');
+  const m=modal('<h2>'+esc(j.name)+'</h2><div style="display:grid;gap:10px"><button class="btn primary" data-a="people">People & invite links</button><button class="btn" data-a="scope">Scope items</button><button class="btn" data-a="dl">Download job (save to OneDrive)</button><button class="btn" data-a="edit">Edit name, address, PM</button><button class="btn danger" data-a="del">Delete job</button><button class="btn" data-a="x">Close</button></div>');
   $('[data-a=x]',m).onclick=()=>m.close();
   $('[data-a=people]',m).onclick=()=>{m.close();peoplePanel()};
   $('[data-a=scope]',m).onclick=()=>{m.close();scopeEditor()};
   $('[data-a=dl]',m).onclick=()=>{m.close();downloadJob()};
-  $('[data-a=edit]',m).onclick=async()=>{m.close();const v=await formBox('Edit job',[{k:'name',label:'Job name',value:j.name,req:true},{k:'addr',label:'Address or GC',value:j.addr}]);if(v&&await run(sb.from('jobs').update({name:v.name.slice(0,120),addr:v.addr.slice(0,160)}).eq('id',j.id)))loadJobs()};
+  $('[data-a=edit]',m).onclick=async()=>{m.close();const v=await formBox('Edit job',[{k:'name',label:'Job name',value:j.name,req:true},{k:'addr',label:'Address or GC',value:j.addr},{k:'pm',label:'PM',type:'select',value:j.pm||'',options:(S.office||[]).map(o=>[o.id,o.name]).concat([['','No PM']])}]);if(v&&await run(sb.from('jobs').update({name:v.name.slice(0,120),addr:v.addr.slice(0,160),pm:v.pm||null}).eq('id',j.id)))loadJobs()};
   $('[data-a=del]',m).onclick=async()=>{
     m.close();if(!await confirmBox('Delete "'+(j.name||'this job')+'" with all its sheets, markups, progress and logs, for everyone?'))return;
     try{const files=[];for(const f of ['sheets','photos']){const {data}=await sb.storage.from(BUCKET).list(j.id+'/'+f,{limit:1000});(data||[]).forEach(o=>files.push(j.id+'/'+f+'/'+o.name))}if(files.length)await sb.storage.from(BUCKET).remove(files)}catch(e){}
@@ -535,6 +576,24 @@ function scopeEditor(){
     };
   };
   bind();
+}
+
+/* office users (PMs and office staff) */
+function officeInviteText(name){return 'Hi '+name+',\n\nYou now have an office login for Crew Plans, our plans and progress app for the crews.\n\n1. Open '+location.origin+location.pathname+'?office (bookmark it)\n2. Tap "First time? Set up your office login"\n3. Enter your work email and pick a password\n4. Tap the confirm link in the email you get, and you\'re in.\n\nYou\'ll see every job; tap My jobs for the ones you\'re PM on.'}
+async function officeUsers(){
+  const m=modal('<h2>Office users</h2><p class="muted" style="margin-top:0">Office users see every job and can set up jobs, plans and crew links. Add someone here, then send them the sign-up steps.</p><div data-body class="muted">Loading…</div><div class="mbtns"><button class="btn" data-x>Close</button><button class="btn primary" data-add>+ Add office user</button></div>');
+  $('[data-x]',m).onclick=()=>m.close();
+  const draw=async()=>{
+    let list=[];try{list=await q(sb.from('admins').select('*').order('added_at'))}catch(e){toast(errMsg(e))}
+    const body=$('[data-body]',m);if(!body)return;body.className='';
+    body.innerHTML=list.map(a=>'<div class="prow2"><div class="grow"><b>'+esc(a.name)+'</b>'+(a.user_id===S.me.id?' <span class="badge">you</span>':'')+'<div class="muted small">'+esc(a.email||'')+' · '+(a.user_id?'Signed up':'Waiting for first sign-in')+' · '+S.jobs.filter(j=>j.pm===a.id).length+' jobs as PM</div></div>'+
+      (a.user_id?'':'<button class="btn sm" data-mail="'+esc(a.id)+'">Email steps</button>')+(a.user_id===S.me.id?'':'<button class="ico" data-rm="'+esc(a.id)+'" aria-label="Remove">✕</button>')+'</div>').join('');
+    $$('[data-mail]',body).forEach(b=>b.onclick=()=>{const a=list.find(x=>x.id===b.dataset.mail);if(!a)return;location.href='mailto:'+encodeURIComponent(a.email).replace(/%40/g,'@')+'?subject='+encodeURIComponent('Your Crew Plans office login')+'&body='+encodeURIComponent(officeInviteText(a.name))});
+    $$('[data-rm]',body).forEach(b=>b.onclick=async()=>{const a=list.find(x=>x.id===b.dataset.rm);if(!a)return;if(!await confirmBox('Remove '+a.name+' from the office list? They\'ll lose office access right away. Their jobs keep their data but show No PM.','Remove'))return;if(await run(sb.from('admins').delete().eq('id',a.id),'Removed.')){await loadOffice();loadJobs();draw()}});
+  };
+  $('[data-add]',m).onclick=async()=>{const v=await formBox('Add office user',[{k:'name',label:'Name (as it should show on jobs)',req:true,ph:'e.g. Rob'},{k:'email',label:'Work email',type:'email',req:true,ph:'name@alpha-drywall.com'}],'Add');if(!v)return;
+    if(await run(sb.from('admins').insert({name:v.name.slice(0,40),email:v.email.toLowerCase()}),'Added. Send them the sign-up steps.')){await loadOffice();draw()}};
+  draw();
 }
 
 /* people & invites */
