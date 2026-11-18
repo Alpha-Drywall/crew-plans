@@ -482,6 +482,7 @@ async function newInvite(){
   let role='editor';
   const m=modal('<h2>Invite someone</h2><form><label class="field"><span>Their name</span><input name="n" required placeholder="e.g. Mike – foreman"></label>'+
     '<div class="field"><span style="display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:6px">What can they do?</span><div class="chips"><button type="button" class="chip" data-r="editor">Editor</button><button type="button" class="chip" data-r="viewer">View only</button></div><div class="muted small" data-desc></div></div>'+
+    '<label class="field"><span>Their email (optional)</span><input name="e" type="email" inputmode="email" placeholder="e.g. mike@gmail.com"></label>'+
     '<div class="mbtns"><button type="button" class="btn" data-x>Cancel</button><button class="btn primary">Make link</button></div></form>');
   const sync=()=>{$$('[data-r]',m).forEach(b=>b.classList.toggle('on',b.dataset.r===role));$('[data-desc]',m).textContent=role==='editor'?'Can mark up plans, drop pins and photos, update progress and write daily logs.':'Can look at plans, markups, progress and logs, but can\'t change anything.'};
   sync();$$('[data-r]',m).forEach(b=>b.onclick=()=>{role=b.dataset.r;sync()});
@@ -489,15 +490,19 @@ async function newInvite(){
   setTimeout(()=>$('[name=n]',m).focus(),50);
   $('form',m).onsubmit=async e=>{e.preventDefault();const n=$('[name=n]',m).value.trim().slice(0,60);if(!n)return;
     const d=await run(sb.from('invites').insert({job_id:S.job.id,role,name:n}).select().single());
-    if(d&&d.token){m.close();shareLink(d)}};
+    const em=$('[name=e]',m).value.trim();if(d&&d.token){m.close();shareLink(d,em)}};
 }
-function shareLink(inv){
+function shareLink(inv,email){
   const link=inviteLink(inv.token);
   const msg='You\'re invited to '+S.job.name+' on Crew Plans. Open this link on your phone: '+link;
   const m=modal('<h2>Send this link to '+esc(inv.name)+'</h2><p class="muted" style="margin-top:0">'+roleName(inv.role)+'. Works on one phone only: the first phone that opens it keeps it.</p><input class="linkbox" readonly value="'+esc(link)+'">'+
-    '<div style="display:grid;gap:10px;margin-top:12px"><a class="btn primary" data-sms href="sms:?&body='+encodeURIComponent(msg)+'">Text it</a><button class="btn" data-copy>Copy link</button>'+(navigator.share?'<button class="btn" data-share>Share…</button>':'')+'<button class="btn" data-x>Done</button></div>');
+    '<div class="row" style="margin-top:12px"><input data-em type="email" inputmode="email" class="grow" placeholder="Email address" value="'+esc(email||'')+'" style="border:1px solid var(--line);border-radius:10px;padding:10px;min-height:44px"><a class="btn primary" data-mail href="#">Email it</a></div>'+
+    '<div style="display:grid;gap:10px;margin-top:10px"><a class="btn primary" data-sms href="sms:?&body='+encodeURIComponent(msg)+'">Text it</a><button class="btn" data-copy>Copy link</button>'+(navigator.share?'<button class="btn" data-share>Share…</button>':'')+'<button class="btn" data-x>Done</button></div>');
   $('[data-x]',m).onclick=()=>m.close();
   $('.linkbox',m).onclick=e=>e.target.select();
+  const mail=$('[data-mail]',m);const setMail=()=>{const to=$('[data-em]',m).value.trim();mail.href='mailto:'+encodeURIComponent(to).replace(/%40/g,'@')+'?subject='+encodeURIComponent('Crew Plans: '+S.job.name)+'&body='+encodeURIComponent('Hi '+inv.name+',\n\nYou\'re invited to '+S.job.name+' on Crew Plans ('+roleName(inv.role)+').\n\nOpen this link on your phone. No account or password needed:\n'+link+'\n\nThe link works on one phone only, so open it on the phone you\'ll use on site.')};
+  setMail();$('[data-em]',m).oninput=setMail;
+  mail.addEventListener('click',e=>{if(!$('[data-em]',m).value.trim()){e.preventDefault();toast('Type their email address first.');$('[data-em]',m).focus()}});
   $('[data-copy]',m).onclick=async()=>{try{await navigator.clipboard.writeText(link);toast('Link copied.')}catch(e){$('.linkbox',m).select();toast('Press and hold the link to copy it.')}};
   const sh=$('[data-share]',m);if(sh)sh.onclick=()=>navigator.share({title:'Crew Plans',text:msg}).catch(()=>{});
 }
@@ -666,7 +671,7 @@ async function openSheet(id){
   el.innerHTML='<div class="vbar"><button id="vBack">‹ Sheets</button><div class="vt">'+esc(sh.name||'Sheet')+'</div><button id="vLayers">Layers</button></div>'+
     '<div id="stage"><div id="board"><img id="planImg" alt="" draggable="false"><svg id="ink" xmlns="http://www.w3.org/2000/svg"><g id="marksG"></g><g id="liveG"></g></svg></div><div id="pinLayer"></div><div class="hint" id="hint">Loading sheet…</div></div>'+
     '<div class="vtools">'+(cw?'<div class="trow" id="phaseRow">'+PHASES.map(p=>'<button class="pc" data-ph="'+p.k+'" style="background:'+p.c+'">'+p.n+'</button>').join('')+'<button class="tb" id="penBtn">Pen: Thin</button></div>':'')+
-    '<div class="trow" id="modeRow"><button class="tb" data-mode="pan">✋ Move</button>'+(cw?'<button class="tb" data-mode="line">🖍 Highlight</button><button class="tb" data-mode="box">▭ Area</button><button class="tb" data-mode="pin">📍 Pin</button><button class="tb" data-mode="erase">⌫ Erase</button><button class="tb" id="undoBtn">↶ Undo</button>':'')+
+    '<div class="trow" id="modeRow"><button class="tb" data-mode="pan">✋ Move</button>'+(cw?'<button class="tb" data-mode="straight">📏 Straight</button><button class="tb" data-mode="line">🖍 Highlight</button><button class="tb" data-mode="box">▭ Area</button><button class="tb" data-mode="pin">📍 Pin</button><button class="tb" data-mode="erase">⌫ Erase</button><button class="tb" id="undoBtn">↶ Undo</button>':'')+
     '<button class="tb" id="fitBtn">⤢ Fit</button></div></div>';
   V.stage=$('#stage');V.board=$('#board');V.img=$('#planImg');
   $('#vBack').onclick=()=>{if(location.hash==='#sheet')history.back();else closeSheet()};
@@ -704,7 +709,7 @@ function syncTools(){
   if($('#undoBtn'))$('#undoBtn').disabled=!V.mine.length;
 }
 function hint(){const h=$('#hint');if(!h||!V.W)return;const p=phase(V.phase).n;
-  h.textContent={pan:'Drag to move · pinch to zoom · tap a pin to open it',line:'Draw along walls to mark them '+p+' · two fingers to move',box:'Drag a box over a finished area ('+p+') · two fingers to move',pin:'Tap the plan where you want a pin',erase:'Tap a highlight or area to erase it'}[V.mode];h.style.display='block'}
+  h.textContent={pan:'Drag to move · pinch to zoom · tap a pin to open it',straight:'Drag along a wall for a straight '+p+' line (snaps level/plumb) · two fingers to move',line:'Draw along walls to mark them '+p+' · two fingers to move',box:'Drag a box over a finished area ('+p+') · two fingers to move',pin:'Tap the plan where you want a pin',erase:'Tap a highlight or area to erase it'}[V.mode];h.style.display='block'}
 function fit(){if(!V||!V.W)return;const r=V.stage.getBoundingClientRect();const s=Math.min(r.width/V.W,r.height/V.H)*.97;V.minS=s*.6;V.t={s,x:(r.width-V.W*s)/2,y:(r.height-V.H*s)/2};applyT()}
 function applyT(){V.board.style.transform='translate('+V.t.x+'px,'+V.t.y+'px) scale('+V.t.s+')';placePins()}
 function toImg(cx,cy){const r=V.stage.getBoundingClientRect();return {x:(cx-r.left-V.t.x)/V.t.s,y:(cy-r.top-V.t.y)/V.t.s}}
@@ -716,14 +721,14 @@ function bindStage(){
     if(!V||!V.W)return;try{st.setPointerCapture(e.pointerId)}catch(_){}
     V.pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
     if(V.pts.size===2){if(V.g&&V.g.type==='draw')clearLive();const [a,b]=[...V.pts.values()];V.g={type:'pinch',d0:Math.max(1,dist(a,b)),c0:mid(a,b),t0:Object.assign({},V.t)}}
-    else if(V.pts.size===1){const drawing=(V.mode==='line'||V.mode==='box')&&canWrite();const p=toImg(e.clientX,e.clientY);
+    else if(V.pts.size===1){const drawing=(V.mode==='line'||V.mode==='box'||V.mode==='straight')&&canWrite();const p=toImg(e.clientX,e.clientY);
       V.g={type:drawing?'draw':'pan',sx:e.clientX,sy:e.clientY,t0:Object.assign({},V.t),moved:false,time:Date.now(),pts:[p],start:p,end:p};const h=$('#hint');if(h)h.style.display='none'}
   });
   st.addEventListener('pointermove',e=>{
     if(!V||!V.pts.has(e.pointerId))return;V.pts.set(e.pointerId,{x:e.clientX,y:e.clientY});const g=V.g;if(!g)return;
     if(g.type==='pinch'&&V.pts.size>=2){const [a,b]=[...V.pts.values()];const c=mid(a,b);const r=V.stage.getBoundingClientRect();const s=clamp(g.t0.s*dist(a,b)/g.d0,V.minS,4);const ix=(g.c0.x-r.left-g.t0.x)/g.t0.s,iy=(g.c0.y-r.top-g.t0.y)/g.t0.s;V.t={s,x:c.x-r.left-ix*s,y:c.y-r.top-iy*s};applyT()}
     else if(g.type==='pan'){const dx=e.clientX-g.sx,dy=e.clientY-g.sy;if(Math.hypot(dx,dy)>7)g.moved=true;if(g.moved){V.t=Object.assign({},g.t0,{x:g.t0.x+dx,y:g.t0.y+dy});applyT()}}
-    else if(g.type==='draw'){if(Math.hypot(e.clientX-g.sx,e.clientY-g.sy)>5)g.moved=true;const p=toImg(e.clientX,e.clientY);if(V.mode==='line'){const l=g.pts[g.pts.length-1];if(dist(p,l)>3/V.t.s)g.pts.push(p)}else g.end=p;drawLive()}
+    else if(g.type==='draw'){if(Math.hypot(e.clientX-g.sx,e.clientY-g.sy)>5)g.moved=true;const p=toImg(e.clientX,e.clientY);if(V.mode==='line'){const l=g.pts[g.pts.length-1];if(dist(p,l)>3/V.t.s)g.pts.push(p)}else if(V.mode==='straight')g.end=snapLine(g.start,p);else g.end=p;drawLive()}
   });
   const end=e=>{
     if(!V||!V.pts.has(e.pointerId))return;V.pts.delete(e.pointerId);const g=V.g;if(!g)return;
@@ -739,14 +744,18 @@ const r4=v=>Math.round(clamp(v,0,1)*10000)/10000;
 function penW(){return V.pen==='thick'?.012:.006}
 function drawLive(){
   const g=V.g;const c=phase(V.phase).c;const sw=penW()*Math.max(V.W,V.H);let s='';
-  if(V.mode==='line')s='<polyline points="'+g.pts.map(p=>p.x.toFixed(1)+','+p.y.toFixed(1)).join(' ')+'" fill="none" stroke="'+c+'" stroke-opacity=".6" stroke-width="'+sw+'" stroke-linecap="round" stroke-linejoin="round"/>';
+  if(V.mode==='straight')s='<line x1="'+g.start.x.toFixed(1)+'" y1="'+g.start.y.toFixed(1)+'" x2="'+g.end.x.toFixed(1)+'" y2="'+g.end.y.toFixed(1)+'" stroke="'+c+'" stroke-opacity=".6" stroke-width="'+sw+'" stroke-linecap="round"/>';
+  else if(V.mode==='line')s='<polyline points="'+g.pts.map(p=>p.x.toFixed(1)+','+p.y.toFixed(1)).join(' ')+'" fill="none" stroke="'+c+'" stroke-opacity=".6" stroke-width="'+sw+'" stroke-linecap="round" stroke-linejoin="round"/>';
   else{const x=Math.min(g.start.x,g.end.x),y=Math.min(g.start.y,g.end.y),w=Math.abs(g.end.x-g.start.x),h=Math.abs(g.end.y-g.start.y);s='<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" fill="'+c+'" fill-opacity=".3" stroke="'+c+'" stroke-width="'+(sw/2)+'"/>'}
   $('#liveG').innerHTML=s;
 }
+/* straight lines snap to level/plumb (and 45°) when close */
+function snapLine(a,b){const dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy);if(!len)return b;const ang=Math.atan2(dy,dx);const step=Math.PI/4;const near=Math.round(ang/step)*step;if(Math.abs(ang-near)<7*Math.PI/180)return {x:a.x+len*Math.cos(near),y:a.y+len*Math.sin(near)};return b}
 function clearLive(){const l=$('#liveG');if(l)l.innerHTML=''}
 async function commitDraw(g){
   let pts;
-  if(V.mode==='line'){if(g.pts.length<2)return;pts=[];g.pts.forEach(p=>pts.push(r4(p.x/V.W),r4(p.y/V.H)))}
+  if(V.mode==='straight'){const a=g.start,b=g.end;if(dist(a,b)<6/V.t.s)return;pts=[r4(a.x/V.W),r4(a.y/V.H),r4(b.x/V.W),r4(b.y/V.H)]}
+  else if(V.mode==='line'){if(g.pts.length<2)return;pts=[];g.pts.forEach(p=>pts.push(r4(p.x/V.W),r4(p.y/V.H)))}
   else{const a=g.start,b=g.end;if(Math.abs(a.x-b.x)<4/V.t.s||Math.abs(a.y-b.y)<4/V.t.s)return;pts=[r4(Math.min(a.x,b.x)/V.W),r4(Math.min(a.y,b.y)/V.H),r4(Math.max(a.x,b.x)/V.W),r4(Math.max(a.y,b.y)/V.H)]}
   if(pts.length>3000)pts=pts.slice(0,3000);
   const row={id:uuid(),job_id:S.job.id,sheet_id:V.id,kind:V.mode==='box'?'box':'line',phase:V.phase,pts,w:penW(),created_at:new Date().toISOString()};
