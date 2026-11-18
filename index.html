@@ -134,6 +134,11 @@ input[type=range]{width:100%;height:32px}
 .tb.on{background:var(--head);border-color:var(--head);color:#fff}
 .pc{flex:0 0 auto;border:3px solid transparent;border-radius:999px;padding:6px 12px;font-weight:700;font-size:14px;color:#fff;text-shadow:0 1px 1px #0005;min-height:40px;white-space:nowrap}
 .pc.on{border-color:var(--ink);box-shadow:0 0 0 2px #fff inset}
+.wf{display:grid;grid-template-columns:repeat(2,1fr);gap:0 10px}
+.wf .field{margin-bottom:6px}
+.lrow{display:flex;gap:6px;margin-bottom:6px;align-items:center}.lrow input{flex:1;min-width:0}
+canvas.sig{display:block;width:100%;height:120px;border:1px dashed #9aa4af;border-radius:10px;background:#fff;touch-action:none;margin:4px 0}
+.seg{display:flex;gap:16px;margin:4px 0}.seg label{display:flex;align-items:center;gap:6px;font-weight:600}.seg input{width:20px;height:20px}
 .snav{position:absolute;top:50%;transform:translateY(-50%);z-index:6;width:44px;height:64px;border:0;border-radius:12px;background:#1d232bcc;color:#fff;font-size:30px;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px #0004}
 .snav:disabled{opacity:.25}
 #snPrev{left:8px}#snNext{right:8px}
@@ -194,7 +199,7 @@ async function run(p,okMsg){try{const d=await q(p);if(okMsg)toast(okMsg);return 
 /* ===== offline: local cache + outbox ===== */
 const OFF={db:null,ops:[],flushing:false,online:navigator.onLine!==false,ready:null};
 const OFF_TABLES=['marks','pins','logs','areas'];
-const OFF_DEFAULTS={pins:{layer:'plans',kind:'issue',text:'',photos:[],status:'open',done_by:null,done_at:null},marks:{w:0.006,layer:'plans'},areas:{pct:{}},logs:{crew:0,hours:0,work:'',deliveries:'',notes:'',name:'',hours_by_code:{}}};
+const OFF_DEFAULTS={pins:{layer:'plans',kind:'issue',text:'',photos:[],status:'open',done_by:null,done_at:null},marks:{w:0.006,layer:'plans'},areas:{pct:{}},logs:{crew:0,hours:0,work:'',deliveries:'',notes:'',name:'',hours_by_code:{},weather:'',problems:'',sub_progress:'',trade_damage:'',workforce:{},equipment:[],materials:[],extra_work:[],signature:null,send_gc:false,pdf_path:null,filed_at:null,sent_at:null,file_error:null}};
 function idb(){if(OFF.db)return OFF.db;OFF.db=new Promise((res,rej)=>{try{const r=indexedDB.open('alpha-crew-view',1);r.onupgradeneeded=()=>{const d=r.result;d.createObjectStore('resp');d.createObjectStore('img');d.createObjectStore('outbox',{keyPath:'n',autoIncrement:true})};r.onsuccess=()=>{const d=r.result;d.onclose=()=>{OFF.db=null};d.onversionchange=()=>{try{d.close()}catch(e){}OFF.db=null};res(d)};r.onerror=()=>{OFF.db=null;rej(r.error)}}catch(e){OFF.db=null;rej(e)}});return OFF.db}
 function idbOnce(store,mode,fn){return idb().then(d=>new Promise((res,rej)=>{const tx=d.transaction(store,mode);const r=fn(tx.objectStore(store));let out;if(r)r.onsuccess=()=>{out=r.result};tx.oncomplete=()=>res(out);tx.onerror=tx.onabort=()=>rej(tx.error)}))}
 async function idbDo(store,mode,fn){try{return await idbOnce(store,mode,fn)}catch(e){OFF.db=null;return await idbOnce(store,mode,fn)}}
@@ -254,7 +259,7 @@ async function offlineFetch(input,init){
     throw new TypeError('Failed to fetch: not saved on this device yet');
   }
   const objPath=stor?decodeURIComponent(u.pathname.replace(/^\/storage\/v1\/object\/[^/]+\//,'')):'';
-  const queueable=rest?(rpc?rpc==='set_area_pct':OFF_TABLES.includes(name)):(method==='POST'&&/\/photos\//.test(objPath));
+  const queueable=rest?(rpc?rpc==='set_area_pct':OFF_TABLES.includes(name)):(method==='POST'&&/\/(photos|reports)\//.test(objPath));
   if(!queueable)return fetch(input,init);
   await OFF.ready;
   const sub=(S.me&&S.me.id)||jwtSub(hdr);const prefer=hdr.get('prefer')||'';
@@ -377,7 +382,7 @@ async function urlsFor(paths,force){
   return paths.map(p=>S.urls[p]||'');
 }
 async function fillImgs(root){const imgs=$$('img[data-path]',root);if(!imgs.length)return;const us=await urlsFor(imgs.map(i=>i.dataset.path));imgs.forEach((i,k)=>{if(us[k]&&i.src!==us[k])i.src=us[k]})}
-async function putFile(path,blob){const {error}=await sb.storage.from(BUCKET).upload(path,blob,{contentType:'image/jpeg',upsert:false,cacheControl:'31536000'});if(error)throw error;return path}
+async function putFile(path,blob,type){const {error}=await sb.storage.from(BUCKET).upload(path,blob,{contentType:type||'image/jpeg',upsert:false,cacheControl:'31536000'});if(error)throw error;return path}
 const toBlob=(c,q=.82)=>new Promise((res,rej)=>c.toBlob(b=>b?res(b):rej(new Error('Could not encode image')),'image/jpeg',q));
 function scaledCanvas(src,sw,sh,max){const k=Math.min(1,max/Math.max(sw,sh));const c=document.createElement('canvas');c.width=Math.max(1,Math.round(sw*k));c.height=Math.max(1,Math.round(sh*k));const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(src,0,0,c.width,c.height);return c}
 function loadImageFile(file){return new Promise((res,rej)=>{const u=URL.createObjectURL(file);const i=new Image();i.onload=()=>res(i);i.onerror=()=>{URL.revokeObjectURL(u);rej(new Error("Couldn't read that image"))};i.src=u})}
@@ -609,7 +614,7 @@ function render(){
   if(!app.querySelector('[data-jobshell]')||app.dataset.job!==j.id||app.dataset.tab!==S.tab||app.dataset.role!==S.role){
     app.dataset.job=j.id;app.dataset.tab=S.tab;app.dataset.role=S.role;
     app.innerHTML='<div data-jobshell><div class="top"><button id="back" aria-label="Back">‹</button><h1 id="jt"></h1>'+(isAdminRole()?'<button id="jmenu" aria-label="Job menu">⋯</button>':'')+'</div>'+
-      '<div class="tabs"><button data-tab="plans">Plans</button><button data-tab="progress">Progress</button><button data-tab="log">Daily Log</button><button data-tab="labor">Labor</button></div><main id="tabBody"></main></div>';
+      '<div class="tabs"><button data-tab="plans">Plans</button><button data-tab="progress">Progress</button><button data-tab="log">Daily Report</button><button data-tab="labor">Labor</button></div><main id="tabBody"></main></div>';
     $('#back').onclick=closeJob;
     $$('.tabs button').forEach(b=>b.onclick=()=>{S.tab=b.dataset.tab;window.scrollTo(0,0);render()});
     if($('#jmenu'))$('#jmenu').onclick=jobMenu;
@@ -774,12 +779,12 @@ function bindJobs(){
 }
 async function jobMenu(){
   const j=S.job;
-  const m=modal('<h2>'+esc(j.name)+'</h2><div style="display:grid;gap:10px"><button class="btn primary" data-a="people">People & invite links</button><button class="btn" data-a="scope">Scope items</button><button class="btn" data-a="dl">Download job (save to OneDrive)</button><button class="btn" data-a="edit">Edit name, address, PM</button><button class="btn danger" data-a="del">Delete job</button><button class="btn" data-a="x">Close</button></div>');
+  const m=modal('<h2>'+esc(j.name)+'</h2><div style="display:grid;gap:10px"><button class="btn primary" data-a="people">People & invite links</button><button class="btn" data-a="scope">Scope items</button><button class="btn" data-a="dl">Download job (save to OneDrive)</button><button class="btn" data-a="edit">Edit job (name, PM, GC email)</button><button class="btn danger" data-a="del">Delete job</button><button class="btn" data-a="x">Close</button></div>');
   $('[data-a=x]',m).onclick=()=>m.close();
   $('[data-a=people]',m).onclick=()=>{m.close();peoplePanel()};
   $('[data-a=scope]',m).onclick=()=>{m.close();scopeEditor()};
   $('[data-a=dl]',m).onclick=()=>{m.close();downloadJob()};
-  $('[data-a=edit]',m).onclick=async()=>{m.close();const v=await formBox('Edit job',[{k:'name',label:'Job name',value:j.name,req:true},{k:'addr',label:'Address or GC',value:j.addr},{k:'pm',label:'PM',type:'select',value:j.pm||'',options:(S.office||[]).map(o=>[o.id,o.name]).concat([['','No PM']])}]);if(v&&await run(sb.from('jobs').update({name:v.name.slice(0,120),addr:v.addr.slice(0,160),pm:v.pm||null}).eq('id',j.id)))loadJobs()};
+  $('[data-a=edit]',m).onclick=async()=>{m.close();const v=await formBox('Edit job',[{k:'name',label:'Job name',value:j.name,req:true},{k:'addr',label:'Address or GC',value:j.addr},{k:'pm',label:'PM',type:'select',value:j.pm||'',options:(S.office||[]).map(o=>[o.id,o.name]).concat([['','No PM']])},{k:'gc_name',label:'General contractor (company)',value:j.gc_name||''},{k:'gc_email',label:'GC email for daily reports (separate several with commas)',value:j.gc_email||'',ph:'super@gc.com, pm@gc.com'}]);if(v){const bad=String(v.gc_email||'').split(/[,;\s]+/).filter(x=>x&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x));if(bad.length){toast('Check this email: '+bad[0]);return}if(await run(sb.from('jobs').update({name:v.name.slice(0,120),addr:v.addr.slice(0,160),pm:v.pm||null,gc_name:v.gc_name.slice(0,120),gc_email:v.gc_email.slice(0,400)}).eq('id',j.id))){loadJobs();Object.assign(j,{gc_name:v.gc_name,gc_email:v.gc_email});if(S.tab==='log'){S.tab='log';const a=$('#app');a.dataset.tab='';render()}}}};
   $('[data-a=del]',m).onclick=async()=>{
     m.close();if(!await confirmBox('Delete "'+(j.name||'this job')+'" with all its sheets, markups, progress and logs, for everyone?'))return;
     try{const files=[];for(const f of ['sheets','photos']){const {data}=await sb.storage.from(BUCKET).list(j.id+'/'+f,{limit:1000});(data||[]).forEach(o=>files.push(j.id+'/'+f+'/'+o.name))}if(files.length)await sb.storage.from(BUCKET).remove(files)}catch(e){}
@@ -1175,45 +1180,153 @@ async function areaMenu(id){
 }
 
 /* daily log tab */
+const LOGO_PNG='data:image/png;base64,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';
+const WORKFORCE=['Super','Foreman','Framer','Drywall','Carpenter','Taper','Laborer','Truck Driver','Safety','Stockers'];
+const DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+function dayName(d){const [y,m,dd]=String(d).split('-').map(Number);return DAYS[new Date(y,m-1,dd).getDay()]}
+function jobNo(j){j=j||S.job||{};return ((j.name||'').match(/^\s*(\d{3,})/)||[])[1]||''}
+function gcEmails(j){return String((j||S.job||{}).gc_email||'').split(/[,;\s]+/).map(x=>x.trim()).filter(x=>/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x))}
+function rowsEditor(key,cols,vals){
+  const r=(v)=>'<div class="lrow" data-row>'+cols.map(c=>'<input data-c="'+c.k+'" placeholder="'+esc(c.ph)+'" value="'+esc((v||{})[c.k]||'')+'"'+(c.num?' type="number" inputmode="decimal" min="0" style="max-width:76px"':'')+'>').join('')+'<button type="button" class="ico" data-rm aria-label="Remove">✕</button></div>';
+  return '<div data-rows="'+key+'">'+((vals&&vals.length?vals:[{}]).map(r).join(''))+'</div><button type="button" class="btn sm" data-add="'+key+'">+ Add line</button><template data-tpl="'+key+'">'+r({})+'</template>';
+}
+function readRows(form,key){return $$('[data-rows="'+key+'"] [data-row]',form).map(rw=>{const o={};$$('[data-c]',rw).forEach(i=>{const v=i.value.trim();if(v)o[i.dataset.c]=i.type==='number'?num(v):v.slice(0,300)});return o}).filter(o=>Object.keys(o).length)}
+function bindRows(form){
+  form.addEventListener('click',e=>{const a=e.target.closest('[data-add]');if(a){const k=a.dataset.add;const box=$('[data-rows="'+k+'"]',form);box.insertAdjacentHTML('beforeend',$('[data-tpl="'+k+'"]',form).innerHTML);const ins=$$('[data-row]',box);const l=ins[ins.length-1];const f=l&&$('input',l);if(f)f.focus();return}
+    const rm=e.target.closest('[data-rm]');if(rm){const rw=rm.closest('[data-row]');const box=rw.parentElement;if($$('[data-row]',box).length>1)rw.remove();else $$('input',rw).forEach(i=>i.value='')}});
+}
+function sigPad(cv){
+  const x=cv.getContext('2d');let drawing=false,dirty=false,last=null;
+  const fitCv=()=>{const r=cv.getBoundingClientRect();if(!r.width)return;const keep=dirty?cv.toDataURL():null;cv.width=Math.round(r.width*2);cv.height=Math.round(r.height*2);x.lineWidth=4;x.lineCap='round';x.lineJoin='round';x.strokeStyle='#111';if(keep)pad.load(keep)};
+  const pt=e=>{const r=cv.getBoundingClientRect();return {x:(e.clientX-r.left)*cv.width/r.width,y:(e.clientY-r.top)*cv.height/r.height}};
+  cv.addEventListener('pointerdown',e=>{e.preventDefault();drawing=true;last=pt(e);try{cv.setPointerCapture(e.pointerId)}catch(_){}});
+  cv.addEventListener('pointermove',e=>{if(!drawing)return;const p=pt(e);x.beginPath();x.moveTo(last.x,last.y);x.lineTo(p.x,p.y);x.stroke();last=p;dirty=true});
+  const end=()=>{drawing=false};cv.addEventListener('pointerup',end);cv.addEventListener('pointercancel',end);
+  const pad={clear(){x.clearRect(0,0,cv.width,cv.height);dirty=false},
+    load(u){if(!u){pad.clear();return}const i=new Image();i.onload=()=>{x.clearRect(0,0,cv.width,cv.height);x.drawImage(i,0,0,cv.width,cv.height);dirty=true};i.src=u},
+    get(){if(!dirty)return null;const c=document.createElement('canvas');c.width=480;c.height=Math.round(480*cv.height/cv.width);const g=c.getContext('2d');g.drawImage(cv,0,0,c.width,c.height);return c.toDataURL('image/png')},
+    get dirty(){return dirty}};
+  requestAnimationFrame(fitCv);return pad;
+}
 function renderLogForm(){
   const box=$('#logForm');if(!box)return;
   if(!canWrite()){box.innerHTML='';return}
-  box.innerHTML='<div class="card"><b style="font-size:17px">Your daily log</b><form style="margin-top:10px">'+
-    '<div class="two"><label class="field"><span>Filled out by</span><input name="who" required maxlength="60" autocomplete="name" placeholder="Your name"></label><label class="field"><span>Date</span><input type="date" name="date" value="'+today()+'"></label></div>'+
-    '<fieldset class="codes"><legend>Hours by cost code</legend><div class="two">'+LABOR_CODES.map(c=>'<label class="field"><span>'+esc(c.n)+'</span><input type="number" inputmode="decimal" min="0" step="0.5" data-code="'+c.k+'" placeholder="0"></label>').join('')+'</div><p class="muted small" style="margin:0 0 8px">Total man-hours for each code today (all workers added together).</p></fieldset>'+
-    '<div class="two"><label class="field"><span>Crew on site</span><input type="number" inputmode="numeric" min="0" name="crew" placeholder="0"></label><label class="field"><span>Total man-hours</span><input type="number" name="hours" placeholder="0" readonly tabindex="-1" style="background:#eef1f4"></label></div>'+
-    '<label class="field"><span>Work done today</span><textarea name="work" placeholder="e.g. Framed corridor 2nd floor, hung lids in 201–204"></textarea></label>'+
-    '<label class="field"><span>Material delivered</span><input name="deliveries" placeholder="e.g. 120 sheets 5/8 Type X"></label>'+
-    '<label class="field"><span>Delays / issues / notes</span><textarea name="notes" placeholder="e.g. Waiting on electrician in 205"></textarea></label>'+
-    '<button class="btn primary block" type="submit">Save log</button><div class="muted small" data-st style="text-align:center;margin-top:6px"></div></form></div>';
-  const form=$('form',box);let touched=false;
+  if(navigator.onLine!==false)loadPdfLib().catch(()=>{});
+  const j=S.job;const gce=gcEmails(j);
+  const ta=(n,l,ph)=>'<label class="field"><span>'+l+'</span><textarea name="'+n+'" placeholder="'+esc(ph||'')+'"></textarea></label>';
+  box.innerHTML='<div class="card"><b style="font-size:17px">Daily report</b><div class="muted small">'+esc(j.gc_name?'For '+j.gc_name+' · ':'')+esc(j.name)+'</div><form style="margin-top:10px">'+
+    '<div class="two"><label class="field"><span>Date</span><input type="date" name="date" value="'+today()+'"></label><label class="field"><span>Weather</span><input name="weather" maxlength="80" placeholder="e.g. Sunny, 45°"></label></div>'+
+    ta('work','Work performed today','e.g. Framed corridor 2nd floor, hung lids in 201–204')+
+    '<fieldset class="codes"><legend>Workforce</legend><div class="wf">'+WORKFORCE.map(w=>'<label class="field"><span>'+esc(w)+'</span><input type="number" inputmode="numeric" min="0" step="1" data-wf="'+esc(w)+'" placeholder="0"></label>').join('')+'</div><div class="muted small" style="margin-top:2px">Total: <b data-wft>0</b></div></fieldset>'+
+    ta('problems','Problems / delays','e.g. Waiting on electrician in 205')+ta('subs','Subcontractor progress','')+ta('damage','Trade damage','')+
+    '<fieldset class="codes"><legend>Equipment</legend>'+rowsEditor('equip',[{k:'name',ph:'e.g. Scissor lift'},{k:'qty',ph:'Qty',num:1}])+'</fieldset>'+
+    '<fieldset class="codes"><legend>Materials delivered (PO)</legend>'+rowsEditor('mat',[{k:'text',ph:'e.g. 120 sheets 5/8 Type X'},{k:'po',ph:'PO #'}])+'</fieldset>'+
+    '<fieldset class="codes"><legend>Additional work</legend>'+rowsEditor('extra',[{k:'work',ph:'Work'},{k:'by',ph:'Authorized by'},{k:'awa',ph:'AWA #'}])+'</fieldset>'+
+    '<label class="field"><span>Supervisor (print name)</span><input name="who" required maxlength="60" autocomplete="name" placeholder="Your name"></label>'+
+    '<div class="field"><span>Supervisor signature</span><canvas class="sig" data-sig></canvas><div class="row" style="justify-content:space-between"><span class="muted small">Sign with your finger</span><button type="button" class="btn sm" data-sigclr>Clear</button></div></div>'+
+    '<div class="field gcq"><span>Send to general contractor?</span>'+(gce.length?'<div class="seg"><label><input type="radio" name="gc" value="yes"> Yes</label><label><input type="radio" name="gc" value="no" checked> No</label></div><div class="muted small">'+esc(gce.join(', '))+'</div>'
+      :'<div class="muted small">No GC email on this job yet. '+(isAdminRole()?'Add it under ⋯ → Edit job.':'Ask the office to add it.')+'</div>')+'</div>'+
+    '<button class="btn primary block" type="submit">Save daily report</button><div class="muted small" data-st style="text-align:center;margin-top:6px">A PDF is saved to the job\'s Daily Reports folder.</div></form></div>';
+  const form=$('form',box);let touched=false;bindRows(form);const pad=sigPad($('[data-sig]',form));
+  $('[data-sigclr]',form).onclick=()=>{pad.clear();touched=true};
+  const wfTot=()=>{$('[data-wft]',form).textContent=$$('[data-wf]',form).reduce((a,i)=>a+num(i.value),0)};
   const mine=d=>S.logs.find(l=>l.date===d&&l.user_id===S.me.id);
-  const fill=()=>{const e=mine(form.date.value);form.who.value=(e&&e.name)||lsGet('crewplans.logName')||myName();['crew','hours','work','deliveries','notes'].forEach(k=>{form[k].value=!e?'':(k==='crew'||k==='hours')?num(e[k]):(e[k]||'')});const hb=(e&&e.hours_by_code)||{};$$('[data-code]',form).forEach(i=>{i.value=hb[i.dataset.code]?num(hb[i.dataset.code]):''});if(e&&codeHrs(e))form.hours.value=codeHrs(e);$('[data-st]',form).textContent=e?'Editing your saved log for this day.':'';touched=false};
-  form.date.onchange=fill;form.addEventListener('input',e=>{if(e.target!==form.date)touched=true;if(e.target.dataset&&e.target.dataset.code){const t=$$('[data-code]',form).reduce((a,i)=>a+num(i.value),0);form.hours.value=t||''}});fill();
+  const setRows=(k,vals)=>{const b=$('[data-rows="'+k+'"]',form);const t=$('[data-tpl="'+k+'"]',form).innerHTML;b.innerHTML='';(vals&&vals.length?vals:[{}]).forEach(v=>{b.insertAdjacentHTML('beforeend',t);const rw=b.lastElementChild;$$('[data-c]',rw).forEach(i=>i.value=v[i.dataset.c]!=null?v[i.dataset.c]:'')})};
+  const fill=()=>{const e=mine(form.date.value);form.who.value=(e&&e.name)||lsGet('crewplans.logName')||myName();
+    form.weather.value=(e&&e.weather)||'';form.work.value=(e&&e.work)||'';form.problems.value=(e&&(e.problems||e.notes))||'';form.subs.value=(e&&e.sub_progress)||'';form.damage.value=(e&&e.trade_damage)||'';
+    const wf=(e&&e.workforce)||{};$$('[data-wf]',form).forEach(i=>i.value=wf[i.dataset.wf]||'');wfTot();
+    setRows('equip',e&&e.equipment);setRows('mat',(e&&e.materials)||(e&&e.deliveries?[{text:e.deliveries}]:null));setRows('extra',e&&e.extra_work);
+    pad.load(e&&e.signature);const g=$$('[name=gc]',form);g.forEach(r=>r.checked=r.value==='no')};
+  form.date.onchange=fill;form.addEventListener('input',e=>{if(e.target!==form.date)touched=true;if(e.target.dataset&&e.target.dataset.wf!=null)wfTot()});
+  $('[data-sig]',form).addEventListener('pointerdown',()=>touched=true);fill();
   box._fillIfEmpty=()=>{if(!touched)fill()};
-  box._edit=d=>{form.date.value=d;fill();$('[data-st]',form).textContent='Editing your saved log for this day. Change it and tap Save log.';box.scrollIntoView({behavior:'smooth',block:'start'})};
-  form.onsubmit=async e=>{e.preventDefault();const d=form.date.value||today();const nm=form.who.value.trim().slice(0,60);if(!nm){toast('Enter who filled out the log.');form.who.focus();return}lsSet('crewplans.logName',nm);
-    const hbc={};$$('[data-code]',form).forEach(i=>{const v=num(i.value);if(v>0)hbc[i.dataset.code]=Math.round(v*100)/100});const tot=Object.values(hbc).reduce((a,b)=>a+b,0);
-    if(!tot&&!await confirmBox('No hours entered for any cost code. Save the log anyway?','Save anyway',false))return;
-    const o={job_id:S.job.id,user_id:S.me.id,name:nm,date:d,crew:num(form.crew.value),hours:tot,hours_by_code:hbc,work:form.work.value.trim().slice(0,2000),deliveries:form.deliveries.value.trim().slice(0,500),notes:form.notes.value.trim().slice(0,2000),updated_at:new Date().toISOString()};
-    if(await run(sb.from('logs').upsert(o,{onConflict:'job_id,user_id,date'}),'Log saved.')){touched=false;$('[data-st]',form).textContent='Editing your saved log for this day.';loadLogs()}};
+  box._edit=d=>{form.date.value=d;fill();$('[data-st]',form).textContent='Editing your saved report for this day. Change it and tap Save.';box.scrollIntoView({behavior:'smooth',block:'start'})};
+  form.onsubmit=async e=>{e.preventDefault();const d=form.date.value||today();const nm=form.who.value.trim().slice(0,60);if(!nm){toast('Enter the supervisor name.');form.who.focus();return}lsSet('crewplans.logName',nm);
+    const wf={};$$('[data-wf]',form).forEach(i=>{const v=num(i.value);if(v>0)wf[i.dataset.wf]=v});const crew=Object.values(wf).reduce((a,b)=>a+b,0);
+    const sig=pad.get();if(!sig&&!await confirmBox('No signature. Save the report anyway?','Save anyway',false))return;
+    const gcR=$('[name=gc]:checked',form);const send=!!(gcR&&gcR.value==='yes'&&gce.length);
+    const o={job_id:S.job.id,user_id:S.me.id,name:nm,date:d,crew,weather:form.weather.value.trim().slice(0,80),work:form.work.value.trim().slice(0,3000),problems:form.problems.value.trim().slice(0,3000),
+      sub_progress:form.subs.value.trim().slice(0,3000),trade_damage:form.damage.value.trim().slice(0,3000),workforce:wf,equipment:readRows(form,'equip'),materials:readRows(form,'mat'),extra_work:readRows(form,'extra'),
+      signature:sig,send_gc:send,filed_at:null,sent_at:null,file_error:null,updated_at:new Date().toISOString()};
+    const btn=$('button[type=submit]',form);btn.disabled=true;$('[data-st]',form).textContent='Making the PDF…';
+    try{const blob=await reportPdf(o,S.job);o.pdf_path=await putFile(S.job.id+'/reports/'+d+'_'+S.me.id.slice(0,8)+'_'+Date.now()+'.pdf',blob,'application/pdf')}
+    catch(err){o.pdf_path=null;toast("Saved, but the PDF couldn't be made: "+errMsg(err))}
+    btn.disabled=false;
+    if(await run(sb.from('logs').upsert(o,{onConflict:'job_id,user_id,date'}),send?'Report saved. It will be emailed to the GC and filed in the job folder.':'Report saved. It will be filed in the job folder.')){touched=false;$('[data-st]',form).textContent='Editing your saved report for this day.';loadLogs()}
+    else $('[data-st]',form).textContent='';
+  };
+}
+let pdfP=null;
+function loadPdfLib(){if(!pdfP)pdfP=loadScript('https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js').catch(e=>{pdfP=null;throw e});return pdfP}
+async function reportPdf(o,job){
+  await loadPdfLib();const {jsPDF}=window.jspdf;const doc=new jsPDF({unit:'pt',format:'letter'});
+  const W=612,L=36,R=576,MID=392,fs=9;let y;
+  doc.setFont('helvetica','normal');doc.setLineHeightFactor(11/9);
+  doc.addImage(LOGO_PNG,'PNG',W/2-95,24,190,80);
+  const line=(lab,val,x,yy,w)=>{doc.setFontSize(9);doc.setFont('helvetica','normal');doc.text(lab,x,yy,{align:'right'});doc.setFont('helvetica','bold');doc.text(String(val||''),x+4,yy);doc.setLineWidth(.5);doc.line(x+2,yy+2,x+w,yy+2)};
+  line('Contractor:',job.gc_name||'',110,122,190);line('Date:',fmtDay(o.date),360,122,180);
+  line('Job Name:',(job.name||'').replace(/^\s*\d{3,}\s*[-–]\s*/,''),110,140,190);line('Job No.',jobNo(job),360,140,180);
+  const top=156;
+  // right column
+  const rx=MID+8,rw=R-rx;y=top;doc.setLineWidth(.6);
+  const rcell=(a,b,bold)=>{doc.rect(rx,y,rw,14);doc.line(rx+rw*.55,y,rx+rw*.55,y+14);doc.setFont('helvetica',bold?'bold':'normal');doc.setFontSize(8.5);doc.text(String(a),rx+3,y+10);doc.text(String(b==null?'':b),rx+rw*.55+rw*.225,y+10,{align:'center'});y+=14};
+  rcell('Day:',dayName(o.date));doc.rect(rx,y,rw,14);doc.setFont('helvetica','normal');doc.text('Weather: '+(o.weather||''),rx+3,y+10,{maxWidth:rw-6});y+=14;
+  rcell('Workforce','Quantity',true);WORKFORCE.forEach(w=>rcell(w,(o.workforce||{})[w]||''));rcell('Total:',o.crew||0,true);
+  y+=6;rcell('Equipment','Quantity',true);const eq=(o.equipment||[]);for(let i=0;i<Math.max(4,eq.length);i++)rcell(eq[i]?(eq[i].name||''):'',eq[i]?(eq[i].qty||''):'');
+  y+=6;doc.rect(rx,y,rw,14);doc.setFont('helvetica','bold');doc.text('Materials Delivered (PO)',rx+rw/2,y+10,{align:'center'});y+=14;doc.setFont('helvetica','normal');
+  const mats=(o.materials||[]);for(let i=0;i<Math.max(4,mats.length);i++){const m=mats[i];const t=m?((m.text||'')+(m.po?' (PO '+m.po+')':'')):'';const ls=doc.splitTextToSize(t,rw-6);const h=Math.max(14,ls.length*10+4);doc.rect(rx,y,rw,h);doc.text(ls,rx+3,y+10);y+=h}
+  const rightEnd=y;
+  // left column
+  y=top;const lw=MID-L;
+  const block=(title,text,minLines)=>{doc.setFontSize(fs);const ls=doc.splitTextToSize(String(text||''),lw-8);const n=Math.max(minLines,ls.length);const h=14+n*11+4;
+    if(y+h>700){doc.addPage();y=40}
+    doc.rect(L,y,lw,h);doc.setFont('helvetica','bold');doc.text(title,L+3,y+10);doc.setFont('helvetica','normal');doc.text(ls,L+4,y+22);
+    for(let i=0;i<n-1;i++){doc.setDrawColor(205);doc.line(L,y+25+i*11,L+lw,y+25+i*11)}doc.setDrawColor(0);y+=h};
+  block('Work Performed Today:',o.work,7);block('Problems/Delays:',o.problems,4);block('Subcontractor Progress:',o.sub_progress,3);block('Trade Damage:',o.trade_damage,2);
+  // additional work table
+  const ex=o.extra_work||[];const cw=[lw*.42,lw*.33,lw*.25];if(y+30>700){doc.addPage();y=40}
+  doc.setFont('helvetica','bold');let cx=L;['Additional Work','Authorized By','AWA #'].forEach((h,i)=>{doc.rect(cx,y,cw[i],14);doc.text(h,cx+cw[i]/2,y+10,{align:'center'});cx+=cw[i]});y+=14;doc.setFont('helvetica','normal');
+  for(let i=0;i<Math.max(3,ex.length);i++){const r=ex[i]||{};const cells=[r.work||'',r.by||'',r.awa||''].map((t,k)=>doc.splitTextToSize(String(t),cw[k]-6));const h=Math.max(14,Math.max(...cells.map(c=>c.length))*10+4);if(y+h>720){doc.addPage();y=40}
+    cx=L;cells.forEach((c,k)=>{doc.rect(cx,y,cw[k],h);doc.text(c,cx+3,y+10);cx+=cw[k]});y+=h}
+  // signature
+  y=Math.max(y,doc.getNumberOfPages()===1?rightEnd:y)+18;if(y>690){doc.addPage();y=60}
+  doc.setFont('helvetica','bold');doc.setFontSize(10);doc.text(o.name||'',L+110,y,{align:'center'});doc.setLineWidth(.5);doc.line(L+30,y+3,L+190,y+3);doc.setFont('helvetica','italic');doc.setFontSize(8);doc.text('(Print)',L+110,y+13,{align:'center'});
+  doc.setFont('helvetica','normal');doc.setFontSize(9);doc.text('Supervisor Signature:',L+300,y,{align:'right'});
+  if(o.signature){try{doc.addImage(o.signature,'PNG',L+306,y-30,150,40)}catch(e){}}else{doc.setFont('helvetica','bold');doc.setFontSize(12);doc.text(o.name||'',L+310,y-2)}
+  doc.line(L+304,y+3,R,y+3);
+  // footer
+  const pages=doc.getNumberOfPages();for(let p=1;p<=pages;p++){doc.setPage(p);doc.setFontSize(8);doc.setFont('helvetica','bold');doc.text('Alpha Drywall, LLC',W/2,748,{align:'center'});doc.setFont('helvetica','italic');doc.text('Drywall -- Metal Stud Framing-- Suspended Ceilings',W/2,758,{align:'center'});doc.setFont('helvetica','bolditalic');doc.text('2724 S. 3600 W. Suite L, West Valley City, UT 84119',W/2,768,{align:'center'});doc.text('Office#(801) 682-4447/Fax#(801) 683-2847',W/2,778,{align:'center'})}
+  return doc.output('blob');
+}
+function reportStatus(l){
+  if(!l.pdf_path)return '<span class="muted small">No PDF</span>';
+  const f=l.filed_at?'✓ In job folder':(l.file_error?'⚠ Not filed: '+esc(l.file_error):'Filing to job folder…');
+  const g=l.send_gc?(l.sent_at?' · ✓ Sent to GC':' · Sending to GC…'):'';
+  return '<span class="muted small">'+f+g+'</span>';
 }
 function renderLogList(){
   const box=$('#logList');if(!box)return;
-  if(!S.loaded.logs){box.innerHTML='<div class="empty">Loading logs…</div>';return}
-  if(!S.logs.length){box.innerHTML='<div class="empty"><b>No logs yet</b>Each foreman saves one log per day. Saved logs show up here, newest first, for everyone on the job.</div>';return}
+  if(!S.loaded.logs){box.innerHTML='<div class="empty">Loading reports…</div>';return}
+  if(!S.logs.length){box.innerHTML='<div class="empty"><b>No daily reports yet</b>Each foreman saves one report per day. Saved reports show up here, newest first.</div>';return}
   const byDay={};S.logs.forEach(l=>{(byDay[l.date]=byDay[l.date]||[]).push(l)});
-  box.innerHTML=Object.keys(byDay).sort().reverse().map(d=>{const ls=byDay[d];const crew=ls.reduce((a,l)=>a+num(l.crew),0);const hrs=ls.reduce((a,l)=>a+num(l.hours),0);
-    return '<div class="logday"><span>'+fmtDay(d)+'</span><span class="muted">'+crew+' crew · '+hrs+' hrs</span></div>'+ls.map(l=>
-      '<div class="card"><div class="row"><b class="grow">'+esc(logName(l))+'</b><span class="muted small">'+num(l.crew)+' crew · '+num(l.hours)+' hrs</span></div>'+
-      (codeHrs(l)?'<div class="kv"><b>Hours:</b> '+LABOR_CODES.filter(c=>num((l.hours_by_code||{})[c.k])).map(c=>esc(c.n)+' '+num(l.hours_by_code[c.k])).join(' · ')+'</div>':'')+
-      (l.work?'<div class="kv"><b>Work:</b> '+esc(l.work)+'</div>':'')+(l.deliveries?'<div class="kv"><b>Delivered:</b> '+esc(l.deliveries)+'</div>':'')+(l.notes?'<div class="kv"><b>Notes:</b> '+esc(l.notes)+'</div>':'')+
-      (l.updated_at?'<div class="progress-note">Saved '+esc(fmtWhen(l.updated_at))+' by '+esc(logName(l))+'</div>':'')+
-      ((l.user_id===S.me.id&&canWrite())||isAdminRole()?'<div class="row" style="margin-top:8px;justify-content:flex-end">'+(l.user_id===S.me.id&&canWrite()?'<button class="btn sm" data-ledit="'+esc(l.id)+'">✎ Edit</button>':'')+'<button class="btn sm" data-ldel="'+esc(l.id)+'" style="color:var(--danger)">Delete</button></div>':'')+'</div>').join('')}).join('');
+  box.innerHTML=Object.keys(byDay).sort().reverse().map(d=>{const ls=byDay[d];const crew=ls.reduce((a,l)=>a+num(l.crew),0);
+    return '<div class="logday"><span>'+fmtDay(d)+'</span><span class="muted">'+crew+' on site</span></div>'+ls.map(l=>{const wf=l.workforce||{};
+      return '<div class="card"><div class="row"><b class="grow">'+esc(logName(l))+'</b><span class="muted small">'+num(l.crew)+' crew'+(l.weather?' · '+esc(l.weather):'')+'</span></div>'+
+      (Object.keys(wf).length?'<div class="kv"><b>Crew:</b> '+WORKFORCE.filter(w=>num(wf[w])).map(w=>esc(w)+' '+num(wf[w])).join(' · ')+'</div>':'')+
+      (l.work?'<div class="kv"><b>Work:</b> '+esc(l.work)+'</div>':'')+((l.problems||l.notes)?'<div class="kv"><b>Problems:</b> '+esc(l.problems||l.notes)+'</div>':'')+
+      (l.sub_progress?'<div class="kv"><b>Subs:</b> '+esc(l.sub_progress)+'</div>':'')+(l.trade_damage?'<div class="kv"><b>Trade damage:</b> '+esc(l.trade_damage)+'</div>':'')+
+      ((l.equipment||[]).length?'<div class="kv"><b>Equipment:</b> '+l.equipment.map(x=>esc((x.name||'')+(x.qty?' ('+x.qty+')':''))).join(', ')+'</div>':'')+
+      ((l.materials||[]).length?'<div class="kv"><b>Delivered:</b> '+l.materials.map(x=>esc((x.text||'')+(x.po?' PO '+x.po:''))).join('; ')+'</div>':(l.deliveries?'<div class="kv"><b>Delivered:</b> '+esc(l.deliveries)+'</div>':''))+
+      ((l.extra_work||[]).length?'<div class="kv"><b>Additional work:</b> '+l.extra_work.map(x=>esc((x.work||'')+(x.by?' – auth. '+x.by:'')+(x.awa?' – AWA '+x.awa:''))).join('; ')+'</div>':'')+
+      '<div class="row" style="margin-top:8px;gap:8px;align-items:center"><span class="grow">'+reportStatus(l)+'</span>'+(l.pdf_path?'<button class="btn sm" data-lpdf="'+esc(l.id)+'">PDF</button>':'')+
+      ((l.user_id===S.me.id&&canWrite())?'<button class="btn sm" data-ledit="'+esc(l.id)+'">✎ Edit</button>':'')+
+      ((l.user_id===S.me.id&&canWrite())||isAdminRole()?'<button class="btn sm" data-ldel="'+esc(l.id)+'" style="color:var(--danger)">Delete</button>':'')+'</div>'+
+      (l.updated_at?'<div class="progress-note">Saved '+esc(fmtWhen(l.updated_at))+' by '+esc(logName(l))+'</div>':'')+'</div>'}).join('')}).join('');
   $$('[data-ledit]',box).forEach(b=>b.onclick=()=>{const l=S.logs.find(x=>x.id===b.dataset.ledit);const f=$('#logForm');if(l&&f&&f._edit)f._edit(l.date)});
+  $$('[data-lpdf]',box).forEach(b=>b.onclick=async()=>{const l=S.logs.find(x=>x.id===b.dataset.lpdf);if(!l)return;const w=window.open('','_blank');const [u]=await urlsFor([l.pdf_path]);if(u){if(w)w.location=u;else location.href=u}else{if(w)w.close();toast("Couldn't open the PDF. Check your signal.")}});
   $$('[data-ldel]',box).forEach(b=>b.onclick=async()=>{const l=S.logs.find(x=>x.id===b.dataset.ldel);if(!l)return;
-    if(!await confirmBox('Delete '+(l.user_id===S.me.id?'your':logName(l)+'\'s')+' log for '+fmtDay(l.date)+'?'))return;
-    if(await run(sb.from('logs').delete().eq('id',l.id),'Log deleted.')){S.logs=S.logs.filter(x=>x.id!==l.id);renderLogList();const f=$('#logForm');if(f&&f._fillIfEmpty)f._fillIfEmpty()}});
+    if(!await confirmBox('Delete '+(l.user_id===S.me.id?'your':logName(l)+'\'s')+' report for '+fmtDay(l.date)+'?'))return;
+    if(await run(sb.from('logs').delete().eq('id',l.id),'Report deleted.')){S.logs=S.logs.filter(x=>x.id!==l.id);renderLogList();const f=$('#logForm');if(f&&f._fillIfEmpty)f._fillIfEmpty()}});
 }
 
 /* ===== sheet viewer ===== */
