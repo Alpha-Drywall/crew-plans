@@ -204,12 +204,85 @@ async function photoFromFile(file){const img=await loadImageFile(file);const c=s
 let pdfLoading=null;
 function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=rej;document.head.appendChild(s)})}
 function loadPdfJs(){if(!pdfLoading){pdfLoading=(async()=>{await loadScript(PDFJS+'pdf.min.js');await loadScript(PDFJS+'pdf.worker.min.js');window.pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS+'pdf.worker.min.js';return window.pdfjsLib})().catch(e=>{pdfLoading=null;throw e})}return pdfLoading}
-async function guessSheetName(page,vp){
-  try{const tc=await page.getTextContent();const re=/^[A-Z]{1,3}[-.]?\d{1,3}(\.\d{1,3})?[A-Z]?$/;let best=null,bh=0;
-    for(const it of tc.items){const s=String(it.str||'').trim();if(!re.test(s))continue;const t=it.transform||[];const h=Math.hypot(t[2]||0,t[3]||0);const x=t[4]||0,y=t[5]||0;const sc=h*((x>vp.width*.6&&y<vp.height*.35)?3:1);if(sc>bh){bh=sc;best=s}}
-    return best}catch(e){return null}
+const SHEET_NUM=/([A-Z]{1,3}[-.]?\d{1,3}(?:\.\d{1,3})?[A-Z]?)/;
+const TITLE_KW=/\b(PLANS?|ELEVATIONS?|SECTIONS?|DETAILS?|SCHEDULES?|NOTES|SITE|ROOF|FLOOR|CEILING|FOUNDATION|FRAMING|COVER|TITLE|DEMO\w*|WALLS?|DOORS?|FINISH\w*|LAYOUT|ELECTRICAL|MECHANICAL|PLUMBING|STRUCTURAL|GENERAL|SPECIFICATIONS?|DIAGRAMS?|INDEX|ENLARGED|REFLECTED|INTERIOR|EXTERIOR|SAFETY|ACCESSIBILITY|PARTITIONS?|ASSEMBLIES|RCP)\b/;
+/* make a set's sheet numbers consistent: "AD-3" -> "D-3", "D2" -> "D-2" when most sheets are "D-n" */
+function harmonizeNums(items){
+  const pat=n=>{const m=/^([A-Z]+)([-.]?)(\d.*)$/.exec(n||'');return m?{p:m[1],sep:m[2],rest:m[3]}:null};
+  const cnt={};items.forEach(it=>{const q=pat(it.num);if(q){const k=q.p+'|'+q.sep;cnt[k]=(cnt[k]||0)+1}});
+  const top=Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0];if(!top||top[1]<3)return items;
+  const [dp,ds]=top[0].split('|');
+  items.forEach(it=>{const q=pat(it.num);if(!q)return;let p=q.p,sep=q.sep;
+    if(p!==dp&&p.length>dp.length&&p.endsWith(dp))p=dp;
+    if(p===dp&&sep!==ds)sep=ds;
+    it.num=p+sep+q.rest});
+  return items;
 }
-
+function sheetLabel(num,title){title=title?String(title).replace(/\s+/g,' ').trim():'';return num?(title?num+' – '+title:num):(title||'')}
+/* fast path: PDFs that still have a text layer */
+async function nameFromText(page,vp){
+  try{
+    const tc=await page.getTextContent();let num=null,ns=0,title=null,ts=0;
+    for(const it of tc.items){
+      const str=String(it.str||'').trim();if(!str)continue;const t=it.transform||[];const size=Math.hypot(t[2]||0,t[3]||0);
+      const [x,y]=vp.convertToViewportPoint(t[4]||0,t[5]||0);
+      const inBlock=(x>vp.width*.6&&y>vp.height*.65)||x>vp.width*.84;
+      const up=str.toUpperCase();
+      if(/^[A-Z]{1,3}[-.]?\d{1,3}(\.\d{1,3})?[A-Z]?$/.test(up)){const sc=size*(inBlock?3:1);if(sc>ns){ns=sc;num=up}}
+      else if(inBlock&&TITLE_KW.test(up)&&str.length<=60){if(size>ts){ts=size;title=str}}
+    }
+    return {num,title};
+  }catch(e){return {num:null,title:null}}
+}
+/* slow path: read the title block from the picture (scanned or flattened PDFs) */
+let ocrP=null,ocrBusy=Promise.resolve();
+function loadOcr(){if(!ocrP){ocrP=(async()=>{await loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js');return await window.Tesseract.createWorker('eng')})().catch(e=>{ocrP=null;throw e})}return ocrP}
+function cropFrom(src,x0,y0,x1,y1,rot,scale){
+  const W=src.naturalWidth||src.width,H=src.naturalHeight||src.height;const sx=x0*W,sy=y0*H,sw=(x1-x0)*W,sh=(y1-y0)*H;
+  const c=document.createElement('canvas');const rw=rot?sh:sw,rh=rot?sw:sh;c.width=Math.round(rw*scale);c.height=Math.round(rh*scale);
+  const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);g.scale(scale,scale);
+  if(rot===90){g.translate(rw,0);g.rotate(Math.PI/2)}else if(rot===-90){g.translate(0,rh);g.rotate(-Math.PI/2)}
+  g.drawImage(src,sx,sy,sw,sh,0,0,sw,sh);return c;
+}
+function stripLines(c,minRun){
+  const g=c.getContext('2d');const w=c.width,h=c.height;const im=g.getImageData(0,0,w,h);const d=im.data;const dark=new Uint8Array(w*h),kill=new Uint8Array(w*h);
+  for(let i=0;i<w*h;i++)dark[i]=(d[i*4]+d[i*4+1]+d[i*4+2])/3<140?1:0;
+  for(let y=0;y<h;y++){let s=-1;for(let x=0;x<=w;x++){const on=x<w&&dark[y*w+x];if(on&&s<0)s=x;if(!on&&s>=0){if(x-s>=minRun)for(let k=s;k<x;k++)kill[y*w+k]=1;s=-1}}}
+  for(let x=0;x<w;x++){let s=-1;for(let y=0;y<=h;y++){const on=y<h&&dark[y*w+x];if(on&&s<0)s=y;if(!on&&s>=0){if(y-s>=minRun)for(let k=s;k<y;k++)kill[k*w+x]=1;s=-1}}}
+  for(let i=0;i<w*h;i++){const v=(dark[i]&&!kill[i])?0:255;d[i*4]=d[i*4+1]=d[i*4+2]=v;d[i*4+3]=255}
+  g.putImageData(im,0,0);return c;
+}
+async function ocrNumCands(w,c,acc){
+  await w.setParameters({tessedit_pageseg_mode:'11'});const r=await w.recognize(c);
+  for(const x of r.data.words){const m=String(x.text).toUpperCase().match(SHEET_NUM);if(!m||!/\d/.test(m[1])||!/[A-Z]/.test(m[1]))continue;
+    const k=m[1];const e=acc[k]||(acc[k]={t:k,score:0,maxConf:0});e.score+=x.confidence*(x.bbox.y1-x.bbox.y0);e.maxConf=Math.max(e.maxConf,x.confidence)}
+  return acc;
+}
+function pickNum(acc){let best=null;for(const e of Object.values(acc))if(e.maxConf>=55&&(!best||e.score>best.score))best=e;return best}
+async function ocrTitle(w,c){
+  await w.setParameters({tessedit_pageseg_mode:'3'});const r=await w.recognize(c);let best=null;
+  for(const ln of r.data.lines){
+    const kw=ln.words.find(x=>TITLE_KW.test(String(x.text).toUpperCase()));if(!kw)continue;const h=kw.bbox.y1-kw.bbox.y0;
+    const sim=ln.words.filter(x=>{const hh=x.bbox.y1-x.bbox.y0;return hh>h*.6&&hh<h*1.5&&x.confidence>40}).sort((a,b)=>a.bbox.x0-b.bbox.x0);
+    const ki=sim.indexOf(kw);if(ki<0)continue;let a=ki,b=ki;
+    while(a>0&&sim[a].bbox.x0-sim[a-1].bbox.x1<h*1.5)a--;while(b<sim.length-1&&sim[b+1].bbox.x0-sim[b].bbox.x1<h*1.5)b++;
+    const t=sim.slice(a,b+1).map(x=>x.text).join(' ').replace(/[^A-Za-z0-9 ()&.,'\/-]/g,'').replace(/\s+/g,' ').trim();
+    const sc=h*kw.confidence;const nw=t.split(' ').length;if(t.length>=4&&t.length<=48&&nw<=7&&(!best||sc>best.sc))best={t,sc};
+  }
+  return best;
+}
+async function nameFromImage(src){
+  const w=await loadOcr();
+  const run=async()=>{
+    const acc={};
+    for(const r of [[.88,.9,1,1],[.9,.93,1,1],[.84,.86,1,1],[.92,.92,.98,1]])await ocrNumCands(w,stripLines(cropFrom(src,...r,0,3),165),acc);
+    let num=pickNum(acc);
+    if(!num){await ocrNumCands(w,stripLines(cropFrom(src,.86,0,1,1,90,1.5),80),acc);await ocrNumCands(w,stripLines(cropFrom(src,.6,.85,1,1,0,2),110),acc);num=pickNum(acc)}
+    let t=await ocrTitle(w,cropFrom(src,.86,0,1,1,90,1.5));const t2=await ocrTitle(w,cropFrom(src,.6,.8,1,1,0,1.5));if(t2&&(!t||t2.sc>t.sc))t=t2;
+    return {num:num?num.t:null,title:t?t.t:null};
+  };
+  const p=ocrBusy.then(run,run);ocrBusy=p.catch(()=>{});return p;
+}
 /* ===== boot & auth ===== */
 (async function boot(){
   if(SB_URL.startsWith('__')){fatal('This app has not been connected to its database yet.');return}
@@ -399,20 +472,42 @@ function shareLink(inv){
 /* plans tab */
 function renderPlans(){
   let h='';const admin=isAdminRole();
-  if(admin)h+='<label class="btn primary block" style="margin-bottom:6px">+ Add plans (PDF or photos)<input type="file" id="planFile" accept="application/pdf,image/*" multiple hidden></label><p class="muted small" style="margin:0 0 14px;text-align:center">Each PDF page becomes a sheet. Big sets take a minute.</p>';
+  if(admin)h+='<label class="btn primary block" style="margin-bottom:6px">+ Add plans (PDF or photos)<input type="file" id="planFile" accept="application/pdf,image/*" multiple hidden></label><p class="muted small" style="margin:0 0 10px;text-align:center">Each PDF page becomes a sheet and gets named from its title block.</p>'+(S.sheets.length?'<button class="btn block" id="autoName" style="margin-bottom:14px">Auto-name sheets from title blocks</button>':'');
   if(!S.loaded.sheets)return h+'<div class="empty">Loading sheets…</div>';
   if(!S.sheets.length)return h+'<div class="empty"><b>No sheets yet</b>'+(admin?'Upload the plan set PDF to get started.':'The office hasn\'t uploaded plans for this job yet.')+'</div>';
   return h+'<div class="grid">'+S.sheets.map(s=>'<div class="sheet" data-id="'+esc(s.id)+'"><img loading="lazy" alt="" data-path="'+esc(s.thumb_path||s.path)+'"><div class="sname">'+esc(s.name||'Sheet')+'</div>'+(admin?'<button class="ico" data-edit aria-label="Edit sheet">✎</button>':'')+'</div>').join('')+'</div>';
 }
 function bindPlans(){
+  const an=$('#autoName');if(an)an.onclick=autoNameSheets;
   const f=$('#planFile');if(f)f.onchange=()=>{const files=[...f.files];f.value='';if(files.length)addPlans(files)};
   $$('.sheet').forEach(el=>{el.onclick=e=>{if(e.target.closest('[data-edit]'))return;openSheet(el.dataset.id)};const b=$('[data-edit]',el);if(b)b.onclick=()=>editSheet(el.dataset.id)});
+}
+async function autoNameSheets(){
+  const list=S.sheets.slice();if(!list.length)return;
+  const pb=progressBox('Loading the text reader…');const found=[];
+  try{await loadOcr()}catch(e){pb.close();toast("Couldn't load the text reader. Check your signal.");return}
+  for(let i=0;i<list.length;i++){
+    const s=list[i];pb.set('Reading sheet '+(i+1)+' of '+list.length+'…');
+    try{const [u]=await urlsFor([s.path]);const img=new Image();img.crossOrigin='anonymous';await new Promise((r,j)=>{img.onload=r;img.onerror=j;img.src=u});
+      const o=await nameFromImage(img);found.push({s,num:o.num,title:o.title})}
+    catch(e){found.push({s,num:null,title:null})}
+  }
+  pb.close();harmonizeNums(found);found.forEach(f=>f.name=sheetLabel(f.num,f.title));
+  const m=modal('<h2>Check the sheet names</h2><p class="muted" style="margin-top:0">Fix any the reader got wrong, then save. Blank ones keep their current name.</p>'+
+    found.map((f,i)=>'<label class="field"><span>'+esc(f.s.name)+'</span><input data-i="'+i+'" value="'+esc(f.name)+'" placeholder="'+esc(f.s.name)+'"></label>').join('')+
+    '<div class="mbtns"><button class="btn" data-x>Cancel</button><button class="btn primary" data-ok>Save names</button></div>');
+  $('[data-x]',m).onclick=()=>m.close();
+  $('[data-ok]',m).onclick=async()=>{
+    const b=$('[data-ok]',m);b.disabled=true;let n=0;
+    for(const inp of $$('[data-i]',m)){const f=found[+inp.dataset.i];const v=inp.value.trim().slice(0,80);if(v&&v!==f.s.name&&await run(sb.from('sheets').update({name:v}).eq('id',f.s.id)))n++}
+    m.close();toast('Renamed '+n+' sheet'+(n===1?'':'s')+'.');loadSheets();
+  };
 }
 async function editSheet(id){
   const s=S.sheets.find(x=>x.id===id);if(!s)return;
   const m=modal('<h2>Sheet '+esc(s.name)+'</h2><form><label class="field"><span>Sheet name</span><input name="n" value="'+esc(s.name)+'"></label><label class="field"><span>Order (lower shows first)</span><input name="o" type="number" value="'+esc(Math.round(num(s.sort)))+'"></label><div class="mbtns"><button type="button" class="btn danger" data-del>Delete sheet</button><button type="button" class="btn" data-x>Cancel</button><button class="btn primary">Save</button></div></form>');
   $('[data-x]',m).onclick=()=>m.close();
-  $('form',m).onsubmit=async e=>{e.preventDefault();const n=$('[name=n]',m).value.trim().slice(0,60);const o=num($('[name=o]',m).value,num(s.sort));m.close();if(n&&await run(sb.from('sheets').update({name:n,sort:o}).eq('id',id)))loadSheets()};
+  $('form',m).onsubmit=async e=>{e.preventDefault();const n=$('[name=n]',m).value.trim().slice(0,80);const o=num($('[name=o]',m).value,num(s.sort));m.close();if(n&&await run(sb.from('sheets').update({name:n,sort:o}).eq('id',id)))loadSheets()};
   $('[data-del]',m).onclick=async()=>{m.close();if(await confirmBox('Delete sheet '+s.name+' and its markups for everyone?')){if(await run(sb.from('sheets').delete().eq('id',id))){sb.storage.from(BUCKET).remove([s.path,s.thumb_path].filter(Boolean));loadSheets()}}};
 }
 async function addPlans(files){
@@ -424,19 +519,26 @@ async function addPlans(files){
       if(isPdf){
         pb.set('Loading PDF reader…');let lib;try{lib=await loadPdfJs()}catch(e){toast("Couldn't load the PDF reader. Check your signal.");break}
         pb.set('Opening '+file.name+'…');
+        const made=[];
         const pdf=await lib.getDocument({data:new Uint8Array(await file.arrayBuffer()),isEvalSupported:false}).promise;
         for(let i=1;i<=pdf.numPages;i++){
           pb.set('Processing page '+i+' of '+pdf.numPages+' ('+file.name+')…');
           const page=await pdf.getPage(i);const vp1=page.getViewport({scale:1});const scale=Math.min(5,3600/Math.max(vp1.width,vp1.height));const vp=page.getViewport({scale});
           const c=document.createElement('canvas');c.width=Math.floor(vp.width);c.height=Math.floor(vp.height);const cx=c.getContext('2d');cx.fillStyle='#fff';cx.fillRect(0,0,c.width,c.height);
           await page.render({canvasContext:cx,viewport:vp}).promise;
-          const name=(await guessSheetName(page,vp1))||(pdf.numPages>1?base+' p'+i:base);
-          await storeSheet(jid,c,name,++order);added++;page.cleanup();c.width=c.height=0;
+          let nm=await nameFromText(page,vp1);
+          if(!nm.num){pb.set('Reading sheet name, page '+i+' of '+pdf.numPages+'…');try{const o=await nameFromImage(c);nm={num:o.num||nm.num,title:nm.title||o.title}}catch(e){}}
+          const name=sheetLabel(nm.num,nm.title)||(pdf.numPages>1?base+' p'+i:base);
+          const sid=await storeSheet(jid,c,name,++order);added++;page.cleanup();c.width=c.height=0;
+          made.push({id:sid,num:nm.num,title:nm.title,name});
         }
+        const before=made.map(x=>x.num);harmonizeNums(made);
+        for(let k=0;k<made.length;k++){if(made[k].num&&made[k].num!==before[k])await run(sb.from('sheets').update({name:sheetLabel(made[k].num,made[k].title)}).eq('id',made[k].id))}
         try{pdf.destroy()}catch(e){}
       }else if(/^image\//.test(file.type)){
         pb.set('Processing '+file.name+'…');const img=await loadImageFile(file);const c=scaledCanvas(img,img.naturalWidth,img.naturalHeight,4000);URL.revokeObjectURL(img.src);
-        await storeSheet(jid,c,base,++order);added++;c.width=c.height=0;
+        let name=base;try{pb.set('Reading sheet name ('+file.name+')…');const o=await nameFromImage(c);name=sheetLabel(o.num,o.title)||base}catch(e){}
+        await storeSheet(jid,c,name,++order);added++;c.width=c.height=0;
       }else toast(file.name+' is not a PDF or image.');
     }
   }catch(e){toast(errMsg(e))}
@@ -445,7 +547,8 @@ async function addPlans(files){
 async function storeSheet(jid,canvas,name,order){
   const id=uuid();const big=await toBlob(canvas,.82);const th=scaledCanvas(canvas,canvas.width,canvas.height,480);const small=await toBlob(th,.75);th.width=th.height=0;
   const p1=await putFile(jid+'/sheets/'+id+'.jpg',big);const p2=await putFile(jid+'/sheets/'+id+'_t.jpg',small);
-  await q(sb.from('sheets').insert({id,job_id:jid,name:String(name).slice(0,60),path:p1,thumb_path:p2,w:canvas.width,h:canvas.height,sort:order}));
+  await q(sb.from('sheets').insert({id,job_id:jid,name:String(name).slice(0,80),path:p1,thumb_path:p2,w:canvas.width,h:canvas.height,sort:order}));
+  return id;
 }
 
 /* progress tab */
