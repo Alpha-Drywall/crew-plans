@@ -1,0 +1,696 @@
+test line
+<b>`x`</b><!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#1d232b">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Crew Plans</title>
+<style>
+:root{--bg:#f1f2f4;--card:#fff;--ink:#16191d;--muted:#5d6670;--line:#dde1e6;--head:#1d232b;--accent:#f2a516;--accent-ink:#1d232b;--danger:#c62828;--ok:#2e7d32;--r:12px}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body.noscroll{overflow:hidden}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer}
+.top{position:sticky;top:0;z-index:20;background:var(--head);color:#fff;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;display:flex;align-items:center;gap:10px;min-height:56px}
+.top h1{font-size:19px;margin:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700}
+.top .sub{font-size:13px;color:#aeb6c0;font-weight:400}
+.top button{background:none;border:0;color:#fff;font-size:22px;padding:4px 8px;min-width:40px;min-height:40px;border-radius:8px}
+.top button:active{background:#ffffff22}
+.brand{display:inline-block;width:12px;height:12px;background:var(--accent);border-radius:3px;margin-right:8px;vertical-align:1px}
+.tabs{position:sticky;top:56px;z-index:19;display:flex;background:var(--head);padding:0 8px}
+.tabs button{flex:1;background:none;border:0;color:#aeb6c0;padding:11px 4px;font-weight:600;font-size:15px;border-bottom:3px solid transparent}
+.tabs button.on{color:#fff;border-bottom-color:var(--accent)}
+main{padding:14px 14px calc(30px + env(safe-area-inset-bottom));max-width:860px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:12px}
+.row{display:flex;align-items:center;gap:10px}
+.grow{flex:1;min-width:0}
+.muted{color:var(--muted);font-size:14px}
+.small{font-size:13px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--line);background:#fff;border-radius:10px;padding:10px 14px;min-height:44px;font-weight:600;text-decoration:none;color:var(--ink)}
+.btn:active{filter:brightness(.94)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.danger{background:var(--danger);border-color:var(--danger);color:#fff}
+.btn.block{width:100%}
+.btn.sm{min-height:36px;padding:6px 10px;font-size:14px}
+.btn[disabled]{opacity:.5}
+.ico{border:0;background:none;font-size:18px;padding:6px 8px;border-radius:8px;color:var(--muted);min-width:36px;min-height:36px}
+.ico:active{background:#0000000f}
+.job{display:flex;align-items:center;gap:12px;cursor:pointer}
+.job .name{font-weight:700;font-size:17px}
+.chev{color:#9aa3ad;font-size:22px}
+.empty{text-align:center;padding:36px 18px;color:var(--muted)}
+.empty b{display:block;color:var(--ink);font-size:17px;margin-bottom:6px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.sheet{background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden;cursor:pointer;position:relative}
+.sheet img{display:block;width:100%;aspect-ratio:3/2;object-fit:contain;background:#fafafa;border-bottom:1px solid var(--line)}
+.sheet .sname{padding:8px 34px 8px 10px;font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sheet .ico{position:absolute;right:2px;bottom:2px;font-size:15px}
+.bar{height:10px;background:#e6e9ed;border-radius:6px;overflow:hidden}
+.bar>i{display:block;height:100%;border-radius:6px}
+.prow{display:grid;grid-template-columns:72px 1fr 46px;align-items:center;gap:10px;margin:8px 0}
+.prow label{font-size:14px;font-weight:600}
+.prow .val{text-align:right;font-variant-numeric:tabular-nums;font-weight:700}
+input[type=range]{width:100%;height:32px}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:0}
+.field{display:block;margin-bottom:12px}
+.field>span{display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:4px}
+.field input,.field textarea,.field select{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:#fff;min-height:44px}
+.field textarea{min-height:76px;resize:vertical}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.logday{font-weight:700;margin:18px 2px 8px;display:flex;justify-content:space-between}
+.logday .muted{font-weight:400}
+.kv{font-size:14px;margin-top:4px;white-space:pre-wrap}
+.kv b{color:var(--muted);font-weight:600}
+.badge{display:inline-block;font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px;background:#e8ebef;color:#38414b;vertical-align:1px}
+.badge.ed{background:#fff1d0;color:#7a4f00}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(70px + env(safe-area-inset-bottom));z-index:300;background:#222;color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;max-width:90vw;box-shadow:0 6px 20px #0004}
+.mwrap{position:fixed;inset:0;z-index:150;background:#0008;display:flex;align-items:flex-end;justify-content:center}
+.mcard{background:#fff;width:100%;max-width:560px;max-height:88vh;overflow:auto;border-radius:16px 16px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom))}
+@media(min-width:700px){.mwrap{align-items:center}.mcard{border-radius:16px}}
+.mcard h2{margin:0 0 12px;font-size:19px}
+.mcard h3{margin:18px 0 8px;font-size:16px}
+.mbtns{display:flex;gap:10px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.chip{border:2px solid var(--line);background:#fff;border-radius:999px;padding:7px 12px;font-weight:600;font-size:14px;min-height:38px}
+.chip.on{border-color:var(--head);background:var(--head);color:#fff}
+.photos{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 12px}
+.photos .ph{width:78px;height:78px;border-radius:8px;object-fit:cover;border:1px solid var(--line);cursor:pointer;background:#eee}
+.addph{width:78px;height:78px;border:2px dashed #b9c0c8;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-direction:column;font-size:12px;color:var(--muted);cursor:pointer;text-align:center}
+.addph b{font-size:22px;line-height:1}
+.photoview{position:fixed;inset:0;z-index:400;background:#000e;display:flex;align-items:center;justify-content:center}
+.photoview img{max-width:100%;max-height:100%}
+.prow2{display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--line)}
+.prow2:last-child{border-bottom:0}
+.linkbox{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px;font-size:14px;background:#f7f8f9}
+#viewer{position:fixed;inset:0;z-index:50;background:#cfd4da;display:flex;flex-direction:column}
+#viewer[hidden]{display:none}
+.vbar{background:var(--head);color:#fff;display:flex;align-items:center;gap:6px;padding:calc(6px + env(safe-area-inset-top)) 8px 6px;min-height:52px}
+.vbar .vt{flex:1;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center}
+.vbar button{background:#ffffff14;border:0;color:#fff;border-radius:8px;padding:8px 12px;font-weight:600;min-height:40px}
+#stage{position:relative;flex:1;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}
+#board{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform;background:#fff;box-shadow:0 2px 14px #0003}
+#board img{display:block;width:100%;height:100%;pointer-events:none;-webkit-user-drag:none}
+#ink{position:absolute;left:0;top:0;width:100%;height:100%;mix-blend-mode:multiply;pointer-events:none}
+#pinLayer{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.pin{position:absolute;left:0;top:0;width:34px;height:34px;margin:-40px 0 0 -17px;border-radius:50%;border:2px solid #fff;color:#fff;font-weight:800;font-size:16px;display:flex;align-items:center;justify-content:center;pointer-events:auto;box-shadow:0 2px 6px #0006;padding:0}
+.pin::after{content:"";position:absolute;left:50%;bottom:-9px;margin-left:-6px;border:6px solid transparent;border-top:8px solid #fff}
+.pin.issue{background:#d32f2f}.pin.question{background:#f59e0b;color:#1d232b}.pin.extra{background:#0f766e}.pin.note{background:#475569}
+.pin.done{background:var(--ok)!important;color:#fff!important;opacity:.85}
+.vtools{background:#fff;border-top:1px solid var(--line);padding:8px 8px calc(8px + env(safe-area-inset-bottom))}
+.trow{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:2px 0}
+.trow::-webkit-scrollbar{display:none}
+.trow+.trow{margin-top:6px}
+.tb{flex:0 0 auto;border:2px solid var(--line);background:#fff;border-radius:10px;padding:7px 11px;font-weight:600;font-size:14px;min-height:42px;white-space:nowrap}
+.tb.on{background:var(--head);border-color:var(--head);color:#fff}
+.pc{flex:0 0 auto;border:3px solid transparent;border-radius:999px;padding:6px 12px;font-weight:700;font-size:14px;color:#fff;min-height:40px;white-space:nowrap}
+.pc.on{border-color:var(--ink);box-shadow:0 0 0 2px #fff inset}
+.hint{position:absolute;left:50%;top:10px;transform:translateX(-50%);background:#1d232bdd;color:#fff;font-size:13px;padding:6px 12px;border-radius:999px;pointer-events:none;white-space:nowrap;max-width:94%;overflow:hidden;text-overflow:ellipsis}
+.lrow{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.lrow:last-child{border-bottom:0}
+.lrow input{width:22px;height:22px}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:13px;margin:6px 0 2px}
+.progress-note{font-size:13px;color:var(--muted);margin-top:4px}
+.welcome{max-width:420px;margin:30px auto}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<div id="app"><div class="top"><h1><span class="brand"></span>Crew Plans</h1></div><main><div class="empty">Loading…</div></main></div>
+<div id="viewer" hidden></div>
+<script>
+"use strict";
+/* ===== Connection settings (filled in at setup) ===== */
+const SB_URL='https://fgdjqhkrpbxjsuobyhwl.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnZGpxaGtycGJ4anN1b2J5aHdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ5NzA5NjYsImV4cCI6MjExMDU0Njk2Nn0.-K_MLnctOyAvjZ9F5Zkw_MW9CfMZt3m_cocrLk4G9ik';
+
+/* ===== constants & helpers ===== */
+const PHASES=[{k:'framing',n:'Framing',c:'#2563eb'},{k:'board',n:'Board',c:'#ea580c'},{k:'tape',n:'Tape',c:'#9333ea'},{k:'finish',n:'Finish',c:'#16a34a'}];
+const PIN_KINDS=[{k:'issue',n:'Issue',i:'!'},{k:'question',n:'Question',i:'?'},{k:'extra',n:'Extra work',i:'$'},{k:'note',n:'Note',i:'i'}];
+const PDFJS='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+const BUCKET='files';
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num=(v,d=0)=>{const n=Number(v);return Number.isFinite(n)?n:d};
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const phase=k=>PHASES.find(p=>p.k===k)||PHASES[0];
+const pinKind=k=>PIN_KINDS.find(p=>p.k===k)||PIN_KINDS[3];
+const uuid=()=>(crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;return (c==='x'?r:(r&3|8)).toString(16)}));
+function today(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function fmtDay(s){const [y,m,d]=String(s).split('-').map(Number);if(!y)return esc(s);return new Date(y,m-1,d).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric',year:'numeric'})}
+function fmtWhen(v){if(!v)return '';const d=new Date(v);if(isNaN(d))return '';return d.toLocaleDateString(undefined,{month:'short',day:'numeric'})+' '+d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'})}
+function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
+function lsSet(k,v){try{v==null?localStorage.removeItem(k):localStorage.setItem(k,v)}catch(e){}}
+let toastT=null;
+function toast(msg){let t=$('#toast');if(!t){t=document.createElement('div');t.id='toast';t.className='toast';document.body.appendChild(t)}t.textContent=msg;t.style.display='block';clearTimeout(toastT);toastT=setTimeout(()=>t.style.display='none',4000)}
+function errMsg(e){const m=String((e&&e.message)||e||'');if(/row-level security|permission denied|42501|Unauthorized|403/i.test(m+(e&&e.code||'')+(e&&e.statusCode||'')))return "You don't have permission to change that.";if(/Failed to fetch|NetworkError|network|Load failed/i.test(m))return 'No connection. Check your signal and try again.';return m||'Something went wrong.'}
+async function q(p){const r=await p;if(r.error)throw r.error;return r.data}
+async function run(p,okMsg){try{const d=await q(p);if(okMsg)toast(okMsg);return d==null?true:d}catch(e){toast(errMsg(e));return null}}
+
+/* ===== state ===== */
+let sb=null;
+const S={me:null,isAdmin:false,jobs:[],jobsLoaded:false,job:null,role:null,tab:'plans',
+  sheets:[],areas:[],logs:[],members:[],invites:[],loaded:{},people:{},urls:{},
+  hidden:new Set(),pinFilter:'all',sliding:false,pendingRender:false,chan:null,jobsChan:null};
+const canWrite=()=>S.role==='admin'||S.role==='editor';
+const isAdminRole=()=>S.role==='admin';
+function who(id){if(!id)return 'Someone';if(S.me&&id===S.me.id)return 'You';return S.people[id]||'Crew member'}
+
+/* ===== modal helpers ===== */
+function modal(inner,onClose){
+  const w=document.createElement('div');w.className='mwrap';w.innerHTML='<div class="mcard">'+inner+'</div>';
+  document.body.appendChild(w);let closed=false;
+  w.close=()=>{if(closed)return;closed=true;w.remove();onClose&&onClose()};
+  w.addEventListener('click',e=>{if(e.target===w)w.close()});return w;
+}
+function confirmBox(msg,okLabel='Delete',danger=true){
+  return new Promise(res=>{
+    const m=modal('<p style="margin:4px 0 6px;font-size:17px">'+esc(msg)+'</p><div class="mbtns"><button class="btn" data-x>Cancel</button><button class="btn '+(danger?'danger':'primary')+'" data-ok>'+esc(okLabel)+'</button></div>',()=>res(false));
+    $('[data-x]',m).onclick=()=>m.close();$('[data-ok]',m).onclick=()=>{res(true);m.close()};
+  });
+}
+function formBox(title,fields,okLabel='Save'){
+  return new Promise(res=>{
+    const html='<h2>'+esc(title)+'</h2><form>'+fields.map(f=>'<label class="field"><span>'+esc(f.label)+'</span>'+
+      (f.type==='textarea'?'<textarea name="'+f.k+'" placeholder="'+esc(f.ph||'')+'">'+esc(f.value||'')+'</textarea>'
+      :f.type==='select'?'<select name="'+f.k+'">'+f.options.map(o=>'<option value="'+esc(o[0])+'"'+(o[0]===f.value?' selected':'')+'>'+esc(o[1])+'</option>').join('')+'</select>'
+      :'<input name="'+f.k+'" type="'+(f.type||'text')+'" value="'+esc(f.value||'')+'" placeholder="'+esc(f.ph||'')+'" '+(f.req?'required':'')+'>')+'</label>').join('')+
+      '<div class="mbtns"><button type="button" class="btn" data-x>Cancel</button><button class="btn primary" type="submit">'+esc(okLabel)+'</button></div></form>';
+    let done=false;const m=modal(html,()=>{if(!done)res(null)});
+    $('[data-x]',m).onclick=()=>m.close();
+    $('form',m).onsubmit=e=>{e.preventDefault();const o={};fields.forEach(f=>o[f.k]=String($('[name="'+f.k+'"]',m).value||'').trim());if(fields.some(f=>f.req&&!o[f.k]))return;done=true;res(o);m.close()};
+    setTimeout(()=>{const i=$('input,textarea',m);i&&i.focus()},50);
+  });
+}
+function progressBox(text){const m=modal('<h2>Working…</h2><p class="muted" data-t>'+esc(text)+'</p><p class="small muted">Keep this screen open until it finishes.</p>');m.set=t=>{$('[data-t]',m).textContent=t};return m}
+async function showPhoto(path){const [u]=await urlsFor([path]);if(!u){toast("Couldn't load that photo.");return}const v=document.createElement('div');v.className='photoview';v.innerHTML='<img alt="">';$('img',v).src=u;v.onclick=()=>v.remove();document.body.appendChild(v)}
+
+/* ===== files ===== */
+async function urlsFor(paths){
+  const need=[...new Set(paths.filter(p=>p&&!S.urls[p]))];
+  if(need.length){try{const {data}=await sb.storage.from(BUCKET).createSignedUrls(need,60*60*12);(data||[]).forEach(d=>{if(d&&d.signedUrl&&d.path)S.urls[d.path]=d.signedUrl})}catch(e){}}
+  return paths.map(p=>S.urls[p]||'');
+}
+async function fillImgs(root){const imgs=$$('img[data-path]',root);if(!imgs.length)return;const us=await urlsFor(imgs.map(i=>i.dataset.path));imgs.forEach((i,k)=>{if(us[k]&&i.src!==us[k])i.src=us[k]})}
+async function putFile(path,blob){const {error}=await sb.storage.from(BUCKET).upload(path,blob,{contentType:'image/jpeg',upsert:false,cacheControl:'31536000'});if(error)throw error;return path}
+const toBlob=(c,q=.82)=>new Promise((res,rej)=>c.toBlob(b=>b?res(b):rej(new Error('Could not encode image')),'image/jpeg',q));
+function scaledCanvas(src,sw,sh,max){const k=Math.min(1,max/Math.max(sw,sh));const c=document.createElement('canvas');c.width=Math.max(1,Math.round(sw*k));c.height=Math.max(1,Math.round(sh*k));const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(src,0,0,c.width,c.height);return c}
+function loadImageFile(file){return new Promise((res,rej)=>{const u=URL.createObjectURL(file);const i=new Image();i.onload=()=>res(i);i.onerror=()=>{URL.revokeObjectURL(u);rej(new Error("Couldn't read that image"))};i.src=u})}
+async function photoFromFile(file){const img=await loadImageFile(file);const c=scaledCanvas(img,img.naturalWidth,img.naturalHeight,1600);URL.revokeObjectURL(img.src);return toBlob(c,.8)}
+
+/* ===== PDF ===== */
+let pdfLoading=null;
+function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=rej;document.head.appendChild(s)})}
+function loadPdfJs(){if(!pdfLoading){pdfLoading=(async()=>{await loadScript(PDFJS+'pdf.min.js');await loadScript(PDFJS+'pdf.worker.min.js');window.pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS+'pdf.worker.min.js';return window.pdfjsLib})().catch(e=>{pdfLoading=null;throw e})}return pdfLoading}
+async function guessSheetName(page,vp){
+  try{const tc=await page.getTextContent();const re=/^[A-Z]{1,3}[-.]?\d{1,3}(\.\d{1,3})?[A-Z]?$/;let best=null,bh=0;
+    for(const it of tc.items){const s=String(it.str||'').trim();if(!re.test(s))continue;const t=it.transform||[];const h=Math.hypot(t[2]||0,t[3]||0);const x=t[4]||0,y=t[5]||0;const sc=h*((x>vp.width*.6&&y<vp.height*.35)?3:1);if(sc>bh){bh=sc;best=s}}
+    return best}catch(e){return null}
+}
+
+/* ===== boot & auth ===== */
+(async function boot(){
+  if(SB_URL.startsWith('__')){fatal('This app has not been connected to its database yet.');return}
+  if(!window.supabase){fatal("Couldn't load. Check your signal and reload the page.");return}
+  sb=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,storageKey:'crewplans-auth'}});
+  const params=new URLSearchParams(location.search);const inv=params.get('invite');
+  let session=null;try{session=(await sb.auth.getSession()).data.session}catch(e){}
+  if(inv){
+    try{history.replaceState(null,'',location.pathname)}catch(e){}
+    if(!session){const r=await sb.auth.signInAnonymously();if(r.error){fatal("Couldn't open your invite: "+errMsg(r.error));return}session=r.data.session}
+    const r=await sb.rpc('redeem_invite',{t:inv});
+    if(r.error){await afterLogin(null);toast(r.error.message||"That invite link didn't work.");return}
+    await afterLogin(r.data);return;
+  }
+  if(!session){renderWelcome();return}
+  await afterLogin(null);
+})();
+function fatal(msg){$('#app').innerHTML='<div class="top"><h1><span class="brand"></span>Crew Plans</h1></div><main><div class="empty"><b>Can\'t open Crew Plans</b>'+esc(msg)+'</div></main>'}
+function renderWelcome(){
+  $('#app').innerHTML='<div class="top"><h1><span class="brand"></span>Crew Plans</h1></div><main><div class="welcome">'+
+    '<div class="card"><b style="font-size:18px">Crew members</b><p class="muted" style="margin:6px 0 0">Open the invite link the office texted you. You don\'t need an account or password.</p></div>'+
+    '<div class="card"><b style="font-size:18px">Office sign in</b><form style="margin-top:12px"><label class="field"><span>Email</span><input name="email" type="email" autocomplete="username" required></label><label class="field"><span>Password</span><input name="pw" type="password" autocomplete="current-password" required></label><button class="btn primary block">Sign in</button></form></div></div></main>';
+  $('form').onsubmit=async e=>{e.preventDefault();const f=e.target;const b=$('button',f);b.disabled=true;
+    const r=await sb.auth.signInWithPassword({email:f.email.value.trim(),password:f.pw.value});
+    if(r.error){b.disabled=false;toast(/Invalid login/i.test(r.error.message)?'Wrong email or password.':errMsg(r.error));return}
+    afterLogin(null)};
+}
+async function afterLogin(openId){
+  try{S.me=(await sb.auth.getUser()).data.user}catch(e){}
+  if(!S.me){renderWelcome();return}
+  try{const adm=await q(sb.from('admins').select('user_id,name'));adm.forEach(a=>S.people[a.user_id]=a.name||'Office');S.isAdmin=adm.some(a=>a.user_id===S.me.id)}catch(e){}
+  await loadJobs();
+  S.jobsChan=sb.channel('jobs-list').on('postgres_changes',{event:'*',schema:'public',table:'jobs'},()=>debounce('jobs',loadJobs))
+    .on('postgres_changes',{event:'*',schema:'public',table:'members'},()=>debounce('jobs',loadJobs)).subscribe();
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){loadJobs();if(S.job)reloadJob();if(V)loadSheetData()}});
+  const target=openId||lsGet('crewplans.lastJob');
+  if(target&&S.jobs.some(j=>j.id===target)){openJob(target);return}
+  render();
+}
+async function loadJobs(){
+  try{S.jobs=await q(sb.from('jobs').select('*').order('created_at',{ascending:false}));S.jobsLoaded=true}
+  catch(e){toast(errMsg(e));S.jobsLoaded=true}
+  if(S.job){const j=S.jobs.find(x=>x.id===S.job.id);if(!j){toast("You no longer have access to this job.");closeJob();return}S.job=j;
+    if(!S.isAdmin){try{const m=await q(sb.from('members').select('role').eq('job_id',j.id).eq('user_id',S.me.id).maybeSingle());const nr=m?m.role:null;if(nr!==S.role){S.role=nr;if(V)closeSheet();render();return}}catch(e){}}}
+  if(S.view!=='job'||S.job)render();
+}
+const timers={};
+function debounce(k,fn,ms=350){clearTimeout(timers[k]);timers[k]=setTimeout(fn,ms)}
+
+/* ===== job loading ===== */
+async function openJob(id){
+  const j=S.jobs.find(x=>x.id===id);if(!j)return;
+  S.job=j;S.view='job';S.tab=S.tab||'plans';S.sheets=[];S.areas=[];S.logs=[];S.members=[];S.invites=[];S.loaded={};
+  if(S.isAdmin)S.role='admin';
+  else{try{const m=await q(sb.from('members').select('role').eq('job_id',id).eq('user_id',S.me.id).maybeSingle());S.role=m?m.role:null}catch(e){S.role=null}}
+  if(!S.role){toast("You don't have access to that job.");S.job=null;S.view='jobs';render();return}
+  lsSet('crewplans.lastJob',id);
+  if(S.chan){sb.removeChannel(S.chan);S.chan=null}
+  const ch=sb.channel('job-'+id);
+  const map={sheets:loadSheets,areas:loadAreas,logs:loadLogs,members:loadMembers};
+  Object.keys(map).forEach(t=>ch.on('postgres_changes',{event:'*',schema:'public',table:t,filter:'job_id=eq.'+id},()=>debounce(t,map[t])));
+  ['sheets','areas','logs','members','marks','pins'].forEach(t=>ch.on('postgres_changes',{event:'DELETE',schema:'public',table:t},()=>debounce(t+'-del',()=>{if(map[t])map[t]();else if(V)loadSheetData()})));
+  ['marks','pins'].forEach(t=>ch.on('postgres_changes',{event:'*',schema:'public',table:t,filter:'job_id=eq.'+id},()=>debounce(t,()=>{if(V)loadSheetData()})));
+  ch.subscribe();S.chan=ch;
+  window.scrollTo(0,0);render();reloadJob();
+}
+function reloadJob(){loadSheets();loadAreas();loadLogs();loadMembers()}
+function jobId(){return S.job&&S.job.id}
+async function loadSheets(){const id=jobId();if(!id)return;try{const d=await q(sb.from('sheets').select('*').eq('job_id',id).order('sort'));if(jobId()!==id)return;S.sheets=d;S.loaded.sheets=true;if(S.tab==='plans')render()}catch(e){toast(errMsg(e))}}
+async function loadAreas(){const id=jobId();if(!id)return;try{const d=await q(sb.from('areas').select('*').eq('job_id',id).order('created_at'));if(jobId()!==id)return;S.areas=d;S.loaded.areas=true;if(S.tab==='progress')render()}catch(e){toast(errMsg(e))}}
+async function loadLogs(){const id=jobId();if(!id)return;try{const d=await q(sb.from('logs').select('*').eq('job_id',id).order('date',{ascending:false}).limit(300));if(jobId()!==id)return;S.logs=d;S.loaded.logs=true;if(S.tab==='log'){renderLogList();const b=$('#logForm');if(b&&b._fillIfEmpty)b._fillIfEmpty()}}catch(e){toast(errMsg(e))}}
+async function loadMembers(){const id=jobId();if(!id)return;try{const d=await q(sb.from('members').select('*').eq('job_id',id).order('joined_at'));if(jobId()!==id)return;S.members=d;d.forEach(m=>S.people[m.user_id]=m.name);render();if(V)buildPins()}catch(e){}}
+async function loadInvites(){const id=jobId();if(!id||!isAdminRole())return [];try{S.invites=await q(sb.from('invites').select('*').eq('job_id',id).order('created_at',{ascending:false}))}catch(e){toast(errMsg(e))}return S.invites}
+function closeJob(){
+  if(V)closeSheet();
+  if(S.chan){sb.removeChannel(S.chan);S.chan=null}
+  S.job=null;S.role=null;S.view='jobs';lsSet('crewplans.lastJob',null);render();
+}
+
+/* ===== render ===== */
+function render(){
+  if(!sb||!S.me)return;
+  if(S.sliding){S.pendingRender=true;return}
+  const app=$('#app');
+  if(S.view!=='job'||!S.job){app.dataset.job='';app.innerHTML=renderJobs();bindJobs();return}
+  const j=S.job;
+  if(!app.querySelector('[data-jobshell]')||app.dataset.job!==j.id||app.dataset.tab!==S.tab||app.dataset.role!==S.role){
+    app.dataset.job=j.id;app.dataset.tab=S.tab;app.dataset.role=S.role;
+    app.innerHTML='<div data-jobshell><div class="top"><button id="back" aria-label="Back">‹</button><h1 id="jt"></h1>'+(isAdminRole()?'<button id="jmenu" aria-label="Job menu">⋯</button>':'')+'</div>'+
+      '<div class="tabs"><button data-tab="plans">Plans</button><button data-tab="progress">Progress</button><button data-tab="log">Daily Log</button></div><main id="tabBody"></main></div>';
+    $('#back').onclick=closeJob;
+    $$('.tabs button').forEach(b=>b.onclick=()=>{S.tab=b.dataset.tab;window.scrollTo(0,0);render()});
+    if($('#jmenu'))$('#jmenu').onclick=jobMenu;
+    if(S.tab==='log'){$('#tabBody').innerHTML='<div id="logForm"></div><div id="logList"></div>';renderLogForm()}
+  }
+  $('#jt').innerHTML=esc(j.name||'Job')+'<div class="sub">'+(j.addr?esc(j.addr)+' · ':'')+(S.role==='viewer'?'View only':S.role==='editor'?'Editor':'Office')+'</div>';
+  $$('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===S.tab));
+  if(S.tab==='plans'){$('#tabBody').innerHTML=renderPlans();bindPlans();fillImgs($('#tabBody'))}
+  else if(S.tab==='progress'){$('#tabBody').innerHTML=renderProgress();bindProgress()}
+  else renderLogList();
+}
+
+/* jobs list */
+function renderJobs(){
+  let h='<div class="top"><h1><span class="brand"></span>Crew Plans</h1><button id="acct" aria-label="Account">☰</button></div><main>';
+  if(S.isAdmin)h+='<button class="btn primary block" id="newJob" style="margin-bottom:14px">+ New job</button>';
+  if(!S.jobsLoaded)h+='<div class="empty">Loading jobs…</div>';
+  else if(!S.jobs.length)h+='<div class="empty"><b>No jobs yet</b>'+(S.isAdmin?'Add a job, upload its plan PDF, then invite your foreman from the job\'s ⋯ menu.':'Open the invite link the office texted you to get access to a job.')+'</div>';
+  else h+=S.jobs.map(j=>'<div class="card job" data-id="'+esc(j.id)+'"><div class="grow"><div class="name">'+esc(j.name||'Untitled job')+'</div>'+(j.addr?'<div class="muted">'+esc(j.addr)+'</div>':'')+'</div><span class="chev">›</span></div>').join('');
+  return h+'</main>';
+}
+function bindJobs(){
+  if($('#newJob'))$('#newJob').onclick=async()=>{
+    const v=await formBox('New job',[{k:'name',label:'Job name',req:true,ph:'e.g. Riverside Medical Office'},{k:'addr',label:'Address or GC (optional)',ph:'e.g. 120 Main St / Turner'}],'Create job');
+    if(!v)return;const d=await run(sb.from('jobs').insert({name:v.name.slice(0,120),addr:v.addr.slice(0,160)}).select().single());
+    if(d&&d.id){S.jobs.unshift(d);openJob(d.id)}
+  };
+  $$('.job').forEach(el=>el.onclick=()=>openJob(el.dataset.id));
+  $('#acct').onclick=()=>{
+    const m=modal('<h2>Account</h2><p class="muted">'+(S.isAdmin?'Signed in as office: '+esc(S.me.email||who(S.me.id)):'Crew access on this phone. Your access comes from invite links; signing out would remove it from this phone.')+'</p><div style="display:grid;gap:10px;margin-top:12px">'+
+      (S.isAdmin?'<button class="btn" data-out>Sign out</button>':'')+'<button class="btn" data-x>Close</button></div>');
+    $('[data-x]',m).onclick=()=>m.close();
+    const o=$('[data-out]',m);if(o)o.onclick=async()=>{await sb.auth.signOut();lsSet('crewplans.lastJob',null);location.reload()};
+  };
+}
+async function jobMenu(){
+  const j=S.job;
+  const m=modal('<h2>'+esc(j.name)+'</h2><div style="display:grid;gap:10px"><button class="btn primary" data-a="people">People & invite links</button><button class="btn" data-a="edit">Rename / edit address</button><button class="btn danger" data-a="del">Delete job</button><button class="btn" data-a="x">Close</button></div>');
+  $('[data-a=x]',m).onclick=()=>m.close();
+  $('[data-a=people]',m).onclick=()=>{m.close();peoplePanel()};
+  $('[data-a=edit]',m).onclick=async()=>{m.close();const v=await formBox('Edit job',[{k:'name',label:'Job name',value:j.name,req:true},{k:'addr',label:'Address or GC',value:j.addr}]);if(v&&await run(sb.from('jobs').update({name:v.name.slice(0,120),addr:v.addr.slice(0,160)}).eq('id',j.id)))loadJobs()};
+  $('[data-a=del]',m).onclick=async()=>{
+    m.close();if(!await confirmBox('Delete "'+(j.name||'this job')+'" with all its sheets, markups, progress and logs, for everyone?'))return;
+    try{const files=[];for(const f of ['sheets','photos']){const {data}=await sb.storage.from(BUCKET).list(j.id+'/'+f,{limit:1000});(data||[]).forEach(o=>files.push(j.id+'/'+f+'/'+o.name))}if(files.length)await sb.storage.from(BUCKET).remove(files)}catch(e){}
+    if(await run(sb.from('jobs').delete().eq('id',j.id))){toast('Job deleted.');S.jobs=S.jobs.filter(x=>x.id!==j.id);closeJob()}
+  };
+}
+
+/* people & invites */
+function inviteLink(t){return location.origin+location.pathname+'?invite='+encodeURIComponent(t)}
+const roleName=r=>r==='editor'?'Editor':'View only';
+async function peoplePanel(){
+  const m=modal('<h2>People on '+esc(S.job.name)+'</h2><div data-body class="muted">Loading…</div><div class="mbtns"><button class="btn" data-x>Close</button><button class="btn primary" data-new>+ Invite someone</button></div>');
+  $('[data-x]',m).onclick=()=>m.close();
+  $('[data-new]',m).onclick=()=>{m.close();newInvite()};
+  await loadInvites();await loadMembers();
+  const body=$('[data-body]',m);if(!body)return;
+  const draw=()=>{
+    const pending=S.invites.filter(i=>!i.revoked&&!i.used_by);
+    body.className='';
+    body.innerHTML='<div class="muted small" style="margin-bottom:6px">Office accounts see every job. Crew only see jobs they\'re invited to.</div>'+
+      (S.members.length?S.members.map(p=>'<div class="prow2"><div class="grow"><b>'+esc(p.name)+'</b><div class="muted small">Joined '+esc(fmtWhen(p.joined_at))+'</div></div><select data-role="'+esc(p.user_id)+'" style="border:1px solid var(--line);border-radius:8px;padding:6px;min-height:36px"><option value="editor"'+(p.role==='editor'?' selected':'')+'>Editor</option><option value="viewer"'+(p.role==='viewer'?' selected':'')+'>View only</option></select><button class="ico" data-rm="'+esc(p.user_id)+'" aria-label="Remove">✕</button></div>').join(''):'<p class="muted">No crew on this job yet.</p>')+
+      (pending.length?'<h3>Links not opened yet</h3>'+pending.map(i=>'<div class="prow2"><div class="grow"><b>'+esc(i.name)+'</b> <span class="badge'+(i.role==='editor'?' ed':'')+'">'+roleName(i.role)+'</span><div class="muted small">Made '+esc(fmtWhen(i.created_at))+'</div></div><button class="btn sm" data-share="'+esc(i.id)+'">Share</button><button class="ico" data-revoke="'+esc(i.id)+'" aria-label="Cancel link">✕</button></div>').join(''):'');
+    $$('[data-role]',body).forEach(s=>s.onchange=async()=>{await run(sb.from('members').update({role:s.value}).eq('job_id',S.job.id).eq('user_id',s.dataset.role),'Access updated.');loadMembers()});
+    $$('[data-rm]',body).forEach(b=>b.onclick=async()=>{const p=S.members.find(x=>x.user_id===b.dataset.rm);if(!p||!await confirmBox('Remove '+p.name+' from this job? Their link will stop working.','Remove'))return;
+      if(p.invite_id)await run(sb.from('invites').update({revoked:true}).eq('id',p.invite_id));
+      await run(sb.from('members').delete().eq('job_id',S.job.id).eq('user_id',p.user_id),'Removed.');await loadMembers();draw()});
+    $$('[data-share]',body).forEach(b=>b.onclick=()=>{const i=S.invites.find(x=>x.id===b.dataset.share);if(i)shareLink(i)});
+    $$('[data-revoke]',body).forEach(b=>b.onclick=async()=>{if(!await confirmBox('Cancel this invite link?','Cancel link'))return;await run(sb.from('invites').update({revoked:true}).eq('id',b.dataset.revoke),'Link cancelled.');await loadInvites();draw()});
+  };
+  draw();
+}
+async function newInvite(){
+  let role='editor';
+  const m=modal('<h2>Invite someone</h2><form><label class="field"><span>Their name</span><input name="n" required placeholder="e.g. Mike – foreman"></label>'+
+    '<div class="field"><span style="display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:6px">What can they do?</span><div class="chips"><button type="button" class="chip" data-r="editor">Editor</button><button type="button" class="chip" data-r="viewer">View only</button></div><div class="muted small" data-desc></div></div>'+
+    '<div class="mbtns"><button type="button" class="btn" data-x>Cancel</button><button class="btn primary">Make link</button></div></form>');
+  const sync=()=>{$$('[data-r]',m).forEach(b=>b.classList.toggle('on',b.dataset.r===role));$('[data-desc]',m).textContent=role==='editor'?'Can mark up plans, drop pins and photos, update progress and write daily logs.':'Can look at plans, markups, progress and logs, but can\'t change anything.'};
+  sync();$$('[data-r]',m).forEach(b=>b.onclick=()=>{role=b.dataset.r;sync()});
+  $('[data-x]',m).onclick=()=>m.close();
+  setTimeout(()=>$('[name=n]',m).focus(),50);
+  $('form',m).onsubmit=async e=>{e.preventDefault();const n=$('[name=n]',m).value.trim().slice(0,60);if(!n)return;
+    const d=await run(sb.from('invites').insert({job_id:S.job.id,role,name:n}).select().single());
+    if(d&&d.token){m.close();shareLink(d)}};
+}
+function shareLink(inv){
+  const link=inviteLink(inv.token);
+  const msg='You\'re invited to '+S.job.name+' on Crew Plans. Open this link on your phone: '+link;
+  const m=modal('<h2>Send this link to '+esc(inv.name)+'</h2><p class="muted" style="margin-top:0">'+roleName(inv.role)+'. Works on one phone only: the first phone that opens it keeps it.</p><input class="linkbox" readonly value="'+esc(link)+'">'+
+    '<div style="display:grid;gap:10px;margin-top:12px"><a class="btn primary" data-sms href="sms:?&body='+encodeURIComponent(msg)+'">Text it</a><button class="btn" data-copy>Copy link</button>'+(navigator.share?'<button class="btn" data-share>Share…</button>':'')+'<button class="btn" data-x>Done</button></div>');
+  $('[data-x]',m).onclick=()=>m.close();
+  $('.linkbox',m).onclick=e=>e.target.select();
+  $('[data-copy]',m).onclick=async()=>{try{await navigator.clipboard.writeText(link);toast('Link copied.')}catch(e){$('.linkbox',m).select();toast('Press and hold the link to copy it.')}};
+  const sh=$('[data-share]',m);if(sh)sh.onclick=()=>navigator.share({title:'Crew Plans',text:msg}).catch(()=>{});
+}
+
+/* plans tab */
+function renderPlans(){
+  let h='';const admin=isAdminRole();
+  if(admin)h+='<label class="btn primary block" style="margin-bottom:6px">+ Add plans (PDF or photos)<input type="file" id="planFile" accept="application/pdf,image/*" multiple hidden></label><p class="muted small" style="margin:0 0 14px;text-align:center">Each PDF page becomes a sheet. Big sets take a minute.</p>';
+  if(!S.loaded.sheets)return h+'<div class="empty">Loading sheets…</div>';
+  if(!S.sheets.length)return h+'<div class="empty"><b>No sheets yet</b>'+(admin?'Upload the plan set PDF to get started.':'The office hasn\'t uploaded plans for this job yet.')+'</div>';
+  return h+'<div class="grid">'+S.sheets.map(s=>'<div class="sheet" data-id="'+esc(s.id)+'"><img loading="lazy" alt="" data-path="'+esc(s.thumb_path||s.path)+'"><div class="sname">'+esc(s.name||'Sheet')+'</div>'+(admin?'<button class="ico" data-edit aria-label="Edit sheet">✎</button>':'')+'</div>').join('')+'</div>';
+}
+function bindPlans(){
+  const f=$('#planFile');if(f)f.onchange=()=>{const files=[...f.files];f.value='';if(files.length)addPlans(files)};
+  $$('.sheet').forEach(el=>{el.onclick=e=>{if(e.target.closest('[data-edit]'))return;openSheet(el.dataset.id)};const b=$('[data-edit]',el);if(b)b.onclick=()=>editSheet(el.dataset.id)});
+}
+async function editSheet(id){
+  const s=S.sheets.find(x=>x.id===id);if(!s)return;
+  const m=modal('<h2>Sheet '+esc(s.name)+'</h2><form><label class="field"><span>Sheet name</span><input name="n" value="'+esc(s.name)+'"></label><label class="field"><span>Order (lower shows first)</span><input name="o" type="number" value="'+esc(Math.round(num(s.sort)))+'"></label><div class="mbtns"><button type="button" class="btn danger" data-del>Delete sheet</button><button type="button" class="btn" data-x>Cancel</button><button class="btn primary">Save</button></div></form>');
+  $('[data-x]',m).onclick=()=>m.close();
+  $('form',m).onsubmit=async e=>{e.preventDefault();const n=$('[name=n]',m).value.trim().slice(0,60);const o=num($('[name=o]',m).value,num(s.sort));m.close();if(n&&await run(sb.from('sheets').update({name:n,sort:o}).eq('id',id)))loadSheets()};
+  $('[data-del]',m).onclick=async()=>{m.close();if(await confirmBox('Delete sheet '+s.name+' and its markups for everyone?')){if(await run(sb.from('sheets').delete().eq('id',id))){sb.storage.from(BUCKET).remove([s.path,s.thumb_path].filter(Boolean));loadSheets()}}};
+}
+async function addPlans(files){
+  const jid=S.job.id;let order=S.sheets.reduce((a,s)=>Math.max(a,num(s.sort)),0);
+  const pb=progressBox('Starting…');let added=0;
+  try{
+    for(const file of files){
+      const isPdf=file.type==='application/pdf'||/\.pdf$/i.test(file.name);const base=file.name.replace(/\.[^.]+$/,'').slice(0,40);
+      if(isPdf){
+        pb.set('Loading PDF reader…');let lib;try{lib=await loadPdfJs()}catch(e){toast("Couldn't load the PDF reader. Check your signal.");break}
+        pb.set('Opening '+file.name+'…');
+        const pdf=await lib.getDocument({data:new Uint8Array(await file.arrayBuffer()),isEvalSupported:false}).promise;
+        for(let i=1;i<=pdf.numPages;i++){
+          pb.set('Processing page '+i+' of '+pdf.numPages+' ('+file.name+')…');
+          const page=await pdf.getPage(i);const vp1=page.getViewport({scale:1});const scale=Math.min(5,3600/Math.max(vp1.width,vp1.height));const vp=page.getViewport({scale});
+          const c=document.createElement('canvas');c.width=Math.floor(vp.width);c.height=Math.floor(vp.height);const cx=c.getContext('2d');cx.fillStyle='#fff';cx.fillRect(0,0,c.width,c.height);
+          await page.render({canvasContext:cx,viewport:vp}).promise;
+          const name=(await guessSheetName(page,vp1))||(pdf.numPages>1?base+' p'+i:base);
+          await storeSheet(jid,c,name,++order);added++;page.cleanup();c.width=c.height=0;
+        }
+        try{pdf.destroy()}catch(e){}
+      }else if(/^image\//.test(file.type)){
+        pb.set('Processing '+file.name+'…');const img=await loadImageFile(file);const c=scaledCanvas(img,img.naturalWidth,img.naturalHeight,4000);URL.revokeObjectURL(img.src);
+        await storeSheet(jid,c,base,++order);added++;c.width=c.height=0;
+      }else toast(file.name+' is not a PDF or image.');
+    }
+  }catch(e){toast(errMsg(e))}
+  pb.close();if(added){toast('Added '+added+' sheet'+(added>1?'s':'')+'.');loadSheets()}
+}
+async function storeSheet(jid,canvas,name,order){
+  const id=uuid();const big=await toBlob(canvas,.82);const th=scaledCanvas(canvas,canvas.width,canvas.height,480);const small=await toBlob(th,.75);th.width=th.height=0;
+  const p1=await putFile(jid+'/sheets/'+id+'.jpg',big);const p2=await putFile(jid+'/sheets/'+id+'_t.jpg',small);
+  await q(sb.from('sheets').insert({id,job_id:jid,name:String(name).slice(0,60),path:p1,thumb_path:p2,w:canvas.width,h:canvas.height,sort:order}));
+}
+
+/* progress tab */
+function avg(k){if(!S.areas.length)return 0;return Math.round(S.areas.reduce((a,p)=>a+clamp(num(p[k]),0,100),0)/S.areas.length)}
+function renderProgress(){
+  if(!S.loaded.areas)return '<div class="empty">Loading progress…</div>';
+  const cw=canWrite();const overall=Math.round(PHASES.reduce((a,p)=>a+avg(p.k),0)/PHASES.length);
+  let h='<div class="card"><div class="row"><div class="grow"><b style="font-size:17px">Job progress</b><div class="muted small">Average across '+S.areas.length+' area'+(S.areas.length===1?'':'s')+'</div></div><div style="font-size:26px;font-weight:800">'+overall+'%</div></div>'+
+    PHASES.map(p=>{const v=avg(p.k);return '<div class="prow"><label><span class="dot" style="background:'+p.c+'"></span>'+p.n+'</label><div class="bar"><i style="width:'+v+'%;background:'+p.c+'"></i></div><div class="val">'+v+'%</div></div>'}).join('')+'</div>';
+  if(cw)h+='<button class="btn block" id="addArea" style="margin-bottom:12px">+ Add area (floor, wing, unit…)</button>';
+  if(!S.areas.length)h+='<div class="empty"><b>No areas yet</b>Break the job into areas like "Level 1 East" or "Units 101–110", then slide each phase as work gets done.</div>';
+  h+=S.areas.map(a=>'<div class="card" data-area="'+esc(a.id)+'"><div class="row"><b class="grow" style="font-size:16px">'+esc(a.name||'Area')+'</b>'+(cw?'<button class="ico" data-amenu aria-label="Area menu">⋯</button>':'')+'</div>'+
+    PHASES.map(p=>{const v=clamp(num(a[p.k]),0,100);return '<div class="prow"><label><span class="dot" style="background:'+p.c+'"></span>'+p.n+'</label><input type="range" min="0" max="100" step="5" value="'+v+'" data-ph="'+p.k+'" '+(cw?'':'disabled')+' style="accent-color:'+p.c+'"><div class="val">'+v+'%</div></div>'}).join('')+
+    (a.updated_at?'<div class="progress-note">Updated '+esc(fmtWhen(a.updated_at))+' by '+esc(who(a.updated_by))+'</div>':'')+'</div>').join('');
+  return h;
+}
+function bindProgress(){
+  const add=$('#addArea');if(add)add.onclick=async()=>{const v=await formBox('New area',[{k:'name',label:'Area name',req:true,ph:'e.g. Level 2 – West'}],'Add');if(v&&await run(sb.from('areas').insert({job_id:S.job.id,name:v.name.slice(0,80)})))loadAreas()};
+  $$('[data-area]').forEach(card=>{
+    const id=card.dataset.area;const mb=$('[data-amenu]',card);if(mb)mb.onclick=()=>areaMenu(id);
+    $$('input[type=range]',card).forEach(r=>{
+      const lab=r.parentElement.querySelector('.val');
+      r.addEventListener('pointerdown',()=>{S.sliding=true});
+      r.addEventListener('input',()=>{lab.textContent=r.value+'%'});
+      r.addEventListener('change',async()=>{
+        S.sliding=false;
+        await run(sb.from('areas').update({[r.dataset.ph]:Number(r.value),updated_by:S.me.id,updated_at:new Date().toISOString()}).eq('id',id));
+        S.pendingRender=false;loadAreas();
+      });
+      r.addEventListener('blur',()=>{if(S.sliding){S.sliding=false;if(S.pendingRender){S.pendingRender=false;render()}}});
+    });
+  });
+}
+async function areaMenu(id){
+  const a=S.areas.find(x=>x.id===id);if(!a)return;
+  const m=modal('<h2>'+esc(a.name)+'</h2><div style="display:grid;gap:10px"><button class="btn" data-a="r">Rename</button><button class="btn danger" data-a="d">Delete area</button><button class="btn" data-a="x">Close</button></div>');
+  $('[data-a=x]',m).onclick=()=>m.close();
+  $('[data-a=r]',m).onclick=async()=>{m.close();const v=await formBox('Rename area',[{k:'name',label:'Area name',value:a.name,req:true}]);if(v&&await run(sb.from('areas').update({name:v.name.slice(0,80)}).eq('id',id)))loadAreas()};
+  $('[data-a=d]',m).onclick=async()=>{m.close();if(await confirmBox('Delete area "'+a.name+'"?')&&await run(sb.from('areas').delete().eq('id',id)))loadAreas()};
+}
+
+/* daily log tab */
+function renderLogForm(){
+  const box=$('#logForm');if(!box)return;
+  if(!canWrite()){box.innerHTML='';return}
+  box.innerHTML='<div class="card"><b style="font-size:17px">Your daily log</b><form style="margin-top:10px">'+
+    '<label class="field"><span>Date</span><input type="date" name="date" value="'+today()+'"></label>'+
+    '<div class="two"><label class="field"><span>Crew on site</span><input type="number" inputmode="numeric" min="0" name="crew" placeholder="0"></label><label class="field"><span>Total man-hours</span><input type="number" inputmode="decimal" min="0" step="0.5" name="hours" placeholder="0"></label></div>'+
+    '<label class="field"><span>Work done today</span><textarea name="work" placeholder="e.g. Framed corridor 2nd floor, hung lids in 201–204"></textarea></label>'+
+    '<label class="field"><span>Material delivered</span><input name="deliveries" placeholder="e.g. 120 sheets 5/8 Type X"></label>'+
+    '<label class="field"><span>Delays / issues / notes</span><textarea name="notes" placeholder="e.g. Waiting on electrician in 205"></textarea></label>'+
+    '<button class="btn primary block" type="submit">Save log</button><div class="muted small" data-st style="text-align:center;margin-top:6px"></div></form></div>';
+  const form=$('form',box);let touched=false;
+  const mine=d=>S.logs.find(l=>l.date===d&&l.user_id===S.me.id);
+  const fill=()=>{const e=mine(form.date.value);['crew','hours','work','deliveries','notes'].forEach(k=>{form[k].value=!e?'':(k==='crew'||k==='hours')?num(e[k]):(e[k]||'')});$('[data-st]',form).textContent=e?'Editing your saved log for this day.':'';touched=false};
+  form.date.onchange=fill;form.addEventListener('input',e=>{if(e.target!==form.date)touched=true});fill();
+  box._fillIfEmpty=()=>{if(!touched)fill()};
+  form.onsubmit=async e=>{e.preventDefault();const d=form.date.value||today();
+    const o={job_id:S.job.id,user_id:S.me.id,date:d,crew:num(form.crew.value),hours:num(form.hours.value),work:form.work.value.trim().slice(0,2000),deliveries:form.deliveries.value.trim().slice(0,500),notes:form.notes.value.trim().slice(0,2000),updated_at:new Date().toISOString()};
+    if(await run(sb.from('logs').upsert(o,{onConflict:'job_id,user_id,date'}),'Log saved.')){touched=false;$('[data-st]',form).textContent='Editing your saved log for this day.';loadLogs()}};
+}
+function renderLogList(){
+  const box=$('#logList');if(!box)return;
+  if(!S.loaded.logs){box.innerHTML='<div class="empty">Loading logs…</div>';return}
+  if(!S.logs.length){box.innerHTML='<div class="empty"><b>No logs yet</b>Each foreman saves one log per day. They show up here for everyone on the job.</div>';return}
+  const byDay={};S.logs.forEach(l=>{(byDay[l.date]=byDay[l.date]||[]).push(l)});
+  box.innerHTML=Object.keys(byDay).sort().reverse().map(d=>{const ls=byDay[d];const crew=ls.reduce((a,l)=>a+num(l.crew),0);const hrs=ls.reduce((a,l)=>a+num(l.hours),0);
+    return '<div class="logday"><span>'+fmtDay(d)+'</span><span class="muted">'+crew+' crew · '+hrs+' hrs</span></div>'+ls.map(l=>
+      '<div class="card"><div class="row"><b class="grow">'+esc(who(l.user_id))+'</b><span class="muted small">'+num(l.crew)+' crew · '+num(l.hours)+' hrs</span></div>'+
+      (l.work?'<div class="kv"><b>Work:</b> '+esc(l.work)+'</div>':'')+(l.deliveries?'<div class="kv"><b>Delivered:</b> '+esc(l.deliveries)+'</div>':'')+(l.notes?'<div class="kv"><b>Notes:</b> '+esc(l.notes)+'</div>':'')+'</div>').join('')}).join('');
+}
+
+/* ===== sheet viewer ===== */
+let V=null;
+async function openSheet(id){
+  const sh=S.sheets.find(s=>s.id===id);if(!sh)return;
+  const cw=canWrite();
+  V={id,sh,W:0,H:0,t:{x:0,y:0,s:1},minS:.05,mode:'pan',phase:'framing',pen:'thin',pts:new Map(),g:null,marks:[],pins:[],mine:[]};
+  const el=$('#viewer');el.hidden=false;document.body.classList.add('noscroll');
+  el.innerHTML='<div class="vbar"><button id="vBack">‹ Sheets</button><div class="vt">'+esc(sh.name||'Sheet')+'</div><button id="vLayers">Layers</button></div>'+
+    '<div id="stage"><div id="board"><img id="planImg" alt="" draggable="false"><svg id="ink" xmlns="http://www.w3.org/2000/svg"><g id="marksG"></g><g id="liveG"></g></svg></div><div id="pinLayer"></div><div class="hint" id="hint">Loading sheet…</div></div>'+
+    '<div class="vtools">'+(cw?'<div class="trow" id="phaseRow">'+PHASES.map(p=>'<button class="pc" data-ph="'+p.k+'" style="background:'+p.c+'">'+p.n+'</button>').join('')+'<button class="tb" id="penBtn">Pen: Thin</button></div>':'')+
+    '<div class="trow" id="modeRow"><button class="tb" data-mode="pan">✋ Move</button>'+(cw?'<button class="tb" data-mode="line">🖍 Highlight</button><button class="tb" data-mode="box">▭ Area</button><button class="tb" data-mode="pin">📍 Pin</button><button class="tb" data-mode="erase">⌫ Erase</button><button class="tb" id="undoBtn">↶ Undo</button>':'')+
+    '<button class="tb" id="fitBtn">⤢ Fit</button></div></div>';
+  V.stage=$('#stage');V.board=$('#board');V.img=$('#planImg');
+  $('#vBack').onclick=()=>{if(location.hash==='#sheet')history.back();else closeSheet()};
+  $('#vLayers').onclick=layersPanel;$('#fitBtn').onclick=fit;
+  $$('#modeRow [data-mode]').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
+  $$('#phaseRow [data-ph]').forEach(b=>b.onclick=()=>{V.phase=b.dataset.ph;if(V.mode==='pan'||V.mode==='pin'||V.mode==='erase')setMode('line');else syncTools()});
+  if($('#penBtn'))$('#penBtn').onclick=()=>{V.pen=V.pen==='thin'?'thick':'thin';syncTools()};
+  if($('#undoBtn'))$('#undoBtn').onclick=undo;
+  syncTools();
+  V.img.onload=()=>{if(!V)return;V.W=V.img.naturalWidth;V.H=V.img.naturalHeight;V.board.style.width=V.W+'px';V.board.style.height=V.H+'px';$('#ink').setAttribute('viewBox','0 0 '+V.W+' '+V.H);fit();drawMarks();buildPins();hint()};
+  V.img.onerror=()=>{const h=$('#hint');if(h)h.textContent="Couldn't load this sheet. Check your signal."};
+  bindStage();
+  try{if(location.hash!=='#sheet')location.hash='sheet'}catch(e){}
+  window.addEventListener('resize',onResize);
+  const [u]=await urlsFor([sh.path]);if(V&&V.id===id){if(u)V.img.src=u;else V.img.onerror()}
+  loadSheetData();
+}
+async function loadSheetData(){
+  if(!V)return;const id=V.id;
+  try{const [mk,pn]=await Promise.all([q(sb.from('marks').select('*').eq('sheet_id',id).order('created_at')),q(sb.from('pins').select('*').eq('sheet_id',id).order('created_at'))]);
+    if(!V||V.id!==id)return;V.marks=mk;V.pins=pn;drawMarks();buildPins()}catch(e){toast(errMsg(e))}
+}
+function onResize(){if(V&&V.W)placePins()}
+function closeSheet(){
+  V=null;window.removeEventListener('resize',onResize);
+  if(location.hash==='#sheet')try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}
+  const el=$('#viewer');el.hidden=true;el.innerHTML='';document.body.classList.remove('noscroll');
+}
+window.addEventListener('hashchange',()=>{if(V&&location.hash!=='#sheet'){$$('.mwrap').forEach(m=>m.close());closeSheet()}});
+function setMode(m){V.mode=m;syncTools();hint()}
+function syncTools(){
+  $$('#modeRow [data-mode]').forEach(b=>b.classList.toggle('on',b.dataset.mode===V.mode));
+  $$('#phaseRow [data-ph]').forEach(b=>b.classList.toggle('on',b.dataset.ph===V.phase));
+  if($('#penBtn'))$('#penBtn').textContent='Pen: '+(V.pen==='thin'?'Thin':'Thick');
+  if($('#undoBtn'))$('#undoBtn').disabled=!V.mine.length;
+}
+function hint(){const h=$('#hint');if(!h||!V.W)return;const p=phase(V.phase).n;
+  h.textContent={pan:'Drag to move · pinch to zoom · tap a pin to open it',line:'Draw along walls to mark them '+p+' · two fingers to move',box:'Drag a box over a finished area ('+p+') · two fingers to move',pin:'Tap the plan where you want a pin',erase:'Tap a highlight or area to erase it'}[V.mode];h.style.display='block'}
+function fit(){if(!V||!V.W)return;const r=V.stage.getBoundingClientRect();const s=Math.min(r.width/V.W,r.height/V.H)*.97;V.minS=s*.6;V.t={s,x:(r.width-V.W*s)/2,y:(r.height-V.H*s)/2};applyT()}
+function applyT(){V.board.style.transform='translate('+V.t.x+'px,'+V.t.y+'px) scale('+V.t.s+')';placePins()}
+function toImg(cx,cy){const r=V.stage.getBoundingClientRect();return {x:(cx-r.left-V.t.x)/V.t.s,y:(cy-r.top-V.t.y)/V.t.s}}
+const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+const mid=(a,b)=>({x:(a.x+b.x)/2,y:(a.y+b.y)/2});
+function bindStage(){
+  const st=V.stage;
+  st.addEventListener('pointerdown',e=>{
+    if(!V||!V.W)return;try{st.setPointerCapture(e.pointerId)}catch(_){}
+    V.pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(V.pts.size===2){if(V.g&&V.g.type==='draw')clearLive();const [a,b]=[...V.pts.values()];V.g={type:'pinch',d0:Math.max(1,dist(a,b)),c0:mid(a,b),t0:Object.assign({},V.t)}}
+    else if(V.pts.size===1){const drawing=(V.mode==='line'||V.mode==='box')&&canWrite();const p=toImg(e.clientX,e.clientY);
+      V.g={type:drawing?'draw':'pan',sx:e.clientX,sy:e.clientY,t0:Object.assign({},V.t),moved:false,time:Date.now(),pts:[p],start:p,end:p};const h=$('#hint');if(h)h.style.display='none'}
+  });
+  st.addEventListener('pointermove',e=>{
+    if(!V||!V.pts.has(e.pointerId))return;V.pts.set(e.pointerId,{x:e.clientX,y:e.clientY});const g=V.g;if(!g)return;
+    if(g.type==='pinch'&&V.pts.size>=2){const [a,b]=[...V.pts.values()];const c=mid(a,b);const r=V.stage.getBoundingClientRect();const s=clamp(g.t0.s*dist(a,b)/g.d0,V.minS,4);const ix=(g.c0.x-r.left-g.t0.x)/g.t0.s,iy=(g.c0.y-r.top-g.t0.y)/g.t0.s;V.t={s,x:c.x-r.left-ix*s,y:c.y-r.top-iy*s};applyT()}
+    else if(g.type==='pan'){const dx=e.clientX-g.sx,dy=e.clientY-g.sy;if(Math.hypot(dx,dy)>7)g.moved=true;if(g.moved){V.t=Object.assign({},g.t0,{x:g.t0.x+dx,y:g.t0.y+dy});applyT()}}
+    else if(g.type==='draw'){if(Math.hypot(e.clientX-g.sx,e.clientY-g.sy)>5)g.moved=true;const p=toImg(e.clientX,e.clientY);if(V.mode==='line'){const l=g.pts[g.pts.length-1];if(dist(p,l)>3/V.t.s)g.pts.push(p)}else g.end=p;drawLive()}
+  });
+  const end=e=>{
+    if(!V||!V.pts.has(e.pointerId))return;V.pts.delete(e.pointerId);const g=V.g;if(!g)return;
+    if(g.type==='pinch'){if(V.pts.size===1){const [a]=[...V.pts.values()];V.g={type:'pan',sx:a.x,sy:a.y,t0:Object.assign({},V.t),moved:true,time:0}}else if(!V.pts.size)V.g=null;return}
+    V.g=null;
+    if(g.type==='draw'){if(e.type!=='pointercancel'&&g.moved)commitDraw(g);clearLive();return}
+    if(g.type==='pan'&&!g.moved&&e.type!=='pointercancel'&&Date.now()-g.time<600)tap(e.clientX,e.clientY);
+  };
+  st.addEventListener('pointerup',end);st.addEventListener('pointercancel',end);
+  st.addEventListener('wheel',e=>{if(!V||!V.W)return;e.preventDefault();const r=V.stage.getBoundingClientRect();const s=clamp(V.t.s*Math.exp(-e.deltaY*.0015),V.minS,4);const ix=(e.clientX-r.left-V.t.x)/V.t.s,iy=(e.clientY-r.top-V.t.y)/V.t.s;V.t={s,x:e.clientX-r.left-ix*s,y:e.clientY-r.top-iy*s};applyT()},{passive:false});
+}
+const r4=v=>Math.round(clamp(v,0,1)*10000)/10000;
+function penW(){return V.pen==='thick'?.012:.006}
+function drawLive(){
+  const g=V.g;const c=phase(V.phase).c;const sw=penW()*Math.max(V.W,V.H);let s='';
+  if(V.mode==='line')s='<polyline points="'+g.pts.map(p=>p.x.toFixed(1)+','+p.y.toFixed(1)).join(' ')+'" fill="none" stroke="'+c+'" stroke-opacity=".6" stroke-width="'+sw+'" stroke-linecap="round" stroke-linejoin="round"/>';
+  else{const x=Math.min(g.start.x,g.end.x),y=Math.min(g.start.y,g.end.y),w=Math.abs(g.end.x-g.start.x),h=Math.abs(g.end.y-g.start.y);s='<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" fill="'+c+'" fill-opacity=".3" stroke="'+c+'" stroke-width="'+(sw/2)+'"/>'}
+  $('#liveG').innerHTML=s;
+}
+function clearLive(){const l=$('#liveG');if(l)l.innerHTML=''}
+async function commitDraw(g){
+  let pts;
+  if(V.mode==='line'){if(g.pts.length<2)return;pts=[];g.pts.forEach(p=>pts.push(r4(p.x/V.W),r4(p.y/V.H)))}
+  else{const a=g.start,b=g.end;if(Math.abs(a.x-b.x)<4/V.t.s||Math.abs(a.y-b.y)<4/V.t.s)return;pts=[r4(Math.min(a.x,b.x)/V.W),r4(Math.min(a.y,b.y)/V.H),r4(Math.max(a.x,b.x)/V.W),r4(Math.max(a.y,b.y)/V.H)]}
+  if(pts.length>3000)pts=pts.slice(0,3000);
+  const row={id:uuid(),job_id:S.job.id,sheet_id:V.id,kind:V.mode==='box'?'box':'line',phase:V.phase,pts,w:penW(),created_at:new Date().toISOString()};
+  V.marks.push(row);drawMarks();V.mine.push(row.id);syncTools();
+  const sheetId=V.id;const ok=await run(sb.from('marks').insert(row));
+  if(!ok&&V&&V.id===sheetId){V.marks=V.marks.filter(m=>m.id!==row.id);V.mine=V.mine.filter(i=>i!==row.id);drawMarks();syncTools()}
+}
+async function undo(){const id=V.mine.pop();syncTools();if(!id)return;V.marks=V.marks.filter(m=>m.id!==id);drawMarks();await run(sb.from('marks').delete().eq('id',id))}
+function markGeom(m){return {kind:m.kind==='box'?'box':'line',p:Array.isArray(m.pts)?m.pts.map(v=>num(v)):[]}}
+function drawMarks(){
+  const g=$('#marksG');if(!g||!V.W)return;const M=Math.max(V.W,V.H);
+  g.innerHTML=V.marks.filter(m=>!S.hidden.has(phase(m.phase).k)).map(m=>{
+    const c=phase(m.phase).c;const sw=clamp(num(m.w,.006),.001,.03)*M;const {kind,p}=markGeom(m);
+    if(kind==='box'){if(p.length<4)return '';return '<rect x="'+p[0]*V.W+'" y="'+p[1]*V.H+'" width="'+Math.max(0,(p[2]-p[0])*V.W)+'" height="'+Math.max(0,(p[3]-p[1])*V.H)+'" fill="'+c+'" fill-opacity=".28" stroke="'+c+'" stroke-opacity=".85" stroke-width="'+(sw/2)+'"/>'}
+    if(p.length<4)return '';let s='';for(let i=0;i+1<p.length;i+=2)s+=(p[i]*V.W).toFixed(1)+','+(p[i+1]*V.H).toFixed(1)+' ';
+    return '<polyline points="'+s+'" fill="none" stroke="'+c+'" stroke-opacity=".6" stroke-width="'+sw+'" stroke-linecap="round" stroke-linejoin="round"/>';
+  }).join('');
+}
+function segDist(px,py,ax,ay,bx,by){const dx=bx-ax,dy=by-ay;const l=dx*dx+dy*dy;let t=l?((px-ax)*dx+(py-ay)*dy)/l:0;t=clamp(t,0,1);return Math.hypot(px-(ax+t*dx),py-(ay+t*dy))}
+function nearestMark(pt){
+  const tol=22/V.t.s;let best=null,bd=Infinity;const M=Math.max(V.W,V.H);
+  for(const m of V.marks){if(S.hidden.has(phase(m.phase).k))continue;const {kind,p}=markGeom(m);let d=Infinity;
+    if(kind==='box'&&p.length>=4){const x1=p[0]*V.W,y1=p[1]*V.H,x2=p[2]*V.W,y2=p[3]*V.H;if(pt.x>=x1&&pt.x<=x2&&pt.y>=y1&&pt.y<=y2)d=0;else d=Math.min(segDist(pt.x,pt.y,x1,y1,x2,y1),segDist(pt.x,pt.y,x2,y1,x2,y2),segDist(pt.x,pt.y,x2,y2,x1,y2),segDist(pt.x,pt.y,x1,y2,x1,y1))}
+    else{for(let i=0;i+3<p.length;i+=2)d=Math.min(d,segDist(pt.x,pt.y,p[i]*V.W,p[i+1]*V.H,p[i+2]*V.W,p[i+3]*V.H));d-=clamp(num(m.w,.006),.001,.03)*M/2}
+    if(d<bd){bd=d;best=m}}
+  return bd<=tol?best:null;
+}
+async function tap(cx,cy){
+  const p=toImg(cx,cy);if(p.x<0||p.y<0||p.x>V.W||p.y>V.H)return;
+  if(V.mode==='pin'&&canWrite())pinDialog(null,{x:r4(p.x/V.W),y:r4(p.y/V.H)});
+  else if(V.mode==='erase'&&canWrite()){const m=nearestMark(p);if(!m){toast('No markup there. Zoom in and tap right on it.');return}
+    if(await confirmBox('Erase this '+phase(m.phase).n+' '+(m.kind==='box'?'area':'highlight')+'?','Erase')){if(V){V.marks=V.marks.filter(x=>x.id!==m.id);drawMarks()}await run(sb.from('marks').delete().eq('id',m.id))}}
+}
+function visiblePins(){return V.pins.filter(p=>S.pinFilter==='all'||(S.pinFilter==='open'&&p.status!=='done'))}
+function buildPins(){
+  const L=$('#pinLayer');if(!L||!V||!V.W)return;
+  L.innerHTML=visiblePins().map(p=>{const k=pinKind(p.kind);return '<button class="pin '+k.k+(p.status==='done'?' done':'')+'" data-id="'+esc(p.id)+'" aria-label="'+esc(k.n)+'">'+(p.status==='done'?'✓':k.i)+'</button>'}).join('');
+  $$('.pin',L).forEach(b=>b.onclick=()=>{const p=V.pins.find(x=>x.id===b.dataset.id);if(p)pinDialog(p)});placePins();
+}
+function placePins(){if(!V||!V.W)return;$$('#pinLayer .pin').forEach(b=>{const p=V.pins.find(x=>x.id===b.dataset.id);if(!p)return;const x=clamp(num(p.x),0,1)*V.W*V.t.s+V.t.x,y=clamp(num(p.y),0,1)*V.H*V.t.s+V.t.y;b.style.transform='translate('+x+'px,'+y+'px)'})}
+function layersPanel(){
+  const counts={};V.marks.forEach(m=>{const k=phase(m.phase).k;counts[k]=(counts[k]||0)+1});const open=V.pins.filter(p=>p.status!=='done').length;
+  const m=modal('<h2>Layers</h2>'+PHASES.map(p=>'<label class="lrow"><input type="checkbox" data-ph="'+p.k+'" '+(S.hidden.has(p.k)?'':'checked')+'><span class="dot" style="background:'+p.c+'"></span><span class="grow">'+p.n+'</span><span class="muted">'+(counts[p.k]||0)+' marks</span></label>').join('')+
+    '<div style="margin-top:14px"><b>Pins</b> <span class="muted small">('+open+' open of '+V.pins.length+')</span></div><div class="chips" style="margin-top:8px">'+[['all','All'],['open','Open only'],['none','Hide']].map(([k,n])=>'<button class="chip'+(S.pinFilter===k?' on':'')+'" data-pf="'+k+'">'+n+'</button>').join('')+'</div>'+
+    '<div class="legend"><span><span class="dot" style="background:#d32f2f"></span>Issue</span><span><span class="dot" style="background:#f59e0b"></span>Question</span><span><span class="dot" style="background:#0f766e"></span>Extra work</span><span><span class="dot" style="background:#475569"></span>Note</span><span><span class="dot" style="background:#2e7d32"></span>Done</span></div>'+
+    '<div class="mbtns"><button class="btn primary" data-x>Done</button></div>');
+  $$('[data-ph]',m).forEach(c=>c.onchange=()=>{c.checked?S.hidden.delete(c.dataset.ph):S.hidden.add(c.dataset.ph);drawMarks()});
+  $$('[data-pf]',m).forEach(b=>b.onclick=()=>{S.pinFilter=b.dataset.pf;$$('[data-pf]',m).forEach(x=>x.classList.toggle('on',x===b));buildPins()});
+  $('[data-x]',m).onclick=()=>m.close();
+}
+function pinDialog(pin,at){
+  const isNew=!pin;const jid=S.job.id,sheetId=V.id;const ro=!canWrite();
+  let kind=isNew?'issue':pinKind(pin.kind).k;let photos=isNew?[]:(Array.isArray(pin.photos)?pin.photos.filter(p=>typeof p==='string'):[]);
+  const m=modal('<h2>'+(isNew?'New pin':esc(pinKind(pin.kind).n))+'</h2><div class="chips">'+PIN_KINDS.map(k=>'<button class="chip" data-k="'+k.k+'" '+(ro?'disabled':'')+'>'+k.n+'</button>').join('')+'</div>'+
+    '<label class="field"><span>Note</span><textarea data-text '+(ro?'readonly':'')+' placeholder="What\'s going on here?">'+esc(isNew?'':pin.text||'')+'</textarea></label>'+
+    '<div class="field"><span style="display:block;font-size:13px;font-weight:600;color:var(--muted)">Photos</span><div class="photos" data-ph></div></div>'+
+    (isNew?'':'<div class="muted small">Added by '+esc(who(pin.created_by))+' · '+esc(fmtWhen(pin.created_at))+(pin.status==='done'?'<br>Marked done by '+esc(who(pin.done_by))+' · '+esc(fmtWhen(pin.done_at)):'')+'</div>')+
+    '<div class="mbtns">'+(!isNew&&!ro&&(pin.created_by===S.me.id||isAdminRole())?'<button class="btn danger" data-del>Delete</button>':'')+(!isNew&&!ro?'<button class="btn" data-done>'+(pin.status==='done'?'Reopen':'Mark done')+'</button>':'')+
+    '<button class="btn" data-x>'+(ro?'Close':'Cancel')+'</button>'+(ro?'':'<button class="btn primary" data-save>Save</button>')+'</div>');
+  const syncK=()=>$$('[data-k]',m).forEach(b=>b.classList.toggle('on',b.dataset.k===kind));syncK();
+  $$('[data-k]',m).forEach(b=>b.onclick=()=>{kind=b.dataset.k;syncK()});
+  const drawPh=()=>{
+    const box=$('[data-ph]',m);
+    box.innerHTML=photos.map(p=>'<img class="ph" alt="" data-path="'+esc(p)+'">').join('')+(!ro?'<label class="addph"><b>+</b>Photo<input type="file" accept="image/*" capture="environment" hidden></label>':'')+(!photos.length&&ro?'<span class="muted small">No photos</span>':'');
+    fillImgs(box);$$('.ph',box).forEach(i=>i.onclick=()=>showPhoto(i.dataset.path));
+    const inp=$('input[type=file]',box);
+    if(inp)inp.onchange=async()=>{const f=inp.files[0];inp.value='';if(!f)return;const lab=inp.parentElement;lab.innerHTML='<b>…</b>Uploading';
+      try{const b=await photoFromFile(f);const path=await putFile(jid+'/photos/'+uuid()+'.jpg',b);photos.push(path)}catch(e){toast(errMsg(e))}drawPh()};
+  };
+  drawPh();
+  $('[data-x]',m).onclick=()=>m.close();
+  const sb2=$('[data-save]',m);
+  if(sb2)sb2.onclick=async()=>{const text=$('[data-text]',m).value.trim().slice(0,2000);sb2.disabled=true;
+    const ok=isNew?await run(sb.from('pins').insert({job_id:jid,sheet_id:sheetId,x:at.x,y:at.y,kind,text,photos,status:'open'}))
+      :await run(sb.from('pins').update({kind,text,photos}).eq('id',pin.id));
+    if(ok){m.close();if(isNew&&V)setMode('pan');loadSheetData()}else sb2.disabled=false};
+  const db=$('[data-done]',m);
+  if(db)db.onclick=async()=>{const reopen=pin.status==='done';if(await run(sb.from('pins').update(reopen?{status:'open',done_by:null,done_at:null}:{status:'done',done_by:S.me.id,done_at:new Date().toISOString()}).eq('id',pin.id))){m.close();loadSheetData()}};
+  const dl=$('[data-del]',m);
+  if(dl)dl.onclick=async()=>{m.close();if(await confirmBox('Delete this pin for everyone?')&&await run(sb.from('pins').delete().eq('id',pin.id)))loadSheetData()};
+}
+</script>
+</body>
+</html>
