@@ -582,7 +582,7 @@ async function openJob(id){
   ch.subscribe();S.chan=ch;
   window.scrollTo(0,0);render();reloadJob();
 }
-function reloadJob(){loadSheets();loadAreas();loadLogs();loadMembers();if(isAdminRole()&&S.tab==='labor')loadLabor()}
+function reloadJob(){loadSheets();loadAreas();loadLogs();loadMembers();if(S.tab==='labor')loadLabor()}
 function jobId(){return S.job&&S.job.id}
 async function loadSheets(){const id=jobId();if(!id)return;try{const d=await q(sb.from('sheets').select('*').eq('job_id',id).order('sort'));if(jobId()!==id)return;S.sheets=d;S.loaded.sheets=true;if(S.tab==='plans')render()}catch(e){toast(errMsg(e))}}
 async function loadBudget(){const id=jobId();if(!id||!isAdminRole()){S.budget=null;return}try{const d=await q(sb.from('job_budget').select('amounts').eq('job_id',id).maybeSingle());if(jobId()===id)S.budget=d?d.amounts||{}:null}catch(e){S.budget=null}}
@@ -602,11 +602,11 @@ function render(){
   if(S.sliding){S.pendingRender=true;return}
   const app=$('#app');
   if(S.view!=='job'||!S.job){app.dataset.job='';app.innerHTML=renderJobs();bindJobs();return}
-  const j=S.job;if(S.tab==='labor'&&!isAdminRole())S.tab='plans';
+  const j=S.job;
   if(!app.querySelector('[data-jobshell]')||app.dataset.job!==j.id||app.dataset.tab!==S.tab||app.dataset.role!==S.role){
     app.dataset.job=j.id;app.dataset.tab=S.tab;app.dataset.role=S.role;
     app.innerHTML='<div data-jobshell><div class="top"><button id="back" aria-label="Back">‹</button><h1 id="jt"></h1>'+(isAdminRole()?'<button id="jmenu" aria-label="Job menu">⋯</button>':'')+'</div>'+
-      '<div class="tabs"><button data-tab="plans">Plans</button><button data-tab="progress">Progress</button><button data-tab="log">Daily Log</button>'+(isAdminRole()?'<button data-tab="labor">Labor</button>':'')+'</div><main id="tabBody"></main></div>';
+      '<div class="tabs"><button data-tab="plans">Plans</button><button data-tab="progress">Progress</button><button data-tab="log">Daily Log</button><button data-tab="labor">Labor</button></div><main id="tabBody"></main></div>';
     $('#back').onclick=closeJob;
     $$('.tabs button').forEach(b=>b.onclick=()=>{S.tab=b.dataset.tab;window.scrollTo(0,0);render()});
     if($('#jmenu'))$('#jmenu').onclick=jobMenu;
@@ -620,10 +620,12 @@ function render(){
   else renderLogList();
 }
 
-/* labor (office only) */
-async function loadLabor(){const id=jobId();if(!id||!isAdminRole())return;S.laborLoading=true;
-  try{const [b,ls]=await Promise.all([q(sb.from('job_budget').select('labor').eq('job_id',id).maybeSingle()),q(sb.from('logs').select('date,hours,hours_by_code').eq('job_id',id).order('date'))]);
-    if(jobId()!==id)return;S.labor=(b&&b.labor)||{};S.laborLogs=ls||[];S.loaded.labor=true}catch(e){toast(errMsg(e))}finally{S.laborLoading=false}
+/* labor (office edits budget; everyone on the job can view) */
+async function laborBudgetRead(id){if(isAdminRole()){const b=await q(sb.from('job_budget').select('labor').eq('job_id',id).maybeSingle());return (b&&b.labor)||{}}
+  return (await q(sb.rpc('labor_budget',{j:id},{get:true})))||{}}
+async function loadLabor(){const id=jobId();if(!id)return;S.laborLoading=true;
+  try{const [lb,ls]=await Promise.all([laborBudgetRead(id),q(sb.from('logs').select('date,hours,hours_by_code').eq('job_id',id).order('date'))]);
+    if(jobId()!==id)return;S.labor=lb||{};S.laborLogs=ls||[];S.loaded.labor=true}catch(e){toast(errMsg(e))}finally{S.laborLoading=false}
   if(S.tab==='labor')render()}
 function laborCalc(){
   const L=S.labor||{};const hpd=num(L.hpd)||10;const budget=L.hours||{};const weeks={};let unc=0;
@@ -639,9 +641,9 @@ function fmtWk(w){const [y,m,d]=w.split('-').map(Number);return new Date(y,m-1,d
 function renderLabor(){
   if(!S.loaded.labor)return '<div class="empty">Loading labor…</div>';
   const C=laborCalc();const noBudget=!C.t.bh;
-  let h='<div class="card"><div class="row"><div class="grow"><b style="font-size:17px">Labor</b><div class="muted small">'+(C.jobNo?'Job # '+esc(C.jobNo)+' · ':'')+C.hpd+' hrs per day · from daily logs · office only</div></div></div>'+
-    '<div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><button class="btn sm" id="labBudget">Budget hours ✎</button><button class="btn sm" id="labImp">⬆ Import from bid sheet</button><input type="file" id="labFile" accept=".xlsx,.xlsm" hidden><button class="btn sm primary" id="labDl">⬇ Download labor workbook</button></div></div>';
-  if(noBudget)h+='<div class="card" style="background:#fff8e6"><b>No budget hours yet.</b><div class="muted small" style="margin-top:4px">Tap <b>Budget hours</b> and enter the HOURS column from the bid sheet\'s LABOR tab.</div></div>';
+  let h='<div class="card"><div class="row"><div class="grow"><b style="font-size:17px">Labor</b><div class="muted small">'+(C.jobNo?'Job # '+esc(C.jobNo)+' · ':'')+C.hpd+' hrs per day · from daily logs</div></div></div>'+
+    (!isAdminRole()?'</div>':'<div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><button class="btn sm" id="labBudget">Budget hours ✎</button><button class="btn sm" id="labImp">⬆ Import from bid sheet</button><input type="file" id="labFile" accept=".xlsx,.xlsm" hidden><button class="btn sm primary" id="labDl">⬇ Download labor workbook</button></div></div>');
+  if(noBudget)h+='<div class="card" style="background:#fff8e6"><b>No budget hours yet.</b><div class="muted small" style="margin-top:4px">'+(isAdminRole()?'Tap <b>Import from bid sheet</b> or <b>Budget hours</b>.':'The office hasn\'t entered the budget hours for this job yet.')+'</div></div>';
   h+='<div class="card lscroll"><table class="ltab"><thead><tr><th>Code</th><th>Budget hrs</th><th>Man days</th><th>Used</th><th>Left</th><th>% left</th></tr></thead><tbody>'+
     C.rows.map(r=>'<tr><td>'+esc(r.c.n)+'</td><td>'+f1(r.bh)+'</td><td>'+f1(r.md)+'</td><td class="used">'+f1(r.used)+'</td><td'+(r.left<0?' class="over"':'')+'>'+f1(r.left)+'</td><td'+(r.left<0?' class="over"':'')+'>'+(r.md?pctS(r.pct):'–')+'</td></tr>').join('')+
     '<tr class="tot"><td>TOTAL</td><td>'+f1(C.t.bh)+'</td><td>'+f1(C.t.md)+'</td><td class="used">'+f1(C.t.used)+'</td><td'+(C.t.left<0?' class="over"':'')+'>'+f1(C.t.left)+'</td><td>'+(C.t.md?pctS(C.t.pct):'–')+'</td></tr></tbody></table>'+
