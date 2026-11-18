@@ -134,6 +134,9 @@ input[type=range]{width:100%;height:32px}
 .tb.on{background:var(--head);border-color:var(--head);color:#fff}
 .pc{flex:0 0 auto;border:3px solid transparent;border-radius:999px;padding:6px 12px;font-weight:700;font-size:14px;color:#fff;text-shadow:0 1px 1px #0005;min-height:40px;white-space:nowrap}
 .pc.on{border-color:var(--ink);box-shadow:0 0 0 2px #fff inset}
+.snav{position:absolute;top:50%;transform:translateY(-50%);z-index:6;width:44px;height:64px;border:0;border-radius:12px;background:#1d232bcc;color:#fff;font-size:30px;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px #0004}
+.snav:disabled{opacity:.25}
+#snPrev{left:8px}#snNext{right:8px}
 .hint{position:absolute;left:50%;top:10px;transform:translateX(-50%);background:#1d232bdd;color:#fff;font-size:13px;padding:6px 12px;border-radius:999px;pointer-events:none;white-space:nowrap;max-width:94%;overflow:hidden;text-overflow:ellipsis}
 .lrow{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
 .lrow:last-child{border-bottom:0}
@@ -191,7 +194,7 @@ async function run(p,okMsg){try{const d=await q(p);if(okMsg)toast(okMsg);return 
 /* ===== offline: local cache + outbox ===== */
 const OFF={db:null,ops:[],flushing:false,online:navigator.onLine!==false,ready:null};
 const OFF_TABLES=['marks','pins','logs','areas'];
-const OFF_DEFAULTS={pins:{kind:'issue',text:'',photos:[],status:'open',done_by:null,done_at:null},marks:{w:0.006},areas:{pct:{}},logs:{crew:0,hours:0,work:'',deliveries:'',notes:'',name:'',hours_by_code:{}}};
+const OFF_DEFAULTS={pins:{layer:'plans',kind:'issue',text:'',photos:[],status:'open',done_by:null,done_at:null},marks:{w:0.006,layer:'plans'},areas:{pct:{}},logs:{crew:0,hours:0,work:'',deliveries:'',notes:'',name:'',hours_by_code:{}}};
 function idb(){if(OFF.db)return OFF.db;OFF.db=new Promise((res,rej)=>{try{const r=indexedDB.open('alpha-crew-view',1);r.onupgradeneeded=()=>{const d=r.result;d.createObjectStore('resp');d.createObjectStore('img');d.createObjectStore('outbox',{keyPath:'n',autoIncrement:true})};r.onsuccess=()=>{const d=r.result;d.onclose=()=>{OFF.db=null};d.onversionchange=()=>{try{d.close()}catch(e){}OFF.db=null};res(d)};r.onerror=()=>{OFF.db=null;rej(r.error)}}catch(e){OFF.db=null;rej(e)}});return OFF.db}
 function idbOnce(store,mode,fn){return idb().then(d=>new Promise((res,rej)=>{const tx=d.transaction(store,mode);const r=fn(tx.objectStore(store));let out;if(r)r.onsuccess=()=>{out=r.result};tx.oncomplete=()=>res(out);tx.onerror=tx.onabort=()=>rej(tx.error)}))}
 async function idbDo(store,mode,fn){try{return await idbOnce(store,mode,fn)}catch(e){OFF.db=null;return await idbOnce(store,mode,fn)}}
@@ -615,7 +618,7 @@ function render(){
   $('#jt').innerHTML=esc(j.name||'Job')+'<div class="sub">'+(j.addr?esc(j.addr)+' · ':'')+(pmName(j.pm)?'PM '+esc(pmName(j.pm))+' · ':'')+(S.role==='viewer'?'View only':S.role==='editor'?'Editor':'Office')+'</div>';
   $$('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===S.tab));
   if(S.tab==='plans'){$('#tabBody').innerHTML=renderPlans();bindPlans();fillImgs($('#tabBody'))}
-  else if(S.tab==='progress'){$('#tabBody').innerHTML=renderProgress();bindProgress()}
+  else if(S.tab==='progress'){$('#tabBody').innerHTML=renderProgress();bindProgress();fillImgs($('#tabBody'))}
   else if(S.tab==='labor'){$('#tabBody').innerHTML=renderLabor();bindLabor();if(!S.loaded.labor&&!S.laborLoading)loadLabor()}
   else renderLogList();
 }
@@ -811,8 +814,8 @@ async function downloadJob(){
     pb.set('Collecting job data…');
     const [sheets,marks,pins,areas,logs,members]=await Promise.all([
       q(sb.from('sheets').select('*').eq('job_id',job.id).eq('is_current',true).order('sort')),
-      q(sb.from('marks').select('*').eq('job_id',job.id).order('created_at')),
-      q(sb.from('pins').select('*').eq('job_id',job.id).order('created_at')),
+      q(sb.from('marks').select('*').eq('job_id',job.id).eq('layer','plans').order('created_at')),
+      q(sb.from('pins').select('*').eq('job_id',job.id).eq('layer','plans').order('created_at')),
       q(sb.from('areas').select('*').eq('job_id',job.id).order('created_at')),
       q(sb.from('logs').select('*').eq('job_id',job.id).order('date')),
       q(sb.from('members').select('*').eq('job_id',job.id))]);
@@ -1004,7 +1007,7 @@ async function saveJobOffline(){
     await Promise.all([loadSheets(),loadAreas(),loadLogs(),loadMembers()]);
     const list=curSheets();const photos=[];let bad=0;
     for(let i=0;i<list.length;i++){const s=list[i];pb.set('Saving sheet '+(i+1)+' of '+list.length+'…');
-      try{const [,pn]=await Promise.all([q(marksQ(s.id)),q(pinsQ(s.id))]);(pn||[]).forEach(p=>(Array.isArray(p.photos)?p.photos:[]).forEach(x=>photos.push(x)))}catch(e){bad++}
+      try{const ls=s.on_progress?['plans','progress']:['plans'];const rs=await Promise.all(ls.flatMap(l=>[q(marksQ(s.id,l)),q(pinsQ(s.id,l))]));rs.filter((_,k)=>k%2).map(x=>x||[]).flat().forEach(p=>(Array.isArray(p.photos)?p.photos:[]).forEach(x=>photos.push(x)))}catch(e){bad++}
       const us=await urlsFor([s.path,s.thumb_path].filter(Boolean),true);if(!us[0]||!us[0].startsWith('blob:'))bad++}
     if(photos.length){pb.set('Saving '+photos.length+' pin photo'+(photos.length>1?'s':'')+'…');await urlsFor(photos,true)}
     pb.close();
@@ -1037,9 +1040,9 @@ async function autoNameSheets(){
 }
 async function editSheet(id){
   const s=S.sheets.find(x=>x.id===id);if(!s)return;
-  const m=modal('<h2>Sheet '+esc(s.name)+'</h2><form><label class="field"><span>Sheet name</span><input name="n" value="'+esc(s.name)+'"></label><label class="field"><span>Order (lower shows first)</span><input name="o" type="number" value="'+esc(Math.round(num(s.sort)))+'"></label><div class="mbtns"><button type="button" class="btn danger" data-del>Delete sheet</button><button type="button" class="btn" data-x>Cancel</button><button class="btn primary">Save</button></div></form>');
+  const m=modal('<h2>Sheet '+esc(s.name)+'</h2><form><label class="field"><span>Sheet name</span><input name="n" value="'+esc(s.name)+'"></label><label class="field"><span>Order (lower shows first)</span><input name="o" type="number" value="'+esc(Math.round(num(s.sort)))+'"></label><label class="field" style="display:flex;align-items:center;gap:10px"><input type="checkbox" name="pg" style="width:22px;height:22px"'+(s.on_progress?' checked':'')+'><span style="margin:0">Show on Progress tab (crew highlights progress on it)</span></label><div class="mbtns"><button type="button" class="btn danger" data-del>Delete sheet</button><button type="button" class="btn" data-x>Cancel</button><button class="btn primary">Save</button></div></form>');
   $('[data-x]',m).onclick=()=>m.close();
-  $('form',m).onsubmit=async e=>{e.preventDefault();const n=$('[name=n]',m).value.trim().slice(0,80);const o=num($('[name=o]',m).value,num(s.sort));m.close();if(n&&await run(sb.from('sheets').update({name:n,sort:o}).eq('id',id)))loadSheets()};
+  $('form',m).onsubmit=async e=>{e.preventDefault();const n=$('[name=n]',m).value.trim().slice(0,80);const o=num($('[name=o]',m).value,num(s.sort));const pg=$('[name=pg]',m).checked;m.close();if(n&&await run(sb.from('sheets').update({name:n,sort:o,on_progress:pg}).eq('id',id)))loadSheets()};
   $('[data-del]',m).onclick=async()=>{m.close();const vs=versionsOf(s);const prev=vs.filter(v=>v.id!==s.id)[0];
     const msg=vs.length>1&&s.is_current!==false?'Delete Rev '+num(s.rev,1)+' of '+s.name+' and its markups for everyone? Rev '+num(prev.rev,1)+' becomes the current version again.':'Delete sheet '+s.name+(vs.length>1?' (all '+vs.length+' versions)':'')+' and its markups for everyone?';
     if(!await confirmBox(msg))return;
@@ -1107,7 +1110,7 @@ function reviseDialog(made){
           const old=pick!=='__new'&&!used.has(pick)?S.sheets.find(s=>s.id===pick):null;
           if(!old){await q(sb.from('sheets').update({is_current:true,sort:++order}).eq('id',x.id));nw++;continue}
           used.add(old.id);pb.set('Updating '+old.name+'…');
-          await q(sb.from('sheets').update({group_id:gid(old),rev:Math.max(...versionsOf(old).map(v=>num(v.rev,1)))+1,sort:num(old.sort),is_current:true,revised_at:now}).eq('id',x.id));
+          await q(sb.from('sheets').update({group_id:gid(old),rev:Math.max(...versionsOf(old).map(v=>num(v.rev,1)))+1,sort:num(old.sort),is_current:true,revised_at:now,on_progress:!!old.on_progress}).eq('id',x.id));
           await q(sb.from('sheets').update({is_current:false}).eq('id',old.id));
           carried+=num(await q(sb.rpc('carry_markups',{old_sheet:old.id,new_sheet:x.id})));rv++;
         }
@@ -1153,40 +1156,14 @@ function overallPct(){if(weighted()){const tw=PHASES.reduce((a,p)=>a+p.w,0);retu
 const money=v=>'$'+Math.round(num(v)).toLocaleString();
 function avg(k){if(!S.areas.length)return 0;return Math.round(S.areas.reduce((a,p)=>a+areaPct(p,k),0)/S.areas.length)}
 function renderProgress(){
-  if(!S.loaded.areas)return '<div class="empty">Loading progress…</div>';
-  const cw=canWrite();const overall=overallPct();const B=isAdminRole()?S.budget:null;const bt=B?PHASES.reduce((a,p)=>a+num(B[p.k]),0):0;
-  let h='<div class="card"><div class="row"><div class="grow"><b style="font-size:17px">Job progress</b><div class="muted small">'+(S.areas.length>1?'Average across '+S.areas.length+' areas':'All scope items')+(weighted()?' · weighted by Schedule of Values':'')+(bt?'<br><b>'+money(PHASES.reduce((a,p)=>a+num(B[p.k])*avg(p.k)/100,0))+'</b> of '+money(bt)+' earned':'')+'</div></div><div style="font-size:26px;font-weight:800">'+overall+'%</div></div>'+
-    PHASES.map(p=>{const v=avg(p.k);return '<div class="prow"><label><span class="dot" style="background:'+p.c+'"></span>'+p.n+(bt&&num(B[p.k])?'<div class="muted small" style="font-weight:400">'+money(num(B[p.k])*v/100)+' / '+money(B[p.k])+'</div>':'')+'</label><div class="bar"><i style="width:'+v+'%;background:'+p.c+'"></i></div><div class="val">'+v+'%</div></div>'}).join('')+'</div>';
-  if(isAdminRole())h+='<div class="row" style="margin-bottom:10px;align-items:stretch"><button class="btn grow" id="editScope">Scope items ✎</button><button class="btn grow" id="editSov">SOV values ($) ✎</button></div>';
-  if(cw)h+='<p class="muted small" style="margin:4px 2px 10px">Drag the ball as work gets done, or tap the % to type it.</p>';
-  const list=S.areas.length?S.areas:(cw?[{id:'__new',name:'Whole job',pct:{}}]:[]);
-  if(!list.length)h+='<div class="empty"><b>No progress entered yet</b>The foreman or office will update this as work gets done.</div>';
-  h+=list.map(a=>'<div class="card" data-area="'+esc(a.id)+'"><div class="row"><b class="grow" style="font-size:16px">'+esc(a.name||'Area')+'</b>'+(cw&&a.id!=='__new'?'<button class="ico" data-amenu aria-label="Area menu">⋯</button>':'')+'</div>'+
-    PHASES.map(p=>{const v=areaPct(a,p.k);return '<div class="prow"><label><span class="dot" style="background:'+p.c+'"></span>'+p.n+'</label><div class="sl'+(cw?'':' off')+'" data-ph="'+p.k+'" data-v="'+v+'"><div class="tr"><i class="fi" style="width:'+v+'%;background:'+p.c+'"></i><span class="kn" style="left:'+v+'%;border-color:'+p.c+'" aria-label="Drag to change '+esc(p.n)+'"></span></div></div><div class="val"'+(cw?' data-type="'+p.k+'" style="cursor:pointer;text-decoration:underline dotted"':'')+'>'+v+'%</div></div>'}).join('')+
-    (a.updated_at?'<div class="progress-note">Updated '+esc(fmtWhen(a.updated_at))+' by '+esc(who(a.updated_by))+'</div>':'')+'</div>').join('');
-  if(cw)h+='<button class="btn block" id="addArea" style="margin:4px 0 12px">+ '+(S.areas.length?'Add another area':'Track by area instead (floor, wing, unit…)')+'</button>';
-  return h;
+  if(!S.loaded.sheets)return '<div class="empty">Loading sheets…</div>';
+  const admin=isAdminRole();const ps=progSheets();
+  let h='<p class="muted small" style="margin:0 2px 10px">'+(canWrite()?'Open a sheet and highlight the work as it gets done, by scope color.':'Sheets the crew highlights as work gets done.')+'</p>';
+  if(!ps.length)return h+'<div class="empty"><b>No progress sheets yet</b>'+(admin?'Open a sheet on the Plans tab, tap ✎ and turn on <b>Show on Progress tab</b>.':'The office hasn\'t picked the progress sheets for this job yet.')+'</div>';
+  return h+'<div class="grid">'+ps.map(s=>'<div class="sheet" data-pid="'+esc(s.id)+'"><img loading="lazy" alt="" data-path="'+esc(s.thumb_path||s.path)+'"><div class="sname">'+esc(s.name||'Sheet')+'</div></div>').join('')+'</div>';
 }
 function bindProgress(){
-  const es=$('#editScope');if(es)es.onclick=scopeEditor;
-  const ev=$('#editSov');if(ev)ev.onclick=sovEditor;
-  const add=$('#addArea');if(add)add.onclick=async()=>{const v=await formBox('New area',[{k:'name',label:'Area name',req:true,ph:'e.g. Level 2 – West'}],'Add');if(v&&await run(sb.from('areas').insert({job_id:S.job.id,name:v.name.slice(0,80)})))loadAreas()};
-  let creating=null;
-  const areaId=async id=>{if(id!=='__new')return id;if(!creating)creating=run(sb.from('areas').insert({job_id:S.job.id,name:'Whole job'}).select().single());const d=await creating;return d&&d.id};
-  const setPct=async(id,k,v)=>{const rid=await areaId(id);if(rid)await run(sb.rpc('set_area_pct',{a:rid,k,v}));S.pendingRender=false;loadAreas()};
-  $$('[data-area]').forEach(card=>{
-    const id=card.dataset.area;const mb=$('[data-amenu]',card);if(mb)mb.onclick=()=>areaMenu(id);
-    $$('[data-type]',card).forEach(el=>el.onclick=async()=>{const p=phase(el.dataset.type);const cur=parseInt(el.textContent)||0;const v=await formBox(p.n+' – percent complete',[{k:'v',label:'Percent (0–100)',type:'number',value:String(cur),req:true}]);if(!v)return;const n=clamp(Math.round(num(v.v,cur)),0,100);el.textContent=n+'%';const r=el.parentElement.querySelector('.sl');if(r)setSl(r,n);setPct(id,p.k,n)});
-    $$('.sl:not(.off)',card).forEach(sl=>{
-      const kn=$('.kn',sl),tr=$('.tr',sl),lab=sl.parentElement.querySelector('.val');let start=null;
-      const at=x=>{const b=tr.getBoundingClientRect();return clamp(Math.round((x-b.left)/b.width*20)*5,0,100)};
-      kn.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();start=Number(sl.dataset.v);S.sliding=true;sl.classList.add('drag');try{kn.setPointerCapture(e.pointerId)}catch(_){}});
-      kn.addEventListener('pointermove',e=>{if(start===null)return;const v=at(e.clientX);if(v!==Number(sl.dataset.v)){setSl(sl,v);lab.textContent=v+'%'}});
-      const end=async()=>{if(start===null)return;const v=Number(sl.dataset.v),was=start;start=null;sl.classList.remove('drag');S.sliding=false;
-        if(v!==was)await setPct(id,sl.dataset.ph,v);else if(S.pendingRender){S.pendingRender=false;render()}};
-      kn.addEventListener('pointerup',end);kn.addEventListener('pointercancel',end);kn.addEventListener('lostpointercapture',end);
-    });
-  });
+  $$('[data-pid]').forEach(el=>el.onclick=()=>openSheet(el.dataset.pid,'progress'));
 }
 function setSl(sl,v){sl.dataset.v=v;const f=$('.fi',sl),k=$('.kn',sl);if(f)f.style.width=v+'%';if(k)k.style.left=v+'%'}
 async function areaMenu(id){
@@ -1241,21 +1218,27 @@ function renderLogList(){
 
 /* ===== sheet viewer ===== */
 let V=null;
-async function openSheet(id){
+function navList(layer){return layer==='progress'?progSheets():curSheets()}
+function progSheets(){return curSheets().filter(s=>s.on_progress)}
+async function openSheet(id,layer){
+  layer=layer==='progress'?'progress':'plans';
   const sh=S.sheets.find(s=>s.id===id);if(!sh)return;
+  const nl=sh.is_current===false?[]:navList(layer);const ni=nl.findIndex(s=>s.id===id);
   const sup=sh.is_current===false;const vers=versionsOf(sh);const curV=vers.find(v=>v.is_current!==false);
   const cw=canWrite()&&!sup;
-  V={id,sh,W:0,H:0,t:{x:0,y:0,s:1},minS:.05,mode:'pan',phase:PHASES[0].k,pen:'thin',pts:new Map(),g:null,marks:[],pins:[],mine:[]};
+  V={id,sh,layer,nl,ni,W:0,H:0,t:{x:0,y:0,s:1},minS:.05,mode:'pan',phase:PHASES[0].k,pen:'thin',pts:new Map(),g:null,marks:[],pins:[],mine:[]};
   const el=$('#viewer');el.hidden=false;document.body.classList.add('noscroll');
-  el.innerHTML='<div class="vbar"><button id="vBack">‹ Sheets</button><div class="vt">'+esc(sh.name||'Sheet')+'</div>'+(vers.length>1?'<button id="vVer">Rev '+num(sh.rev,1)+' ▾</button>':'')+'<button id="vLayers">Layers</button></div>'+
+  el.innerHTML='<div class="vbar"><button id="vBack">‹ '+(layer==='progress'?'Progress':'Sheets')+'</button><div class="vt">'+(layer==='progress'?'Progress · ':'')+esc(sh.name||'Sheet')+(ni>=0&&nl.length>1?' <span style="font-weight:400;opacity:.7">('+(ni+1)+'/'+nl.length+')</span>':'')+'</div>'+(vers.length>1?'<button id="vVer">Rev '+num(sh.rev,1)+' ▾</button>':'')+'<button id="vLayers">Layers</button></div>'+
     (sup?'<div class="supbar" id="vSup">SUPERSEDED · Rev '+num(sh.rev,1)+(curV?' — tap to open current (Rev '+num(curV.rev,1)+')':'')+'</div>':'')+
-    '<div id="stage"><div id="board"><img id="planImg" alt="" draggable="false"><svg id="ink" xmlns="http://www.w3.org/2000/svg"><g id="marksG"></g><g id="liveG"></g></svg></div><div id="pinLayer"></div><div class="hint" id="hint">Loading sheet…</div></div>'+
+    '<div id="stage"><div id="board"><img id="planImg" alt="" draggable="false"><svg id="ink" xmlns="http://www.w3.org/2000/svg"><g id="marksG"></g><g id="liveG"></g></svg></div><div id="pinLayer"></div><div class="hint" id="hint">Loading sheet…</div>'+(ni>=0&&nl.length>1?'<button class="snav" id="snPrev" aria-label="Previous sheet"'+(ni===0?' disabled':'')+'>‹</button><button class="snav" id="snNext" aria-label="Next sheet"'+(ni===nl.length-1?' disabled':'')+'>›</button>':'')+'</div>'+
     '<div class="vtools">'+(cw?'<div class="trow" id="phaseRow">'+PHASES.map(p=>'<button class="pc" data-ph="'+p.k+'" style="background:'+p.c+'">'+p.n+'</button>').join('')+'<button class="tb" id="penBtn">Pen: Thin</button></div>':'')+
     '<div class="trow" id="modeRow"><button class="tb" data-mode="pan">✋ Move</button>'+(cw?'<button class="tb" data-mode="straight">📏 Straight</button><button class="tb" data-mode="line">🖍 Highlight</button><button class="tb" data-mode="box">▭ Area</button><button class="tb" data-mode="pin">📍 Pin</button><button class="tb" data-mode="erase">⌫ Erase</button><button class="tb" id="undoBtn">↶ Undo</button>':'')+
     '<button class="tb" id="fitBtn">⤢ Fit</button></div></div>';
   V.stage=$('#stage');V.board=$('#board');V.img=$('#planImg');
   $('#vBack').onclick=()=>{if(location.hash==='#sheet')history.back();else closeSheet()};
   $('#vLayers').onclick=layersPanel;$('#fitBtn').onclick=fit;
+  const sp=$('#snPrev'),sn=$('#snNext');if(sp)sp.onclick=e=>{e.stopPropagation();stepSheet(-1)};if(sn)sn.onclick=e=>{e.stopPropagation();stepSheet(1)};
+  ['pointerdown','touchstart'].forEach(t=>[sp,sn].forEach(b=>b&&b.addEventListener(t,e=>e.stopPropagation())));
   if($('#vVer'))$('#vVer').onclick=()=>versionsPanel(sh);
   if($('#vSup')&&curV)$('#vSup').onclick=()=>switchSheet(curV.id);
   $$('#modeRow [data-mode]').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
@@ -1271,15 +1254,17 @@ async function openSheet(id){
   const [u]=await urlsFor([sh.path]);if(V&&V.id===id){if(u)V.img.src=u;else V.img.onerror()}
   loadSheetData();
 }
-const marksQ=id=>sb.from('marks').select('*').eq('sheet_id',id).order('created_at');
-const pinsQ=id=>sb.from('pins').select('*').eq('sheet_id',id).order('created_at');
+const marksQ=(id,layer)=>sb.from('marks').select('*').eq('sheet_id',id).eq('layer',layer||'plans').order('created_at');
+const pinsQ=(id,layer)=>sb.from('pins').select('*').eq('sheet_id',id).eq('layer',layer||'plans').order('created_at');
+function stepSheet(d){if(!V||V.ni<0)return;const n=V.nl[V.ni+d];if(!n)return;const layer=V.layer;closeSheet(true);openSheet(n.id,layer)}
+window.addEventListener('keydown',e=>{if(!V||$('.mwrap')||/INPUT|TEXTAREA|SELECT/.test((e.target&&e.target.tagName)||''))return;if(e.key==='ArrowRight')stepSheet(1);else if(e.key==='ArrowLeft')stepSheet(-1)});
 async function loadSheetData(){
-  if(!V)return;const id=V.id;
-  try{const [mk,pn]=await Promise.all([q(marksQ(id)),q(pinsQ(id))]);
+  if(!V)return;const id=V.id,ly=V.layer;
+  try{const [mk,pn]=await Promise.all([q(marksQ(id,ly)),q(pinsQ(id,ly))]);
     if(!V||V.id!==id)return;V.marks=mk;V.pins=pn;drawMarks();buildPins();carryNote()}catch(e){toast(errMsg(e))}
 }
 function onResize(){if(V&&V.W)placePins()}
-function switchSheet(id){closeSheet();openSheet(id)}
+function switchSheet(id){const ly=V&&V.layer;closeSheet(true);openSheet(id,ly)}
 function versionsPanel(sh){
   const vs=versionsOf(sh);
   const m=modal('<h2>Versions of '+esc(sh.name)+'</h2>'+vs.map(v=>'<button class="btn verrow" data-v="'+esc(v.id)+'"'+(v.id===sh.id?' disabled':'')+'><b>Rev '+num(v.rev,1)+'</b><span class="grow">'+(v.is_current!==false?'Current':'Superseded')+'</span><span class="muted small">'+esc(new Date(v.revised_at||v.created_at).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}))+'</span></button>').join('')+'<div class="mbtns"><button class="btn" data-x>Close</button></div>');
@@ -1294,9 +1279,9 @@ function carryNote(){
   const d=document.createElement('div');d.id='revNote';d.className='revnote';d.textContent=n+' markup'+(n>1?'s':'')+' (dashed) carried over from Rev '+r+'. Check they still line up, erase any that don\'t. Tap to hide.';
   d.onclick=()=>{lsSet('acv.carryok.'+V.id,'1');d.remove()};const st=$('#stage');if(st)st.appendChild(d);
 }
-function closeSheet(){
+function closeSheet(keep){
   V=null;window.removeEventListener('resize',onResize);
-  if(location.hash==='#sheet')try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}
+  if(!keep&&location.hash==='#sheet')try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}
   const el=$('#viewer');el.hidden=true;el.innerHTML='';document.body.classList.remove('noscroll');
 }
 window.addEventListener('hashchange',()=>{if(V&&location.hash!=='#sheet'){$$('.mwrap').forEach(m=>m.close());closeSheet()}});
@@ -1357,7 +1342,7 @@ async function commitDraw(g){
   else if(V.mode==='line'){if(g.pts.length<2)return;pts=[];g.pts.forEach(p=>pts.push(r4(p.x/V.W),r4(p.y/V.H)))}
   else{const a=g.start,b=g.end;if(Math.abs(a.x-b.x)<4/V.t.s||Math.abs(a.y-b.y)<4/V.t.s)return;pts=[r4(Math.min(a.x,b.x)/V.W),r4(Math.min(a.y,b.y)/V.H),r4(Math.max(a.x,b.x)/V.W),r4(Math.max(a.y,b.y)/V.H)]}
   if(pts.length>3000)pts=pts.slice(0,3000);
-  const row={id:uuid(),job_id:S.job.id,sheet_id:V.id,kind:V.mode==='box'?'box':'line',phase:V.phase,pts,w:penW(),created_at:new Date().toISOString()};
+  const row={id:uuid(),job_id:S.job.id,sheet_id:V.id,layer:V.layer,kind:V.mode==='box'?'box':'line',phase:V.phase,pts,w:penW(),created_at:new Date().toISOString()};
   V.marks.push(row);drawMarks();V.mine.push(row.id);syncTools();
   const sheetId=V.id;const ok=await run(sb.from('marks').insert(row));
   if(!ok&&V&&V.id===sheetId){V.marks=V.marks.filter(m=>m.id!==row.id);V.mine=V.mine.filter(i=>i!==row.id);drawMarks();syncTools()}
@@ -1407,7 +1392,7 @@ function layersPanel(){
   $('[data-x]',m).onclick=()=>m.close();
 }
 function pinDialog(pin,at){
-  const isNew=!pin;const jid=S.job.id,sheetId=V.id;const ro=!canWrite()||V.sh.is_current===false;
+  const isNew=!pin;const jid=S.job.id,sheetId=V.id,lay=V.layer;const ro=!canWrite()||V.sh.is_current===false;
   let kind=isNew?'issue':pinKind(pin.kind).k;let photos=isNew?[]:(Array.isArray(pin.photos)?pin.photos.filter(p=>typeof p==='string'):[]);
   const m=modal('<h2>'+(isNew?'New pin':esc(pinKind(pin.kind).n))+'</h2><div class="chips">'+PIN_KINDS.map(k=>'<button class="chip" data-k="'+k.k+'" '+(ro?'disabled':'')+'>'+k.n+'</button>').join('')+'</div>'+
     '<label class="field"><span>Note</span><textarea data-text '+(ro?'readonly':'')+' placeholder="What\'s going on here?">'+esc(isNew?'':pin.text||'')+'</textarea></label>'+
@@ -1429,7 +1414,7 @@ function pinDialog(pin,at){
   $('[data-x]',m).onclick=()=>m.close();
   const sb2=$('[data-save]',m);
   if(sb2)sb2.onclick=async()=>{const text=$('[data-text]',m).value.trim().slice(0,2000);sb2.disabled=true;
-    const ok=isNew?await run(sb.from('pins').insert({job_id:jid,sheet_id:sheetId,x:at.x,y:at.y,kind,text,photos,status:'open'}))
+    const ok=isNew?await run(sb.from('pins').insert({job_id:jid,sheet_id:sheetId,layer:lay,x:at.x,y:at.y,kind,text,photos,status:'open'}))
       :await run(sb.from('pins').update({kind,text,photos}).eq('id',pin.id));
     if(ok){m.close();if(isNew&&V)setMode('pan');loadSheetData()}else sb2.disabled=false};
   const db=$('[data-done]',m);
