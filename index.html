@@ -76,6 +76,17 @@ input[type=range]{width:100%;height:32px}
 .field input,.field textarea,.field select{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:#fff;min-height:44px}
 .field textarea{min-height:76px;resize:vertical}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.codes{border:1px solid var(--line);border-radius:10px;padding:10px 10px 2px;margin-bottom:12px}
+.codes legend{font-weight:700;font-size:14px;padding:0 4px}
+.codes .field span{font-size:13px}
+.ltab{width:100%;border-collapse:collapse;font-size:14px}
+.ltab th,.ltab td{padding:7px 6px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+.ltab th:first-child,.ltab td:first-child{text-align:left;white-space:normal}
+.ltab th{font-size:12px;color:#5d6670;font-weight:700}
+.ltab tr.tot td{font-weight:800;border-top:2px solid #333}
+.ltab td.used{background:#fff8c4}
+.ltab .over{color:var(--danger);font-weight:700}
+.lscroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .logday{font-weight:700;margin:18px 2px 8px;display:flex;justify-content:space-between}
 .logday .muted{font-weight:400}
 .kv{font-size:14px;margin-top:4px;white-space:pre-wrap}
@@ -180,7 +191,7 @@ async function run(p,okMsg){try{const d=await q(p);if(okMsg)toast(okMsg);return 
 /* ===== offline: local cache + outbox ===== */
 const OFF={db:null,ops:[],flushing:false,online:navigator.onLine!==false,ready:null};
 const OFF_TABLES=['marks','pins','logs','areas'];
-const OFF_DEFAULTS={pins:{kind:'issue',text:'',photos:[],status:'open',done_by:null,done_at:null},marks:{w:0.006},areas:{pct:{}},logs:{crew:0,hours:0,work:'',deliveries:'',notes:'',name:''}};
+const OFF_DEFAULTS={pins:{kind:'issue',text:'',photos:[],status:'open',done_by:null,done_at:null},marks:{w:0.006},areas:{pct:{}},logs:{crew:0,hours:0,work:'',deliveries:'',notes:'',name:'',hours_by_code:{}}};
 function idb(){if(OFF.db)return OFF.db;OFF.db=new Promise((res,rej)=>{try{const r=indexedDB.open('alpha-crew-view',1);r.onupgradeneeded=()=>{const d=r.result;d.createObjectStore('resp');d.createObjectStore('img');d.createObjectStore('outbox',{keyPath:'n',autoIncrement:true})};r.onsuccess=()=>{const d=r.result;d.onclose=()=>{OFF.db=null};d.onversionchange=()=>{try{d.close()}catch(e){}OFF.db=null};res(d)};r.onerror=()=>{OFF.db=null;rej(r.error)}}catch(e){OFF.db=null;rej(e)}});return OFF.db}
 function idbOnce(store,mode,fn){return idb().then(d=>new Promise((res,rej)=>{const tx=d.transaction(store,mode);const r=fn(tx.objectStore(store));let out;if(r)r.onsuccess=()=>{out=r.result};tx.oncomplete=()=>res(out);tx.onerror=tx.onabort=()=>rej(tx.error)}))}
 async function idbDo(store,mode,fn){try{return await idbOnce(store,mode,fn)}catch(e){OFF.db=null;return await idbOnce(store,mode,fn)}}
@@ -316,6 +327,9 @@ const S={me:null,isAdmin:false,jobs:[],jobsLoaded:false,job:null,role:null,tab:'
   hidden:new Set(),pinFilter:'all',sliding:false,pendingRender:false,chan:null,jobsChan:null};
 const canWrite=()=>S.role==='admin'||S.role==='editor';
 const isAdminRole=()=>S.role==='admin';
+const LABOR_CODES=[{k:'112',n:'112-Framing'},{k:'122',n:'122-Hanging'},{k:'132',n:'132-Finishing'},{k:'142c',n:'142-Cleanup'},{k:'142s',n:'142-Supervision'},{k:'161',n:'161-Batts & Caulk'},{k:'172',n:'172-Extra'}];
+const codeHrs=l=>{const h=(l&&l.hours_by_code)||{};return LABOR_CODES.reduce((a,c)=>a+num(h[c.k]),0)};
+function weekEnd(d){const [y,m,dd]=String(d).split('-').map(Number);const t=new Date(y,m-1,dd);t.setDate(t.getDate()+(6-t.getDay()));return t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0')}
 function myName(){return (S.me&&S.people[S.me.id])||''}
 function logName(l){return l.name||(S.people[l.user_id])||(S.me&&l.user_id===S.me.id?'You':'Crew member')}
 function who(id){if(!id)return 'Someone';if(S.me&&id===S.me.id)return 'You';return S.people[id]||'Crew member'}
@@ -338,7 +352,7 @@ function formBox(title,fields,okLabel='Save'){
     const html='<h2>'+esc(title)+'</h2><form>'+fields.map(f=>'<label class="field"><span>'+esc(f.label)+'</span>'+
       (f.type==='textarea'?'<textarea name="'+f.k+'" placeholder="'+esc(f.ph||'')+'">'+esc(f.value||'')+'</textarea>'
       :f.type==='select'?'<select name="'+f.k+'">'+f.options.map(o=>'<option value="'+esc(o[0])+'"'+(o[0]===f.value?' selected':'')+'>'+esc(o[1])+'</option>').join('')+'</select>'
-      :'<input name="'+f.k+'" type="'+(f.type||'text')+'" value="'+esc(f.value||'')+'" placeholder="'+esc(f.ph||'')+'" '+(f.req?'required':'')+'>')+'</label>').join('')+
+      :'<input name="'+f.k+'" type="'+(f.type||'text')+'"'+(f.type==='number'?' step="any" inputmode="decimal"':'')+' value="'+esc(f.value||'')+'" placeholder="'+esc(f.ph||'')+'" '+(f.req?'required':'')+'>')+'</label>').join('')+
       '<div class="mbtns"><button type="button" class="btn" data-x>Cancel</button><button class="btn primary" type="submit">'+esc(okLabel)+'</button></div></form>';
     let done=false;const m=modal(html,()=>{if(!done)res(null)});
     $('[data-x]',m).onclick=()=>m.close();
@@ -561,14 +575,14 @@ async function openJob(id){
   lsSet('crewplans.lastJob',id);
   if(S.chan){sb.removeChannel(S.chan);S.chan=null}
   const ch=sb.channel('job-'+id);
-  const map={sheets:loadSheets,areas:loadAreas,logs:loadLogs,members:loadMembers};
+  const map={sheets:loadSheets,areas:loadAreas,logs:()=>{loadLogs();if(S.tab==='labor')loadLabor()},members:loadMembers};
   Object.keys(map).forEach(t=>ch.on('postgres_changes',{event:'*',schema:'public',table:t,filter:'job_id=eq.'+id},()=>debounce(t,map[t])));
   ['sheets','areas','logs','members','marks','pins'].forEach(t=>ch.on('postgres_changes',{event:'DELETE',schema:'public',table:t},()=>debounce(t+'-del',()=>{if(map[t])map[t]();else if(V)loadSheetData()})));
   ['marks','pins'].forEach(t=>ch.on('postgres_changes',{event:'*',schema:'public',table:t,filter:'job_id=eq.'+id},()=>debounce(t,()=>{if(V)loadSheetData()})));
   ch.subscribe();S.chan=ch;
   window.scrollTo(0,0);render();reloadJob();
 }
-function reloadJob(){loadSheets();loadAreas();loadLogs();loadMembers()}
+function reloadJob(){loadSheets();loadAreas();loadLogs();loadMembers();if(isAdminRole()&&S.tab==='labor')loadLabor()}
 function jobId(){return S.job&&S.job.id}
 async function loadSheets(){const id=jobId();if(!id)return;try{const d=await q(sb.from('sheets').select('*').eq('job_id',id).order('sort'));if(jobId()!==id)return;S.sheets=d;S.loaded.sheets=true;if(S.tab==='plans')render()}catch(e){toast(errMsg(e))}}
 async function loadBudget(){const id=jobId();if(!id||!isAdminRole()){S.budget=null;return}try{const d=await q(sb.from('job_budget').select('amounts').eq('job_id',id).maybeSingle());if(jobId()===id)S.budget=d?d.amounts||{}:null}catch(e){S.budget=null}}
@@ -588,11 +602,11 @@ function render(){
   if(S.sliding){S.pendingRender=true;return}
   const app=$('#app');
   if(S.view!=='job'||!S.job){app.dataset.job='';app.innerHTML=renderJobs();bindJobs();return}
-  const j=S.job;
+  const j=S.job;if(S.tab==='labor'&&!isAdminRole())S.tab='plans';
   if(!app.querySelector('[data-jobshell]')||app.dataset.job!==j.id||app.dataset.tab!==S.tab||app.dataset.role!==S.role){
     app.dataset.job=j.id;app.dataset.tab=S.tab;app.dataset.role=S.role;
     app.innerHTML='<div data-jobshell><div class="top"><button id="back" aria-label="Back">‹</button><h1 id="jt"></h1>'+(isAdminRole()?'<button id="jmenu" aria-label="Job menu">⋯</button>':'')+'</div>'+
-      '<div class="tabs"><button data-tab="plans">Plans</button><button data-tab="progress">Progress</button><button data-tab="log">Daily Log</button></div><main id="tabBody"></main></div>';
+      '<div class="tabs"><button data-tab="plans">Plans</button><button data-tab="progress">Progress</button><button data-tab="log">Daily Log</button>'+(isAdminRole()?'<button data-tab="labor">Labor</button>':'')+'</div><main id="tabBody"></main></div>';
     $('#back').onclick=closeJob;
     $$('.tabs button').forEach(b=>b.onclick=()=>{S.tab=b.dataset.tab;window.scrollTo(0,0);render()});
     if($('#jmenu'))$('#jmenu').onclick=jobMenu;
@@ -602,7 +616,87 @@ function render(){
   $$('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===S.tab));
   if(S.tab==='plans'){$('#tabBody').innerHTML=renderPlans();bindPlans();fillImgs($('#tabBody'))}
   else if(S.tab==='progress'){$('#tabBody').innerHTML=renderProgress();bindProgress()}
+  else if(S.tab==='labor'){$('#tabBody').innerHTML=renderLabor();bindLabor();if(!S.loaded.labor&&!S.laborLoading)loadLabor()}
   else renderLogList();
+}
+
+/* labor (office only) */
+async function loadLabor(){const id=jobId();if(!id||!isAdminRole())return;S.laborLoading=true;
+  try{const [b,ls]=await Promise.all([q(sb.from('job_budget').select('labor').eq('job_id',id).maybeSingle()),q(sb.from('logs').select('date,hours,hours_by_code').eq('job_id',id).order('date'))]);
+    if(jobId()!==id)return;S.labor=(b&&b.labor)||{};S.laborLogs=ls||[];S.loaded.labor=true}catch(e){toast(errMsg(e))}finally{S.laborLoading=false}
+  if(S.tab==='labor')render()}
+function laborCalc(){
+  const L=S.labor||{};const hpd=num(L.hpd)||10;const budget=L.hours||{};const weeks={};let unc=0;
+  (S.laborLogs||[]).forEach(l=>{const h=l.hours_by_code||{};if(!codeHrs(l)){unc+=num(l.hours);return}const w=weekEnd(l.date);weeks[w]=weeks[w]||{};LABOR_CODES.forEach(c=>{if(num(h[c.k]))weeks[w][c.k]=(weeks[w][c.k]||0)+num(h[c.k])})});
+  const wk=Object.keys(weeks).sort();
+  const rows=LABOR_CODES.map(c=>{const bh=num(budget[c.k]);const md=bh/hpd;const usedH=wk.reduce((a,w)=>a+num(weeks[w][c.k]),0);const used=usedH/hpd;return {c,bh,md,usedH,used,left:md-used,pct:md?(md-used)/md:0}});
+  const t={bh:rows.reduce((a,r)=>a+r.bh,0),md:rows.reduce((a,r)=>a+r.md,0),usedH:rows.reduce((a,r)=>a+r.usedH,0),used:rows.reduce((a,r)=>a+r.used,0)};t.left=t.md-t.used;t.pct=t.md?t.left/t.md:0;
+  return {hpd,rows,t,weeks,wk,unc,jobNo:L.job_no||''};
+}
+const f1=v=>(Math.round(v*10)/10).toLocaleString(undefined,{maximumFractionDigits:1});
+const pctS=v=>Math.round(v*100)+'%';
+function fmtWk(w){const [y,m,d]=w.split('-').map(Number);return new Date(y,m-1,d).toLocaleDateString(undefined,{month:'short',day:'numeric'})}
+function renderLabor(){
+  if(!S.loaded.labor)return '<div class="empty">Loading labor…</div>';
+  const C=laborCalc();const noBudget=!C.t.bh;
+  let h='<div class="card"><div class="row"><div class="grow"><b style="font-size:17px">Labor</b><div class="muted small">'+(C.jobNo?'Job # '+esc(C.jobNo)+' · ':'')+C.hpd+' hrs per day · from daily logs · office only</div></div></div>'+
+    '<div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><button class="btn sm" id="labBudget">Budget hours ✎</button><button class="btn sm primary" id="labDl">⬇ Download labor workbook</button></div></div>';
+  if(noBudget)h+='<div class="card" style="background:#fff8e6"><b>No budget hours yet.</b><div class="muted small" style="margin-top:4px">Tap <b>Budget hours</b> and enter the HOURS column from the bid sheet\'s LABOR tab.</div></div>';
+  h+='<div class="card lscroll"><table class="ltab"><thead><tr><th>Code</th><th>Budget hrs</th><th>Man days</th><th>Used</th><th>Left</th><th>% left</th></tr></thead><tbody>'+
+    C.rows.map(r=>'<tr><td>'+esc(r.c.n)+'</td><td>'+f1(r.bh)+'</td><td>'+f1(r.md)+'</td><td class="used">'+f1(r.used)+'</td><td'+(r.left<0?' class="over"':'')+'>'+f1(r.left)+'</td><td'+(r.left<0?' class="over"':'')+'>'+(r.md?pctS(r.pct):'–')+'</td></tr>').join('')+
+    '<tr class="tot"><td>TOTAL</td><td>'+f1(C.t.bh)+'</td><td>'+f1(C.t.md)+'</td><td class="used">'+f1(C.t.used)+'</td><td'+(C.t.left<0?' class="over"':'')+'>'+f1(C.t.left)+'</td><td>'+(C.t.md?pctS(C.t.pct):'–')+'</td></tr></tbody></table>'+
+    '<div class="muted small" style="margin-top:6px">Man days = hours ÷ '+C.hpd+'. Used = hours from daily logs ÷ '+C.hpd+'.</div></div>';
+  if(C.wk.length)h+='<h3 style="margin:16px 2px 8px">Man days by week (week ending Sat)</h3><div class="card lscroll"><table class="ltab"><thead><tr><th>Week end</th>'+LABOR_CODES.map(c=>'<th>'+esc(c.k.replace(/[cs]$/,m=>m==='c'?' Cln':' Sup'))+'</th>').join('')+'<th>Total</th></tr></thead><tbody>'+
+    C.wk.slice().reverse().map(w=>{const x=C.weeks[w];const tot=LABOR_CODES.reduce((a,c)=>a+num(x[c.k]),0)/C.hpd;return '<tr><td>'+fmtWk(w)+'</td>'+LABOR_CODES.map(c=>'<td>'+(num(x[c.k])?f1(num(x[c.k])/C.hpd):'')+'</td>').join('')+'<td><b>'+f1(tot)+'</b></td></tr>'}).join('')+'</tbody></table></div>';
+  else h+='<div class="empty"><b>No hours logged yet</b>Hours show up here when foremen enter hours by cost code on the daily log.</div>';
+  if(C.unc)h+='<p class="muted small">'+f1(C.unc)+' hrs from older logs had no cost code and aren\'t counted.</p>';
+  return h;
+}
+function bindLabor(){
+  const b=$('#labBudget');if(b)b.onclick=laborBudgetEditor;
+  const d=$('#labDl');if(d)d.onclick=downloadLabor;
+}
+async function laborBudgetEditor(){
+  const L=S.labor||{};const H=L.hours||{};
+  const v=await formBox('Budget hours for '+S.job.name,[{k:'job_no',label:'Job #',value:L.job_no||((S.job.name.match(/^\s*(\d{3,})/)||[])[1]||'')},{k:'hpd',label:'Hours per man-day',type:'number',value:String(num(L.hpd)||10)}].concat(LABOR_CODES.map(c=>({k:'c'+c.k,label:c.n+' – budget hours',type:'number',value:H[c.k]?String(num(H[c.k])):''}))),'Save');
+  if(!v)return;const hours={};LABOR_CODES.forEach(c=>{const x=num(v['c'+c.k]);if(x>0)hours[c.k]=x});
+  const labor={hours,hpd:num(v.hpd)>0?num(v.hpd):10,job_no:String(v.job_no||'').slice(0,20)};
+  if(await run(sb.from('job_budget').upsert({job_id:S.job.id,labor},{onConflict:'job_id'}),'Budget hours saved.')){S.labor=labor;render()}
+}
+let excelP=null;
+function loadExcel(){if(!excelP)excelP=loadScript('https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js').catch(e=>{excelP=null;throw e});return excelP}
+async function downloadLabor(){
+  const pb=progressBox('Building labor workbook…');
+  try{await loadExcel();const C=laborCalc();const job=S.job;
+    const wb=new window.ExcelJS.Workbook();const ws=wb.addWorksheet('LABOR',{views:[{state:'frozen',xSplit:1,ySplit:4}]});
+    const last=8+Math.max(C.wk.length,1);const colL=n=>{let s='';while(n>0){const m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=Math.floor((n-1)/26)}return s};
+    ws.getColumn(1).width=24;[2,3,4,5,6].forEach(i=>ws.getColumn(i).width=12);for(let i=7;i<=last;i++)ws.getColumn(i).width=10;
+    ws.mergeCells('A1:F1');const t=ws.getCell('A1');t.value=job.name;t.font={bold:true,size:16};t.alignment={horizontal:'center'};
+    ws.getCell('A2').value='JOB #';ws.getCell('A2').font={bold:true};ws.getCell('B2').value=C.jobNo;
+    ws.getCell('C2').value='Update Date:';ws.getCell('C2').font={bold:true};const ud=ws.getCell('D2');{const n=new Date();ud.value=new Date(Date.UTC(n.getFullYear(),n.getMonth(),n.getDate()))}ud.numFmt='m/d/yyyy';ud.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFFF00'}};ud.border={top:{style:'medium'},left:{style:'medium'},bottom:{style:'medium'},right:{style:'medium'}};
+    ws.getCell('E2').value='hrs per day';ws.getCell('E2').font={bold:true};const hc=ws.getCell('F2');hc.value=C.hpd;hc.font={bold:true};['E2','F2'].forEach(a=>ws.getCell(a).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFC000'}});
+    const hdr=['','HOURS','MAN DAYS','MAN DAYS USED','MD LEFT','% LEFT'];hdr.forEach((x,i)=>{const c=ws.getCell(4,i+1);c.value=x;c.font={bold:true,underline:true,size:10};c.alignment={horizontal:'center'}});
+    ws.getCell(3,7).value='Week ending';ws.getCell(3,7).font={bold:true,size:10};
+    C.wk.forEach((w,i)=>{const [y,m,d]=w.split('-').map(Number);const c=ws.getCell(4,7+i);c.value=new Date(Date.UTC(y,m-1,d));c.numFmt='m/d';c.font={bold:true,size:10};c.alignment={horizontal:'center'}});
+    const wkFirst=colL(7),wkLast=colL(Math.max(6+C.wk.length,7));
+    C.rows.forEach((r,i)=>{const row=5+i;ws.getCell(row,1).value=r.c.n.toUpperCase();ws.getCell(row,1).font={bold:true,size:12};
+      ws.getCell(row,2).value=r.bh||null;
+      ws.getCell(row,3).value={formula:'IFERROR(B'+row+'/$F$2,0)',result:r.md};
+      ws.getCell(row,4).value={formula:'SUM('+wkFirst+row+':'+wkLast+row+')',result:r.used};ws.getCell(row,4).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFFF00'}};
+      ws.getCell(row,5).value={formula:'C'+row+'-D'+row,result:r.left};
+      ws.getCell(row,6).value={formula:'IFERROR(E'+row+'/C'+row+',0)',result:r.md?r.pct:0};ws.getCell(row,6).numFmt='0%';
+      [3,4,5].forEach(cn=>ws.getCell(row,cn).numFmt='0.0');
+      C.wk.forEach((w,j)=>{const hrs=num(C.weeks[w][r.c.k]);if(hrs)ws.getCell(row,7+j).value=Math.round(hrs/C.hpd*100)/100;ws.getCell(row,7+j).numFmt='0.0'})});
+    const tr=5+C.rows.length;ws.getCell(tr,1).value='TOTAL';ws.getCell(tr,1).font={bold:true,size:14};
+    [2,3,4,5].forEach(cn=>{const L=colL(cn);const v=[C.t.bh,C.t.md,C.t.used,C.t.left][cn-2];ws.getCell(tr,cn).value={formula:'SUM('+L+'5:'+L+(tr-1)+')',result:v};ws.getCell(tr,cn).numFmt='0.0';ws.getCell(tr,cn).font={bold:true};ws.getCell(tr,cn).border={top:{style:'thin'}}});
+    ws.getCell(tr,6).value={formula:'IFERROR(E'+tr+'/C'+tr+',0)',result:C.t.pct};ws.getCell(tr,6).numFmt='0%';
+    for(let j=0;j<C.wk.length;j++){const L=colL(7+j);ws.getCell(tr,7+j).value={formula:'SUM('+L+'5:'+L+(tr-1)+')',result:LABOR_CODES.reduce((a,c)=>a+num(C.weeks[C.wk[j]][c.k]),0)/C.hpd};ws.getCell(tr,7+j).numFmt='0.0';ws.getCell(tr,7+j).font={bold:true}}
+    ws.getCell(tr+2,1).value='Man days = hours ÷ hrs per day. Weekly man days come from Alpha Crew View daily logs (hours by cost code).';ws.getCell(tr+2,1).font={italic:true,size:9,color:{argb:'FF666666'}};
+    const buf=await wb.xlsx.writeBuffer();const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const d=new Date();const stamp=(d.getMonth()+1)+'.'+d.getDate()+'.'+String(d.getFullYear()).slice(2);
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fileSafe((C.jobNo?C.jobNo+' ':'')+job.name)+' LABOR '+stamp+'.xlsx';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},60000);
+    pb.close();toast('Labor workbook downloaded. Save it in the job folder.');
+  }catch(e){pb.close();toast(errMsg(e))}
 }
 
 /* jobs list */
@@ -1075,19 +1169,22 @@ function renderLogForm(){
   if(!canWrite()){box.innerHTML='';return}
   box.innerHTML='<div class="card"><b style="font-size:17px">Your daily log</b><form style="margin-top:10px">'+
     '<div class="two"><label class="field"><span>Filled out by</span><input name="who" required maxlength="60" autocomplete="name" placeholder="Your name"></label><label class="field"><span>Date</span><input type="date" name="date" value="'+today()+'"></label></div>'+
-    '<div class="two"><label class="field"><span>Crew on site</span><input type="number" inputmode="numeric" min="0" name="crew" placeholder="0"></label><label class="field"><span>Total man-hours</span><input type="number" inputmode="decimal" min="0" step="0.5" name="hours" placeholder="0"></label></div>'+
+    '<fieldset class="codes"><legend>Hours by cost code</legend><div class="two">'+LABOR_CODES.map(c=>'<label class="field"><span>'+esc(c.n)+'</span><input type="number" inputmode="decimal" min="0" step="0.5" data-code="'+c.k+'" placeholder="0"></label>').join('')+'</div><p class="muted small" style="margin:0 0 8px">Total man-hours for each code today (all workers added together).</p></fieldset>'+
+    '<div class="two"><label class="field"><span>Crew on site</span><input type="number" inputmode="numeric" min="0" name="crew" placeholder="0"></label><label class="field"><span>Total man-hours</span><input type="number" name="hours" placeholder="0" readonly tabindex="-1" style="background:#eef1f4"></label></div>'+
     '<label class="field"><span>Work done today</span><textarea name="work" placeholder="e.g. Framed corridor 2nd floor, hung lids in 201–204"></textarea></label>'+
     '<label class="field"><span>Material delivered</span><input name="deliveries" placeholder="e.g. 120 sheets 5/8 Type X"></label>'+
     '<label class="field"><span>Delays / issues / notes</span><textarea name="notes" placeholder="e.g. Waiting on electrician in 205"></textarea></label>'+
     '<button class="btn primary block" type="submit">Save log</button><div class="muted small" data-st style="text-align:center;margin-top:6px"></div></form></div>';
   const form=$('form',box);let touched=false;
   const mine=d=>S.logs.find(l=>l.date===d&&l.user_id===S.me.id);
-  const fill=()=>{const e=mine(form.date.value);form.who.value=(e&&e.name)||lsGet('crewplans.logName')||myName();['crew','hours','work','deliveries','notes'].forEach(k=>{form[k].value=!e?'':(k==='crew'||k==='hours')?num(e[k]):(e[k]||'')});$('[data-st]',form).textContent=e?'Editing your saved log for this day.':'';touched=false};
-  form.date.onchange=fill;form.addEventListener('input',e=>{if(e.target!==form.date)touched=true});fill();
+  const fill=()=>{const e=mine(form.date.value);form.who.value=(e&&e.name)||lsGet('crewplans.logName')||myName();['crew','hours','work','deliveries','notes'].forEach(k=>{form[k].value=!e?'':(k==='crew'||k==='hours')?num(e[k]):(e[k]||'')});const hb=(e&&e.hours_by_code)||{};$$('[data-code]',form).forEach(i=>{i.value=hb[i.dataset.code]?num(hb[i.dataset.code]):''});if(e&&codeHrs(e))form.hours.value=codeHrs(e);$('[data-st]',form).textContent=e?'Editing your saved log for this day.':'';touched=false};
+  form.date.onchange=fill;form.addEventListener('input',e=>{if(e.target!==form.date)touched=true;if(e.target.dataset&&e.target.dataset.code){const t=$$('[data-code]',form).reduce((a,i)=>a+num(i.value),0);form.hours.value=t||''}});fill();
   box._fillIfEmpty=()=>{if(!touched)fill()};
   box._edit=d=>{form.date.value=d;fill();$('[data-st]',form).textContent='Editing your saved log for this day. Change it and tap Save log.';box.scrollIntoView({behavior:'smooth',block:'start'})};
   form.onsubmit=async e=>{e.preventDefault();const d=form.date.value||today();const nm=form.who.value.trim().slice(0,60);if(!nm){toast('Enter who filled out the log.');form.who.focus();return}lsSet('crewplans.logName',nm);
-    const o={job_id:S.job.id,user_id:S.me.id,name:nm,date:d,crew:num(form.crew.value),hours:num(form.hours.value),work:form.work.value.trim().slice(0,2000),deliveries:form.deliveries.value.trim().slice(0,500),notes:form.notes.value.trim().slice(0,2000),updated_at:new Date().toISOString()};
+    const hbc={};$$('[data-code]',form).forEach(i=>{const v=num(i.value);if(v>0)hbc[i.dataset.code]=Math.round(v*100)/100});const tot=Object.values(hbc).reduce((a,b)=>a+b,0);
+    if(!tot&&!await confirmBox('No hours entered for any cost code. Save the log anyway?','Save anyway',false))return;
+    const o={job_id:S.job.id,user_id:S.me.id,name:nm,date:d,crew:num(form.crew.value),hours:tot,hours_by_code:hbc,work:form.work.value.trim().slice(0,2000),deliveries:form.deliveries.value.trim().slice(0,500),notes:form.notes.value.trim().slice(0,2000),updated_at:new Date().toISOString()};
     if(await run(sb.from('logs').upsert(o,{onConflict:'job_id,user_id,date'}),'Log saved.')){touched=false;$('[data-st]',form).textContent='Editing your saved log for this day.';loadLogs()}};
 }
 function renderLogList(){
@@ -1098,6 +1195,7 @@ function renderLogList(){
   box.innerHTML=Object.keys(byDay).sort().reverse().map(d=>{const ls=byDay[d];const crew=ls.reduce((a,l)=>a+num(l.crew),0);const hrs=ls.reduce((a,l)=>a+num(l.hours),0);
     return '<div class="logday"><span>'+fmtDay(d)+'</span><span class="muted">'+crew+' crew · '+hrs+' hrs</span></div>'+ls.map(l=>
       '<div class="card"><div class="row"><b class="grow">'+esc(logName(l))+'</b><span class="muted small">'+num(l.crew)+' crew · '+num(l.hours)+' hrs</span></div>'+
+      (codeHrs(l)?'<div class="kv"><b>Hours:</b> '+LABOR_CODES.filter(c=>num((l.hours_by_code||{})[c.k])).map(c=>esc(c.n)+' '+num(l.hours_by_code[c.k])).join(' · ')+'</div>':'')+
       (l.work?'<div class="kv"><b>Work:</b> '+esc(l.work)+'</div>':'')+(l.deliveries?'<div class="kv"><b>Delivered:</b> '+esc(l.deliveries)+'</div>':'')+(l.notes?'<div class="kv"><b>Notes:</b> '+esc(l.notes)+'</div>':'')+
       (l.updated_at?'<div class="progress-note">Saved '+esc(fmtWhen(l.updated_at))+' by '+esc(logName(l))+'</div>':'')+
       ((l.user_id===S.me.id&&canWrite())||isAdminRole()?'<div class="row" style="margin-top:8px;justify-content:flex-end">'+(l.user_id===S.me.id&&canWrite()?'<button class="btn sm" data-ledit="'+esc(l.id)+'">✎ Edit</button>':'')+'<button class="btn sm" data-ldel="'+esc(l.id)+'" style="color:var(--danger)">Delete</button></div>':'')+'</div>').join('')}).join('');
