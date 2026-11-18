@@ -205,13 +205,15 @@ let pdfLoading=null;
 function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=rej;document.head.appendChild(s)})}
 function loadPdfJs(){if(!pdfLoading){pdfLoading=(async()=>{await loadScript(PDFJS+'pdf.min.js');await loadScript(PDFJS+'pdf.worker.min.js');window.pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS+'pdf.worker.min.js';return window.pdfjsLib})().catch(e=>{pdfLoading=null;throw e})}return pdfLoading}
 const SHEET_NUM=/([A-Z]{1,3}[-.]?\d{1,3}(?:\.\d{1,3})?[A-Z]?)/;
-const TITLE_KW=/\b(PLANS?|ELEVATIONS?|SECTIONS?|DETAILS?|SCHEDULES?|NOTES|SITE|ROOF|FLOOR|CEILING|FOUNDATION|FRAMING|COVER|TITLE|DEMO\w*|WALLS?|DOORS?|FINISH\w*|LAYOUT|ELECTRICAL|MECHANICAL|PLUMBING|STRUCTURAL|GENERAL|SPECIFICATIONS?|DIAGRAMS?|INDEX|ENLARGED|REFLECTED|INTERIOR|EXTERIOR|SAFETY|ACCESSIBILITY|PARTITIONS?|ASSEMBLIES|RCP)\b/;
+const TITLE_KW=/\b(PLANS?|ELEVATIONS?|SECTIONS?|DETAILS?|SCHEDULES?|NOTES|SITE|ROOF|FLOOR|CEILING|FOUNDATION|FRAMING|COVER|TITLE|DEMO\w*|WALLS?|DOORS?|FINISH\w*|LAYOUT|ELECTRICAL|MECHANICAL|PLUMBING|STRUCTURAL|GENERAL|SPECIFICATIONS?|DIAGRAMS?|INDEX|ENLARGED|REFLECTED|INTERIOR|EXTERIOR|LIFE SAFETY|ACCESSIBILITY|PARTITIONS?|ASSEMBLIES|RCP)\b/;
 /* make a set's sheet numbers consistent: "AD-3" -> "D-3", "D2" -> "D-2" when most sheets are "D-n" */
 function harmonizeNums(items){
   const pat=n=>{const m=/^([A-Z]+)([-.]?)(\d.*)$/.exec(n||'');return m?{p:m[1],sep:m[2],rest:m[3]}:null};
   const cnt={};items.forEach(it=>{const q=pat(it.num);if(q){const k=q.p+'|'+q.sep;cnt[k]=(cnt[k]||0)+1}});
   const top=Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0];if(!top||top[1]<3)return items;
   const [dp,ds]=top[0].split('|');
+  const fits=n=>{const q=pat(n);return q&&(q.p===dp||(q.p.length>dp.length&&q.p.endsWith(dp)))};
+  items.forEach(it=>{if(it.num&&!fits(it.num)&&Array.isArray(it.cands)){const alt=it.cands.find(fits);if(alt)it.num=alt}});
   items.forEach(it=>{const q=pat(it.num);if(!q)return;let p=q.p,sep=q.sep;
     if(p!==dp&&p.length>dp.length&&p.endsWith(dp))p=dp;
     if(p===dp&&sep!==ds)sep=ds;
@@ -279,7 +281,8 @@ async function nameFromImage(src){
     let num=pickNum(acc);
     if(!num){await ocrNumCands(w,stripLines(cropFrom(src,.86,0,1,1,90,1.5),80),acc);await ocrNumCands(w,stripLines(cropFrom(src,.6,.85,1,1,0,2),110),acc);num=pickNum(acc)}
     let t=await ocrTitle(w,cropFrom(src,.86,0,1,1,90,1.5));const t2=await ocrTitle(w,cropFrom(src,.6,.8,1,1,0,1.5));if(t2&&(!t||t2.sc>t.sc))t=t2;
-    return {num:num?num.t:null,title:t?t.t:null};
+    const cands=Object.values(acc).filter(e=>e.maxConf>=30).sort((x,y)=>y.score-x.score).map(e=>e.t);
+    return {num:num?num.t:null,title:t?t.t:null,cands};
   };
   const p=ocrBusy.then(run,run);ocrBusy=p.catch(()=>{});return p;
 }
@@ -489,7 +492,7 @@ async function autoNameSheets(){
   for(let i=0;i<list.length;i++){
     const s=list[i];pb.set('Reading sheet '+(i+1)+' of '+list.length+'…');
     try{const [u]=await urlsFor([s.path]);const img=new Image();img.crossOrigin='anonymous';await new Promise((r,j)=>{img.onload=r;img.onerror=j;img.src=u});
-      const o=await nameFromImage(img);found.push({s,num:o.num,title:o.title})}
+      const o=await nameFromImage(img);found.push({s,num:o.num,title:o.title,cands:o.cands})}
     catch(e){found.push({s,num:null,title:null})}
   }
   pb.close();harmonizeNums(found);found.forEach(f=>f.name=sheetLabel(f.num,f.title));
@@ -527,10 +530,10 @@ async function addPlans(files){
           const c=document.createElement('canvas');c.width=Math.floor(vp.width);c.height=Math.floor(vp.height);const cx=c.getContext('2d');cx.fillStyle='#fff';cx.fillRect(0,0,c.width,c.height);
           await page.render({canvasContext:cx,viewport:vp}).promise;
           let nm=await nameFromText(page,vp1);
-          if(!nm.num){pb.set('Reading sheet name, page '+i+' of '+pdf.numPages+'…');try{const o=await nameFromImage(c);nm={num:o.num||nm.num,title:nm.title||o.title}}catch(e){}}
+          if(!nm.num){pb.set('Reading sheet name, page '+i+' of '+pdf.numPages+'…');try{const o=await nameFromImage(c);nm={num:o.num||nm.num,title:nm.title||o.title,cands:o.cands}}catch(e){}}
           const name=sheetLabel(nm.num,nm.title)||(pdf.numPages>1?base+' p'+i:base);
           const sid=await storeSheet(jid,c,name,++order);added++;page.cleanup();c.width=c.height=0;
-          made.push({id:sid,num:nm.num,title:nm.title,name});
+          made.push({id:sid,num:nm.num,title:nm.title,cands:nm.cands,name});
         }
         const before=made.map(x=>x.num);harmonizeNums(made);
         for(let k=0;k<made.length;k++){if(made[k].num&&made[k].num!==before[k])await run(sb.from('sheets').update({name:sheetLabel(made[k].num,made[k].title)}).eq('id',made[k].id))}
