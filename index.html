@@ -122,10 +122,14 @@ input[type=range]{width:100%;height:32px}
 .lrow:last-child{border-bottom:0}
 .lrow input{width:22px;height:22px}
 .legend{display:flex;flex-wrap:wrap;gap:12px;font-size:13px;margin:6px 0 2px}
+.netpill{position:fixed;left:10px;bottom:calc(14px + env(safe-area-inset-bottom));z-index:250;background:#475569;color:#fff;font-size:13px;font-weight:600;padding:6px 12px;border-radius:999px;box-shadow:0 2px 8px #0004;display:none;cursor:pointer}
+.netpill.wait{background:#b45309}
+body.noscroll .netpill{bottom:auto;top:calc(56px + env(safe-area-inset-top))}
+.offrow{display:flex;align-items:center;gap:10px;margin:0 0 10px;flex-wrap:wrap}
 .progress-note{font-size:13px;color:var(--muted);margin-top:4px}
 .welcome{max-width:420px;margin:30px auto}
 </style>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js"></script>
 </head>
 <body>
 <div id="app"><div class="top"><h1><span class="brand"></span>Alpha Crew View</h1></div><main><div class="empty">Loading…</div></main></div>
@@ -164,6 +168,138 @@ function toast(msg){let t=$('#toast');if(!t){t=document.createElement('div');t.i
 function errMsg(e){const m=String((e&&e.message)||e||'');if(/row-level security|permission denied|42501|Unauthorized|403/i.test(m+(e&&e.code||'')+(e&&e.statusCode||'')))return "You don't have permission to change that.";if(/Failed to fetch|NetworkError|network|Load failed/i.test(m))return 'No connection. Check your signal and try again.';return m||'Something went wrong.'}
 async function q(p){const r=await p;if(r.error)throw r.error;return r.data}
 async function run(p,okMsg){try{const d=await q(p);if(okMsg)toast(okMsg);return d==null?true:d}catch(e){toast(errMsg(e));return null}}
+
+/* ===== offline: local cache + outbox ===== */
+const OFF={db:null,ops:[],flushing:false,online:navigator.onLine!==false,ready:null};
+const OFF_TABLES=['marks','pins','logs','areas'];
+const OFF_DEFAULTS={pins:{kind:'issue',text:'',photos:[],status:'open',done_by:null,done_at:null},marks:{w:0.006},areas:{pct:{}},logs:{crew:0,hours:0,work:'',deliveries:'',notes:'',name:''}};
+function idb(){if(OFF.db)return OFF.db;OFF.db=new Promise((res,rej)=>{try{const r=indexedDB.open('alpha-crew-view',1);r.onupgradeneeded=()=>{const d=r.result;d.createObjectStore('resp');d.createObjectStore('img');d.createObjectStore('outbox',{keyPath:'n',autoIncrement:true})};r.onsuccess=()=>{const d=r.result;d.onclose=()=>{OFF.db=null};d.onversionchange=()=>{try{d.close()}catch(e){}OFF.db=null};res(d)};r.onerror=()=>{OFF.db=null;rej(r.error)}}catch(e){OFF.db=null;rej(e)}});return OFF.db}
+function idbOnce(store,mode,fn){return idb().then(d=>new Promise((res,rej)=>{const tx=d.transaction(store,mode);const r=fn(tx.objectStore(store));let out;if(r)r.onsuccess=()=>{out=r.result};tx.oncomplete=()=>res(out);tx.onerror=tx.onabort=()=>rej(tx.error)}))}
+async function idbDo(store,mode,fn){try{return await idbOnce(store,mode,fn)}catch(e){OFF.db=null;return await idbOnce(store,mode,fn)}}
+const idbGet=(s,k)=>idbDo(s,'readonly',st=>st.get(k)).catch(()=>undefined);
+const idbPut=(s,v,k)=>idbDo(s,'readwrite',st=>k===undefined?st.put(v):st.put(v,k)).catch(()=>undefined);
+const idbDel=(s,k)=>idbDo(s,'readwrite',st=>st.delete(k)).then(()=>true,()=>false);
+const myOps=()=>{const me=S.me&&S.me.id;return OFF.ops.filter(o=>!me||o.sub===me)};
+const idbAll=s=>idbDo(s,'readonly',st=>st.getAll()).catch(()=>[]);
+OFF.ready=idbAll('outbox').then(a=>{OFF.ops=(a||[]).sort((x,y)=>x.n-y.n);netPill()}).catch(()=>{});
+function jwtSub(h){try{const t=(h.get('authorization')||'').split(' ')[1];return JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))).sub||'anon'}catch(e){return 'anon'}}
+function netFetch(url,init,ms){const ac=new AbortController();const t=setTimeout(()=>ac.abort(),ms);return fetch(url,Object.assign({},init,{signal:ac.signal})).finally(()=>clearTimeout(t))}
+function noteOnline(v){if(OFF.online!==v){OFF.online=v;netPill();if(v)setTimeout(flushOutbox,300)}}
+const PG_KEYS=['select','order','limit','offset','on_conflict','columns'];
+function urlFilters(u){const f=[];u.searchParams.forEach((v,k)=>{if(!PG_KEYS.includes(k)&&v.startsWith('eq.'))f.push([k,v.slice(3)])});return f}
+const rowHit=(r,f)=>f.every(([k,v])=>r&&String(r[k])===v);
+function jsonRes(obj,status){return new Response(obj==null?null:JSON.stringify(obj),{status:status||200,headers:{'content-type':'application/json'}})}
+function applyOps(table,rows,filters){
+  const me=S.me&&S.me.id;
+  for(const op of OFF.ops){
+    if(me&&op.sub!==me)continue;
+    if(op.table!==table&&!(op.kind==='rpc'&&table==='areas'))continue;
+    const now=new Date(op.t).toISOString();
+    if(op.kind==='insert'||op.kind==='upsert'){
+      for(const r0 of op.rows){const r=Object.assign({created_at:now,created_by:op.sub},OFF_DEFAULTS[table]||{},r0);if(table==='logs'){r.user_id=r.user_id||op.sub;r.id=r.id||('local-'+op.n)}
+        if(!rowHit(r,filters))continue;
+        const i=op.kind==='upsert'&&op.conflict.length?rows.findIndex(x=>op.conflict.every(c=>String(x[c])===String(r[c]))):rows.findIndex(x=>x.id===r.id);
+        if(i>=0)rows[i]=Object.assign({},rows[i],r0);else rows.push(r)}
+    }else if(op.kind==='update'){rows.forEach((r,i)=>{if(rowHit(r,op.filters))rows[i]=Object.assign({},r,op.patch)})}
+    else if(op.kind==='delete'){for(let i=rows.length-1;i>=0;i--)if(rowHit(rows[i],op.filters))rows.splice(i,1)}
+    else if(op.kind==='rpc'&&op.rpc==='set_area_pct'&&table==='areas'){const a=op.args||{};rows.forEach((r,i)=>{if(r.id===a.a)rows[i]=Object.assign({},r,{pct:Object.assign({},r.pct||{},{[a.k]:a.v}),updated_by:op.sub,updated_at:now})})}
+  }
+  return rows;
+}
+function sortRows(rows,order){if(!order)return rows;const [col,dir]=order.split(',')[0].split('.');const d=dir==='desc'?-1:1;return rows.sort((a,b)=>{const x=a[col],y=b[col];return x==y?0:(x==null?-1:y==null?1:(x<y?-1:1))*d})}
+function overlay(table,u,body,status,ct){
+  if(!myOps().length||!OFF_TABLES.includes(table))return new Response(body,{status,headers:{'content-type':ct||'application/json'}});
+  let data;try{data=JSON.parse(body)}catch(e){return new Response(body,{status,headers:{'content-type':ct||'application/json'}})}
+  if(!Array.isArray(data))return new Response(body,{status,headers:{'content-type':ct||'application/json'}});
+  return jsonRes(sortRows(applyOps(table,data,urlFilters(u)),u.searchParams.get('order')),status);
+}
+async function offlineFetch(input,init){
+  init=init||{};const url=typeof input==='string'?input:input.url;let u;try{u=new URL(url)}catch(e){return fetch(input,init)}
+  const method=String(init.method||(typeof input!=='string'&&input.method)||'GET').toUpperCase();
+  const rest=u.pathname.startsWith('/rest/v1/'),stor=u.pathname.startsWith('/storage/v1/object/')&&!u.pathname.startsWith('/storage/v1/object/sign');
+  if(!rest&&!stor)return fetch(input,init);
+  const hdr=new Headers(init.headers||{});const name=rest?decodeURIComponent(u.pathname.slice(9)):'';const rpc=name.startsWith('rpc/')?name.slice(4):'';
+  if(rest&&(method==='GET'||rpc==='office_names'||rpc==='claim_office')){
+    await OFF.ready;
+    const key=((S.me&&S.me.id)||jwtSub(hdr))+'|'+method+'|'+(hdr.get('accept')||'')+'|'+url+'|'+(method==='GET'?'':String(init.body||''));
+    let res=null;
+    if(navigator.onLine!==false){try{res=await netFetch(url,init,OFF.online?12000:4000)}catch(e){res=null}}
+    if(res&&res.ok){const body=await res.text();const ct=res.headers.get('content-type');idbPut('resp',{body,ct,at:Date.now()},key);noteOnline(true);return overlay(name,u,body,res.status,ct)}
+    if(res&&res.status!==0&&res.status<500)return res;
+    noteOnline(false);
+    const c=await idbGet('resp',key);
+    if(c)return overlay(name,u,c.body,200,c.ct);
+    throw new TypeError('Failed to fetch: not saved on this device yet');
+  }
+  const objPath=stor?decodeURIComponent(u.pathname.replace(/^\/storage\/v1\/object\/[^/]+\//,'')):'';
+  const queueable=rest?(rpc?rpc==='set_area_pct':OFF_TABLES.includes(name)):(method==='POST'&&/\/photos\//.test(objPath));
+  if(!queueable)return fetch(input,init);
+  await OFF.ready;
+  const sub=(S.me&&S.me.id)||jwtSub(hdr);const prefer=hdr.get('prefer')||'';
+  const op={url,method,t:Date.now(),sub,table:rpc?'':name,headers:{}};
+  hdr.forEach((v,k)=>{if(k!=='authorization')op.headers[k]=v});
+  let body=init.body;
+  if(stor){op.kind='file';op.path=objPath;
+    if(body instanceof FormData){const form=[];body.forEach((v,k)=>form.push([k,v]));op.body={form};const blob=form.map(x=>x[1]).find(v=>v instanceof Blob);if(blob)await idbPut('img',blob,objPath)}
+    else if(body instanceof Blob){op.body=body;await idbPut('img',body,objPath)}else op.body=body}
+  else if(rpc){op.kind='rpc';op.rpc=rpc;try{op.args=JSON.parse(body)}catch(e){op.args={}}op.body=body}
+  else if(method==='POST'){let rows;try{rows=JSON.parse(body)}catch(e){rows=[]}const arr=Array.isArray(rows)?rows:[rows];
+    if(/merge-duplicates/.test(prefer)){op.kind='upsert';op.conflict=(u.searchParams.get('on_conflict')||'').split(',').filter(Boolean)}
+    else{op.kind='insert';arr.forEach(r=>{if(r&&!r.id)r.id=uuid()})}
+    op.rows=arr;body=JSON.stringify(Array.isArray(rows)?arr:arr[0]);op.body=body;init=Object.assign({},init,{body})}
+  else if(method==='PATCH'){op.kind='update';op.filters=urlFilters(u);try{op.patch=JSON.parse(body)}catch(e){op.patch={}}op.body=body}
+  else if(method==='DELETE'){op.kind='delete';op.filters=urlFilters(u);op.body=null;
+    const lid=op.filters.find(([k,v])=>k==='id'&&v.startsWith('local-'));
+    if(lid){const n=Number(lid[1].slice(6));const i=OFF.ops.findIndex(o=>o.n===n);if(i>=0){OFF.ops.splice(i,1);await idbDel('outbox',n);netPill()}return jsonRes(null,204)}}
+  else return fetch(input,init);
+  op.tries=0;
+  const n=await idbPut('outbox',op);
+  if(n==null){if(navigator.onLine===false)throw new TypeError('Failed to fetch: could not save on this device');return netFetch(url,init,20000)}
+  op.n=n;if(!OFF.ops.some(o=>o.n===n))OFF.ops.push(op);netPill();setTimeout(flushOutbox,0);
+  if(stor)return jsonRes({Id:uuid(),Key:u.pathname.split('/object/')[1]},200);
+  const wantsObj=/vnd\.pgrst\.object/.test(hdr.get('accept')||'');const rep=/return=representation/.test(prefer);
+  if(op.kind==='insert'||op.kind==='upsert'){const rows=op.rows.map(r=>Object.assign({created_at:new Date(op.t).toISOString(),created_by:sub},OFF_DEFAULTS[op.table]||{},r));if(wantsObj)return jsonRes(rows[0],201);if(rep)return jsonRes(rows,201)}
+  return jsonRes(null,op.kind==='rpc'?204:(method==='POST'?201:204));
+}
+async function flushOutbox(){
+  await OFF.ready;
+  if(OFF.flushing||!myOps().length||!sb||!S.me||navigator.onLine===false)return;
+  if(navigator.locks&&navigator.locks.request&&!OFF.inLock){return navigator.locks.request('acv-flush',{ifAvailable:true},async l=>{if(!l)return;OFF.inLock=true;try{OFF.ops=((await idbAll('outbox'))||[]).sort((x,y)=>x.n-y.n);await flushOutbox()}finally{OFF.inLock=false}}).catch(()=>{})}
+  OFF.flushing=true;netPill();let sent=0,dropped=0,gaveUp=0;
+  try{
+    let tok=null;try{tok=(await sb.auth.getSession()).data.session?.access_token}catch(e){}
+    while(true){
+      const op=myOps()[0];if(!op)break;
+      const h=new Headers(op.headers);if(tok)h.set('authorization','Bearer '+tok);
+      let body=op.body;if(body&&body.form){const fd=new FormData();body.form.forEach(([k,v])=>fd.append(k,v));body=fd;h.delete('content-type')}
+      let res;try{res=await netFetch(op.url,{method:op.method,headers:h,body},30000)}catch(e){noteOnline(false);break}
+      noteOnline(true);
+      if(res.status>=500||res.status===401||res.status===408||res.status===429){
+        op.tries=(op.tries||0)+1;
+        if(op.tries<8){await idbPut('outbox',op);if(res.status===401){try{await sb.auth.refreshSession()}catch(e){}}break}
+        gaveUp++;
+      }else if(!res.ok&&res.status!==409){let t='';try{t=await res.text()}catch(e){}if(!/Duplicate|already exists|23505/i.test(t))dropped++}
+      if(!(await idbDel('outbox',op.n))){OFF.db=null;break}
+      OFF.ops=OFF.ops.filter(o=>o.n!==op.n);sent++;netPill();
+    }
+  }finally{OFF.flushing=false;netPill()}
+  if(dropped||gaveUp)toast((dropped+gaveUp)+' change'+(dropped+gaveUp>1?'s':'')+" couldn't be saved"+(gaveUp?' after several tries':'. You may not have permission anymore')+'.');
+  else if(sent&&!myOps().length&&OFF.hadOffline){OFF.hadOffline=false;toast('All changes synced.')}
+  if(sent){if(S.job)reloadJob();if(V)loadSheetData()}
+}
+function netPill(){
+  let p=document.getElementById('netpill');
+  if(!p){if(!document.body)return;p=document.createElement('div');p.id='netpill';p.className='netpill';p.onclick=()=>{if(navigator.onLine!==false)flushOutbox();toast(myOps().length?myOps().length+' change'+(myOps().length>1?'s are':' is')+' saved on this device and will upload when you have signal.':(OFF.online?'Online.':'No signal. You can keep working on saved jobs; changes upload when you\'re back online.'))};document.body.appendChild(p)}
+  const n=myOps().length;const off=!OFF.online||navigator.onLine===false;if(off)OFF.hadOffline=true;
+  if(!n&&!off){p.style.display='none';return}
+  p.style.display='block';p.className='netpill'+(n?' wait':'');
+  p.textContent=(off?'Offline':(OFF.flushing?'Syncing…':'Online'))+(n?' · '+n+' change'+(n>1?'s':'')+' waiting':'');
+}
+window.addEventListener('online',()=>{OFF.online=true;netPill();setTimeout(flushOutbox,800)});
+window.addEventListener('offline',()=>{OFF.online=false;netPill()});
+setInterval(()=>{if(myOps().length)flushOutbox()},20000);
+async function okToSignOut(){const n=myOps().length;if(!n)return true;return await confirmBox(n+' change'+(n>1?'s':'')+" made on this device haven't uploaded yet. If you sign out now they'll be lost. Sign out anyway?",'Sign out')}
+async function clearDeviceCache(){try{await idbDo('resp','readwrite',st=>st.clear());await idbDo('img','readwrite',st=>st.clear())}catch(e){}S.urls={}}
 
 /* ===== state ===== */
 let sb=null;
@@ -206,9 +342,13 @@ function progressBox(text){const m=modal('<h2>Working…</h2><p class="muted" da
 async function showPhoto(path){const [u]=await urlsFor([path]);if(!u){toast("Couldn't load that photo.");return}const v=document.createElement('div');v.className='photoview';v.innerHTML='<img alt="">';$('img',v).src=u;v.onclick=()=>v.remove();document.body.appendChild(v)}
 
 /* ===== files ===== */
-async function urlsFor(paths){
-  const need=[...new Set(paths.filter(p=>p&&!S.urls[p]))];
-  if(need.length){try{const {data}=await sb.storage.from(BUCKET).createSignedUrls(need,60*60*12);(data||[]).forEach(d=>{if(d&&d.signedUrl&&d.path)S.urls[d.path]=d.signedUrl})}catch(e){}}
+async function urlsFor(paths,force){
+  const miss=[...new Set(paths.filter(p=>p&&(!S.urls[p]||(force&&!S.urls[p].startsWith('blob:')))))];
+  await Promise.all(miss.map(async p=>{const b=await idbGet('img',p);if(b)S.urls[p]=URL.createObjectURL(b)}));
+  const need=miss.filter(p=>!S.urls[p]||!S.urls[p].startsWith('blob:'));
+  if(need.length&&navigator.onLine!==false){let signed=[];try{const {data}=await sb.storage.from(BUCKET).createSignedUrls(need,60*60*12);signed=(data||[]).filter(d=>d&&d.signedUrl&&d.path)}catch(e){}
+    let i=0;const worker=async()=>{while(i<signed.length){const d=signed[i++];try{const r=await netFetch(d.signedUrl,{},90000);if(!r.ok)throw new Error('http '+r.status);const b=await r.blob();await idbPut('img',b,d.path);S.urls[d.path]=URL.createObjectURL(b)}catch(e){if(!S.urls[d.path])S.urls[d.path]=d.signedUrl}}};
+    await Promise.all([worker(),worker(),worker(),worker()])}
   return paths.map(p=>S.urls[p]||'');
 }
 async function fillImgs(root){const imgs=$$('img[data-path]',root);if(!imgs.length)return;const us=await urlsFor(imgs.map(i=>i.dataset.path));imgs.forEach((i,k)=>{if(us[k]&&i.src!==us[k])i.src=us[k]})}
@@ -308,10 +448,20 @@ async function nameFromImage(src){
 (async function boot(){
   if(SB_URL.startsWith('__')){fatal('This app has not been connected to its database yet.');return}
   if(!window.supabase){fatal("Couldn't load. Check your signal and reload the page.");return}
-  sb=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,storageKey:'crewplans-auth'}});
+  sb=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,storageKey:'crewplans-auth'},global:{fetch:offlineFetch}});
+  {const gs=sb.auth.getSession.bind(sb.auth);
+   sb.auth.getSession=async()=>{const st=storedSession();
+     if(st&&st.user&&(!OFF.online||navigator.onLine===false))return {data:{session:st},error:null};
+     const r=await Promise.race([gs().catch(e=>({data:{session:null},error:e})),new Promise(res=>setTimeout(()=>res(null),3000))]);
+     if(r&&(r.data&&r.data.session||!st))return r;
+     if(!r)noteOnline(false);
+     return {data:{session:st&&st.user?st:null},error:null}}}
+  if('serviceWorker' in navigator){try{navigator.serviceWorker.register('sw.js').catch(()=>{})}catch(e){}}
+  netPill();try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{})}catch(e){}
   sb.auth.onAuthStateChange(ev=>{if(ev==='PASSWORD_RECOVERY')setTimeout(()=>setPasswordBox('Set a new password'),300)});
   const params=new URLSearchParams(location.search);const inv=params.get('invite');
   let session=null;try{session=(await sb.auth.getSession()).data.session}catch(e){}
+  if(!session&&!inv){const st=storedSession();if(st&&st.user&&st.refresh_token)session=st}
   if(inv){
     try{history.replaceState(null,'',location.pathname)}catch(e){}
     if(!session){const r=await sb.auth.signInAnonymously();if(r.error){fatal("Couldn't open your invite: "+errMsg(r.error));return}session=r.data.session}
@@ -353,19 +503,24 @@ async function setPasswordBox(title){
   const r=await sb.auth.updateUser({password:v.pw});if(r.error){toast(errMsg(r.error));return}toast('Password saved.');
   if(!S.me)afterLogin(null);
 }
+function storedSession(){try{const s=JSON.parse(localStorage.getItem('crewplans-auth')||'null');return s&&(s.currentSession||s)}catch(e){return null}}
 async function afterLogin(openId){
-  try{S.me=(await sb.auth.getUser()).data.user}catch(e){}
+  {const st=storedSession();
+   if(st&&st.user&&(!OFF.online||navigator.onLine===false))S.me=st.user;
+   else{try{const r=await Promise.race([sb.auth.getUser(),new Promise(res=>setTimeout(()=>res(null),3000))]);if(!r)noteOnline(false);S.me=r&&r.data?r.data.user:null}catch(e){}
+     if(!S.me&&st&&st.user)S.me=st.user}}
   if(!S.me){renderWelcome();return}
   S.isAdmin=false;
   if(!S.me.is_anonymous){try{S.isAdmin=!!(await q(sb.rpc('claim_office')))}catch(e){}}
   await loadOffice();
   if(!S.me.is_anonymous&&!S.isAdmin){
     $('#app').innerHTML='<div class="top"><h1><span class="brand"></span>Alpha Crew View</h1></div><main><div class="empty"><b>Not on the office list yet</b>'+esc(S.me.email||'This login')+' isn\'t on the office list. Ask a PM to add you under ☰ → Office users, then sign in again.<div style="margin-top:14px"><button class="btn" id="so">Sign out</button></div></div></main>';
-    $('#so').onclick=async()=>{await sb.auth.signOut();location.href=location.pathname+'?office'};return;
+    $('#so').onclick=async()=>{if(!await okToSignOut())return;await sb.auth.signOut();await clearDeviceCache();location.href=location.pathname+'?office'};return;
   }
   await loadJobs();
   S.jobsChan=sb.channel('jobs-list').on('postgres_changes',{event:'*',schema:'public',table:'jobs'},()=>debounce('jobs',loadJobs))
     .on('postgres_changes',{event:'*',schema:'public',table:'members'},()=>debounce('jobs',loadJobs)).subscribe();
+  window.addEventListener('online',()=>setTimeout(()=>{if(!myOps().length){loadJobs();if(S.job)reloadJob();if(V)loadSheetData()}},1500));
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){loadJobs();if(S.job)reloadJob();if(V)loadSheetData()}});
   const target=openId||lsGet('crewplans.lastJob');
   if(target&&S.jobs.some(j=>j.id===target)){openJob(target);return}
@@ -467,10 +622,10 @@ function bindJobs(){
     const m=modal('<h2>Account</h2><p class="muted">'+(S.isAdmin?'Signed in as office: '+esc(S.me.email||who(S.me.id)):'Crew access on this phone. Your access comes from invite links; signing out would remove it from this phone.')+'</p><div style="display:grid;gap:10px;margin-top:12px">'+
       (S.isAdmin?'<button class="btn" data-users>Office users</button><button class="btn" data-pw>Change password</button><button class="btn" data-out>Sign out</button>':'<button class="btn" data-off>Office sign in on this device</button>')+'<button class="btn" data-x>Close</button></div>');
     $('[data-x]',m).onclick=()=>m.close();
-    const o=$('[data-out]',m);if(o)o.onclick=async()=>{await sb.auth.signOut();lsSet('crewplans.lastJob',null);location.href=location.pathname+'?office'};
+    const o=$('[data-out]',m);if(o)o.onclick=async()=>{if(!await okToSignOut())return;await sb.auth.signOut();await clearDeviceCache();lsSet('crewplans.lastJob',null);location.href=location.pathname+'?office'};
     const ou=$('[data-users]',m);if(ou)ou.onclick=()=>{m.close();officeUsers()};
     const pw=$('[data-pw]',m);if(pw)pw.onclick=()=>{m.close();setPasswordBox('Change password')};
-    const of=$('[data-off]',m);if(of)of.onclick=async()=>{m.close();if(!await confirmBox('This phone or computer will stop being signed in as crew. You\'d need a new invite link to get crew access back here. Continue to office sign in?','Continue',false))return;location.href=location.pathname+'?office'};
+    const of=$('[data-off]',m);if(of)of.onclick=async()=>{m.close();if(!await okToSignOut())return;if(!await confirmBox('This phone or computer will stop being signed in as crew. You\'d need a new invite link to get crew access back here. Continue to office sign in?','Continue',false))return;location.href=location.pathname+'?office'};
   };
 }
 async function jobMenu(){
@@ -668,12 +823,33 @@ function renderPlans(){
   if(admin)h+='<label class="btn primary block" style="margin-bottom:6px">+ Add plans (PDF or photos)<input type="file" id="planFile" accept="application/pdf,image/*" multiple hidden></label><p class="muted small" style="margin:0 0 10px;text-align:center">Each PDF page becomes a sheet and gets named from its title block.</p>'+(S.sheets.length?'<button class="btn block" id="autoName" style="margin-bottom:14px">Auto-name sheets from title blocks</button>':'');
   if(!S.loaded.sheets)return h+'<div class="empty">Loading sheets…</div>';
   if(!S.sheets.length)return h+'<div class="empty"><b>No sheets yet</b>'+(admin?'Upload the plan set PDF to get started.':'The office hasn\'t uploaded plans for this job yet.')+'</div>';
+  const sv=lsGet('acv.saved.'+S.job.id);
+  h+='<div class="offrow"><button class="btn sm" id="saveOff">⬇ Save for offline</button><span class="muted small">'+(sv?'Saved on this device '+esc(fmtWhen(sv)):'Save before going where there\'s no signal.')+'</span></div>';
   return h+'<div class="grid">'+S.sheets.map(s=>'<div class="sheet" data-id="'+esc(s.id)+'"><img loading="lazy" alt="" data-path="'+esc(s.thumb_path||s.path)+'"><div class="sname">'+esc(s.name||'Sheet')+'</div>'+(admin?'<button class="ico" data-edit aria-label="Edit sheet">✎</button>':'')+'</div>').join('')+'</div>';
 }
 function bindPlans(){
   const an=$('#autoName');if(an)an.onclick=autoNameSheets;
+  const so=$('#saveOff');if(so)so.onclick=saveJobOffline;
   const f=$('#planFile');if(f)f.onchange=()=>{const files=[...f.files];f.value='';if(files.length)addPlans(files)};
   $$('.sheet').forEach(el=>{el.onclick=e=>{if(e.target.closest('[data-edit]'))return;openSheet(el.dataset.id)};const b=$('[data-edit]',el);if(b)b.onclick=()=>editSheet(el.dataset.id)});
+}
+async function saveJobOffline(){
+  if(navigator.onLine===false){toast('Connect to Wi-Fi or signal first, then save the job.');return}
+  const job=S.job;if(!job)return;const pb=progressBox('Saving job info…');
+  try{
+    try{if(navigator.storage&&navigator.storage.persist)await navigator.storage.persist()}catch(e){}
+    await Promise.all([loadSheets(),loadAreas(),loadLogs(),loadMembers()]);
+    const list=S.sheets.slice();const photos=[];let bad=0;
+    for(let i=0;i<list.length;i++){const s=list[i];pb.set('Saving sheet '+(i+1)+' of '+list.length+'…');
+      try{const [,pn]=await Promise.all([q(marksQ(s.id)),q(pinsQ(s.id))]);(pn||[]).forEach(p=>(Array.isArray(p.photos)?p.photos:[]).forEach(x=>photos.push(x)))}catch(e){bad++}
+      const us=await urlsFor([s.path,s.thumb_path].filter(Boolean),true);if(!us[0]||!us[0].startsWith('blob:'))bad++}
+    if(photos.length){pb.set('Saving '+photos.length+' pin photo'+(photos.length>1?'s':'')+'…');await urlsFor(photos,true)}
+    pb.close();
+    if(bad){toast("Some sheets didn't save. Check your signal and tap Save for offline again.");return}
+    lsSet('acv.saved.'+job.id,new Date().toISOString());
+    let mb='';try{const e=await navigator.storage.estimate();mb=' About '+Math.round(e.usage/1048576)+' MB used on this device.'}catch(e){}
+    toast('Saved for offline: '+list.length+' sheet'+(list.length===1?'':'s')+'.'+mb);if(S.tab==='plans')render();
+  }catch(e){pb.close();toast(errMsg(e))}
 }
 async function autoNameSheets(){
   const list=S.sheets.slice();if(!list.length)return;
@@ -885,9 +1061,11 @@ async function openSheet(id){
   const [u]=await urlsFor([sh.path]);if(V&&V.id===id){if(u)V.img.src=u;else V.img.onerror()}
   loadSheetData();
 }
+const marksQ=id=>sb.from('marks').select('*').eq('sheet_id',id).order('created_at');
+const pinsQ=id=>sb.from('pins').select('*').eq('sheet_id',id).order('created_at');
 async function loadSheetData(){
   if(!V)return;const id=V.id;
-  try{const [mk,pn]=await Promise.all([q(sb.from('marks').select('*').eq('sheet_id',id).order('created_at')),q(sb.from('pins').select('*').eq('sheet_id',id).order('created_at'))]);
+  try{const [mk,pn]=await Promise.all([q(marksQ(id)),q(pinsQ(id))]);
     if(!V||V.id!==id)return;V.marks=mk;V.pins=pn;drawMarks();buildPins()}catch(e){toast(errMsg(e))}
 }
 function onResize(){if(V&&V.W)placePins()}
