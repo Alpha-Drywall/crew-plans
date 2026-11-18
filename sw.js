@@ -15,7 +15,7 @@ self.addEventListener('fetch',e=>{
   const base=new URL(APP,self.location).pathname;
   const isApp=u.origin===self.location.origin&&(u.pathname===base||u.pathname===base+'index.html');
   if(isApp){
-    e.respondWith(withTimeout(fetch(r),8000).then(res=>{
+    e.respondWith(withTimeout(fetch(r.url,{cache:'no-cache',credentials:'same-origin'}),8000).then(res=>{
       if(res&&res.ok){const cp=res.clone();caches.open(CACHE).then(c=>c.put(APP,cp))}
       return res;
     }).catch(()=>caches.open(CACHE).then(c=>c.match(APP)).then(m=>m||Response.error())));
