@@ -129,7 +129,7 @@ const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZ
 const SCOPE_CATALOG=[{k:'framing',n:'Framing',c:'#2563eb'},{k:'blocking',n:'Blocking',c:'#92400e'},{k:'insulation',n:'Insulation',c:'#db2777'},{k:'sheathing',n:'Sheathing',c:'#65a30d'},{k:'board',n:'Board',c:'#ea580c'},{k:'tape',n:'Tape',c:'#9333ea'},{k:'finish',n:'Finish',c:'#16a34a'},{k:'act',n:'ACT',c:'#0891b2'},{k:'frames',n:'Doors & Frames',c:'#475569'}];
 const CUSTOM_COLORS=['#ca8a04','#be123c','#4f46e5','#0d9488','#7c3aed','#a16207','#0369a1','#15803d'];
 const DEFAULT_SCOPE=['framing','board','tape','finish'].map(k=>SCOPE_CATALOG.find(x=>x.k===k));
-function normScope(sc){if(!Array.isArray(sc)||!sc.length)return DEFAULT_SCOPE;const out=[];const seen=new Set();sc.forEach((x,i)=>{if(!x||typeof x.k!=='string'||!/^[a-z0-9_-]{1,30}$/.test(x.k)||seen.has(x.k))return;seen.add(x.k);const cat=SCOPE_CATALOG.find(c=>c.k===x.k);const col=/^#[0-9a-fA-F]{6}$/.test(x.c||'')?x.c:(cat?cat.c:CUSTOM_COLORS[i%CUSTOM_COLORS.length]);out.push({k:x.k,n:String(x.n||(cat&&cat.n)||x.k).slice(0,24),c:col})});return out.length?out:DEFAULT_SCOPE}
+function normScope(sc){if(!Array.isArray(sc)||!sc.length)return DEFAULT_SCOPE;const out=[];const seen=new Set();sc.forEach((x,i)=>{if(!x||typeof x.k!=='string'||!/^[a-z0-9_-]{1,30}$/.test(x.k)||seen.has(x.k))return;seen.add(x.k);const cat=SCOPE_CATALOG.find(c=>c.k===x.k);const col=/^#[0-9a-fA-F]{6}$/.test(x.c||'')?x.c:(cat?cat.c:CUSTOM_COLORS[i%CUSTOM_COLORS.length]);out.push({k:x.k,n:String(x.n||(cat&&cat.n)||x.k).slice(0,24),c:col,w:Math.max(0,num(x.w,0))})});return out.length?out:DEFAULT_SCOPE}
 let PHASES=DEFAULT_SCOPE;
 const PIN_KINDS=[{k:'issue',n:'Issue',i:'!'},{k:'question',n:'Question',i:'?'},{k:'extra',n:'Extra work',i:'$'},{k:'note',n:'Note',i:'i'}];
 const PDFJS='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
@@ -361,7 +361,8 @@ async function openJob(id){
 function reloadJob(){loadSheets();loadAreas();loadLogs();loadMembers()}
 function jobId(){return S.job&&S.job.id}
 async function loadSheets(){const id=jobId();if(!id)return;try{const d=await q(sb.from('sheets').select('*').eq('job_id',id).order('sort'));if(jobId()!==id)return;S.sheets=d;S.loaded.sheets=true;if(S.tab==='plans')render()}catch(e){toast(errMsg(e))}}
-async function loadAreas(){const id=jobId();if(!id)return;try{const d=await q(sb.from('areas').select('*').eq('job_id',id).order('created_at'));if(jobId()!==id)return;S.areas=d;S.loaded.areas=true;if(S.tab==='progress')render()}catch(e){toast(errMsg(e))}}
+async function loadBudget(){const id=jobId();if(!id||!isAdminRole()){S.budget=null;return}try{const d=await q(sb.from('job_budget').select('amounts').eq('job_id',id).maybeSingle());if(jobId()===id)S.budget=d?d.amounts||{}:null}catch(e){S.budget=null}}
+async function loadAreas(){const id=jobId();if(!id)return;await loadBudget();try{const d=await q(sb.from('areas').select('*').eq('job_id',id).order('created_at'));if(jobId()!==id)return;S.areas=d;S.loaded.areas=true;if(S.tab==='progress')render()}catch(e){toast(errMsg(e))}}
 async function loadLogs(){const id=jobId();if(!id)return;try{const d=await q(sb.from('logs').select('*').eq('job_id',id).order('date',{ascending:false}).limit(300));if(jobId()!==id)return;S.logs=d;S.loaded.logs=true;if(S.tab==='log'){renderLogList();const b=$('#logForm');if(b&&b._fillIfEmpty)b._fillIfEmpty()}}catch(e){toast(errMsg(e))}}
 async function loadMembers(){const id=jobId();if(!id)return;try{const d=await q(sb.from('members').select('*').eq('job_id',id).order('joined_at'));if(jobId()!==id)return;S.members=d;d.forEach(m=>S.people[m.user_id]=m.name);render();if(V)buildPins()}catch(e){}}
 async function loadInvites(){const id=jobId();if(!id||!isAdminRole())return [];try{S.invites=await q(sb.from('invites').select('*').eq('job_id',id).order('created_at',{ascending:false}))}catch(e){toast(errMsg(e))}return S.invites}
@@ -492,6 +493,25 @@ async function downloadJob(){
   }catch(e){pb.close();toast("Couldn't build the download: "+errMsg(e))}
 }
 
+/* SOV dollars per scope item (office only); crews only get each item's weight */
+function sovEditor(){
+  const B=Object.assign({},S.budget||{});
+  const m=modal('<h2>Schedule of Values for '+esc(S.job.name)+'</h2><p class="muted" style="margin-top:0">Dollar value of each scope item. The job\'s total % complete is weighted by these. Only office accounts see dollars; crews see percents. Leave an item at 0 if its cost is carried in another line.</p>'+
+    PHASES.map(p=>'<label class="lrow"><span class="dot" style="background:'+p.c+'"></span><span class="grow">'+esc(p.n)+'</span><span class="muted">$</span><input data-k="'+p.k+'" type="number" inputmode="decimal" min="0" step="1" value="'+(num(B[p.k])||'')+'" placeholder="0" style="width:120px;border:1px solid var(--line);border-radius:8px;padding:8px;text-align:right"></label>').join('')+
+    '<div class="row" style="margin-top:10px"><b class="grow">Total</b><b data-tot></b></div>'+
+    '<div class="mbtns"><button class="btn" data-x>Cancel</button><button class="btn primary" data-ok>Save</button></div>');
+  const tot=()=>{$('[data-tot]',m).textContent=money($$('[data-k]',m).reduce((a,i)=>a+num(i.value),0))};tot();
+  $$('[data-k]',m).forEach(i=>i.oninput=tot);
+  $('[data-x]',m).onclick=()=>m.close();
+  $('[data-ok]',m).onclick=async()=>{
+    const amounts={};$$('[data-k]',m).forEach(i=>{const v=Math.max(0,Math.round(num(i.value)));if(v)amounts[i.dataset.k]=v});
+    const sum=Object.values(amounts).reduce((a,b)=>a+b,0);
+    const sc=normScope(S.job.scope).map(p=>Object.assign({},p,{w:sum?Math.round((amounts[p.k]||0)/sum*10000)/10000:0}));
+    if(!await run(sb.from('job_budget').upsert({job_id:S.job.id,amounts,updated_at:new Date().toISOString()},{onConflict:'job_id'})))return;
+    if(await run(sb.from('jobs').update({scope:sc}).eq('id',S.job.id),'SOV values saved.')){S.job.scope=sc;PHASES=normScope(sc);S.budget=amounts;m.close();render();loadJobs()}
+  };
+}
+
 /* scope items */
 function scopeEditor(){
   const cur=normScope(S.job.scope);let custom=cur.filter(x=>!SCOPE_CATALOG.some(c=>c.k===x.k));
@@ -508,7 +528,8 @@ function scopeEditor(){
       $('.mcard',m).innerHTML=draw();$$('[data-k]',m).forEach(x=>x.checked=checked.has(x.dataset.k)||x.dataset.k===k);bind()};
     $('[data-ok]',m).onclick=async()=>{
       const on=new Set($$('[data-k]',m).filter(x=>x.checked).map(x=>x.dataset.k));
-      const sc=SCOPE_CATALOG.filter(c=>on.has(c.k)).concat(custom.filter(c=>on.has(c.k)));
+      const wOf=k=>{const x=cur.find(c=>c.k===k);return x?x.w:0};
+      const sc=SCOPE_CATALOG.filter(c=>on.has(c.k)).concat(custom.filter(c=>on.has(c.k))).map(c=>Object.assign({},c,{w:wOf(c.k)}));
       if(!sc.length){toast('Pick at least one item.');return}
       if(await run(sb.from('jobs').update({scope:sc}).eq('id',S.job.id),'Scope saved.')){S.job.scope=sc;PHASES=normScope(sc);m.close();render();loadJobs()}
     };
@@ -677,13 +698,16 @@ async function storeSheet(jid,canvas,name,order){
 }
 
 /* progress tab */
+function weighted(){return PHASES.some(p=>p.w>0)}
+function overallPct(){if(weighted()){const tw=PHASES.reduce((a,p)=>a+p.w,0);return Math.round(PHASES.reduce((a,p)=>a+avg(p.k)*p.w,0)/tw)}return Math.round(PHASES.reduce((a,p)=>a+avg(p.k),0)/PHASES.length)}
+const money=v=>'$'+Math.round(num(v)).toLocaleString();
 function avg(k){if(!S.areas.length)return 0;return Math.round(S.areas.reduce((a,p)=>a+areaPct(p,k),0)/S.areas.length)}
 function renderProgress(){
   if(!S.loaded.areas)return '<div class="empty">Loading progress…</div>';
-  const cw=canWrite();const overall=Math.round(PHASES.reduce((a,p)=>a+avg(p.k),0)/PHASES.length);
-  let h='<div class="card"><div class="row"><div class="grow"><b style="font-size:17px">Job progress</b><div class="muted small">'+(S.areas.length>1?'Average across '+S.areas.length+' areas':'All scope items')+'</div></div><div style="font-size:26px;font-weight:800">'+overall+'%</div></div>'+
-    PHASES.map(p=>{const v=avg(p.k);return '<div class="prow"><label><span class="dot" style="background:'+p.c+'"></span>'+p.n+'</label><div class="bar"><i style="width:'+v+'%;background:'+p.c+'"></i></div><div class="val">'+v+'%</div></div>'}).join('')+'</div>';
-  if(isAdminRole())h+='<button class="btn block" id="editScope" style="margin-bottom:10px">Scope items: '+esc(PHASES.map(p=>p.n).join(', '))+' ✎</button>';
+  const cw=canWrite();const overall=overallPct();const B=isAdminRole()?S.budget:null;const bt=B?PHASES.reduce((a,p)=>a+num(B[p.k]),0):0;
+  let h='<div class="card"><div class="row"><div class="grow"><b style="font-size:17px">Job progress</b><div class="muted small">'+(S.areas.length>1?'Average across '+S.areas.length+' areas':'All scope items')+(weighted()?' · weighted by Schedule of Values':'')+(bt?'<br><b>'+money(PHASES.reduce((a,p)=>a+num(B[p.k])*avg(p.k)/100,0))+'</b> of '+money(bt)+' earned':'')+'</div></div><div style="font-size:26px;font-weight:800">'+overall+'%</div></div>'+
+    PHASES.map(p=>{const v=avg(p.k);return '<div class="prow"><label><span class="dot" style="background:'+p.c+'"></span>'+p.n+(bt&&num(B[p.k])?'<div class="muted small" style="font-weight:400">'+money(num(B[p.k])*v/100)+' / '+money(B[p.k])+'</div>':'')+'</label><div class="bar"><i style="width:'+v+'%;background:'+p.c+'"></i></div><div class="val">'+v+'%</div></div>'}).join('')+'</div>';
+  if(isAdminRole())h+='<div class="row" style="margin-bottom:10px;align-items:stretch"><button class="btn grow" id="editScope">Scope items ✎</button><button class="btn grow" id="editSov">SOV values ($) ✎</button></div>';
   if(cw)h+='<p class="muted small" style="margin:4px 2px 10px">Drag a slider as work gets done, or tap the % to type it.</p>';
   const list=S.areas.length?S.areas:(cw?[{id:'__new',name:'Whole job',pct:{}}]:[]);
   if(!list.length)h+='<div class="empty"><b>No progress entered yet</b>The foreman or office will update this as work gets done.</div>';
@@ -695,6 +719,7 @@ function renderProgress(){
 }
 function bindProgress(){
   const es=$('#editScope');if(es)es.onclick=scopeEditor;
+  const ev=$('#editSov');if(ev)ev.onclick=sovEditor;
   const add=$('#addArea');if(add)add.onclick=async()=>{const v=await formBox('New area',[{k:'name',label:'Area name',req:true,ph:'e.g. Level 2 – West'}],'Add');if(v&&await run(sb.from('areas').insert({job_id:S.job.id,name:v.name.slice(0,80)})))loadAreas()};
   let creating=null;
   const areaId=async id=>{if(id!=='__new')return id;if(!creating)creating=run(sb.from('areas').insert({job_id:S.job.id,name:'Whole job'}).select().single());const d=await creating;return d&&d.id};
