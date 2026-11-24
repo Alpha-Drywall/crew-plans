@@ -33,6 +33,22 @@ button{cursor:pointer}
 .pbar2 label{display:flex;align-items:center;gap:5px;font-weight:600;white-space:nowrap}
 .pbar2 input{width:18px;height:18px}
 .pbar2 .grow{flex:1}
+.top .jl{display:none}
+.ptools{margin:0 0 10px}.ptools .pbar,.ptools .pbar2{margin-bottom:8px}
+@media (min-width:700px){
+ .top{grid-template-columns:44px minmax(0,1fr) auto minmax(0,1fr) 44px;min-height:64px}
+ .top>#back{grid-column:1;grid-row:1}
+ .top .jl{display:block;grid-column:2;grid-row:1;font-size:16px;font-weight:700;line-height:1.25;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .top .jl .sub{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .top h1{grid-column:3;grid-row:1;font-size:26px;font-weight:800}
+ .top h1 .brand{width:36px;height:36px}
+ .top h1 .jn{display:none}
+ .top>button:last-child:not(:first-child){grid-column:5;grid-row:1}
+ .ptools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+ .ptools .pbar,.ptools .pbar2{margin:0}
+ .ptools .pbar select{flex:0 1 auto;width:auto;max-width:230px}
+ .ptools .pbar2 .grow{flex:none}
+}
 .top .sub{font-size:13px;color:#aeb6c0;font-weight:400}
 .top button{background:none;border:0;color:#fff;font-size:22px;padding:4px 8px;min-width:40px;min-height:40px;border-radius:8px}
 .top button:active{background:#ffffff22}
@@ -451,8 +467,8 @@ function shownSheets(){const f=sheetFilter(),cs=curSheets();
   if(f.rev==='__revised')return cs.filter(isRevised);
   if(f.rev==='__changed')return cs.filter(s=>changeLabels(s).length);
   if(f.rev==='__docs')return cs.filter(s=>Array.isArray(s.changes)&&s.changes.length);
-  if(f.rev){const out=[];cs.forEach(c=>versionsOf(c).forEach(v=>{if(revText(v)===f.rev)out.push(v)}));return out}
-  if(!f.old)return cs;const out=[];cs.forEach(c=>{out.push(c);versionsOf(c).forEach(v=>{if(v.id!==c.id)out.push(v)})});return out}
+  if(f.rev&&f.rev!=='__all'){const out=[];cs.forEach(c=>versionsOf(c).forEach(v=>{if(revText(v)===f.rev)out.push(v)}));return out}
+  if(f.rev!=='__all')return cs;const out=[];cs.forEach(c=>{out.push(c);versionsOf(c).forEach(v=>{if(v.id!==c.id)out.push(v)})});return out}
 const sheetNo=s=>String((s&&s.name)||'').split(/\s+[–-]\s+/)[0].trim();
 const normNo=x=>String(x||'').toUpperCase().replace(/\s+/g,'').replace(/^[A-Z]{1,2}(?=\d)/,'');
 const isRevised=s=>hasVersions(s)||(!!s.rev_label&&!/^(rev(ision)?\.?\s*0+|issued\b|original|bid\b|updated\b)/i.test(s.rev_label));
@@ -702,14 +718,14 @@ function render(){
   const j=S.job;
   if(!app.querySelector('[data-jobshell]')||app.dataset.job!==j.id||app.dataset.tab!==S.tab||app.dataset.role!==S.role){
     app.dataset.job=j.id;app.dataset.tab=S.tab;app.dataset.role=S.role;
-    app.innerHTML='<div data-jobshell><div class="jhead"><div class="top"><button id="back" aria-label="Back">‹</button><h1><div class="ttl"><span class="brand"></span>Alpha Operations</div><div class="jn" id="jt"></div></h1>'+(isAdminRole()?'<button id="jmenu" aria-label="Job menu">⋯</button>':'')+'</div>'+
+    app.innerHTML='<div data-jobshell><div class="jhead"><div class="top"><button id="back" aria-label="Back">‹</button><div class="jl" id="jt2"></div><h1><div class="ttl"><span class="brand"></span>Alpha Operations</div><div class="jn" id="jt"></div></h1>'+(isAdminRole()?'<button id="jmenu" aria-label="Job menu">⋯</button>':'')+'</div>'+
       '<div class="tabs"><button data-tab="plans">Plans</button><button data-tab="progress">Progress</button><button data-tab="log">Daily Report</button><button data-tab="labor">Labor</button></div></div><main id="tabBody"></main></div>';
     $('#back').onclick=closeJob;
     $$('.tabs button').forEach(b=>b.onclick=()=>{S.tab=b.dataset.tab;window.scrollTo(0,0);render()});
     if($('#jmenu'))$('#jmenu').onclick=jobMenu;
     if(S.tab==='log'){$('#tabBody').innerHTML='<div id="logForm"></div><div id="logList"></div>';renderLogForm()}
   }
-  $('#jt').innerHTML=esc(j.name||'Job')+'<div class="sub">'+(j.addr?esc(j.addr)+' · ':'')+(pmName(j.pm)?'PM '+esc(pmName(j.pm))+' · ':'')+(S.role==='viewer'?'View only':S.role==='editor'?'Editor':'Office')+'</div>';
+  $('#jt').innerHTML=esc(j.name||'Job')+'<div class="sub">'+(j.addr?esc(j.addr)+' · ':'')+(pmName(j.pm)?'PM '+esc(pmName(j.pm))+' · ':'')+(S.role==='viewer'?'View only':S.role==='editor'?'Editor':'Office')+'</div>';$('#jt2').innerHTML=$('#jt').innerHTML;
   $$('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===S.tab));
   if(S.tab==='plans'){$('#tabBody').innerHTML=renderPlans();bindPlans();fillImgs($('#tabBody'))}
   else if(S.tab==='progress'){$('#tabBody').innerHTML=renderProgress();bindProgress();fillImgs($('#tabBody'))}
@@ -1079,11 +1095,11 @@ function renderPlans(){
     :stale?'<button class="btn sm primary" id="saveOff" title="Plans changed since you saved them">⬇ Update offline</button><button class="btn sm" id="rmOff">Remove</button>'
     :'<span class="offok"><b>✓</b> Offline<span style="font-weight:400">· '+esc(new Date(sv.at).toLocaleDateString(undefined,{month:'short',day:'numeric'}))+'</span></span><button class="btn sm" id="rmOff">Remove</button>';
   const f=sheetFilter(),ro=revOptions(),nRev=cs.filter(isRevised).length,nOld=S.sheets.length-cs.length,nChg=cs.filter(s=>changeLabels(s).length).length,nDoc=cs.filter(s=>Array.isArray(s.changes)&&s.changes.length).length;
-  const spec=['__revised','__changed','__docs'];
+  const spec=['__revised','__changed','__docs','__all'];
   {if(f.rev&&!spec.includes(f.rev)&&!ro.some(r=>r.k===f.rev))f.rev='';
     const so=(v,l,n)=>'<option value="'+v+'"'+(f.rev===v?' selected':'')+'>'+l+' ('+n+')</option>';
-    h+='<div class="pbar">'+addB+nameB+'<select id="revFilt" aria-label="Show revisions"><option value="">All sheets ('+cs.length+')</option>'+so('__revised','Revised sheets',nRev)+(nChg||nDoc?so('__changed','Sheets changed by RFI / PR / ASI',nChg)+so('__docs','RFI / PR / ASI pages',nDoc):'')+ro.map(r=>'<option value="'+esc(r.k)+'"'+(f.rev===r.k?' selected':'')+'>'+esc(r.k)+' ('+r.n+' sheet'+(r.n>1?'s':'')+')</option>').join('')+'</select>'+
-      '</div><div class="pbar2"><label><input type="checkbox" id="hideOld"'+(f.old?'':' checked')+(!nOld||(f.rev&&!spec.includes(f.rev))?' disabled':'')+'> Hide old</label><span class="muted grow">'+(nRev||nChg?nRev+' revised'+(nChg?' · '+nChg+' RFI/PR':''):'No revisions')+(nOld?' · '+nOld+' old':'')+'</span>'+offH+'</div>';}
+    h+='<div class="ptools"><div class="pbar">'+addB+nameB+'<select id="revFilt" aria-label="Show revisions"><option value="">Current sheets</option>'+(nOld?so('__all','All sheets incl. old versions',S.sheets.length):'')+so('__revised','Revised sheets',nRev)+(nChg||nDoc?so('__changed','Sheets changed by RFI / PR / ASI',nChg)+so('__docs','RFI / PR / ASI pages',nDoc):'')+ro.map(r=>'<option value="'+esc(r.k)+'"'+(f.rev===r.k?' selected':'')+'>'+esc(r.k)+' ('+r.n+' sheet'+(r.n>1?'s':'')+')</option>').join('')+'</select>'+
+      '</div><div class="pbar2"><span class="muted grow">'+cs.length+' sheets · '+(nRev||nChg?nRev+' revised'+(nChg?' · '+nChg+' RFI/PR':''):'no revisions')+(nOld?' · '+nOld+' old version'+(nOld>1?'s':'')+(f.rev==='__all'?' shown':' hidden'):'')+'</span>'+offH+'</div></div>';}
   const list=shownSheets();
   if(!list.length)return h+'<div class="empty">No sheets match this filter.</div>';
   return h+'<div class="grid">'+list.map(s=>'<div class="sheet'+(s.is_current===false?' oldv':'')+'" data-id="'+esc(s.id)+'"><img loading="lazy" alt="" data-path="'+esc(s.thumb_path||s.path)+'">'+sheetBadge(s)+'<div class="sname">'+esc(s.name||'Sheet')+'</div>'+(Array.isArray(s.changes)&&s.changes.length?'<div class="sfor">'+esc((s.change_ref?s.change_ref+' · ':'')+'changes '+s.changes.join(', '))+'</div>':'')+(admin&&s.is_current!==false?'<button class="ico" data-edit aria-label="Edit sheet">✎</button>':'')+'</div>').join('')+'</div>';
