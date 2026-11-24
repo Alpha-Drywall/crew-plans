@@ -57,6 +57,10 @@ main{padding:14px 14px calc(30px + env(safe-area-inset-bottom));max-width:860px;
 .revb.old{background:#b91c1c}
 .sheet.oldv{opacity:.6;border-style:dashed}
 .sheet.oldv .sname{font-weight:500}
+.pickrow{display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--line);font-size:15px;cursor:pointer}
+.pickrow input{width:22px;height:22px;flex:none}
+.picklist{max-height:55vh;overflow:auto;margin:8px 0}
+.sheet .prm{position:absolute;right:6px;top:6px;background:#000a;color:#fff;border:0;border-radius:8px;width:34px;height:34px;font-size:18px;line-height:1}
 .sfilt{display:flex;align-items:center;gap:8px;margin:0 0 10px;flex-wrap:wrap}
 .sfilt select{flex:1;min-width:0;min-height:44px;border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:#fff;font-size:15px}
 .sfilt label{display:flex;align-items:center;gap:6px;font-weight:600;font-size:14px;white-space:nowrap;min-height:44px}
@@ -1277,11 +1281,37 @@ function renderProgress(){
   if(!S.loaded.sheets)return '<div class="empty">Loading sheets…</div>';
   const admin=isAdminRole();const ps=progSheets();
   let h='<p class="muted small" style="margin:0 2px 10px">'+(canWrite()?'Open a sheet and highlight the work as it gets done, by scope color.':'Sheets the crew highlights as work gets done.')+'</p>';
-  if(!ps.length)return h+'<div class="empty"><b>No progress sheets yet</b>'+(admin?'Open a sheet on the Plans tab, tap ✎ and turn on <b>Show on Progress tab</b>.':'The office hasn\'t picked the progress sheets for this job yet.')+'</div>';
-  return h+'<div class="grid">'+ps.map(s=>'<div class="sheet" data-pid="'+esc(s.id)+'"><img loading="lazy" alt="" data-path="'+esc(s.thumb_path||s.path)+'"><div class="sname">'+esc(s.name||'Sheet')+'</div></div>').join('')+'</div>';
+  if(canWrite()&&curSheets().length)h+='<button class="btn primary block" id="progAdd" style="margin-bottom:12px">+ Add sheets from Plans</button>';
+  if(!ps.length)return h+'<div class="empty"><b>No progress sheets yet</b>'+(canWrite()?'Use the button above to pick the floor plans and ceiling plans to mark up.':'The office hasn\'t picked the progress sheets for this job yet.')+'</div>';
+  return h+'<div class="grid">'+ps.map(s=>'<div class="sheet" data-pid="'+esc(s.id)+'"><img loading="lazy" alt="" data-path="'+esc(s.thumb_path||s.path)+'"><div class="sname">'+esc(s.name||'Sheet')+'</div>'+(canWrite()?'<button class="prm" data-prm="'+esc(s.id)+'" aria-label="Remove from Progress">×</button>':'')+'</div>').join('')+'</div>';
 }
 function bindProgress(){
-  $$('[data-pid]').forEach(el=>el.onclick=()=>openSheet(el.dataset.pid,'progress'));
+  $$('[data-pid]').forEach(el=>el.onclick=e=>{if(e.target.closest('[data-prm]'))return;openSheet(el.dataset.pid,'progress')});
+  const pa=$('#progAdd');if(pa)pa.onclick=pickProgressSheets;
+  $$('[data-prm]').forEach(b=>b.onclick=async e=>{e.stopPropagation();const s=S.sheets.find(x=>x.id===b.dataset.prm);if(!s)return;
+    if(!await confirmBox('Take '+s.name+' off the Progress tab? The progress markups on it are kept and come back if you add it again.','Remove'))return;
+    await setProgress([s.id],false)});
+}
+async function setProgress(ids,val){
+  if(!ids.length)return;
+  const n=await run(sb.rpc('set_progress_sheets',{ids,val}));
+  if(n==null)return;
+  S.sheets.forEach(s=>{if(ids.includes(s.id))s.on_progress=val});render();
+  toast(val?'Added '+ids.length+' sheet'+(ids.length>1?'s':'')+' to Progress.':'Removed from Progress.');
+}
+function pickProgressSheets(){
+  const avail=curSheets().filter(s=>!s.on_progress);
+  if(!avail.length){toast('Every sheet is already on the Progress tab.');return}
+  const looks=s=>/FLOOR PLAN|REFLECTED|\bRCP\b|CEILING PLAN|FINISH PLAN|DIMENSION PLAN|REFERENCE PLAN/i.test(s.name||'')&&!/TAKEOFF/i.test(s.name||'');
+  const m=modal('<h2>Add sheets to Progress</h2><p class="muted" style="margin-top:0">Pick the sheets the crew will highlight. They show up clean here, without the takeoff markups.</p><input id="pkQ" type="search" placeholder="Search sheets" style="width:100%;border:1px solid var(--line);border-radius:10px;padding:10px;min-height:44px"><div class="picklist">'+
+    avail.map(s=>'<label class="pickrow" data-n="'+esc((s.name||'').toLowerCase())+'"><input type="checkbox" value="'+esc(s.id)+'"><span>'+esc(s.name||'Sheet')+(looks(s)?' <span class="muted small">· plan</span>':'')+'</span></label>').join('')+
+    '</div><div class="mbtns"><button class="btn" data-x>Cancel</button><button class="btn primary" data-ok>Add</button></div>');
+  const ok=$('[data-ok]',m),boxes=$$('.pickrow input',m);
+  const upd=()=>{const n=boxes.filter(b=>b.checked).length;ok.textContent=n?'Add '+n+' sheet'+(n>1?'s':''):'Add';ok.disabled=!n};upd();
+  boxes.forEach(b=>b.onchange=upd);
+  $('#pkQ',m).oninput=e=>{const v=e.target.value.trim().toLowerCase();$$('.pickrow',m).forEach(r=>r.style.display=!v||r.dataset.n.includes(v)?'':'none')};
+  $('[data-x]',m).onclick=()=>m.close();
+  ok.onclick=async()=>{const ids=boxes.filter(b=>b.checked).map(b=>b.value);m.close();await setProgress(ids,true)};
 }
 function setSl(sl,v){sl.dataset.v=v;const f=$('.fi',sl),k=$('.kn',sl);if(f)f.style.width=v+'%';if(k)k.style.left=v+'%'}
 async function areaMenu(id){
