@@ -866,7 +866,7 @@ function render(){
   if(!sb||!S.me)return;
   if(S.sliding){S.pendingRender=true;return}
   const app=$('#app');
-  if(S.view==='tc'){app.dataset.job='';app.innerHTML=renderTc();bindTc();return}
+  if(S.view==='tc'){if(!TC.force&&tcTyping())return;TC.force=false;app.dataset.job='';app.innerHTML=renderTc();bindTc();return}
   if(S.view!=='job'||!S.job){app.dataset.job='';app.innerHTML=renderJobs();bindJobs();return}
   const j=S.job;
   if(S.tab==='tc'&&!(isAdminRole()||S.role==='editor'))S.tab='plans';
@@ -884,7 +884,7 @@ function render(){
   if(S.tab==='plans'){$('#tabBody').innerHTML=renderPlans();bindPlans();fillImgs($('#tabBody'))}
   else if(S.tab==='progress'){$('#tabBody').innerHTML=renderProgress();bindProgress();fillImgs($('#tabBody'))}
   else if(S.tab==='labor'){$('#tabBody').innerHTML=renderLabor();bindLabor();if(!S.loaded.labor&&!S.laborLoading)loadLabor()}
-  else if(S.tab==='tc')renderTcTab();
+  else if(S.tab==='tc'){if(TC.force||!tcTyping())renderTcTab();TC.force=false}
   else renderLogList();
 }
 
@@ -1013,7 +1013,8 @@ async function downloadLabor(){
 }
 
 /* ===== time cards (foreman fills; files into his Timecards folder in Excel) ===== */
-const TC={start:'',card:null,list:[],open:-1,saveT:0,loading:false};
+const TC={start:'',card:null,list:[],open:-1,saveT:0,loading:false,force:false};
+const tcTyping=()=>{const a=document.activeElement;return !!(a&&a.tagName==='INPUT'&&a.closest('.tcm,#tabBody')&&(a.id==='tcForeman'||a.id==='tcFolder'||a.dataset.name!=null||a.dataset.rate!=null||a.dataset.hrs!=null))};
 const TC_ANCHOR='2026-09-30',TC_OFF=[0,1,2,3,5,6,7,8,9,10,12,13];
 const TC_CODES=[['112','112 Framing'],['122','122 Hanging'],['132','132 Finishing'],['142','142 Clean/Sup/Layout'],['152','152 Acoustical'],['162','162 Insulation'],['172','172 Extra work']];
 const isoAddD=(iso,d)=>{const t=new Date(iso+'T12:00:00Z');t.setUTCDate(t.getUTCDate()+d);return t.toISOString().slice(0,10)};
@@ -1030,7 +1031,7 @@ const tcMoney=n=>'$'+(Math.round(n*100)/100).toLocaleString(undefined,{minimumFr
 function openTimecards(){S.view='tc';TC.start=TC.start||tcPeriodOf(tcToday());TC.open=-1;window.scrollTo(0,0);loadTc()}
 function closeTimecards(){tcFlush();S.view='jobs';render()}
 async function loadTc(){
-  TC.loading=true;TC.card=null;TC.loadedFor=TC.start;render();
+  TC.loading=true;TC.card=null;TC.loadedFor=TC.start;TC.force=true;render();
   try{
     const me=S.me.id;
     let mine=await q(sb.from('timecards').select('*').eq('owner',me).eq('period_start',TC.start).maybeSingle());
@@ -1042,7 +1043,7 @@ async function loadTc(){
     TC.card=mine;
     TC.list=S.isAdmin?(await q(sb.from('timecards').select('id,owner,foreman,folder,workers,status,submitted_at,filed_at,file_name,file_error,updated_at').eq('period_start',TC.start).order('foreman')))||[]:[];
   }catch(e){toast(errMsg(e))}
-  TC.loading=false;if(S.view==='tc'||(S.view==='job'&&S.tab==='tc'))render();
+  TC.loading=false;TC.force=true;if(S.view==='tc'||(S.view==='job'&&S.tab==='tc'))render();
 }
 function tcSchedule(){clearTimeout(TC.saveT);TC.saveT=setTimeout(tcFlush,900);tcStatus()}
 async function tcFlush(){
@@ -1131,17 +1132,17 @@ function tcTotals(i,d){
   set('[data-wh="'+i+'"]',tcWHrs(w));set('[data-wd="'+i+'"]',tcMoney(tcWHrs(w)*tcRate(w)));
   set('#tcTot',Math.round(c.workers.reduce((a,x)=>a+tcWHrs(x),0)*100)/100);set('#tcDol',tcMoney(c.workers.reduce((a,x)=>a+tcWHrs(x)*tcRate(x),0)));
 }
-function tcChanged(rerender){TC.card.dirty=true;tcSchedule();if(rerender){const y=window.scrollY;render();window.scrollTo(0,y)}}
+function tcChanged(rerender){TC.card.dirty=true;tcSchedule();if(rerender){const y=window.scrollY;TC.force=true;render();window.scrollTo(0,y)}}
 function bindTc(){
   if($('#tcBack'))$('#tcBack').onclick=closeTimecards;
   const shift=n=>{tcFlush();TC.start=isoAddD(TC.start,14*n);TC.open=-1;loadTc()};
   $('#tcPrev').onclick=()=>shift(-1);$('#tcNext').onclick=()=>shift(1);
   if(!TC.card)return;const c=TC.card;
-  $$('[data-tc]').forEach(el=>el.onclick=async()=>{tcFlush();const r=await run(sb.from('timecards').select('*').eq('id',el.dataset.tc).single());if(r&&r.id){TC.card=r;TC.open=-1;render()}});
+  $$('[data-tc]').forEach(el=>el.onclick=async()=>{tcFlush();const r=await run(sb.from('timecards').select('*').eq('id',el.dataset.tc).single());if(r&&r.id){TC.card=r;TC.open=-1;TC.force=true;render()}});
   if($('#tcMine'))$('#tcMine').onclick=()=>{tcFlush();loadTc()};
   $('#tcForeman').oninput=e=>{c.foreman=e.target.value;tcChanged()};
   $('#tcFolder').oninput=e=>{c.folder=e.target.value.trim();tcChanged()};
-  $$('[data-tog]').forEach(el=>el.onclick=()=>{const i=+el.dataset.tog;TC.open=TC.open===i?-1:i;render();const n=$('[data-w="'+i+'"]');if(n&&TC.open===i)n.scrollIntoView({block:'start'})});
+  $$('[data-tog]').forEach(el=>el.onclick=()=>{const i=+el.dataset.tog;TC.open=TC.open===i?-1:i;TC.force=true;render();const n=$('[data-w="'+i+'"]');if(n&&TC.open===i)n.scrollIntoView({block:'start'})});
   $$('input[data-name]').forEach(el=>el.oninput=()=>{const i=+el.dataset.name;c.workers[i].name=el.value;const b=$('[data-w="'+i+'"] .tcwh b');if(b)b.textContent=el.value||'New worker';tcChanged()});
   $$('input[data-rate]').forEach(el=>el.oninput=()=>{const i=+el.dataset.rate;c.workers[i].rate=el.value.trim();tcTotals(i);tcChanged()});
   $$('input[data-hrs]').forEach(el=>el.oninput=()=>{const x=tcLine(el.dataset.hrs);x.l.hrs=el.value.trim();tcTotals(+el.dataset.hrs.split('-')[0],x.d);tcChanged()});
@@ -1168,7 +1169,7 @@ function bindTc(){
     c.dirty=true;await tcFlush();if(!c.id)return;
     const now=new Date().toISOString();
     if(await run(sb.from('timecards').update({status:'submitted',submitted_at:now,file_error:null,file_tries:0}).eq('id',c.id))==null)return;
-    Object.assign(c,{status:'submitted',submitted_at:now,updated_at:now,file_error:null});render();toast('Time cards submitted.');
+    Object.assign(c,{status:'submitted',submitted_at:now,updated_at:now,file_error:null});TC.force=true;render();toast('Time cards submitted.');
     if(navigator.onLine!==false)sb.functions.invoke('crew-sync',{body:{action:'timecards'}}).then(async()=>{const r=await q(sb.from('timecards').select('status,submitted_at,filed_at,file_name,file_error,updated_at').eq('id',c.id).single()).catch(()=>null);if(r&&TC.card&&TC.card.id===c.id){Object.assign(TC.card,r);tcStatus()}}).catch(()=>{});
   };
 }
