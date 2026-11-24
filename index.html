@@ -1263,7 +1263,7 @@ function renderLogForm(){
     try{const blob=await reportPdf(o,S.job);o.pdf_path=await putFile(S.job.id+'/reports/'+d+'_'+S.me.id.slice(0,8)+'_'+Date.now()+'.pdf',blob,'application/pdf')}
     catch(err){o.pdf_path=null;toast("Saved, but the PDF couldn't be made: "+errMsg(err))}
     btn.disabled=false;
-    if(await run(sb.from('logs').upsert(o,{onConflict:'job_id,user_id,date'}),send?'Report saved. It will be emailed to the GC and filed in the job folder.':'Report saved. It will be filed in the job folder.')){touched=false;$('[data-st]',form).textContent='Editing your saved report for this day.';loadLogs()}
+    if(await run(sb.from('logs').upsert(o,{onConflict:'job_id,user_id,date'}),send?'Report saved. It will be emailed to the GC and filed in the job folder.':'Report saved. It will be filed in the job folder.')){touched=false;$('[data-st]',form).textContent='Editing your saved report for this day.';loadLogs();nudgeReports()}
     else $('[data-st]',form).textContent='';
   };
 }
@@ -1309,6 +1309,7 @@ async function reportPdf(o,job){
   const pages=doc.getNumberOfPages();for(let p=1;p<=pages;p++){doc.setPage(p);doc.setFontSize(8);doc.setFont('helvetica','bold');doc.text('Alpha Drywall, LLC',W/2,748,{align:'center'});doc.setFont('helvetica','italic');doc.text('Drywall -- Metal Stud Framing-- Suspended Ceilings',W/2,758,{align:'center'});doc.setFont('helvetica','bolditalic');doc.text('2724 S. 3600 W. Suite L, West Valley City, UT 84119',W/2,768,{align:'center'});doc.text('Office#(801) 682-4447/Fax#(801) 683-2847',W/2,778,{align:'center'})}
   return doc.output('blob');
 }
+let nudgeT=0;function nudgeReports(){if(navigator.onLine===false||Date.now()-nudgeT<20000)return;nudgeT=Date.now();setTimeout(()=>{sb.functions.invoke('crew-sync',{body:{action:'reports'}}).then(r=>{if(r&&r.data&&r.data.reports&&r.data.reports.length)setTimeout(loadLogs,500)}).catch(()=>{})},1500)}
 function reportStatus(l){
   if(!l.pdf_path)return '<span class="muted small">No PDF</span>';
   const f=l.filed_at?'✓ In job folder':(l.file_error?'⚠ Not filed: '+esc(l.file_error):'Filing to job folder…');
@@ -1318,6 +1319,7 @@ function reportStatus(l){
 function renderLogList(){
   const box=$('#logList');if(!box)return;
   if(!S.loaded.logs){box.innerHTML='<div class="empty">Loading reports…</div>';return}
+  if(S.logs.some(l=>l.pdf_path&&(!l.filed_at||(l.send_gc&&!l.sent_at))&&num(l.file_tries)<6))nudgeReports();
   if(!S.logs.length){box.innerHTML='<div class="empty"><b>No daily reports yet</b>Each foreman saves one report per day. Saved reports show up here, newest first.</div>';return}
   const byDay={};S.logs.forEach(l=>{(byDay[l.date]=byDay[l.date]||[]).push(l)});
   box.innerHTML=Object.keys(byDay).sort().reverse().map(d=>{const ls=byDay[d];const crew=ls.reduce((a,l)=>a+num(l.crew),0);
