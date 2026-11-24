@@ -637,33 +637,44 @@ async function loadLabor(){const id=jobId();if(!id)return;S.laborLoading=true;
   if(S.tab==='labor')render()}
 function laborCalc(){
   const L=S.labor||{};const hpd=num(L.hpd)||10;const budget=L.hours||{};const weeks={};let unc=0;
-  (S.laborLogs||[]).forEach(l=>{const h=l.hours_by_code||{};if(!codeHrs(l)){unc+=num(l.hours);return}const w=weekEnd(l.date);weeks[w]=weeks[w]||{};LABOR_CODES.forEach(c=>{if(num(h[c.k]))weeks[w][c.k]=(weeks[w][c.k]||0)+num(h[c.k])})});
+  const cost=L.cost&&Array.isArray(L.cost.history)&&L.cost.history.length?L.cost:null;
+  if(cost){const prev={};cost.history.slice().sort((a,b)=>a.date<b.date?-1:1).forEach(hh=>{const x=weeks[hh.date]={};LABOR_CODES.forEach(c=>{const u=num((hh.used||{})[c.k]);x[c.k]=u-num(prev[c.k]);prev[c.k]=u})})}
+  else (S.laborLogs||[]).forEach(l=>{const h=l.hours_by_code||{};if(!codeHrs(l)){unc+=num(l.hours);return}const w=weekEnd(l.date);weeks[w]=weeks[w]||{};LABOR_CODES.forEach(c=>{if(num(h[c.k]))weeks[w][c.k]=(weeks[w][c.k]||0)+num(h[c.k])})});
   const wk=Object.keys(weeks).sort();
-  const rows=LABOR_CODES.map(c=>{const bh=num(budget[c.k]);const md=bh/hpd;const usedH=wk.reduce((a,w)=>a+num(weeks[w][c.k]),0);const used=usedH/hpd;return {c,bh,md,usedH,used,left:md-used,pct:md?(md-used)/md:0}});
+  const rows=LABOR_CODES.filter(c=>!(cost&&c.k==='142s'&&!num(budget['142s']))).map(c=>{const bh=num(budget[c.k]);const md=bh/hpd;const usedH=wk.reduce((a,w)=>a+num(weeks[w][c.k]),0);const used=usedH/hpd;return {c,bh,md,usedH,used,left:md-used,pct:md?(md-used)/md:0}});
   const t={bh:rows.reduce((a,r)=>a+r.bh,0),md:rows.reduce((a,r)=>a+r.md,0),usedH:rows.reduce((a,r)=>a+r.usedH,0),used:rows.reduce((a,r)=>a+r.used,0)};t.left=t.md-t.used;t.pct=t.md?t.left/t.md:0;
-  return {hpd,rows,t,weeks,wk,unc,jobNo:L.job_no||''};
+  return {hpd,rows,t,weeks,wk,unc,jobNo:L.job_no||'',cost,src:L.source||{}};
 }
 const f1=v=>(Math.round(v*10)/10).toLocaleString(undefined,{maximumFractionDigits:1});
 const pctS=v=>Math.round(v*100)+'%';
 function fmtWk(w){const [y,m,d]=w.split('-').map(Number);return new Date(y,m-1,d).toLocaleDateString(undefined,{month:'short',day:'numeric'})}
+function L$dollars(){const d=(S.labor||{}).cost_dollars;if(!d||!d.codes)return '';
+  return '<details class="card"><summary><b>Labor cost (office only)</b> <span class="muted small">'+esc(d.tab||'')+'</span></summary><table class="ltab" style="margin-top:8px"><thead><tr><th>Code</th><th>Est. cost</th><th>Act. cost</th><th>Spent</th></tr></thead><tbody>'+
+    LABOR_CODES.filter(c=>c.k!=='142s').map(c=>{const x=d.codes[c.k==='142c'?'142':c.k]||{};const e=num(x.est),a=num(x.act);return '<tr><td>'+esc(c.k==='142c'?'142-Misc Labor':c.n)+'</td><td>'+money(e)+'</td><td>'+money(a)+'</td><td'+(e&&a>e?' class="over"':'')+'>'+(e?pctS(a/e):'–')+'</td></tr>'}).join('')+'</tbody></table></details>'}
+async function syncLabor(btn){if(btn)btn.disabled=true;const pb=progressBox('Reading the job cost sheet from SharePoint…');
+  try{const {data,error}=await sb.functions.invoke('crew-sync',{body:{action:'labor',job_id:jobId()}});if(error)throw error;pb.close();
+    const r=(data&&data.results&&data.results[0])||{};if(r.error)toast('Sync: '+r.error);else toast('Labor synced from SharePoint.');S.loaded.labor=false;await loadLabor();render()}
+  catch(e){pb.close();let m=errMsg(e);try{const j=await e.context.json();if(j&&j.error)m=j.error}catch(_){}toast("Couldn't sync: "+m)}finally{if(btn)btn.disabled=false}}
 function renderLabor(){
   if(!S.loaded.labor)return '<div class="empty">Loading labor…</div>';
   const C=laborCalc();const noBudget=!C.t.bh;
-  let h='<div class="card"><div class="row"><div class="grow"><b style="font-size:17px">Labor</b><div class="muted small">'+(C.jobNo?'Job # '+esc(C.jobNo)+' · ':'')+C.hpd+' hrs per day · from daily logs</div></div></div>'+
-    (!isAdminRole()?'</div>':'<div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><button class="btn sm" id="labBudget">Budget hours ✎</button><button class="btn sm" id="labImp">⬆ Import from bid sheet</button><input type="file" id="labFile" accept=".xlsx,.xlsm" hidden><button class="btn sm primary" id="labDl">⬇ Download labor workbook</button></div></div>');
-  if(noBudget)h+='<div class="card" style="background:#fff8e6"><b>No budget hours yet.</b><div class="muted small" style="margin-top:4px">'+(isAdminRole()?'Tap <b>Import from bid sheet</b> or <b>Budget hours</b>.':'The office hasn\'t entered the budget hours for this job yet.')+'</div></div>';
+  let h='<div class="card"><div class="row"><div class="grow"><b style="font-size:17px">Labor</b><div class="muted small">'+(C.jobNo?'Job # '+esc(C.jobNo)+' · ':'')+C.hpd+' hrs per day'+(C.cost?' · used as of '+esc(fmtDay(C.cost.as_of)):'')+'</div>'+((C.src.bid_file||C.cost)?'<div class="muted small">'+(C.cost&&C.cost.file?'From '+esc(C.cost.file)+' ('+esc(C.cost.tab||'')+')'+(isAdminRole()?' at $'+num((S.labor||{}).rate)+'/hr':''):(C.src.bid_file?'Budget: '+esc(C.src.bid_file):''))+(C.src.synced_at?'<br>Synced '+esc(fmtWhen(C.src.synced_at)):'')+'</div>':'')+'</div></div>'+
+    (!isAdminRole()?'</div>':'<div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><button class="btn sm primary" id="labSync">↻ Sync from SharePoint</button><button class="btn sm" id="labBudget">Budget hours ✎</button><button class="btn sm" id="labDl">⬇ Download labor workbook</button></div></div>');
+  if(noBudget)h+='<div class="card" style="background:#fff8e6"><b>No budget hours yet.</b><div class="muted small" style="margin-top:4px">'+(isAdminRole()?'Tap <b>Sync from SharePoint</b> to read the job cost sheet, or enter <b>Budget hours</b> by hand.':'The office hasn\'t entered the budget hours for this job yet.')+'</div></div>';
   h+='<div class="card lscroll"><table class="ltab"><thead><tr><th>Code</th><th>Budget hrs</th><th>Man days</th><th>Used</th><th>Left</th><th>% left</th></tr></thead><tbody>'+
-    C.rows.map(r=>'<tr><td>'+esc(r.c.n)+'</td><td>'+f1(r.bh)+'</td><td>'+f1(r.md)+'</td><td class="used">'+f1(r.used)+'</td><td'+(r.left<0?' class="over"':'')+'>'+f1(r.left)+'</td><td'+(r.left<0?' class="over"':'')+'>'+(r.md?pctS(r.pct):'–')+'</td></tr>').join('')+
+    C.rows.map(r=>'<tr><td>'+esc(C.cost&&r.c.k==='142c'?'142-Misc Labor':r.c.n)+'</td><td>'+f1(r.bh)+'</td><td>'+f1(r.md)+'</td><td class="used">'+f1(r.used)+'</td><td'+(r.left<0?' class="over"':'')+'>'+f1(r.left)+'</td><td'+(r.left<0?' class="over"':'')+'>'+(r.md?pctS(r.pct):'–')+'</td></tr>').join('')+
     '<tr class="tot"><td>TOTAL</td><td>'+f1(C.t.bh)+'</td><td>'+f1(C.t.md)+'</td><td class="used">'+f1(C.t.used)+'</td><td'+(C.t.left<0?' class="over"':'')+'>'+f1(C.t.left)+'</td><td>'+(C.t.md?pctS(C.t.pct):'–')+'</td></tr></tbody></table>'+
-    '<div class="muted small" style="margin-top:6px">Man days = hours ÷ '+C.hpd+'. Used = hours from daily logs ÷ '+C.hpd+'.</div></div>';
-  if(C.wk.length)h+='<h3 style="margin:16px 2px 8px">Man days by week (week ending Sat)</h3><div class="card lscroll"><table class="ltab"><thead><tr><th>Week end</th>'+LABOR_CODES.map(c=>'<th>'+esc(c.k.replace(/[cs]$/,m=>m==='c'?' Cln':' Sup'))+'</th>').join('')+'<th>Total</th></tr></thead><tbody>'+
-    C.wk.slice().reverse().map(w=>{const x=C.weeks[w];const tot=LABOR_CODES.reduce((a,c)=>a+num(x[c.k]),0)/C.hpd;return '<tr><td>'+fmtWk(w)+'</td>'+LABOR_CODES.map(c=>'<td>'+(num(x[c.k])?f1(num(x[c.k])/C.hpd):'')+'</td>').join('')+'<td><b>'+f1(tot)+'</b></td></tr>'}).join('')+'</tbody></table></div>';
-  else h+='<div class="empty"><b>No hours logged yet</b>Hours show up here when foremen enter hours by cost code on the daily log.</div>';
+    '<div class="muted small" style="margin-top:6px">Man days = budget hours ÷ '+C.hpd+'. '+(C.cost?(isAdminRole()?'Budget and used come from the job cost sheet: estimated and actual labor $ ÷ $'+num((S.labor||{}).rate)+'/hr.':'Budget and used come from the office\'s job cost sheet.'):'Used = hours from daily logs ÷ '+C.hpd+'.')+'</div></div>';
+  if(C.cost&&isAdminRole()&&L$dollars())h+=L$dollars();
+  if(C.wk.length)h+='<h3 style="margin:16px 2px 8px">'+(C.cost?'Man days used by job cost update':'Man days by week (week ending Sat)')+'</h3><div class="card lscroll"><table class="ltab"><thead><tr><th>'+(C.cost?'Update':'Week end')+'</th>'+C.rows.map(r=>r.c).map(c=>'<th>'+esc(C.cost&&c.k==='142c'?'142':c.k.replace(/[cs]$/,m=>m==='c'?' Cln':' Sup'))+'</th>').join('')+'<th>Total</th></tr></thead><tbody>'+
+    C.wk.slice().reverse().map(w=>{const x=C.weeks[w];const tot=LABOR_CODES.reduce((a,c)=>a+num(x[c.k]),0)/C.hpd;return '<tr><td>'+fmtWk(w)+'</td>'+C.rows.map(r=>r.c).map(c=>'<td>'+(num(x[c.k])?f1(num(x[c.k])/C.hpd):'')+'</td>').join('')+'<td><b>'+f1(tot)+'</b></td></tr>'}).join('')+'</tbody></table></div>';
+  else h+='<div class="empty"><b>No labor cost yet</b>Used man days come from the job cost sheet in the job folder. '+(isAdminRole()?'Tap <b>Sync from SharePoint</b> after the job cost sheet is updated.':'They show up after the office updates the job cost sheet.')+'</div>';
   if(C.unc)h+='<p class="muted small">'+f1(C.unc)+' hrs from older logs had no cost code and aren\'t counted.</p>';
   return h;
 }
 function bindLabor(){
   const b=$('#labBudget');if(b)b.onclick=()=>laborBudgetEditor();
+  const sy=$('#labSync');if(sy)sy.onclick=()=>syncLabor(sy);
   const im=$('#labImp'),lf=$('#labFile');if(im&&lf){im.onclick=()=>lf.click();lf.onchange=()=>{const f=lf.files[0];lf.value='';if(f)importLaborFile(f)}}
   const d=$('#labDl');if(d)d.onclick=downloadLabor;
 }
@@ -700,9 +711,9 @@ async function importLaborFile(f){
 }
 async function laborBudgetEditor(pre){
   const L0=S.labor||{};const L=pre?{job_no:pre.job_no||L0.job_no,hpd:pre.hpd||L0.hpd,hours:pre.hours}:L0;const H=L.hours||{};
-  const v=await formBox('Budget hours for '+S.job.name,[{k:'job_no',label:'Job #',value:L.job_no||((S.job.name.match(/^\s*(\d{3,})/)||[])[1]||'')},{k:'hpd',label:'Hours per man-day',type:'number',value:String(num(L.hpd)||10)}].concat(LABOR_CODES.map(c=>({k:'c'+c.k,label:c.n+' – budget hours',type:'number',value:H[c.k]?String(num(H[c.k])):''}))),'Save',pre&&pre.note);
+  const v=await formBox('Budget hours for '+S.job.name,[{k:'job_no',label:'Job #',value:L.job_no||((S.job.name.match(/^\s*(\d{3,})/)||[])[1]||'')},{k:'hpd',label:'Hours per man-day',type:'number',value:String(num(L.hpd)||10)},{k:'rate',label:'Labor $ per hour (job cost $ ÷ this = hours)',type:'number',value:String(num(L0.rate)||30)}].concat(LABOR_CODES.map(c=>({k:'c'+c.k,label:c.n+' – budget hours',type:'number',value:H[c.k]?String(num(H[c.k])):''}))),'Save',pre&&pre.note);
   if(!v)return;const hours={};LABOR_CODES.forEach(c=>{const x=num(v['c'+c.k]);if(x>0)hours[c.k]=x});
-  const labor={hours,hpd:num(v.hpd)>0?num(v.hpd):10,job_no:String(v.job_no||'').slice(0,20)};
+  const labor=Object.assign({},L0,{hours,hpd:num(v.hpd)>0?num(v.hpd):10,job_no:String(v.job_no||'').slice(0,20),rate:num(v.rate)>0?num(v.rate):30,rate_manual:num(v.rate)>0&&num(v.rate)!==num(L0.rate)?true:!!L0.rate_manual});
   if(await run(sb.from('job_budget').upsert({job_id:S.job.id,labor},{onConflict:'job_id'}),'Budget hours saved.')){S.labor=labor;render()}
 }
 let excelP=null;
@@ -718,7 +729,7 @@ async function downloadLabor(){
     ws.getCell('C2').value='Update Date:';ws.getCell('C2').font={bold:true};const ud=ws.getCell('D2');{const n=new Date();ud.value=new Date(Date.UTC(n.getFullYear(),n.getMonth(),n.getDate()))}ud.numFmt='m/d/yyyy';ud.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFFF00'}};ud.border={top:{style:'medium'},left:{style:'medium'},bottom:{style:'medium'},right:{style:'medium'}};
     ws.getCell('E2').value='hrs per day';ws.getCell('E2').font={bold:true};const hc=ws.getCell('F2');hc.value=C.hpd;hc.font={bold:true};['E2','F2'].forEach(a=>ws.getCell(a).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFC000'}});
     const hdr=['','HOURS','MAN DAYS','MAN DAYS USED','MD LEFT','% LEFT'];hdr.forEach((x,i)=>{const c=ws.getCell(4,i+1);c.value=x;c.font={bold:true,underline:true,size:10};c.alignment={horizontal:'center'}});
-    ws.getCell(3,7).value='Week ending';ws.getCell(3,7).font={bold:true,size:10};
+    ws.getCell(3,7).value=C.cost?'Job cost update':'Week ending';ws.getCell(3,7).font={bold:true,size:10};
     C.wk.forEach((w,i)=>{const [y,m,d]=w.split('-').map(Number);const c=ws.getCell(4,7+i);c.value=new Date(Date.UTC(y,m-1,d));c.numFmt='m/d';c.font={bold:true,size:10};c.alignment={horizontal:'center'}});
     const wkFirst=colL(7),wkLast=colL(Math.max(6+C.wk.length,7));
     C.rows.forEach((r,i)=>{const row=5+i;ws.getCell(row,1).value=r.c.n.toUpperCase();ws.getCell(row,1).font={bold:true,size:12};
@@ -733,7 +744,7 @@ async function downloadLabor(){
     [2,3,4,5].forEach(cn=>{const L=colL(cn);const v=[C.t.bh,C.t.md,C.t.used,C.t.left][cn-2];ws.getCell(tr,cn).value={formula:'SUM('+L+'5:'+L+(tr-1)+')',result:v};ws.getCell(tr,cn).numFmt='0.0';ws.getCell(tr,cn).font={bold:true};ws.getCell(tr,cn).border={top:{style:'thin'}}});
     ws.getCell(tr,6).value={formula:'IFERROR(E'+tr+'/C'+tr+',0)',result:C.t.pct};ws.getCell(tr,6).numFmt='0%';
     for(let j=0;j<C.wk.length;j++){const L=colL(7+j);ws.getCell(tr,7+j).value={formula:'SUM('+L+'5:'+L+(tr-1)+')',result:LABOR_CODES.reduce((a,c)=>a+num(C.weeks[C.wk[j]][c.k]),0)/C.hpd};ws.getCell(tr,7+j).numFmt='0.0';ws.getCell(tr,7+j).font={bold:true}}
-    ws.getCell(tr+2,1).value='Man days = hours ÷ hrs per day. Weekly man days come from Alpha Crew View daily logs (hours by cost code).';ws.getCell(tr+2,1).font={italic:true,size:9,color:{argb:'FF666666'}};
+    ws.getCell(tr+2,1).value=(C.cost?'From the job cost sheet ('+(C.cost.file||'')+', '+(C.cost.tab||'')+'): hours = labor $ ÷ $'+num((S.labor||{}).rate)+'/hr; man days = hours ÷ hrs per day.':'Man days = hours ÷ hrs per day. Weekly man days come from Alpha Crew View daily logs (hours by cost code).');ws.getCell(tr+2,1).font={italic:true,size:9,color:{argb:'FF666666'}};
     const buf=await wb.xlsx.writeBuffer();const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     const d=new Date();const stamp=(d.getMonth()+1)+'.'+d.getDate()+'.'+String(d.getFullYear()).slice(2);
     const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fileSafe((C.jobNo?C.jobNo+' ':'')+job.name)+' LABOR '+stamp+'.xlsx';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},60000);
