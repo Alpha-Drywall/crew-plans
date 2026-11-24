@@ -33,10 +33,18 @@ button{cursor:pointer}
 .pbar2 label{display:flex;align-items:center;gap:5px;font-weight:600;white-space:nowrap}
 .pbar2 input{width:18px;height:18px}
 .pbar2 .grow{flex:1}
+.olist{max-height:62vh;overflow:auto;margin:8px 0}
+.osec{font-size:15px;margin:14px 0 6px}
+.orow{display:flex;gap:10px;align-items:flex-start;padding:8px 2px;border-bottom:1px solid var(--line);font-size:14px}
+.orow>input{width:22px;height:22px;flex:none;margin-top:2px}
+.orow .grow{flex:1;min-width:0}
+.orow input:not([type]){width:100%;border:1px solid var(--line);border-radius:8px;padding:7px 8px;margin-top:4px;font-size:14px}
 .top .jl{display:none}
+.dsk{display:none}
 .ptools{margin:0 0 10px}.ptools .pbar,.ptools .pbar2{margin-bottom:8px}
 @media (min-width:700px){
  .top{grid-template-columns:44px minmax(0,1fr) auto minmax(0,1fr) 44px;min-height:64px}
+ .dsk{display:inline}
  .top>#back{grid-column:1;grid-row:1}
  .top .jl{display:block;grid-column:2;grid-row:1;font-size:16px;font-weight:700;line-height:1.25;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
  .top .jl .sub{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1086,7 +1094,7 @@ function shareLink(inv,email){
 function renderPlans(){
   let h='';const admin=isAdminRole();
   const addB=admin?'<label class="btn sm primary" title="Add a plan set or photos. Revised sheets are found automatically; old versions are kept.">+ Add plans<input type="file" id="planFile" accept="application/pdf,image/*" multiple hidden></label>':'';
-  const nameB=admin&&S.sheets.length?'<button class="btn sm" id="autoName" title="Auto-name sheets from title blocks">Auto-name</button>':'';
+  const nameB=admin&&S.sheets.length?'<button class="btn sm" id="autoName" title="Read every sheet: names, revision marks, duplicate sheets and RFI / PR / ASI links. You check everything before it saves.">Organize<span class="dsk">sheets</span></button>':'';
   if(!S.loaded.sheets)return h+(addB?'<div class="pbar">'+addB+'</div>':'')+'<div class="empty">Loading sheets…</div>';
   const cs=curSheets();
   if(!cs.length)return h+(addB?'<div class="pbar">'+addB+'</div>':'')+'<div class="empty"><b>No sheets yet</b>'+(admin?'Tap + Add plans and pick the plan set PDF.':'The office hasn\'t uploaded plans for this job yet.')+'</div>';
@@ -1105,7 +1113,7 @@ function renderPlans(){
   return h+'<div class="grid">'+list.map(s=>'<div class="sheet'+(s.is_current===false?' oldv':'')+'" data-id="'+esc(s.id)+'"><img loading="lazy" alt="" data-path="'+esc(s.thumb_path||s.path)+'">'+sheetBadge(s)+'<div class="sname">'+esc(s.name||'Sheet')+'</div>'+(Array.isArray(s.changes)&&s.changes.length?'<div class="sfor">'+esc((s.change_ref?s.change_ref+' · ':'')+'changes '+s.changes.join(', '))+'</div>':'')+(admin&&s.is_current!==false?'<button class="ico" data-edit aria-label="Edit sheet">✎</button>':'')+'</div>').join('')+'</div>';
 }
 function bindPlans(){
-  const an=$('#autoName');if(an)an.onclick=autoNameSheets;
+  const an=$('#autoName');if(an)an.onclick=organizeSheets;
   const so=$('#saveOff');if(so)so.onclick=saveJobOffline;
   const ro=$('#rmOff');if(ro)ro.onclick=removeJobOffline;
   const rf=$('#revFilt');if(rf)rf.onchange=()=>{const x=sheetFilter();x.rev=rf.value;setSheetFilter(x);render()};
@@ -1167,6 +1175,71 @@ async function autoNameSheets(){
     const b=$('[data-ok]',m);b.disabled=true;let n=0;
     for(const inp of $$('[data-i]',m)){const f=found[+inp.dataset.i];const v=inp.value.trim().slice(0,80);if(v&&v!==f.s.name&&await run(sb.from('sheets').update({name:v}).eq('id',f.s.id)))n++}
     m.close();toast('Renamed '+n+' sheet'+(n===1?'':'s')+'.');loadSheets();
+  };
+}
+/* ===== Organize sheets (office only): names, revision marks, duplicates, RFI/PR/ASI links ===== */
+const DOC_RE=/^(RFI|ASI|PR|CCD|PCO|ADD(?:ENDUM)?|BULLETIN|SK)\s*#?\s*(\d{1,4})(?:\s*R(?:EV)?\s*(\d{1,2}))?(?=[-\s–_.]|$)/i;
+function docInfo(s){const m=String(sheetNo(s)||s.name||'').match(DOC_RE);if(!m)return null;let ty=m[1].toUpperCase();if(/^ADD/.test(ty))ty='Addendum';if(ty==='BULLETIN')ty='Bulletin';return {key:ty+m[2]+(m[3]?'R'+m[3]:''),label:ty+' '+(+m[2])+(m[3]?' Rev '+(+m[3]):'')}}
+const genericName=s=>!/\s[–-]\s/.test(s.name||'')||/^(sheet|page)\s*\d+/i.test(s.name||'');
+async function ocrLines(c,psm){const w=await loadOcr();const run=async()=>{await w.setParameters({tessedit_pageseg_mode:String(psm||3)});const r=await w.recognize(c);return (r.data.lines||[]).map(l=>String(l.text||'').trim()).filter(Boolean)};const p=ocrBusy.then(run,run);ocrBusy=p.catch(()=>{});return p}
+async function sheetImage(s){const [u]=await urlsFor([s.path]);const img=new Image();img.crossOrigin='anonymous';await new Promise((r,j)=>{img.onload=r;img.onerror=j;img.src=u});return img}
+async function readForOrganize(s,opt){
+  const img=await sheetImage(s);const W=img.naturalWidth||img.width;const out={num:null,title:null,cands:[],revLines:[],docLines:[]};
+  if(opt.name){try{const o=await nameFromImage(img);Object.assign(out,{num:o.num,title:o.title,cands:o.cands})}catch(e){}}
+  if(opt.rev){const sc=Math.min(1.4,2400/Math.max(1,W*.2));out.revLines=(await ocrLines(cropFrom(img,.8,0,1,1,0,sc),3)).concat(await ocrLines(cropFrom(img,.5,.8,1,1,0,Math.min(1.2,2400/Math.max(1,W*.5))),3))}
+  if(opt.doc){out.docLines=await ocrLines(cropFrom(img,0,0,1,1,0,Math.min(1,2200/Math.max(1,W))),3)}
+  return out;
+}
+function revFromOcr(lines){const r=parseRevLines(lines);if(r.label)return r;let rfi=null;for(const L of lines){const m=String(L).toUpperCase().match(/\bRFI\s*#?\s*(\d{1,3})\b/);if(m&&(!rfi||+m[1]>rfi))rfi=+m[1]}return rfi?{...r,label:'RFI '+rfi}:r}
+function refsFromText(lines,nums,own){const found=new Set();const txt=lines.join(' ').toUpperCase();const re=/\b[A-Z]{0,2}-?\d{1,3}(?:\.\d{1,3})+[A-Z]?\b/g;let m;while((m=re.exec(txt))){const n=normNo(m[0].replace(/-/g,''));if(nums.has(n)&&n!==own)found.add(nums.get(n))}return [...found]}
+async function organizeSheets(){
+  const list=curSheets();if(!list.length)return;
+  const docs=list.filter(docInfo),plain=list.filter(s=>!docInfo(s));
+  const pb=progressBox('Loading the text reader…');
+  try{await loadOcr()}catch(e){pb.close();toast("Couldn't load the text reader. Check your signal.");return}
+  const read=new Map();let i=0;
+  for(const s of list){i++;pb.set('Reading sheet '+i+' of '+list.length+' ('+String(s.name).slice(0,40)+')…');
+    const isDoc=!!docInfo(s);try{read.set(s.id,await readForOrganize(s,{name:genericName(s),rev:!isDoc,doc:isDoc}))}catch(e){read.set(s.id,null)}}
+  pb.close();
+  const named=list.filter(s=>genericName(s)).map(s=>({s,...(read.get(s.id)||{})}));harmonizeNums(named);
+  const P={names:[],revs:[],dups:[],links:[]};
+  named.forEach(f=>{const n=sheetLabel(f.num,f.title);if(n&&n!==f.s.name)P.names.push({s:f.s,v:n,on:true})});
+  plain.forEach(s=>{const r=read.get(s.id);if(!r)return;const rv=revFromOcr(r.revLines);if(!rv.label)return;if((s.rev_label||'')===rv.label)return;
+    P.revs.push({s,v:rv.label,ord:rv.ord,on:!s.rev_label,was:s.rev_label||''})});
+  const nums=new Map();plain.forEach(s=>{const n=normNo(sheetNo(s));if(n&&!nums.has(n))nums.set(n,sheetNo(s))});
+  const byNo={};plain.filter(s=>!/TAKEOFF|MARKUP|\bTO-/i.test(s.name||'')).forEach(s=>{const n=normNo(sheetNo(s));if(n)(byNo[n]=byNo[n]||[]).push(s)});
+  Object.values(byNo).filter(a=>a.length>1&&new Set(a.map(gid)).size>1).forEach(a=>{
+    const ordOf=s=>{const pr=P.revs.find(r=>r.s.id===s.id);const o=pr&&pr.ord!=null?pr.ord:revOrd(String(s.rev_label||'').replace(/^rev(ision)?\s*/i,''));return o!=null?o:-1};
+    const srt=a.slice().sort((x,y)=>{const ox=ordOf(x),oy=ordOf(y);return (ox>=0&&oy>=0&&ox!==oy?oy-ox:0)||String(y.created_at||'').localeCompare(String(x.created_at||''))});
+    P.dups.push({keep:srt[0],old:srt.slice(1),on:true})});
+  const groups={};docs.forEach(s=>{const d=docInfo(s);(groups[d.key]=groups[d.key]||{label:d.label,pages:[]}).pages.push(s)});
+  Object.values(groups).forEach(g=>{const own=null;const refs=new Set();g.pages.forEach(s=>{const r=read.get(s.id);if(r)refsFromText(r.docLines,nums,own).forEach(x=>refs.add(x))});
+    const cur=[...new Set(g.pages.flatMap(s=>s.changes||[]))];const curRef=g.pages.map(s=>s.change_ref).find(Boolean)||'';
+    const add=[...refs].filter(x=>!cur.some(c=>normNo(c)===normNo(x)));
+    if(!add.length&&curRef)return;const v=cur.concat(add);if(!v.length&&curRef===g.label)return;
+    P.links.push({g,label:curRef||g.label,v,on:!cur.length,was:cur.join(', ')})});
+  const total=P.names.length+P.revs.length+P.dups.length+P.links.length;
+  if(!total){toast('Read '+list.length+' sheets. Everything already looks organized.');return}
+  const row=(k,i,on,body)=>'<div class="orow"><input type="checkbox" data-k="'+k+'" data-i="'+i+'"'+(on?' checked':'')+'><div class="grow">'+body+'</div></div>';
+  const sec=(t,n,h)=>n?'<h3 class="osec">'+t+' <span class="muted small">('+n+')</span></h3>'+h:'';
+  const m=modal('<h2>Organize sheets</h2><p class="muted" style="margin-top:0">I read all '+list.length+' sheets. Check what you want changed, fix anything the reader got wrong, then tap Save. Unticked items stay as they are.</p><div class="olist">'+
+    sec('Sheet names',P.names.length,P.names.map((x,i)=>row('names',i,x.on,'<div class="muted small">'+esc(x.s.name)+'</div><input data-v="names" data-i="'+i+'" value="'+esc(x.v)+'">')).join(''))+
+    sec('Revision marks found on the sheet',P.revs.length,P.revs.map((x,i)=>row('revs',i,x.on,'<div><b>'+esc(x.s.name)+'</b>'+(x.was?' <span class="muted small">now: '+esc(x.was)+'</span>':'')+'</div><input data-v="revs" data-i="'+i+'" value="'+esc(x.v)+'">')).join(''))+
+    sec('Same sheet added more than once',P.dups.length,P.dups.map((x,i)=>{const lab=s=>{const pr=P.revs.find(r=>r.s.id===s.id);const rl=pr?pr.v:s.rev_label;return esc(s.name)+' <span class="muted small">('+(rl?esc(rl)+', ':'')+'added '+esc(new Date(s.created_at||Date.now()).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}))+')</span>'};return row('dups',i,x.on,'<b>'+esc(sheetNo(x.keep))+'</b>: keep '+lab(x.keep)+' as current. '+x.old.map(lab).join(', ')+' become'+(x.old.length>1?'':'s')+' old version'+(x.old.length>1?'s':'')+'.')}).join(''))+
+    sec('RFI / PR / ASI pages and the sheets they change',P.links.length,P.links.map((x,i)=>row('links',i,x.on,'<div><b>'+esc(x.g.label)+'</b> <span class="muted small">'+x.g.pages.length+' page'+(x.g.pages.length>1?'s':'')+(x.was?' · now: '+esc(x.was):'')+'</span></div><input data-v="links" data-f="n" data-i="'+i+'" value="'+esc(x.label)+'" placeholder="Name, e.g. RFI 31"><input data-v="links" data-f="c" data-i="'+i+'" value="'+esc(x.v.join(', '))+'" placeholder="Sheets it changes, e.g. 3.40, 3.15">')).join(''))+
+    '</div><div class="mbtns"><button class="btn" data-x>Cancel</button><button class="btn primary" data-ok>Save</button></div>');
+  $('[data-x]',m).onclick=()=>m.close();
+  $('[data-ok]',m).onclick=async()=>{
+    const b=$('[data-ok]',m);b.disabled=true;b.textContent='Saving…';const on=(k,i)=>{const c=$('[data-k="'+k+'"][data-i="'+i+'"]',m);return c&&c.checked};const val=(k,i,f)=>{const e=$('[data-v="'+k+'"][data-i="'+i+'"]'+(f?'[data-f="'+f+'"]':''),m);return e?e.value.trim():''};
+    let n=0;const up=async(id,o)=>{if(await run(sb.from('sheets').update(o).eq('id',id)))n++};
+    for(let i=0;i<P.names.length;i++)if(on('names',i)){const v=val('names',i).slice(0,80);if(v)await up(P.names[i].s.id,{name:v})}
+    for(let i=0;i<P.revs.length;i++)if(on('revs',i)){const v=val('revs',i).slice(0,40);await up(P.revs[i].s.id,{rev_label:v||null})}
+    for(let i=0;i<P.dups.length;i++)if(on('dups',i)){const d=P.dups[i],g=gid(d.keep);let maxR=num(d.keep.rev,1);
+      for(const o of d.old){await up(o.id,{group_id:g,is_current:false});maxR=Math.max(maxR,num(o.rev,1)+1)}
+      await up(d.keep.id,{rev:maxR,is_current:true,revised_at:new Date().toISOString(),on_progress:d.keep.on_progress||d.old.some(o=>o.on_progress)})}
+    for(let i=0;i<P.links.length;i++)if(on('links',i)){const nm=val('links',i,'n').slice(0,40)||null;const cs=val('links',i,'c').split(/[,;\s]+/).map(x=>x.trim()).filter(Boolean).slice(0,40);
+      for(const s of P.links[i].g.pages)await up(s.id,{change_ref:nm,changes:cs})}
+    m.close();toast('Saved '+n+' change'+(n===1?'':'s')+'.');loadSheets();
   };
 }
 async function editSheet(id){
