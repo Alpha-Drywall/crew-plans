@@ -63,6 +63,10 @@ button{cursor:pointer}
 .tcrow{display:flex;align-items:center;gap:10px;padding:10px 2px;border-bottom:1px solid var(--line);cursor:pointer}
 .tcst{font-size:12px;font-weight:700;padding:3px 8px;border-radius:6px;background:#eef1f4}
 .tcst.ok{background:#dcf5e3;color:#14632e}.tcst.wait{background:#fff2d6;color:#7a4b00}
+.tchq{display:flex;gap:4px}.tchq button{min-width:36px;height:36px;border:1px solid var(--line);border-radius:8px;background:#fff;font-weight:700;font-size:14px;color:var(--ink)}.tchq button.on{background:var(--accent);border-color:transparent}
+.tcrate{min-height:44px;display:flex;align-items:center;font-weight:700}
+.tcpick{display:flex;flex-wrap:wrap;gap:8px;max-height:45vh;overflow:auto}
+.fvpill{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom));z-index:900;background:#6a1b9a;color:#fff;border:0;border-radius:999px;padding:10px 16px;font-weight:700;font-size:14px;white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,.25)}
 .tcnote{background:#fff7e0;border-radius:10px;padding:8px 12px;margin:0 0 10px;font-size:14px}
 .splash{position:fixed;inset:0;z-index:9999;background:#1d232b;display:flex;align-items:center;justify-content:center;transition:opacity .3s}
 .splash.out{opacity:0}
@@ -799,8 +803,9 @@ async function afterLogin(openId){
   if(!S.me){renderWelcome();return}
   S.isAdmin=false;
   if(!S.me.is_anonymous){try{S.isAdmin=!!(await q(sb.rpc('claim_office')))}catch(e){}}
+  S.realAdmin=S.isAdmin;if(S.realAdmin&&lsGet('acv.viewAs')==='field'){S.isAdmin=false;fieldPill()}
   await loadOffice();
-  if(!S.me.is_anonymous&&!S.isAdmin){
+  if(!S.me.is_anonymous&&!S.isAdmin&&!S.realAdmin){
     let onJobs=false;try{onJobs=!!((await q(sb.from('members').select('job_id').eq('user_id',S.me.id).limit(1)))||[]).length}catch(e){onJobs=true}
     if(!onJobs){
     $('#app').innerHTML='<div class="top"><h1><div class="ttl"><span class="brand"></span>Alpha Operations</div></h1></div><main><div class="empty"><b>No jobs on this login yet</b>'+esc(S.me.email||'This login')+' isn\'t on any jobs yet. Foremen: ask the office to add you to your jobs, or open the invite link they sent you. Office: ask a PM to add you under ☰ → Office users, then sign in again.<div style="margin-top:14px"><button class="btn" id="so">Sign out</button></div></div></main>';
@@ -818,13 +823,15 @@ async function afterLogin(openId){
   if(target&&S.jobs.some(j=>j.id===target)){openJob(target);return}
   render();
 }
+function fieldPill(){if(document.getElementById('fvPill'))return;const b=document.createElement('button');b.id='fvPill';b.className='fvpill';b.textContent='Field view · back to office';b.onclick=()=>setViewAs('office');document.body.appendChild(b)}
+function setViewAs(v){lsSet('acv.viewAs',v==='field'?'field':null);try{tcFlush()}catch(e){}location.reload()}
 async function loadOffice(){try{S.office=await q(sb.rpc('office_names'))||[];S.office.forEach(o=>{if(o.user_id)S.people[o.user_id]=o.name||'Office'});const me=S.me&&S.office.find(o=>o.user_id===S.me.id);S.myOfficeId=me?me.id:null}catch(e){S.office=S.office||[]}}
 const pmName=id=>{const o=(S.office||[]).find(x=>x.id===id);return o?o.name:''};
 async function loadJobs(){
   try{S.jobs=await q(sb.from('jobs').select('*').order('created_at',{ascending:false}));S.jobsLoaded=true}
   catch(e){toast(errMsg(e));S.jobsLoaded=true}
   if(S.job){const j=S.jobs.find(x=>x.id===S.job.id);if(!j){toast("You no longer have access to this job.");closeJob();return}S.job=j;PHASES=normScope(j.scope);
-    if(!S.isAdmin){try{const m=await q(sb.from('members').select('role').eq('job_id',j.id).eq('user_id',S.me.id).maybeSingle());const nr=m?m.role:null;if(nr!==S.role){S.role=nr;if(V)closeSheet();render();return}}catch(e){}}}
+    if(!S.isAdmin&&!S.realAdmin){try{const m=await q(sb.from('members').select('role').eq('job_id',j.id).eq('user_id',S.me.id).maybeSingle());const nr=m?m.role:null;if(nr!==S.role){S.role=nr;if(V)closeSheet();render();return}}catch(e){}}}
   if(S.view!=='job'||S.job)render();
 }
 const timers={};
@@ -835,6 +842,7 @@ async function openJob(id){
   const j=S.jobs.find(x=>x.id===id);if(!j)return;
   S.job=j;PHASES=normScope(j.scope);S.view='job';S.tab=S.tab||'plans';S.sheets=[];S.areas=[];S.logs=[];S.members=[];S.invites=[];S.loaded={};
   if(S.isAdmin)S.role='admin';
+  else if(S.realAdmin)S.role='editor';
   else{try{const m=await q(sb.from('members').select('role').eq('job_id',id).eq('user_id',S.me.id).maybeSingle());S.role=m?m.role:null}catch(e){S.role=null}}
   if(!S.role){toast("You don't have access to that job.");S.job=null;S.view='jobs';render();return}
   lsSet('crewplans.lastJob',id);
@@ -1013,7 +1021,10 @@ async function downloadLabor(){
 }
 
 /* ===== time cards (foreman fills; files into his Timecards folder in Excel) ===== */
-const TC={start:'',card:null,list:[],open:-1,saveT:0,loading:false,force:false};
+const TC={start:'',card:null,list:[],open:-1,saveT:0,loading:false,force:false,roster:[]};
+const tcKey=n=>String(n||'').trim().toLowerCase();
+const tcRoster=n=>(TC.roster||[]).find(r=>tcKey(r.name)===tcKey(n));
+const tcFirst=n=>(String(n||'').trim().split(/\s+/)[0]||'');
 const tcTyping=()=>{const a=document.activeElement;return !!(a&&a.tagName==='INPUT'&&a.closest('.tcm,#tabBody')&&(a.id==='tcForeman'||a.id==='tcFolder'||a.dataset.name!=null||a.dataset.rate!=null||a.dataset.hrs!=null))};
 const TC_ANCHOR='2026-09-30',TC_OFF=[0,1,2,3,5,6,7,8,9,10,12,13];
 const TC_CODES=[['112','112 Framing'],['122','122 Hanging'],['132','132 Finishing'],['142','142 Clean/Sup/Layout'],['152','152 Acoustical'],['162','162 Insulation'],['172','172 Extra work']];
@@ -1037,13 +1048,26 @@ async function loadTc(){
     let mine=await q(sb.from('timecards').select('*').eq('owner',me).eq('period_start',TC.start).maybeSingle());
     if(!mine){
       const prev=await q(sb.from('timecards').select('foreman,folder,workers,period_start').eq('owner',me).lt('period_start',TC.start).order('period_start',{ascending:false}).limit(1));
-      const p=(prev&&prev[0])||{};const fm=p.foreman||myName()||'';
-      mine={id:null,owner:me,period_start:TC.start,foreman:fm,folder:p.folder||(fm.split(/\s+/)[0]||''),status:'draft',workers:(p.workers||[]).map(w=>({name:w.name||'',rate:w.rate||'',days:{}}))};
+      const p=(prev&&prev[0])||{};const fm=p.foreman||(S.me.user_metadata||{}).full_name||myName()||'';
+      mine={id:null,owner:me,period_start:TC.start,foreman:fm,folder:p.folder||tcFirst(fm),status:'draft',workers:(p.workers||[]).map(w=>({name:w.name||'',rate:w.rate||'',days:{}}))};
     }
     TC.card=mine;
+    try{TC.roster=(await q(sb.from('crew_roster').select('*').eq('active',true).order('name')))||[]}catch(e){TC.roster=TC.roster||[]}
+    tcRefreshRates();
     TC.list=S.isAdmin?(await q(sb.from('timecards').select('id,owner,foreman,folder,workers,status,submitted_at,filed_at,file_name,file_error,updated_at').eq('period_start',TC.start).order('foreman')))||[]:[];
   }catch(e){toast(errMsg(e))}
   TC.loading=false;TC.force=true;if(S.view==='tc'||(S.view==='job'&&S.tab==='tc'))render();
+}
+function tcRefreshRates(force){const c=TC.card;if(!c||!force&&c.status==='submitted'&&!S.isAdmin)return;let ch=false;
+  (c.workers||[]).forEach(w=>{const r=tcRoster(w.name);if(r&&r.rate!=null&&String(r.rate)!==String(w.rate)){w.rate=String(r.rate);ch=true}});
+  if(ch&&c.id){c.dirty=true;tcSchedule()}}
+async function tcRosterSave(name,rate){
+  name=String(name||'').trim().slice(0,60);if(!name)return;const r=tcRoster(name);
+  const rv=S.isAdmin&&rate!==undefined&&String(rate).trim()!==''&&isFinite(+rate)?+rate:null;
+  if(r){if(S.isAdmin&&rate!==undefined&&String(r.rate)!==String(rv)){r.rate=rv;await run(sb.from('crew_roster').update({rate:rv}).eq('id',r.id))}return}
+  const row={name};if(rv!=null)row.rate=rv;const d=await run(sb.from('crew_roster').insert(row).select().single());
+  if(d&&d.id)TC.roster.push(d);else TC.roster.push(Object.assign({id:null,active:true},row));
+  TC.roster.sort((a,b)=>a.name.localeCompare(b.name));
 }
 function tcSchedule(){clearTimeout(TC.saveT);TC.saveT=setTimeout(tcFlush,900);tcStatus()}
 async function tcFlush(){
@@ -1081,9 +1105,9 @@ function renderTcTab(){
 }
 function tcLoginCard(){return '<div class="card"><b style="font-size:18px">Make your foreman login</b><p class="muted" style="margin:6px 0 12px">Time cards need a foreman login so your cards are yours and follow you to any phone or computer. It takes a minute: your email, then a password. Everything on this phone carries over.</p><button class="btn primary block" id="fmMake">Make my foreman login</button></div>'}
 async function makeForemanLogin(){
-  const v=await formBox('Make your foreman login',[{k:'email',label:'Your email',type:'email',req:true,ph:'e.g. mike@gmail.com'}],'Send confirm email');
+  const v=await formBox('Make your foreman login',[{k:'name',label:'Your full name (goes on your time cards)',req:true,ph:'e.g. Mike Lopez'},{k:'email',label:'Your email',type:'email',req:true,ph:'e.g. mike@gmail.com'}],'Send confirm email');
   if(!v)return;
-  const r=await sb.auth.updateUser({email:v.email.trim()},{emailRedirectTo:location.origin+location.pathname});
+  const r=await sb.auth.updateUser({email:v.email.trim(),data:{full_name:v.name.slice(0,60)}},{emailRedirectTo:location.origin+location.pathname});
   if(r.error){const m=r.error.message||'';toast(/already|registered|exists/i.test(m)?'That email already has a login. Ask the office to add that login to your jobs, then sign in with it.':/rate limit/i.test(m)?'Too many emails sent this hour. Try again in an hour.':errMsg(r.error));return}
   modal('<h2>Check your email</h2><p>We sent a confirm link to <b>'+esc(v.email)+'</b>. Tap it on this phone. You\'ll come back here and pick your password.</p><p class="muted small">No email after a few minutes? Check junk.</p><div class="mbtns"><button class="btn primary" onclick="this.closest(\'.mwrap\').close()">OK</button></div>');
 }
@@ -1099,7 +1123,8 @@ function tcBody(){
     h+='<details class="tcall"'+(mine?'':' open')+'><summary>All foremen this period ('+TC.list.length+')</summary>'+(TC.list.length?TC.list.map(x=>{const hrs=(x.workers||[]).reduce((a,w)=>a+tcWHrs(w),0);const st=x.status!=='submitted'?'Draft':x.filed_at&&x.filed_at>=x.submitted_at?'Saved to Excel':x.file_error?'Not saved yet':'Submitted';return '<div class="tcrow" data-tc="'+esc(x.id)+'"><div class="grow"><b>'+esc(x.foreman||'Foreman')+'</b><div class="muted small">'+(x.workers||[]).length+' workers · '+Math.round(hrs*100)/100+' hrs</div></div><span class="tcst'+(st==='Saved to Excel'?' ok':st==='Draft'?'':' wait')+'">'+st+'</span></div>'}).join(''):'<div class="muted small" style="padding:8px 2px">No time cards yet for this period.</div>')+(mine?'':'<button class="btn sm" id="tcMine" style="margin-top:8px">Back to my card</button>')+'</details>';
     if(!mine)h+='<div class="tcnote">Editing <b>'+esc(c.foreman||'a foreman')+'</b>\'s card.</div>';
   }
-  h+='<div class="tchead"><label class="field"><span>Name on the time cards</span><input id="tcForeman" value="'+esc(c.foreman||'')+'" placeholder="Foreman name"></label><label class="field"><span>Timecards folder</span><input id="tcFolder" value="'+esc(c.folder||'')+'" placeholder="e.g. Humberto"></label></div>';
+  h+='<div class="tchead"><label class="field"><span>Name on the time cards</span><input id="tcForeman" value="'+esc(c.foreman||'')+'" placeholder="Foreman name"></label>'+(S.isAdmin?'<label class="field"><span>Timecards folder (office sets)</span><input id="tcFolder" value="'+esc(c.folder||'')+'" placeholder="e.g. Humberto"></label>':'')+'</div>';
+  if(S.isAdmin)h+='<button class="btn sm" id="tcRosterBtn" style="margin:0 0 10px">Crew list & rates</button>';
   const tot=c.workers.reduce((a,w)=>a+tcWHrs(w),0),dol=c.workers.reduce((a,w)=>a+tcWHrs(w)*tcRate(w),0);
   h+='<div class="tcsum"><span><b id="tcTot">'+Math.round(tot*100)/100+'</b> hrs</span><span id="tcDol">'+tcMoney(dol)+'</span><span>'+c.workers.length+' workers</span></div>';
   h+='<div id="tcStat" class="muted small" style="margin:0 0 10px">'+esc(tcStatusText(c))+'</div>';
@@ -1107,12 +1132,12 @@ function tcBody(){
     const open=TC.open===i;
     h+='<div class="card tcw'+(open?' open':'')+'" data-w="'+i+'"><div class="tcwh" data-tog="'+i+'"><div class="grow"><b>'+esc(w.name||'New worker')+'</b><div class="muted small"><span data-wh="'+i+'">'+tcWHrs(w)+'</span> hrs'+(tcRate(w)?' · <span data-wd="'+i+'">'+tcMoney(tcWHrs(w)*tcRate(w))+'</span>':'')+'</div></div><span class="chev">'+(open?'▾':'›')+'</span></div>';
     if(open){
-      h+='<div class="tcwb"><div class="tcwf"><label class="field"><span>Name</span><input data-name="'+i+'" value="'+esc(w.name||'')+'"></label><label class="field" style="max-width:110px"><span>Rate $/hr</span><input data-rate="'+i+'" inputmode="decimal" value="'+esc(w.rate==null?'':String(w.rate))+'"></label></div>';
+      h+='<div class="tcwb"><div class="tcwf"><label class="field"><span>Name</span><input data-name="'+i+'" value="'+esc(w.name||'')+'"></label>'+(S.isAdmin?'<label class="field" style="max-width:110px"><span>Rate $/hr</span><input data-rate="'+i+'" inputmode="decimal" value="'+esc(w.rate==null?'':String(w.rate))+'"></label>':'<div class="field" style="max-width:110px"><span>Rate</span><div class="tcrate">'+(tcRate(w)?'$'+esc(String(w.rate))+'/hr':'Office sets')+'</div></div>')+'</div>';
       for(let d=0;d<12;d++){
         const iso=isoAddD(TC.start,TC_OFF[d]),lines=(w.days&&w.days[d])||[];
         h+='<div class="tcday"><div class="tcdh"><b>'+esc(tcFmt(iso,{weekday:'short',month:'numeric',day:'numeric'}))+'</b><span class="muted small"><span data-dh="'+i+'-'+d+'">'+tcDayHrs(w,d)+'</span> hrs</span></div>';
         lines.forEach((l,k)=>{
-          h+='<div class="tcl"><select data-job="'+i+'-'+d+'-'+k+'">'+tcJobOptions(l)+'</select>'+(l.kind==='off'?'<span class="muted small grow">Off</span>':'<select data-code="'+i+'-'+d+'-'+k+'"><option value="">Code</option>'+TC_CODES.map(o=>'<option value="'+o[0]+'"'+(String(l.code||'')===o[0]?' selected':'')+'>'+o[1]+'</option>').join('')+'</select><input data-hrs="'+i+'-'+d+'-'+k+'" inputmode="decimal" placeholder="hrs" value="'+esc(l.hrs==null?'':String(l.hrs))+'">')+'<button class="ico" data-rml="'+i+'-'+d+'-'+k+'" aria-label="Remove line">✕</button></div>';
+          h+='<div class="tcl"><select data-job="'+i+'-'+d+'-'+k+'">'+tcJobOptions(l)+'</select>'+(l.kind==='off'?'<span class="muted small grow">Off</span>':'<select data-code="'+i+'-'+d+'-'+k+'"><option value="">Code</option>'+TC_CODES.map(o=>'<option value="'+o[0]+'"'+(String(l.code||'')===o[0]?' selected':'')+'>'+o[1]+'</option>').join('')+'</select><input data-hrs="'+i+'-'+d+'-'+k+'" inputmode="decimal" placeholder="hrs" value="'+esc(l.hrs==null?'':String(l.hrs))+'"><span class="tchq">'+[8,10,12].map(n=>'<button type="button" data-qh="'+i+'-'+d+'-'+k+'-'+n+'"'+(String(l.hrs)===String(n)?' class="on"':'')+'>'+n+'</button>').join('')+'</span>')+'<button class="ico" data-rml="'+i+'-'+d+'-'+k+'" aria-label="Remove line">✕</button></div>';
         });
         h+='<div class="tcdb">'+(lines.length<3?'<button class="btn sm" data-addl="'+i+'-'+d+'">+ Line</button>':'')+(d>0?'<button class="btn sm" data-same="'+i+'-'+d+'">Same as '+esc(tcFmt(isoAddD(TC.start,TC_OFF[d-1]),{weekday:'short'}))+'</button>':'')+'</div></div>';
       }
@@ -1121,8 +1146,31 @@ function tcBody(){
     h+='</div>';
   });
   h+='<button class="btn block" id="tcAddW" style="margin:6px 0 14px">+ Add worker</button>';
-  h+='<button class="btn primary block" id="tcSubmit">'+(c.status==='submitted'?'Submit again':'Submit time cards')+'</button><p class="muted small" style="text-align:center">Submitting fills in a copy of the Excel time card in Timecards/'+esc(c.folder||'…')+'. You can change it and submit again until payroll.</p>';
+  h+='<button class="btn primary block" id="tcSubmit">'+(c.status==='submitted'?'Submit again':'Submit time cards')+'</button><p class="muted small" style="text-align:center">'+(S.isAdmin?'Submitting fills in a copy of the Excel time card in Timecards/'+esc(c.folder||'…')+'.':'Submitting sends your time cards to the office.')+' You can change it and submit again until payroll.</p>';
   return h;
+}
+function tcAddWorkers(c){
+  const on=new Set(c.workers.map(w=>tcKey(w.name)));const avail=(TC.roster||[]).filter(r=>!on.has(tcKey(r.name)));const pick=new Set();
+  const m=modal('<h2>Add workers</h2>'+(avail.length?'<p class="muted small" style="margin:-4px 0 8px">Tap everyone on your crew this pay period.</p><div class="chips tcpick">'+avail.map((r,i)=>'<button type="button" class="chip" data-p="'+i+'">'+esc(r.name)+'</button>').join('')+'</div>':'<p class="muted small">Nobody on the crew list yet. Add names below and they\'ll be on the list next time.</p>')+
+    '<form><label class="field" style="margin-top:12px"><span>Someone new? Type their full name</span><input name="n" placeholder="e.g. Javier Mena" autocomplete="off"></label><div class="mbtns"><button type="button" class="btn" data-x>Cancel</button><button class="btn primary">Add</button></div></form>');
+  $$('[data-p]',m).forEach(b=>b.onclick=()=>{const i=+b.dataset.p;pick.has(i)?pick.delete(i):pick.add(i);b.classList.toggle('on',pick.has(i))});
+  $('[data-x]',m).onclick=()=>m.close();
+  $('form',m).onsubmit=e=>{e.preventDefault();const nn=$('[name=n]',m).value.trim().slice(0,60);
+    const add=[...pick].map(i=>avail[i]).map(r=>({name:r.name,rate:r.rate==null?'':String(r.rate),days:{}}));
+    if(nn&&!on.has(tcKey(nn))&&!add.some(w=>tcKey(w.name)===tcKey(nn))){const r=tcRoster(nn);add.push({name:r?r.name:nn,rate:r&&r.rate!=null?String(r.rate):'',days:{}});if(!r)tcRosterSave(nn)}
+    if(!add.length){m.close();return}
+    m.close();c.workers.push(...add);TC.open=add.length===1?c.workers.length-1:-1;tcChanged(true);toast(add.length===1?add[0].name+' added.':add.length+' workers added.')};
+}
+async function tcRosterPanel(){
+  try{TC.roster=(await q(sb.from('crew_roster').select('*').eq('active',true).order('name')))||[]}catch(e){toast(errMsg(e));return}
+  const m=modal('<h2>Crew list & rates</h2><p class="muted small" style="margin:-4px 0 8px">Foremen pick workers from this list. Rates set here fill in on their time cards.</p><div data-rl></div><div class="mbtns"><button class="btn" data-x>Done</button><button class="btn primary" data-addr>+ Add person</button></div>');
+  const draw=()=>{$('[data-rl]',m).innerHTML=TC.roster.length?TC.roster.map((r,i)=>'<div class="prow2"><div class="grow"><b>'+esc(r.name)+'</b></div><input data-rr="'+i+'" inputmode="decimal" placeholder="$/hr" value="'+esc(r.rate==null?'':String(r.rate))+'" style="width:80px;min-height:38px;border:1px solid var(--line);border-radius:8px;padding:4px 6px;text-align:right"><button class="ico" data-rx="'+i+'" aria-label="Remove">✕</button></div>').join(''):'<p class="muted">Nobody on the list yet.</p>';
+    $$('[data-rr]',m).forEach(el=>el.onchange=async()=>{const r=TC.roster[+el.dataset.rr];const v=el.value.trim();if(v&&!isFinite(+v)){toast('Rate must be a number.');return}r.rate=v?+v:null;await run(sb.from('crew_roster').update({rate:r.rate}).eq('id',r.id));if(TC.card){tcRefreshRates();TC.force=true;render()}});
+    $$('[data-rx]',m).forEach(el=>el.onclick=async()=>{const r=TC.roster[+el.dataset.rx];if(!await confirmBox('Take '+r.name+' off the crew list? Past time cards stay the same.','Remove'))return;await run(sb.from('crew_roster').update({active:false}).eq('id',r.id));TC.roster.splice(+el.dataset.rx,1);draw()})};
+  draw();$('[data-x]',m).onclick=()=>m.close();
+  $('[data-addr]',m).onclick=async()=>{const f=await formBox('Add person',[{k:'name',label:'Full name',req:true,ph:'e.g. Javier Mena'},{k:'rate',label:'Rate $/hr',type:'number'}],'Add');if(!f)return;
+    const ex=tcRoster(f.name);if(ex){toast(ex.name+' is already on the list.');return}
+    const d=await run(sb.from('crew_roster').insert({name:f.name.slice(0,60),rate:f.rate?+f.rate:null}).select().single());if(d&&d.id){TC.roster.push(d);TC.roster.sort((a,b)=>a.name.localeCompare(b.name));draw()}};
 }
 function tcLine(key){const [i,d,k]=key.split('-').map(Number);const w=TC.card.workers[i];w.days=w.days||{};w.days[d]=w.days[d]||[];return {w,d,k,lines:w.days[d],l:w.days[d][k]}}
 function tcTotals(i,d){
@@ -1140,12 +1188,15 @@ function bindTc(){
   if(!TC.card)return;const c=TC.card;
   $$('[data-tc]').forEach(el=>el.onclick=async()=>{tcFlush();const r=await run(sb.from('timecards').select('*').eq('id',el.dataset.tc).single());if(r&&r.id){TC.card=r;TC.open=-1;TC.force=true;render()}});
   if($('#tcMine'))$('#tcMine').onclick=()=>{tcFlush();loadTc()};
-  $('#tcForeman').oninput=e=>{c.foreman=e.target.value;tcChanged()};
-  $('#tcFolder').oninput=e=>{c.folder=e.target.value.trim();tcChanged()};
+  $('#tcForeman').oninput=e=>{const was=tcFirst(c.foreman);c.foreman=e.target.value;if(!S.isAdmin&&(!c.folder||c.folder===was))c.folder=tcFirst(c.foreman);tcChanged()};
+  if($('#tcFolder'))$('#tcFolder').oninput=e=>{c.folder=e.target.value.trim();tcChanged()};
+  if($('#tcRosterBtn'))$('#tcRosterBtn').onclick=tcRosterPanel;
   $$('[data-tog]').forEach(el=>el.onclick=()=>{const i=+el.dataset.tog;TC.open=TC.open===i?-1:i;TC.force=true;render();const n=$('[data-w="'+i+'"]');if(n&&TC.open===i)n.scrollIntoView({block:'start'})});
   $$('input[data-name]').forEach(el=>el.oninput=()=>{const i=+el.dataset.name;c.workers[i].name=el.value;const b=$('[data-w="'+i+'"] .tcwh b');if(b)b.textContent=el.value||'New worker';tcChanged()});
-  $$('input[data-rate]').forEach(el=>el.oninput=()=>{const i=+el.dataset.rate;c.workers[i].rate=el.value.trim();tcTotals(i);tcChanged()});
+  $$('input[data-rate]').forEach(el=>{el.oninput=()=>{const i=+el.dataset.rate;c.workers[i].rate=el.value.trim();tcTotals(i);tcChanged()};el.onchange=()=>{const w=c.workers[+el.dataset.rate];tcRosterSave(w.name,w.rate)}});
+  $$('input[data-name]').forEach(el=>el.addEventListener('change',()=>{const w=c.workers[+el.dataset.name];if(w.name.trim())tcRosterSave(w.name,S.isAdmin?w.rate:undefined)}));
   $$('input[data-hrs]').forEach(el=>el.oninput=()=>{const x=tcLine(el.dataset.hrs);x.l.hrs=el.value.trim();tcTotals(+el.dataset.hrs.split('-')[0],x.d);tcChanged()});
+  $$('[data-qh]').forEach(el=>el.onclick=()=>{const p=el.dataset.qh.split('-');const x=tcLine(p.slice(0,3).join('-'));x.l.hrs=p[3];tcChanged(true)});
   $$('select[data-code]').forEach(el=>el.onchange=()=>{tcLine(el.dataset.code).l.code=el.value;tcChanged()});
   $$('select[data-job]').forEach(el=>el.onchange=async()=>{
     const x=tcLine(el.dataset.job),v=el.value,l=x.l;
@@ -1160,10 +1211,12 @@ function bindTc(){
   $$('[data-rml]').forEach(el=>el.onclick=()=>{const x=tcLine(el.dataset.rml);x.lines.splice(x.k,1);tcChanged(true)});
   $$('[data-rmw]').forEach(el=>el.onclick=async()=>{const i=+el.dataset.rmw;if(!await confirmBox('Remove '+(c.workers[i].name||'this worker')+' from this pay period?','Remove'))return;c.workers.splice(i,1);TC.open=-1;tcChanged(true)});
   $$('[data-copyall]').forEach(el=>el.onclick=async()=>{const i=+el.dataset.copyall;if(c.workers.length<2)return;if(!await confirmBox('Copy '+(c.workers[i].name||'this worker')+'\'s jobs, codes and hours to everyone else on this card? Their current days will be replaced. Rates stay the same.','Copy',false))return;const src=JSON.stringify(c.workers[i].days||{});c.workers.forEach((w,j)=>{if(j!==i)w.days=JSON.parse(src)});tcChanged(true);toast('Copied to the whole crew.')});
-  $('#tcAddW').onclick=async()=>{const f=await formBox('Add worker',[{k:'name',label:'Name',req:true,ph:'e.g. Javier Mena'},{k:'rate',label:'Rate $/hr (optional)',type:'number'}],'Add');if(!f)return;c.workers.push({name:f.name.slice(0,60),rate:f.rate,days:{}});TC.open=c.workers.length-1;tcChanged(true)};
+  $('#tcAddW').onclick=()=>tcAddWorkers(c);
   $('#tcSubmit').onclick=async()=>{
     if(!c.workers.length){toast('Add your crew first.');return}
-    if(!String(c.folder||'').trim()){toast('Enter your Timecards folder name first.');$('#tcFolder').focus();return}
+    if(!String(c.folder||'').trim())c.folder=tcFirst(c.foreman);
+    if(!String(c.folder||'').trim()){toast('Enter the name on the time cards first.');$('#tcForeman').focus();return}
+    tcRefreshRates(true);
     const none=c.workers.filter(w=>!tcWHrs(w)).map(w=>w.name||'A worker');
     if(none.length&&!await confirmBox(none.join(', ')+(none.length>1?' have':' has')+' no hours this period. Submit anyway?','Submit',false))return;
     c.dirty=true;await tcFlush();if(!c.id)return;
@@ -1203,11 +1256,12 @@ function bindJobs(){
   if($('#tcOpen'))$('#tcOpen').onclick=openTimecards;
   $$('[data-view]').forEach(b=>b.onclick=()=>{lsSet('crewplans.jobView',b.dataset.view);render()});
   $('#acct').onclick=()=>{
-    const m=modal('<h2>Account</h2><p class="muted">'+(S.isAdmin?'Signed in as office: '+esc(S.me.email||who(S.me.id)):isForeman()?'Signed in as foreman: '+esc(S.me.email||''):'Crew access on this phone. Your access comes from invite links; signing out would remove it from this phone.')+'</p><div style="display:grid;gap:10px;margin-top:12px">'+
-      (S.isAdmin?'<button class="btn" data-users>Office users</button><button class="btn" data-pw>Change password</button><button class="btn" data-out>Sign out</button>':isForeman()?'<button class="btn" data-pw>Change password</button><button class="btn" data-out>Sign out</button>':'<button class="btn primary" data-fm>Make a foreman login</button><button class="btn" data-off>Office or foreman sign in on this device</button>')+'<button class="btn" data-intro>▶ Play intro</button><button class="btn" data-x>Close</button></div>');
+    const m=modal('<h2>Account</h2><p class="muted">'+(S.isAdmin?'Signed in as office: '+esc(S.me.email||who(S.me.id)):S.realAdmin?'Office login, looking at the field view.':isForeman()?'Signed in as foreman: '+esc(S.me.email||''):'Crew access on this phone. Your access comes from invite links; signing out would remove it from this phone.')+'</p><div style="display:grid;gap:10px;margin-top:12px">'+
+      (S.isAdmin?'<button class="btn" data-users>Office users</button><button class="btn" data-pw>Change password</button><button class="btn" data-out>Sign out</button>':isForeman()?'<button class="btn" data-pw>Change password</button><button class="btn" data-out>Sign out</button>':'<button class="btn primary" data-fm>Make a foreman login</button><button class="btn" data-off>Office or foreman sign in on this device</button>')+(S.realAdmin?'<button class="btn'+(S.isAdmin?'':' primary')+'" data-vas>'+(S.isAdmin?'Switch to field view (what a foreman sees)':'Switch back to office view')+'</button>':'')+'<button class="btn" data-intro>▶ Play intro</button><button class="btn" data-x>Close</button></div>');
     $('[data-x]',m).onclick=()=>m.close();
     const o=$('[data-out]',m);if(o)o.onclick=async()=>{if(!await okToSignOut())return;await sb.auth.signOut();await clearDeviceCache();lsSet('crewplans.lastJob',null);location.href=location.pathname+'?office'};
     $('[data-intro]',m).onclick=()=>{primeAudio();m.close();playSplash(true)};
+    const va=$('[data-vas]',m);if(va)va.onclick=()=>{m.close();setViewAs(S.isAdmin?'field':'office')};
     const ou=$('[data-users]',m);if(ou)ou.onclick=()=>{m.close();officeUsers()};
     const pw=$('[data-pw]',m);if(pw)pw.onclick=()=>{m.close();setPasswordBox('Change password')};
     const fm=$('[data-fm]',m);if(fm)fm.onclick=()=>{m.close();makeForemanLogin()};
