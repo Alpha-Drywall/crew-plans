@@ -41,6 +41,29 @@ button{cursor:pointer}
 .orow input:not([type]){width:100%;border:1px solid var(--line);border-radius:8px;padding:7px 8px;margin-top:4px;font-size:14px}
 .top .jl{display:none}
 .dsk{display:none}
+.tcper{display:flex;align-items:center;gap:10px;margin:0 0 12px;text-align:center}
+.tcper .btn{min-width:44px}
+.tchead{display:flex;gap:10px;flex-wrap:wrap}.tchead .field{flex:1;min-width:150px}
+.tcsum{display:flex;gap:14px;flex-wrap:wrap;font-size:15px;margin:4px 0 2px}
+.tcw{padding:0;margin-bottom:10px}.tcwh{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer}
+.tcwb{padding:0 12px 12px;border-top:1px solid var(--line)}
+.tcwf{display:flex;gap:10px}.tcwf .field{flex:1}
+.tcday{border-top:1px solid var(--line);padding:8px 0}
+.tcdh{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.tcl{display:flex;gap:6px;align-items:center;margin:6px 0;flex-wrap:wrap;padding:6px;background:#f6f7f9;border-radius:10px}
+.tcl select[data-job]{flex:1 1 100%}
+.tcl select{flex:1;min-width:0;min-height:40px;border:1px solid var(--line);border-radius:8px;padding:4px 6px;background:#fff;font-size:14px}
+.tcl select[data-code]{flex:1 1 auto}
+@media (min-width:700px){.tcl{flex-wrap:nowrap}.tcl select[data-job]{flex:1 1 auto}.tcl select[data-code]{flex:0 0 190px}}
+.tcl input{width:62px;min-height:40px;border:1px solid var(--line);border-radius:8px;padding:4px 6px;font-size:15px;text-align:right}
+.tcl .ico{position:static;flex:none;width:34px;height:34px;background:none;color:var(--muted);border:0}
+.tcdb{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.tcall{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:0 0 12px}
+.tcall summary{font-weight:700;cursor:pointer}
+.tcrow{display:flex;align-items:center;gap:10px;padding:10px 2px;border-bottom:1px solid var(--line);cursor:pointer}
+.tcst{font-size:12px;font-weight:700;padding:3px 8px;border-radius:6px;background:#eef1f4}
+.tcst.ok{background:#dcf5e3;color:#14632e}.tcst.wait{background:#fff2d6;color:#7a4b00}
+.tcnote{background:#fff7e0;border-radius:10px;padding:8px 12px;margin:0 0 10px;font-size:14px}
 .splash{position:fixed;inset:0;z-index:9999;background:#1d232b;display:flex;align-items:center;justify-content:center;transition:opacity .3s}
 .splash.out{opacity:0}
 .splash .sbox{width:min(92vw,420px)}
@@ -259,8 +282,8 @@ async function run(p,okMsg){try{const d=await q(p);if(okMsg)toast(okMsg);return 
 
 /* ===== offline: local cache + outbox ===== */
 const OFF={db:null,ops:[],flushing:false,online:navigator.onLine!==false,ready:null};
-const OFF_TABLES=['marks','pins','logs','areas'];
-const OFF_DEFAULTS={pins:{layer:'plans',kind:'issue',text:'',photos:[],status:'open',done_by:null,done_at:null},marks:{w:0.006,layer:'plans'},areas:{pct:{}},logs:{crew:0,hours:0,work:'',deliveries:'',notes:'',name:'',hours_by_code:{},weather:'',problems:'',sub_progress:'',trade_damage:'',workforce:{},equipment:[],materials:[],extra_work:[],signature:null,send_gc:false,pdf_path:null,filed_at:null,sent_at:null,file_error:null}};
+const OFF_TABLES=['marks','pins','logs','areas','timecards'];
+const OFF_DEFAULTS={timecards:{workers:[],status:'draft'},pins:{layer:'plans',kind:'issue',text:'',photos:[],status:'open',done_by:null,done_at:null},marks:{w:0.006,layer:'plans'},areas:{pct:{}},logs:{crew:0,hours:0,work:'',deliveries:'',notes:'',name:'',hours_by_code:{},weather:'',problems:'',sub_progress:'',trade_damage:'',workforce:{},equipment:[],materials:[],extra_work:[],signature:null,send_gc:false,pdf_path:null,filed_at:null,sent_at:null,file_error:null}};
 function idb(){if(OFF.db)return OFF.db;OFF.db=new Promise((res,rej)=>{try{const r=indexedDB.open('alpha-crew-view',1);r.onupgradeneeded=()=>{const d=r.result;d.createObjectStore('resp');d.createObjectStore('img');d.createObjectStore('outbox',{keyPath:'n',autoIncrement:true})};r.onsuccess=()=>{const d=r.result;d.onclose=()=>{OFF.db=null};d.onversionchange=()=>{try{d.close()}catch(e){}OFF.db=null};res(d)};r.onerror=()=>{OFF.db=null;rej(r.error)}}catch(e){OFF.db=null;rej(e)}});return OFF.db}
 function idbOnce(store,mode,fn){return idb().then(d=>new Promise((res,rej)=>{const tx=d.transaction(store,mode);const r=fn(tx.objectStore(store));let out;if(r)r.onsuccess=()=>{out=r.result};tx.oncomplete=()=>res(out);tx.onerror=tx.onabort=()=>rej(tx.error)}))}
 async function idbDo(store,mode,fn){try{return await idbOnce(store,mode,fn)}catch(e){OFF.db=null;return await idbOnce(store,mode,fn)}}
@@ -284,7 +307,7 @@ function applyOps(table,rows,filters){
     if(op.table!==table&&!(op.kind==='rpc'&&table==='areas'))continue;
     const now=new Date(op.t).toISOString();
     if(op.kind==='insert'||op.kind==='upsert'){
-      for(const r0 of op.rows){const r=Object.assign({created_at:now,created_by:op.sub},OFF_DEFAULTS[table]||{},r0);if(table==='logs'){r.user_id=r.user_id||op.sub;r.id=r.id||('local-'+op.n)}
+      for(const r0 of op.rows){const r=Object.assign({created_at:now,created_by:op.sub},OFF_DEFAULTS[table]||{},r0);if(table==='logs'){r.user_id=r.user_id||op.sub;r.id=r.id||('local-'+op.n)}if(table==='timecards')r.owner=r.owner||op.sub;
         if(!rowHit(r,filters))continue;
         const i=op.kind==='upsert'&&op.conflict.length?rows.findIndex(x=>op.conflict.every(c=>String(x[c])===String(r[c]))):rows.findIndex(x=>x.id===r.id);
         if(i>=0)rows[i]=Object.assign({},rows[i],r0);else rows.push(r)}
@@ -836,6 +859,7 @@ function render(){
   if(!sb||!S.me)return;
   if(S.sliding){S.pendingRender=true;return}
   const app=$('#app');
+  if(S.view==='tc'){app.dataset.job='';app.innerHTML=renderTc();bindTc();return}
   if(S.view!=='job'||!S.job){app.dataset.job='';app.innerHTML=renderJobs();bindJobs();return}
   const j=S.job;
   if(!app.querySelector('[data-jobshell]')||app.dataset.job!==j.id||app.dataset.tab!==S.tab||app.dataset.role!==S.role){
@@ -979,10 +1003,156 @@ async function downloadLabor(){
   }catch(e){pb.close();toast(errMsg(e))}
 }
 
+/* ===== time cards (foreman fills; files into his Timecards folder in Excel) ===== */
+const TC={start:'',card:null,list:[],open:-1,saveT:0,loading:false};
+const TC_ANCHOR='2026-09-30',TC_OFF=[0,1,2,3,5,6,7,8,9,10,12,13];
+const TC_CODES=[['112','112 Framing'],['122','122 Hanging'],['132','132 Finishing'],['142','142 Clean/Sup/Layout'],['152','152 Acoustical'],['162','162 Insulation'],['172','172 Extra work']];
+const isoAddD=(iso,d)=>{const t=new Date(iso+'T12:00:00Z');t.setUTCDate(t.getUTCDate()+d);return t.toISOString().slice(0,10)};
+function tcPeriodOf(iso){const a=Date.parse(TC_ANCHOR+'T12:00:00Z'),t=Date.parse(iso+'T12:00:00Z');return isoAddD(TC_ANCHOR,Math.floor((t-a)/864e5/14)*14)}
+const tcToday=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+const tcFmt=(iso,o)=>new Date(iso+'T12:00:00').toLocaleDateString(undefined,o||{month:'numeric',day:'numeric'});
+const tcJobNo=n=>(String(n||'').match(/^\s*(\d{3,})/)||[])[1]||'';
+const tcJobShort=n=>String(n||'').replace(/^\s*\d{3,}\s*[-–]?\s*/,'').trim();
+const tcHrs=l=>{const n=parseFloat(l&&l.hrs);return l&&l.kind!=='off'&&isFinite(n)&&n>0?n:0};
+const tcDayHrs=(w,d)=>((w.days&&w.days[d])||[]).reduce((a,l)=>a+tcHrs(l),0);
+const tcWHrs=w=>{let s=0;for(let d=0;d<12;d++)s+=tcDayHrs(w,d);return Math.round(s*100)/100};
+const tcRate=w=>{const n=parseFloat(w.rate);return isFinite(n)?n:0};
+const tcMoney=n=>'$'+(Math.round(n*100)/100).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+function openTimecards(){S.view='tc';TC.start=TC.start||tcPeriodOf(tcToday());TC.open=-1;window.scrollTo(0,0);loadTc()}
+function closeTimecards(){tcFlush();S.view='jobs';render()}
+async function loadTc(){
+  TC.loading=true;TC.card=null;render();
+  try{
+    const me=S.me.id;
+    let mine=await q(sb.from('timecards').select('*').eq('owner',me).eq('period_start',TC.start).maybeSingle());
+    if(!mine){
+      const prev=await q(sb.from('timecards').select('foreman,folder,workers,period_start').eq('owner',me).lt('period_start',TC.start).order('period_start',{ascending:false}).limit(1));
+      const p=(prev&&prev[0])||{};const fm=p.foreman||myName()||'';
+      mine={id:null,owner:me,period_start:TC.start,foreman:fm,folder:p.folder||(fm.split(/\s+/)[0]||''),status:'draft',workers:(p.workers||[]).map(w=>({name:w.name||'',rate:w.rate||'',days:{}}))};
+    }
+    TC.card=mine;
+    TC.list=S.isAdmin?(await q(sb.from('timecards').select('id,owner,foreman,folder,workers,status,submitted_at,filed_at,file_name,file_error,updated_at').eq('period_start',TC.start).order('foreman')))||[]:[];
+  }catch(e){toast(errMsg(e))}
+  TC.loading=false;if(S.view==='tc')render();
+}
+function tcSchedule(){clearTimeout(TC.saveT);TC.saveT=setTimeout(tcFlush,900);tcStatus()}
+async function tcFlush(){
+  clearTimeout(TC.saveT);TC.saveT=0;const c=TC.card;if(!c||!c.dirty)return;c.dirty=false;
+  const row={foreman:(c.foreman||'').slice(0,80),folder:(c.folder||'').slice(0,80),workers:c.workers};
+  if(!c.id){c.id=uuid();const r=await run(sb.from('timecards').insert(Object.assign({id:c.id,period_start:c.period_start},row)));if(r==null){c.id=null;c.dirty=true}}
+  else{c.updated_at=new Date().toISOString();if(await run(sb.from('timecards').update(row).eq('id',c.id))==null)c.dirty=true}
+  tcStatus();
+}
+function tcStatusText(c){
+  if(!c)return '';
+  if(c.dirty||TC.saveT)return 'Saving…';
+  if(c.status!=='submitted')return c.id?'Saved on this card. Not submitted yet.':'Fill in hours. It saves as you go.';
+  const changed=c.updated_at&&c.submitted_at&&c.updated_at>c.submitted_at&&(Date.parse(c.updated_at)-Date.parse(c.submitted_at))>5000;
+  if(changed)return 'Changed since you submitted. Submit again to update the Excel file.';
+  if(c.filed_at&&c.filed_at>=c.submitted_at)return '✓ Saved to '+(c.file_name||'Timecards/'+c.folder);
+  if(c.file_error)return 'Submitted. Not saved to Excel yet: '+c.file_error;
+  return 'Submitted. It will be saved to Timecards/'+(c.folder||'?')+' in Excel.';
+}
+function tcStatus(){const el=$('#tcStat');if(el)el.textContent=tcStatusText(TC.card)}
+function tcJobOptions(l){
+  const opts=['<option value="">Pick job…</option>'];let found=false;
+  (S.jobs||[]).forEach(j=>{const no=tcJobNo(j.name);const sel=l&&l.kind!=='vac'&&l.kind!=='off'&&no&&String(l.job)===no;if(sel)found=true;opts.push('<option value="j:'+esc(j.id)+'"'+(sel?' selected':'')+'>'+esc(j.name)+'</option>')});
+  if(l&&l.kind!=='vac'&&l.kind!=='off'&&(l.job||l.name)&&!found)opts.push('<option value="keep" selected>'+esc((l.job?l.job+' ':'')+(l.name||''))+'</option>');
+  opts.push('<option value="vac"'+(l&&l.kind==='vac'?' selected':'')+'>Vacation</option><option value="off"'+(l&&l.kind==='off'?' selected':'')+'>Off</option><option value="other">Other job…</option>');
+  return opts.join('');
+}
+function renderTc(){
+  let h='<div class="top"><button id="tcBack" aria-label="Back">‹</button><h1><div class="ttl"><span class="brand"></span>Alpha Operations</div></h1></div><main class="tcm">';
+  h+='<h2 style="margin:0 0 8px">Time cards</h2>';
+  const end=isoAddD(TC.start,13);
+  h+='<div class="tcper"><button class="btn sm" id="tcPrev" aria-label="Previous pay period">‹</button><div class="grow"><b>'+esc(tcFmt(TC.start,{weekday:'short',month:'numeric',day:'numeric'}))+' – '+esc(tcFmt(end,{weekday:'short',month:'numeric',day:'numeric',year:'2-digit'}))+'</b><div class="muted small">Pay period</div></div><button class="btn sm" id="tcNext" aria-label="Next pay period">›</button></div>';
+  if(TC.loading||!TC.card)return h+'<div class="empty">Loading…</div></main>';
+  const c=TC.card,mine=c.owner===S.me.id;
+  if(S.isAdmin){
+    const others=TC.list.filter(x=>x.owner!==S.me.id);
+    h+='<details class="tcall"'+(mine?'':' open')+'><summary>All foremen this period ('+TC.list.length+')</summary>'+(TC.list.length?TC.list.map(x=>{const hrs=(x.workers||[]).reduce((a,w)=>a+tcWHrs(w),0);const st=x.status!=='submitted'?'Draft':x.filed_at&&x.filed_at>=x.submitted_at?'Saved to Excel':x.file_error?'Not saved yet':'Submitted';return '<div class="tcrow" data-tc="'+esc(x.id)+'"><div class="grow"><b>'+esc(x.foreman||'Foreman')+'</b><div class="muted small">'+(x.workers||[]).length+' workers · '+Math.round(hrs*100)/100+' hrs</div></div><span class="tcst'+(st==='Saved to Excel'?' ok':st==='Draft'?'':' wait')+'">'+st+'</span></div>'}).join(''):'<div class="muted small" style="padding:8px 2px">No time cards yet for this period.</div>')+(mine?'':'<button class="btn sm" id="tcMine" style="margin-top:8px">Back to my card</button>')+'</details>';
+    if(!mine)h+='<div class="tcnote">Editing <b>'+esc(c.foreman||'a foreman')+'</b>\'s card.</div>';
+  }
+  h+='<div class="tchead"><label class="field"><span>Name on the time cards</span><input id="tcForeman" value="'+esc(c.foreman||'')+'" placeholder="Foreman name"></label><label class="field"><span>Timecards folder</span><input id="tcFolder" value="'+esc(c.folder||'')+'" placeholder="e.g. Humberto"></label></div>';
+  const tot=c.workers.reduce((a,w)=>a+tcWHrs(w),0),dol=c.workers.reduce((a,w)=>a+tcWHrs(w)*tcRate(w),0);
+  h+='<div class="tcsum"><span><b id="tcTot">'+Math.round(tot*100)/100+'</b> hrs</span><span id="tcDol">'+tcMoney(dol)+'</span><span>'+c.workers.length+' workers</span></div>';
+  h+='<div id="tcStat" class="muted small" style="margin:0 0 10px">'+esc(tcStatusText(c))+'</div>';
+  c.workers.forEach((w,i)=>{
+    const open=TC.open===i;
+    h+='<div class="card tcw'+(open?' open':'')+'" data-w="'+i+'"><div class="tcwh" data-tog="'+i+'"><div class="grow"><b>'+esc(w.name||'New worker')+'</b><div class="muted small"><span data-wh="'+i+'">'+tcWHrs(w)+'</span> hrs'+(tcRate(w)?' · <span data-wd="'+i+'">'+tcMoney(tcWHrs(w)*tcRate(w))+'</span>':'')+'</div></div><span class="chev">'+(open?'▾':'›')+'</span></div>';
+    if(open){
+      h+='<div class="tcwb"><div class="tcwf"><label class="field"><span>Name</span><input data-name="'+i+'" value="'+esc(w.name||'')+'"></label><label class="field" style="max-width:110px"><span>Rate $/hr</span><input data-rate="'+i+'" inputmode="decimal" value="'+esc(w.rate==null?'':String(w.rate))+'"></label></div>';
+      for(let d=0;d<12;d++){
+        const iso=isoAddD(TC.start,TC_OFF[d]),lines=(w.days&&w.days[d])||[];
+        h+='<div class="tcday"><div class="tcdh"><b>'+esc(tcFmt(iso,{weekday:'short',month:'numeric',day:'numeric'}))+'</b><span class="muted small"><span data-dh="'+i+'-'+d+'">'+tcDayHrs(w,d)+'</span> hrs</span></div>';
+        lines.forEach((l,k)=>{
+          h+='<div class="tcl"><select data-job="'+i+'-'+d+'-'+k+'">'+tcJobOptions(l)+'</select>'+(l.kind==='off'?'<span class="muted small grow">Off</span>':'<select data-code="'+i+'-'+d+'-'+k+'"><option value="">Code</option>'+TC_CODES.map(o=>'<option value="'+o[0]+'"'+(String(l.code||'')===o[0]?' selected':'')+'>'+o[1]+'</option>').join('')+'</select><input data-hrs="'+i+'-'+d+'-'+k+'" inputmode="decimal" placeholder="hrs" value="'+esc(l.hrs==null?'':String(l.hrs))+'">')+'<button class="ico" data-rml="'+i+'-'+d+'-'+k+'" aria-label="Remove line">✕</button></div>';
+        });
+        h+='<div class="tcdb">'+(lines.length<3?'<button class="btn sm" data-addl="'+i+'-'+d+'">+ Line</button>':'')+(d>0?'<button class="btn sm" data-same="'+i+'-'+d+'">Same as '+esc(tcFmt(isoAddD(TC.start,TC_OFF[d-1]),{weekday:'short'}))+'</button>':'')+'</div></div>';
+      }
+      h+='<div class="tcdb" style="justify-content:space-between"><button class="btn sm" data-copyall="'+i+'">Copy these days to whole crew</button><button class="btn sm danger" data-rmw="'+i+'">Remove worker</button></div></div>';
+    }
+    h+='</div>';
+  });
+  h+='<button class="btn block" id="tcAddW" style="margin:6px 0 14px">+ Add worker</button>';
+  h+='<button class="btn primary block" id="tcSubmit">'+(c.status==='submitted'?'Submit again':'Submit time cards')+'</button><p class="muted small" style="text-align:center">Submitting fills in a copy of the Excel time card in Timecards/'+esc(c.folder||'…')+'. You can change it and submit again until payroll.</p>';
+  return h+'</main>';
+}
+function tcLine(key){const [i,d,k]=key.split('-').map(Number);const w=TC.card.workers[i];w.days=w.days||{};w.days[d]=w.days[d]||[];return {w,d,k,lines:w.days[d],l:w.days[d][k]}}
+function tcTotals(i,d){
+  const c=TC.card,w=c.workers[i];
+  const set=(sel,v)=>{const e=$(sel);if(e)e.textContent=v};
+  if(d!=null)set('[data-dh="'+i+'-'+d+'"]',tcDayHrs(w,d));
+  set('[data-wh="'+i+'"]',tcWHrs(w));set('[data-wd="'+i+'"]',tcMoney(tcWHrs(w)*tcRate(w)));
+  set('#tcTot',Math.round(c.workers.reduce((a,x)=>a+tcWHrs(x),0)*100)/100);set('#tcDol',tcMoney(c.workers.reduce((a,x)=>a+tcWHrs(x)*tcRate(x),0)));
+}
+function tcChanged(rerender){TC.card.dirty=true;tcSchedule();if(rerender){const y=window.scrollY;render();window.scrollTo(0,y)}}
+function bindTc(){
+  $('#tcBack').onclick=closeTimecards;
+  const shift=n=>{tcFlush();TC.start=isoAddD(TC.start,14*n);TC.open=-1;loadTc()};
+  $('#tcPrev').onclick=()=>shift(-1);$('#tcNext').onclick=()=>shift(1);
+  if(!TC.card)return;const c=TC.card;
+  $$('[data-tc]').forEach(el=>el.onclick=async()=>{tcFlush();const r=await run(sb.from('timecards').select('*').eq('id',el.dataset.tc).single());if(r&&r.id){TC.card=r;TC.open=-1;render()}});
+  if($('#tcMine'))$('#tcMine').onclick=()=>{tcFlush();loadTc()};
+  $('#tcForeman').oninput=e=>{c.foreman=e.target.value;tcChanged()};
+  $('#tcFolder').oninput=e=>{c.folder=e.target.value.trim();tcChanged()};
+  $$('[data-tog]').forEach(el=>el.onclick=()=>{const i=+el.dataset.tog;TC.open=TC.open===i?-1:i;render();const n=$('[data-w="'+i+'"]');if(n&&TC.open===i)n.scrollIntoView({block:'start'})});
+  $$('input[data-name]').forEach(el=>el.oninput=()=>{const i=+el.dataset.name;c.workers[i].name=el.value;const b=$('[data-w="'+i+'"] .tcwh b');if(b)b.textContent=el.value||'New worker';tcChanged()});
+  $$('input[data-rate]').forEach(el=>el.oninput=()=>{const i=+el.dataset.rate;c.workers[i].rate=el.value.trim();tcTotals(i);tcChanged()});
+  $$('input[data-hrs]').forEach(el=>el.oninput=()=>{const x=tcLine(el.dataset.hrs);x.l.hrs=el.value.trim();tcTotals(+el.dataset.hrs.split('-')[0],x.d);tcChanged()});
+  $$('select[data-code]').forEach(el=>el.onchange=()=>{tcLine(el.dataset.code).l.code=el.value;tcChanged()});
+  $$('select[data-job]').forEach(el=>el.onchange=async()=>{
+    const x=tcLine(el.dataset.job),v=el.value,l=x.l;
+    if(v==='vac'){l.kind='vac';delete l.job;delete l.name;l.code=l.code||'142'}
+    else if(v==='off'){l.kind='off';delete l.job;delete l.name;delete l.code;delete l.hrs}
+    else if(v==='other'){const f=await formBox('Other job',[{k:'job',label:'Job #',ph:'e.g. 330'},{k:'name',label:'Job name',req:true,ph:'e.g. Smith Remodel'}]);if(f){l.kind='job';l.job=f.job;l.name=f.name}}
+    else if(v.startsWith('j:')){const j=(S.jobs||[]).find(z=>z.id===v.slice(2));if(j){l.kind='job';l.job=tcJobNo(j.name);l.name=tcJobShort(j.name)||j.name}}
+    tcChanged(true);
+  });
+  $$('[data-addl]').forEach(el=>el.onclick=()=>{const [i,d]=el.dataset.addl.split('-').map(Number);const w=c.workers[i];w.days=w.days||{};const L=w.days[d]=w.days[d]||[];const prev=L[L.length-1]||((w.days[d-1]||[])[0]);L.push(prev&&prev.kind!=='off'?{kind:prev.kind||'job',job:prev.job,name:prev.name,code:prev.code,hrs:''}:{kind:'job',hrs:''});tcChanged(true)});
+  $$('[data-same]').forEach(el=>el.onclick=()=>{const [i,d]=el.dataset.same.split('-').map(Number);const w=c.workers[i];w.days=w.days||{};w.days[d]=JSON.parse(JSON.stringify(w.days[d-1]||[]));tcChanged(true)});
+  $$('[data-rml]').forEach(el=>el.onclick=()=>{const x=tcLine(el.dataset.rml);x.lines.splice(x.k,1);tcChanged(true)});
+  $$('[data-rmw]').forEach(el=>el.onclick=async()=>{const i=+el.dataset.rmw;if(!await confirmBox('Remove '+(c.workers[i].name||'this worker')+' from this pay period?','Remove'))return;c.workers.splice(i,1);TC.open=-1;tcChanged(true)});
+  $$('[data-copyall]').forEach(el=>el.onclick=async()=>{const i=+el.dataset.copyall;if(c.workers.length<2)return;if(!await confirmBox('Copy '+(c.workers[i].name||'this worker')+'\'s jobs, codes and hours to everyone else on this card? Their current days will be replaced. Rates stay the same.','Copy',false))return;const src=JSON.stringify(c.workers[i].days||{});c.workers.forEach((w,j)=>{if(j!==i)w.days=JSON.parse(src)});tcChanged(true);toast('Copied to the whole crew.')});
+  $('#tcAddW').onclick=async()=>{const f=await formBox('Add worker',[{k:'name',label:'Name',req:true,ph:'e.g. Javier Mena'},{k:'rate',label:'Rate $/hr (optional)',type:'number'}],'Add');if(!f)return;c.workers.push({name:f.name.slice(0,60),rate:f.rate,days:{}});TC.open=c.workers.length-1;tcChanged(true)};
+  $('#tcSubmit').onclick=async()=>{
+    if(!c.workers.length){toast('Add your crew first.');return}
+    if(!String(c.folder||'').trim()){toast('Enter your Timecards folder name first.');$('#tcFolder').focus();return}
+    const none=c.workers.filter(w=>!tcWHrs(w)).map(w=>w.name||'A worker');
+    if(none.length&&!await confirmBox(none.join(', ')+(none.length>1?' have':' has')+' no hours this period. Submit anyway?','Submit',false))return;
+    c.dirty=true;await tcFlush();if(!c.id)return;
+    const now=new Date().toISOString();
+    if(await run(sb.from('timecards').update({status:'submitted',submitted_at:now,file_error:null,file_tries:0}).eq('id',c.id))==null)return;
+    Object.assign(c,{status:'submitted',submitted_at:now,updated_at:now,file_error:null});render();toast('Time cards submitted.');
+    if(navigator.onLine!==false)sb.functions.invoke('crew-sync',{body:{action:'timecards'}}).then(async()=>{const r=await q(sb.from('timecards').select('status,submitted_at,filed_at,file_name,file_error,updated_at').eq('id',c.id).single()).catch(()=>null);if(r&&TC.card&&TC.card.id===c.id){Object.assign(TC.card,r);tcStatus()}}).catch(()=>{});
+  };
+}
+
 /* jobs list */
 function renderJobs(){
   let h='<div class="top"><h1><div class="ttl"><span class="brand"></span>Alpha Operations</div></h1><button id="acct" aria-label="Account">☰</button></div><main>';
-  if(S.isAdmin)h+='<button class="btn primary block" id="newJob" style="margin-bottom:14px">+ New job</button>';
+  if(S.isAdmin)h+='<button class="btn primary block" id="newJob" style="margin-bottom:10px">+ New job</button>';
+  h+='<button class="btn block" id="tcOpen" style="margin-bottom:14px">⏱ Time cards</button>';
   if(!S.jobsLoaded)h+='<div class="empty">Loading jobs…</div>';
   else if(!S.jobs.length)h+='<div class="empty"><b>No jobs yet</b>'+(S.isAdmin?'Add a job, upload its plan PDF, then invite your foreman from the job\'s ⋯ menu.':'Open the invite link the office texted you to get access to a job.')+'</div>';
   else{
@@ -1004,6 +1174,7 @@ function bindJobs(){
     if(d&&d.id){S.jobs.unshift(d);openJob(d.id)}
   };
   $$('.job').forEach(el=>el.onclick=()=>openJob(el.dataset.id));
+  if($('#tcOpen'))$('#tcOpen').onclick=openTimecards;
   $$('[data-view]').forEach(b=>b.onclick=()=>{lsSet('crewplans.jobView',b.dataset.view);render()});
   $('#acct').onclick=()=>{
     const m=modal('<h2>Account</h2><p class="muted">'+(S.isAdmin?'Signed in as office: '+esc(S.me.email||who(S.me.id)):'Crew access on this phone. Your access comes from invite links; signing out would remove it from this phone.')+'</p><div style="display:grid;gap:10px;margin-top:12px">'+
