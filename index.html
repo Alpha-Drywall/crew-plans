@@ -55,6 +55,9 @@ main{padding:14px 14px calc(30px + env(safe-area-inset-bottom));max-width:860px;
 .revb.new{background:#ea580c}
 .revb.rv{background:#2563eb}
 .revb.old{background:#b91c1c}
+.chgb{position:absolute;left:6px;top:30px;background:#7c3aed;color:#fff;font-size:11px;font-weight:800;padding:3px 7px;border-radius:6px;letter-spacing:.3px;pointer-events:none;max-width:calc(100% - 50px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chgb.ct{top:6px}
+.sheet .sfor{padding:0 34px 8px 10px;margin-top:-4px;font-size:12px;color:#7c3aed;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sheet.oldv{opacity:.6;border-style:dashed}
 .sheet.oldv .sname{font-weight:500}
 .pickrow{display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--line);font-size:15px;cursor:pointer}
@@ -431,12 +434,22 @@ function sheetFilter(){const j=S.job&&S.job.id;let o={};try{o=JSON.parse(lsGet('
 function setSheetFilter(f){if(S.job)lsSet('acv.sf.'+S.job.id,JSON.stringify(f))}
 function revOptions(){const m=new Map();S.sheets.forEach(s=>{if(!(hasVersions(s)||s.rev_label))return;const k=revText(s);const e=m.get(k)||{k,n:0,ord:0};e.n++;e.ord=Math.max(e.ord,revSort(s));m.set(k,e)});return [...m.values()].sort((a,b)=>b.ord-a.ord||a.k.localeCompare(b.k))}
 function shownSheets(){const f=sheetFilter(),cs=curSheets();
-  if(f.rev==='__revised')return cs.filter(hasVersions);
+  if(f.rev==='__revised')return cs.filter(isRevised);
+  if(f.rev==='__changed')return cs.filter(s=>changeLabels(s).length);
+  if(f.rev==='__docs')return cs.filter(s=>Array.isArray(s.changes)&&s.changes.length);
   if(f.rev){const out=[];cs.forEach(c=>versionsOf(c).forEach(v=>{if(revText(v)===f.rev)out.push(v)}));return out}
   if(!f.old)return cs;const out=[];cs.forEach(c=>{out.push(c);versionsOf(c).forEach(v=>{if(v.id!==c.id)out.push(v)})});return out}
+const sheetNo=s=>String((s&&s.name)||'').split(/\s+[–-]\s+/)[0].trim();
+const normNo=x=>String(x||'').toUpperCase().replace(/\s+/g,'').replace(/^[A-Z]{1,2}(?=\d)/,'');
+const isRevised=s=>hasVersions(s)||(!!s.rev_label&&!/^(rev(ision)?\.?\s*0+|issued\b|original|bid\b|updated\b)/i.test(s.rev_label));
+function changeDocs(s){if(!s)return [];const n=normNo(sheetNo(s));if(!n)return [];return curSheets().filter(d=>d.id!==s.id&&Array.isArray(d.changes)&&d.changes.some(c=>normNo(c)===n))}
+function changeLabels(s){return [...new Set(changeDocs(s).map(d=>d.change_ref||sheetNo(d)))]}
 function sheetBadge(s){const old=s.is_current===false;
   if(old)return '<span class="revb old">OLD · '+esc(revText(s).toUpperCase())+'</span>';
-  if(hasVersions(s))return '<span class="revb '+(recentRev(s)?'new':'rv')+'">'+'REVISED · '+esc(revText(s).toUpperCase())+'</span>';
+  const cl=s.is_current===false?[]:changeLabels(s);const cb=cl.length?'<span class="chgb'+(isRevised(s)||s.rev_label?'':' ct')+'">'+esc(cl[0].toUpperCase())+(cl.length>1?' +'+(cl.length-1):'')+'</span>':'';
+  return sheetBadge0(s)+cb}
+function sheetBadge0(s){
+  if(isRevised(s))return '<span class="revb '+(recentRev(s)?'new':'rv')+'">'+'REVISED · '+esc(revText(s).toUpperCase())+'</span>';
   return s.rev_label?'<span class="revb">'+esc(revText(s).toUpperCase())+'</span>':''}
 const recentRev=s=>hasVersions(s)&&s.revised_at&&(Date.now()-new Date(s.revised_at).getTime())<14*864e5;
 function sheetLabel(num,title){title=title?String(title).replace(/\s+/g,' ').trim():'';return num?(title?num+' – '+title:num):(title||'')}
@@ -1050,13 +1063,15 @@ function renderPlans(){
   h+='<div class="offrow">'+(!sv?'<button class="btn sm" id="saveOff">⬇ Save for offline</button><span class="muted small">Save before going where there\'s no signal.</span>'
     :stale?'<button class="btn sm primary" id="saveOff">⬇ Update offline copy</button><button class="btn sm" id="rmOff">Remove</button><span class="muted small" style="flex-basis:100%;margin-top:-4px">Plans changed since you saved them.</span>'
     :'<span class="offok"><b>✓</b> Saved on this device<span style="font-weight:400">· '+esc(new Date(sv.at).toLocaleDateString(undefined,{month:'short',day:'numeric'}))+'</span></span><button class="btn sm" id="rmOff">Remove</button>')+'</div>';
-  const f=sheetFilter(),ro=revOptions(),nRev=cs.filter(hasVersions).length,nOld=S.sheets.length-cs.length;
-  if(ro.length||nOld){if(f.rev&&f.rev!=='__revised'&&!ro.some(r=>r.k===f.rev))f.rev='';
-    h+='<div class="sfilt"><select id="revFilt" aria-label="Show revisions"><option value="">All sheets ('+cs.length+')</option>'+(nRev?'<option value="__revised"'+(f.rev==='__revised'?' selected':'')+'>Revised sheets only ('+nRev+')</option>':'')+ro.map(r=>'<option value="'+esc(r.k)+'"'+(f.rev===r.k?' selected':'')+'>'+esc(r.k)+' ('+r.n+' sheet'+(r.n>1?'s':'')+')</option>').join('')+'</select>'+
-      (nOld?'<label><input type="checkbox" id="hideOld"'+(f.old?'':' checked')+(f.rev&&f.rev!=='__revised'?' disabled':'')+'> Hide old sheets</label>':'')+'</div>'+(nOld&&!f.rev?'<p class="muted small" style="margin:-4px 0 10px">'+nRev+' revised · '+nOld+' old version'+(nOld>1?'s':'')+' '+(f.old?'shown (faded)':'hidden')+'</p>':'');}
+  const f=sheetFilter(),ro=revOptions(),nRev=cs.filter(isRevised).length,nOld=S.sheets.length-cs.length,nChg=cs.filter(s=>changeLabels(s).length).length,nDoc=cs.filter(s=>Array.isArray(s.changes)&&s.changes.length).length;
+  const spec=['__revised','__changed','__docs'];
+  {if(f.rev&&!spec.includes(f.rev)&&!ro.some(r=>r.k===f.rev))f.rev='';
+    const so=(v,l,n)=>'<option value="'+v+'"'+(f.rev===v?' selected':'')+'>'+l+' ('+n+')</option>';
+    h+='<div class="sfilt"><select id="revFilt" aria-label="Show revisions"><option value="">All sheets ('+cs.length+')</option>'+so('__revised','Revised sheets',nRev)+(nChg||nDoc?so('__changed','Sheets changed by RFI / PR / ASI',nChg)+so('__docs','RFI / PR / ASI pages',nDoc):'')+ro.map(r=>'<option value="'+esc(r.k)+'"'+(f.rev===r.k?' selected':'')+'>'+esc(r.k)+' ('+r.n+' sheet'+(r.n>1?'s':'')+')</option>').join('')+'</select>'+
+      '<label><input type="checkbox" id="hideOld"'+(f.old?'':' checked')+(!nOld||(f.rev&&!spec.includes(f.rev))?' disabled':'')+'> Hide old sheets</label></div>'+(!f.rev?'<p class="muted small" style="margin:-4px 0 10px">'+(nRev||nChg?nRev+' revised'+(nChg?' · '+nChg+' changed by RFI/PR':''):'No revisions yet')+' · '+(nOld?nOld+' old version'+(nOld>1?'s':'')+' '+(f.old?'shown (faded)':'hidden'):'no old versions')+'</p>':'');}
   const list=shownSheets();
   if(!list.length)return h+'<div class="empty">No sheets match this filter.</div>';
-  return h+'<div class="grid">'+list.map(s=>'<div class="sheet'+(s.is_current===false?' oldv':'')+'" data-id="'+esc(s.id)+'"><img loading="lazy" alt="" data-path="'+esc(s.thumb_path||s.path)+'">'+sheetBadge(s)+'<div class="sname">'+esc(s.name||'Sheet')+'</div>'+(admin&&s.is_current!==false?'<button class="ico" data-edit aria-label="Edit sheet">✎</button>':'')+'</div>').join('')+'</div>';
+  return h+'<div class="grid">'+list.map(s=>'<div class="sheet'+(s.is_current===false?' oldv':'')+'" data-id="'+esc(s.id)+'"><img loading="lazy" alt="" data-path="'+esc(s.thumb_path||s.path)+'">'+sheetBadge(s)+'<div class="sname">'+esc(s.name||'Sheet')+'</div>'+(Array.isArray(s.changes)&&s.changes.length?'<div class="sfor">'+esc((s.change_ref?s.change_ref+' · ':'')+'changes '+s.changes.join(', '))+'</div>':'')+(admin&&s.is_current!==false?'<button class="ico" data-edit aria-label="Edit sheet">✎</button>':'')+'</div>').join('')+'</div>';
 }
 function bindPlans(){
   const an=$('#autoName');if(an)an.onclick=autoNameSheets;
@@ -1125,9 +1140,9 @@ async function autoNameSheets(){
 }
 async function editSheet(id){
   const s=S.sheets.find(x=>x.id===id);if(!s)return;
-  const m=modal('<h2>Sheet '+esc(s.name)+'</h2><form><label class="field"><span>Sheet name</span><input name="n" value="'+esc(s.name)+'"></label><label class="field"><span>Order (lower shows first)</span><input name="o" type="number" value="'+esc(Math.round(num(s.sort)))+'"></label><label class="field" style="display:flex;align-items:center;gap:10px"><input type="checkbox" name="pg" style="width:22px;height:22px"'+(s.on_progress?' checked':'')+'><span style="margin:0">Show on Progress tab (crew highlights progress on it)</span></label><div class="mbtns"><button type="button" class="btn danger" data-del>Delete sheet</button><button type="button" class="btn" data-x>Cancel</button><button class="btn primary">Save</button></div></form>');
+  const m=modal('<h2>Sheet '+esc(s.name)+'</h2><form><label class="field"><span>Sheet name</span><input name="n" value="'+esc(s.name)+'"></label><label class="field"><span>Revision (e.g. Rev 3, RFI 20, ASI 2)</span><input name="rv" value="'+esc(s.rev_label||'')+'" placeholder="Leave blank if original"></label><label class="field"><span>If this is an RFI / PR / ASI page: its name</span><input name="cr" value="'+esc(s.change_ref||'')+'" placeholder="e.g. RFI 31"></label><label class="field"><span>…and the sheets it changes</span><input name="cs" value="'+esc((s.changes||[]).join(', '))+'" placeholder="e.g. 3.40, 3.15"></label><label class="field"><span>Order (lower shows first)</span><input name="o" type="number" value="'+esc(Math.round(num(s.sort)))+'"></label><label class="field" style="display:flex;align-items:center;gap:10px"><input type="checkbox" name="pg" style="width:22px;height:22px"'+(s.on_progress?' checked':'')+'><span style="margin:0">Show on Progress tab (crew highlights progress on it)</span></label><div class="mbtns"><button type="button" class="btn danger" data-del>Delete sheet</button><button type="button" class="btn" data-x>Cancel</button><button class="btn primary">Save</button></div></form>');
   $('[data-x]',m).onclick=()=>m.close();
-  $('form',m).onsubmit=async e=>{e.preventDefault();const n=$('[name=n]',m).value.trim().slice(0,80);const o=num($('[name=o]',m).value,num(s.sort));const pg=$('[name=pg]',m).checked;m.close();if(n&&await run(sb.from('sheets').update({name:n,sort:o,on_progress:pg}).eq('id',id)))loadSheets()};
+  $('form',m).onsubmit=async e=>{e.preventDefault();const n=$('[name=n]',m).value.trim().slice(0,80);const o=num($('[name=o]',m).value,num(s.sort));const pg=$('[name=pg]',m).checked;const rv=$('[name=rv]',m).value.trim().slice(0,40)||null;const cr=$('[name=cr]',m).value.trim().slice(0,40)||null;const cs=$('[name=cs]',m).value.split(/[,;\s]+/).map(x=>x.trim()).filter(Boolean).slice(0,40);m.close();if(n&&await run(sb.from('sheets').update({name:n,sort:o,on_progress:pg,rev_label:rv,change_ref:cr,changes:cs}).eq('id',id)))loadSheets()};
   $('[data-del]',m).onclick=async()=>{m.close();const vs=versionsOf(s);const prev=vs.filter(v=>v.id!==s.id)[0];
     const msg=vs.length>1&&s.is_current!==false?'Delete '+revText(s)+' of '+s.name+' and its markups for everyone? '+revText(prev)+' becomes the current version again.':'Delete sheet '+s.name+(vs.length>1?' (all '+vs.length+' versions)':'')+' and its markups for everyone?';
     if(!await confirmBox(msg))return;
@@ -1486,7 +1501,7 @@ async function openSheet(id,layer){
   const cw=canWrite()&&!sup;
   V={id,sh,layer,nl,ni,W:0,H:0,t:{x:0,y:0,s:1},minS:.05,mode:'pan',phase:PHASES[0].k,pen:'thin',pts:new Map(),g:null,marks:[],pins:[],mine:[]};
   const el=$('#viewer');el.hidden=false;document.body.classList.add('noscroll');
-  el.innerHTML='<div class="vbar"><button id="vBack">‹ '+(layer==='progress'?'Progress':'Sheets')+'</button><div class="vt">'+(layer==='progress'?'Progress · ':'')+esc(sh.name||'Sheet')+(ni>=0&&nl.length>1?' <span style="font-weight:400;opacity:.7">('+(ni+1)+'/'+nl.length+')</span>':'')+'</div>'+(vers.length>1?'<select id="vVer" aria-label="Revision">'+vers.map(v=>'<option value="'+esc(v.id)+'"'+(v.id===sh.id?' selected':'')+'>'+esc(revText(v))+(v.is_current!==false?' (current)':' (old)')+'</option>').join('')+'</select>':'')+'<button id="vLayers">Layers</button></div>'+
+  el.innerHTML='<div class="vbar"><button id="vBack">‹ '+(layer==='progress'?'Progress':'Sheets')+'</button><div class="vt">'+(layer==='progress'?'Progress · ':'')+esc(sh.name||'Sheet')+(ni>=0&&nl.length>1?' <span style="font-weight:400;opacity:.7">('+(ni+1)+'/'+nl.length+')</span>':'')+'</div>'+(vers.length>1?'<select id="vVer" aria-label="Revision">'+vers.map(v=>'<option value="'+esc(v.id)+'"'+(v.id===sh.id?' selected':'')+'>'+esc(revText(v))+(v.is_current!==false?' (current)':' (old)')+'</option>').join('')+'</select>':'')+(function(){const cd=sup?[]:changeDocs(sh),ti=Array.isArray(sh.changes)?curSheets().filter(x=>sh.changes.some(c=>normNo(c)===normNo(sheetNo(x)))):[];const all=cd.concat(ti);return all.length?'<select id="vChg" aria-label="Related changes"><option value="">'+(cd.length?'Changes ('+cd.length+')':'Changes these')+'</option>'+(cd.length?'<optgroup label="RFI / PR pages for this sheet">'+cd.map(d=>'<option value="'+esc(d.id)+'">'+esc(d.name)+'</option>').join('')+'</optgroup>':'')+(ti.length?'<optgroup label="Sheets this changes">'+ti.map(d=>'<option value="'+esc(d.id)+'">'+esc(d.name)+'</option>').join('')+'</optgroup>':'')+'</select>':''})()+'<button id="vLayers">Layers</button></div>'+
     (sup?'<div class="supbar" id="vSup">SUPERSEDED · '+esc(revText(sh))+(curV?' — tap to open current ('+esc(revText(curV))+')':'')+'</div>':'')+
     '<div id="stage"><div id="board"><img id="planImg" alt="" draggable="false"><svg id="ink" xmlns="http://www.w3.org/2000/svg"><g id="marksG"></g><g id="liveG"></g></svg></div><div id="pinLayer"></div><div class="hint" id="hint">Loading sheet…</div>'+(ni>=0&&nl.length>1?'<button class="snav" id="snPrev" aria-label="Previous sheet"'+(ni===0?' disabled':'')+'>‹</button><button class="snav" id="snNext" aria-label="Next sheet"'+(ni===nl.length-1?' disabled':'')+'>›</button>':'')+'</div>'+
     '<div class="vtools">'+(cw?'<div class="trow" id="phaseRow">'+PHASES.map(p=>'<button class="pc" data-ph="'+p.k+'" style="background:'+p.c+'">'+p.n+'</button>').join('')+'<button class="tb" id="penBtn">Pen: Thin</button></div>':'')+
@@ -1498,6 +1513,7 @@ async function openSheet(id,layer){
   const sp=$('#snPrev'),sn=$('#snNext');if(sp)sp.onclick=e=>{e.stopPropagation();stepSheet(-1)};if(sn)sn.onclick=e=>{e.stopPropagation();stepSheet(1)};
   ['pointerdown','touchstart'].forEach(t=>[sp,sn].forEach(b=>b&&b.addEventListener(t,e=>e.stopPropagation())));
   if($('#vVer'))$('#vVer').onchange=e=>switchSheet(e.target.value);
+  if($('#vChg'))$('#vChg').onchange=e=>{if(e.target.value)switchSheet(e.target.value)};
   if($('#vSup')&&curV)$('#vSup').onclick=()=>switchSheet(curV.id);
   $$('#modeRow [data-mode]').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
   $$('#phaseRow [data-ph]').forEach(b=>b.onclick=()=>{V.phase=b.dataset.ph;if(V.mode==='pan'||V.mode==='pin'||V.mode==='erase')setMode('line');else syncTools()});
