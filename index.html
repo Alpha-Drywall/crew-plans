@@ -1007,9 +1007,10 @@ function bindJobs(){
   $$('[data-view]').forEach(b=>b.onclick=()=>{lsSet('crewplans.jobView',b.dataset.view);render()});
   $('#acct').onclick=()=>{
     const m=modal('<h2>Account</h2><p class="muted">'+(S.isAdmin?'Signed in as office: '+esc(S.me.email||who(S.me.id)):'Crew access on this phone. Your access comes from invite links; signing out would remove it from this phone.')+'</p><div style="display:grid;gap:10px;margin-top:12px">'+
-      (S.isAdmin?'<button class="btn" data-users>Office users</button><button class="btn" data-pw>Change password</button><button class="btn" data-out>Sign out</button>':'<button class="btn" data-off>Office sign in on this device</button>')+'<button class="btn" data-x>Close</button></div>');
+      (S.isAdmin?'<button class="btn" data-users>Office users</button><button class="btn" data-pw>Change password</button><button class="btn" data-out>Sign out</button>':'<button class="btn" data-off>Office sign in on this device</button>')+'<button class="btn" data-intro>▶ Play intro</button><button class="btn" data-x>Close</button></div>');
     $('[data-x]',m).onclick=()=>m.close();
     const o=$('[data-out]',m);if(o)o.onclick=async()=>{if(!await okToSignOut())return;await sb.auth.signOut();await clearDeviceCache();lsSet('crewplans.lastJob',null);location.href=location.pathname+'?office'};
+    $('[data-intro]',m).onclick=()=>{primeAudio();m.close();playSplash(true)};
     const ou=$('[data-users]',m);if(ou)ou.onclick=()=>{m.close();officeUsers()};
     const pw=$('[data-pw]',m);if(pw)pw.onclick=()=>{m.close();setPasswordBox('Change password')};
     const of=$('[data-off]',m);if(of)of.onclick=async()=>{m.close();if(!await okToSignOut())return;if(!await confirmBox('This phone or computer will stop being signed in as crew. You\'d need a new invite link to get crew access back here. Continue to office sign in?','Continue',false))return;location.href=location.pathname+'?office'};
