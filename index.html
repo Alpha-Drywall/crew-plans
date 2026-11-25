@@ -48,7 +48,8 @@ button{cursor:pointer}
 .tcw{padding:0;margin-bottom:10px}.tcwh{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer}
 .tcwb{padding:0 12px 12px;border-top:1px solid var(--line)}
 .tcwf{display:flex;gap:10px}.tcwf .field{flex:1}
-.tcday{border-top:1px solid var(--line);padding:8px 0}
+.tcday{border-top:1px solid var(--line);padding:8px 8px;margin:0 -8px}
+.tcday.alt{background:#eef0f3}.tcday.alt .tcl{background:#fff}
 .tcdh{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
 .tcl{display:flex;gap:6px;align-items:center;margin:6px 0;flex-wrap:wrap;padding:6px;background:#f6f7f9;border-radius:10px}
 .tcl select[data-job]{flex:1 1 100%}
@@ -1171,7 +1172,7 @@ function tcBody(){
       h+='<div class="tcwb"><div class="tcwf"><label class="field"><span>Name</span><input data-name="'+i+'" value="'+esc(w.name||'')+'"></label><label class="field" style="max-width:110px"><span>Rate $/hr</span><input data-rate="'+i+'" inputmode="decimal" value="'+esc(w.rate==null?'':String(w.rate))+'"></label></div>';
       for(let d=0;d<12;d++){
         const iso=isoAddD(TC.start,TC_OFF[d]),lines=(w.days&&w.days[d])||[];
-        h+='<div class="tcday"><div class="tcdh"><b>'+esc(tcFmt(iso,{weekday:'short',month:'numeric',day:'numeric'}))+'</b><span class="muted small"><span data-dh="'+i+'-'+d+'">'+tcDayHrs(w,d)+'</span> hrs</span></div>';
+        h+='<div class="tcday'+(d%2?' alt':'')+'"><div class="tcdh"><b>'+esc(tcFmt(iso,{weekday:'short',month:'numeric',day:'numeric'}))+'</b><span class="muted small"><span data-dh="'+i+'-'+d+'">'+tcDayHrs(w,d)+'</span> hrs</span></div>';
         lines.forEach((l,k)=>{
           h+='<div class="tcl"><select data-job="'+i+'-'+d+'-'+k+'">'+tcJobOptions(l)+'</select>'+(l.kind==='off'?'<span class="muted small grow">Off</span>':'<select data-code="'+i+'-'+d+'-'+k+'"><option value="">Code</option>'+TC_CODES.map(o=>'<option value="'+o[0]+'"'+(String(l.code||'')===o[0]?' selected':'')+'>'+o[1]+'</option>').join('')+'</select><input data-hrs="'+i+'-'+d+'-'+k+'" inputmode="decimal" placeholder="hrs" value="'+esc(l.hrs==null?'':String(l.hrs))+'"><span class="tchq">'+[8,10,12].map(n=>'<button type="button" data-qh="'+i+'-'+d+'-'+k+'-'+n+'"'+(String(l.hrs)===String(n)?' class="on"':'')+'>'+n+'</button>').join('')+'</span>')+'<button class="ico" data-rml="'+i+'-'+d+'-'+k+'" aria-label="Remove line">✕</button></div>';
         });
