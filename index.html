@@ -1126,19 +1126,53 @@ function tcBankBox(c,w){
     '<div class="row" style="gap:8px;align-items:center;margin-top:6px"><div class="muted small grow" id="tcBankSum">'+tcBankSum(x)+'</div><button class="btn sm" id="tcPdfPrev">Preview PDF</button></div></div>';
 }
 function tcBankSum(x){return 'Worked <b>'+x.worked+'</b> · Paid <b>'+x.paid+'</b>'+(x.on?' · From bank '+x.fromBank+' · To bank '+x.toBank+' · Bank after <b>'+x.end+'</b>':' · Bank stays '+x.start)}
+const TC_LOGO='';
+/** The office card PDF, drawn like the printed Excel time card. */
 async function tcPdf(c,w,x){
   await loadPdfLib();const {jsPDF}=window.jspdf;const doc=new jsPDF({unit:'pt',format:'letter'});
-  const end=isoAddD(c.period_start,13),f=iso=>tcFmt(iso,{weekday:'short',month:'numeric',day:'numeric',year:'numeric'});
-  let y=48;doc.setFont('helvetica','bold');doc.setFontSize(16);doc.text((w.name||c.foreman||'')+' — Time Card',40,y);
-  doc.setFont('helvetica','normal');doc.setFontSize(10);y+=16;doc.text('Alpha Drywall · Pay period '+f(c.period_start)+' – '+f(end),40,y);y+=22;
-  const cols=[40,150,200,380,470,530];doc.setFont('helvetica','bold');['Date','Job #','Job name','Code','Hours','Day'].forEach((t,i)=>doc.text(t,cols[i],y));y+=6;doc.line(40,y,572,y);y+=14;doc.setFont('helvetica','normal');
-  for(let d=0;d<12;d++){const iso=isoAddD(c.period_start,TC_OFF[d]),L=x.days[d]||[];const tot=r2(L.reduce((a,l)=>a+l.hrs,0));
-    if(!L.length){doc.setTextColor(150);doc.text(f(iso),cols[0],y);doc.text('—',cols[5],y);doc.setTextColor(0);y+=16;continue}
-    L.forEach((l,k)=>{if(!k)doc.text(f(iso),cols[0],y);doc.text(l.kind==='vac'?'':String(l.job||''),cols[1],y);doc.text(l.kind==='vac'?'Vacation':String(l.name||'').slice(0,34),cols[2],y);doc.text(String(l.code||''),cols[3],y);doc.text(String(l.hrs),cols[4],y);if(!k)doc.text(String(tot),cols[5],y);y+=15});y+=3}
-  doc.line(40,y,572,y);y+=18;doc.setFont('helvetica','bold');doc.text('Total hours: '+x.paid,40,y);const rt=tcRate(w);if(rt){doc.text('Rate: '+tcMoney(rt)+'   Total: '+tcMoney(x.paid*rt),250,y)}y+=24;
-  doc.setFont('helvetica','normal');
-  if(x.on){[['Hours worked',x.worked],['Bank brought forward',x.start],['Used from bank',x.fromBank],['Added to bank',x.toBank],['Bank after this period',x.end]].forEach(([a,v])=>{doc.text(a,40,y);doc.text(String(v),200,y);y+=15})}
-  else{doc.text('Hours worked: '+x.worked+' (banked hours not used this period; bank '+x.start+')',40,y)}
+  const X=[60,117,163,265,371,456,551],T=56,mid=(a,b)=>(X[a]+X[b])/2,R=d=>r2(d).toFixed(2);
+  const ln=(x1,y1,x2,y2,wd)=>{doc.setLineWidth(wd||.5);doc.line(x1,y1,x2,y2)},box=(x1,y1,x2,y2)=>{ln(x1,y1,x2,y1);ln(x1,y2,x2,y2);ln(x1,y1,x1,y2);ln(x2,y1,x2,y2)};
+  const txt=(t,x2,y,o)=>{o=o||{};doc.setFont('helvetica',(o.b?'bold':'normal')+(o.i?'italic':'').replace('normalitalic','italic').replace('bolditalic','bolditalic'));doc.setFontSize(o.s||8);doc.setTextColor(...(o.c||[0,0,0]));doc.text(String(t),x2,y,{align:o.a||'left'});doc.setTextColor(0,0,0)};
+  const end=isoAddD(c.period_start,13),md=iso=>{const [y,m,d]=iso.split('-');return +m+'/'+ +d+'/'+y};
+  // outer frame with a gap for the logo at the top and bottom
+  doc.setLineWidth(1.6);doc.line(X[0],T,272,T);doc.line(368,T,X[6],T);doc.line(X[0],T,X[0],736);doc.line(X[6],T,X[6],736);doc.line(X[0],736,272,736);doc.line(368,736,X[6],736);
+  try{doc.addImage(TC_LOGO,'JPEG',275,58,90,36.5)}catch(e){}
+  doc.setFillColor(255,255,0);doc.rect(X[2],95,X[3]-X[2],10,'F');
+  txt('EMPLOYEE:',X[2]-3,103,{b:true,a:'right'});txt(w.name||c.foreman||'',mid(2,3),103,{b:true,a:'center'});txt('TIME CARD',318,103,{b:true,a:'center'});ln(296,104.5,340,104.5,.6);
+  const H=108,HH=12;ln(X[0],H,X[6],H,1.2);ln(X[0],H+HH,X[6],H+HH,1.2);X.forEach(v=>ln(v,H,v,H+HH,.8));
+  ['DATE','JOB #','JOB NAME','DESCRIPTION','HRS PER JOB','TOTAL HRS'].forEach((t,i)=>txt(t,mid(i,i+1),H+8.5,{b:true,a:'center'}));
+  let y=H+HH+4;const BH=37.2,RH=BH/3,codes=new Map();let anyOff=false;
+  for(let d=0;d<12;d++){
+    const iso=isoAddD(c.period_start,TC_OFF[d]),L=x.days[d]||[],sat=TC_SAT.includes(d),tot=r2(L.reduce((a,l)=>a+l.hrs,0));
+    if(!d){doc.setFillColor(255,255,0);doc.rect(X[0]+.5,y,X[1]-X[0]-1,BH,'F')}
+    for(let r=0;r<=3;r++){if(r===0||r===3){ln(X[0],y+r*RH,X[6],y+r*RH,.6)}else ln(X[1],y+r*RH,X[5],y+r*RH,.4)}
+    X.forEach(v=>ln(v,y,v,y+BH,.6));
+    const dt=d?md(iso):(()=>{const [yy,m,dd]=iso.split('-');return +m+'/'+ +dd+'/'+yy.slice(2)})();
+    txt(dt,mid(0,1),y+RH*1.5+2.5,{a:'center',c:sat?[220,0,0]:[0,0,0]});
+    const rows=[1,2,0];
+    if(!L.length){anyOff=true;txt('off',mid(1,2),y+RH*1.5+2.5,{a:'center'});txt('Off',mid(2,3),y+RH*1.5+2.5,{a:'center'});txt('-',X[6]-12,y+RH*1.5+2.5,{a:'right',b:true})}
+    else{L.slice(0,3).forEach((l,k)=>{const yy=y+RH*rows[k]+RH/2+2.5;const job=l.kind==='vac'?'':String(l.job||'');const nm=l.kind==='vac'?'Vacation':String(l.name||'').toUpperCase();
+      txt(job,mid(1,2),yy,{a:'center'});txt(nm.slice(0,24),mid(2,3),yy,{a:'center'});txt(String(l.code||''),mid(3,4),yy,{a:'center'});txt(R(l.hrs),X[5]-4,yy,{a:'right'});
+      const key=job+'|'+String(l.code||'');const e=codes.get(key)||{job,code:String(l.code||''),h:0};e.h+=l.hrs;codes.set(key,e)});
+      txt(R(tot),X[6]-12,y+RH*1.5+2.5,{a:'right',b:true})}
+    y+=BH;
+  }
+  // job / code summary
+  const S0=y+2,SR=10.4;ln(X[0],S0,X[6],S0,1.2);ln(X[0],S0+SR,X[5],S0+SR,.8);
+  ['JOB #','CODE','HOURS PER CODE','HOURLY RATE','TOTAL PER CODE'].forEach((t,i)=>txt(t,mid(i,i+1),S0+7.5,{b:true,a:'center'}));
+  const list=[...codes.values()];if(anyOff)list.push({job:'off',code:'',h:0,off:true});
+  const rate=tcRate(w),money=v=>v?r2(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}):'-';let sumH=0,sumD=0;
+  for(let k=0;k<9;k++){const yy=S0+SR*(k+1);ln(X[0],yy+SR,X[5],yy+SR,.4);[0,1,2,3,4,5].forEach(i=>ln(X[i],yy,X[i],yy+SR,.6));
+    const ty=yy+7.5;
+    if(k<8){const e=list[k];if(e){const hr=e.off?0:e.h,dl=e.off?0:hr*rate;sumH+=hr;sumD+=dl;
+        if(e.off)txt('off',X[0]+2,ty);else txt(e.job,X[1]-3,ty,{a:'right'});txt(e.code,mid(1,2),ty,{a:'center'});txt(hr?R(hr):'-',X[3]-4,ty,{a:'right'});
+        if(!e.off&&rate){txt('$',X[3]+3,ty);txt(money(rate),X[4]-4,ty,{a:'right'})}txt('$',X[4]+3,ty);txt(money(dl),X[5]-12,ty,{a:'right'})}
+      else{txt('-',X[3]-14,ty,{a:'right'});if(k>2){txt('$',X[3]+3,ty);txt('-',X[4]-14,ty,{a:'right'})}txt('$',X[4]+3,ty);txt('-',X[5]-12,ty,{a:'right'})}}
+    else{txt(R(sumH),X[3]-4,ty,{a:'right'});txt('TOTAL',X[4]-4,ty,{a:'right',b:true,i:true,c:[220,0,0]});txt('$',X[4]+3,ty,{b:true,c:[220,0,0]});txt(money(sumD),X[5]-12,ty,{a:'right',b:true,c:[220,0,0]})}}
+  ln(X[5],S0,X[5],736,.6);const B0=S0+SR*10+4;ln(X[0],B0,X[6],B0,.8);ln(X[5],B0,X[5],736,.6);
+  const by=B0+(736-B0)/2+3;txt('TOTAL HOURS FOR WEEKENDING',X[4]-8,by,{a:'right',b:true,i:true,c:[220,0,0]});txt(md(end),mid(4,5),by,{a:'center',b:true,i:true,c:[220,0,0]});ln(X[4]+8,by+2,X[5]-8,by+2,.6);
+  txt(R(x.paid),X[6]-8,by,{a:'right',b:true,i:true,c:[220,0,0]});
+  if(x.on)txt('Banked hours: brought forward '+x.start+' · used '+x.fromBank+' · added '+x.toBank+' · bank after '+x.end+'   (worked '+x.worked+')',X[0],752,{s:7.5,c:[90,90,90]});
   return doc.output('blob');
 }
 function openTimecards(){S.view='tc';TC.start=TC.start||tcPeriodOf(tcToday());TC.open=-1;window.scrollTo(0,0);if(!tcAllowed()){TC.force=true;render();return}loadTc()}
