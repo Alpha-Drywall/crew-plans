@@ -1140,7 +1140,8 @@ function tcStatusText(c){
 }
 function tcStatus(){const el=$('#tcStat');if(el)el.textContent=tcStatusText(TC.card)}
 function tcJobOptions(l){
-  const opts=['<option value="">Pick job…</option>'];let found=false;
+  const isOff=l&&l.kind!=='vac'&&l.kind!=='off'&&String(l.job)==='1'&&/^office$/i.test(String(l.name||''));
+  const opts=['<option value="">Pick job…</option>','<option value="office"'+(isOff?' selected':'')+'>1 - Office</option>'];let found=isOff;
   (S.jobs||[]).forEach(j=>{const no=tcJobNo(j.name);const sel=l&&l.kind!=='vac'&&l.kind!=='off'&&no&&String(l.job)===no;if(sel)found=true;opts.push('<option value="j:'+esc(j.id)+'"'+(sel?' selected':'')+'>'+esc(j.name)+'</option>')});
   if(l&&l.kind!=='vac'&&l.kind!=='off'&&(l.job||l.name)&&!found)opts.push('<option value="keep" selected>'+esc((l.job?l.job+' ':'')+(l.name||''))+'</option>');
   opts.push('<option value="vac"'+(l&&l.kind==='vac'?' selected':'')+'>Vacation</option><option value="off"'+(l&&l.kind==='off'?' selected':'')+'>Off</option><option value="other">Other job…</option>');
@@ -1259,6 +1260,7 @@ function bindTc(){
     const x=tcLine(el.dataset.job),v=el.value,l=x.l;
     if(v==='vac'){l.kind='vac';delete l.job;delete l.name;l.code=l.code||'142'}
     else if(v==='off'){l.kind='off';delete l.job;delete l.name;delete l.code;delete l.hrs}
+    else if(v==='office'){l.kind='job';l.job='1';l.name='Office'}
     else if(v==='other'){const f=await formBox('Other job',[{k:'job',label:'Job #',ph:'e.g. 330'},{k:'name',label:'Job name',req:true,ph:'e.g. Smith Remodel'}]);if(f){l.kind='job';l.job=f.job;l.name=f.name}}
     else if(v.startsWith('j:')){const j=(S.jobs||[]).find(z=>z.id===v.slice(2));if(j){l.kind='job';l.job=tcJobNo(j.name);l.name=tcJobShort(j.name)||j.name}}
     tcChanged(true);
