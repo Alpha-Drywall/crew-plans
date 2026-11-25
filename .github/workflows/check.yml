@@ -13,3 +13,5 @@ jobs:
           node-version: 20
       - name: Check the app's JavaScript for errors
         run: node .github/scripts/check.js
+      - name: Test the time card hours math
+        run: node .github/scripts/timecards-test.js

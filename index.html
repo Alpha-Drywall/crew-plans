@@ -879,14 +879,15 @@ function fieldPill(){if(document.getElementById('fvPill'))return;const b=documen
 function setViewAs(v){lsSet('acv.viewAs',v==='field'||v==='viewer'?v:null);try{tcFlush()}catch(e){}location.reload()}
 async function loadOffice(){try{S.office=await q(sb.rpc('office_names'))||[];S.office.forEach(o=>{if(o.user_id)S.people[o.user_id]=o.name||'Office'});const me=S.me&&S.office.find(o=>o.user_id===S.me.id);S.myOfficeId=me?me.id:null}catch(e){S.office=S.office||[]}}
 const pmName=id=>{const o=(S.office||[]).find(x=>x.id===id);return o?o.name:''};
-/* Progress reminders: a job needs progress marked when 2+ days with crew hours were logged after the last progress markup.
+/* Progress reminders: a job needs progress marked when 2+ days with crew hours (daily reports or time cards) were logged after the last progress markup.
    Only jobs that have progress sheets count. Everyone on the job sees it (office and foremen). */
 const NUDGE_DAYS=2;
 async function loadNudges(){try{const since=new Date(Date.now()-60*864e5);const sinceD=since.toISOString().slice(0,10);
-  const [logs,marks,areas,ps]=await Promise.all([q(sb.from('logs').select('job_id,date,hours').gte('date',sinceD)),q(sb.from('marks').select('job_id,created_at').eq('layer','progress').gte('created_at',since.toISOString())),q(sb.from('areas').select('job_id,updated_at')),q(sb.from('sheets').select('job_id').eq('on_progress',true).eq('is_current',true))]);
+  const [logs,marks,areas,ps,cards]=await Promise.all([q(sb.from('logs').select('job_id,date,hours').gte('date',sinceD)),q(sb.from('marks').select('job_id,created_at').eq('layer','progress').gte('created_at',since.toISOString())),q(sb.from('areas').select('job_id,updated_at')),q(sb.from('sheets').select('job_id').eq('on_progress',true).eq('is_current',true)),q(sb.from('timecards').select('owner,foreman,period_start,workers').gte('period_start',tcPeriodOf(sinceD))).catch(()=>[])]);
   const uses=new Set((ps||[]).map(x=>x.job_id));const last={};const bump=(j,t)=>{if(t&&(!last[j]||t>last[j]))last[j]=t};
   (marks||[]).forEach(m=>bump(m.job_id,m.created_at));(areas||[]).forEach(a=>bump(a.job_id,a.updated_at));
   const days={};(logs||[]).forEach(l=>{if(!uses.has(l.job_id)||!(num(l.hours)>0))return;const lp=last[l.job_id]?String(last[l.job_id]).slice(0,10):'';if(l.date>lp)(days[l.job_id]=days[l.job_id]||new Set()).add(l.date)});
+  (S.jobs||[]).forEach(j=>{if(!uses.has(j.id)||!(cards||[]).length)return;const K=tcJobKey(j);const lp=last[j.id]?String(last[j.id]).slice(0,10):'';tcJobLive(cards,K[0],K[1],lp>sinceD?lp:sinceD).days.forEach(d=>{if(d<=tcToday())(days[j.id]=days[j.id]||new Set()).add(d)})});
   const out={};Object.keys(days).forEach(j=>{if(days[j].size>=NUDGE_DAYS)out[j]={days:days[j].size,last:last[j]||null}});
   S.nudges=out;render()}catch(e){}}
 function nudgeBanner(){const n=S.job&&(S.nudges||{})[S.job.id];if(!n)return '';
@@ -967,18 +968,29 @@ function render(){
 async function laborBudgetRead(id){if(isAdminRole()){const b=await q(sb.from('job_budget').select('labor').eq('job_id',id).maybeSingle());return (b&&b.labor)||{}}
   return (await q(sb.rpc('labor_budget',{j:id},{get:true})))||{}}
 async function loadLabor(){const id=jobId();if(!id)return;S.laborLoading=true;
-  try{const [lb,ls]=await Promise.all([laborBudgetRead(id),q(sb.from('logs').select('date,hours,hours_by_code').eq('job_id',id).order('date'))]);
-    if(jobId()!==id)return;S.labor=lb||{};S.laborLogs=ls||[];S.loaded.labor=true}catch(e){toast(errMsg(e))}finally{S.laborLoading=false}
+  try{const [lb,ls]=await Promise.all([laborBudgetRead(id),q(sb.from('logs').select('date,hours,hours_by_code,user_id').eq('job_id',id).order('date'))]);
+    if(jobId()!==id)return;const tc=await laborTcRead(lb||{},ls||[]);if(jobId()!==id)return;S.labor=lb||{};S.laborLogs=ls||[];S.laborTc=tc;S.loaded.labor=true}catch(e){toast(errMsg(e))}finally{S.laborLoading=false}
   if(S.tab==='labor')render()}
+/* live time-card hours since the last job cost update (all dates with no job cost). Office reads every card; a foreman reads his own card plus other people's daily reports (their hours come from their cards). */
+const laborCost=L=>L&&L.cost&&Array.isArray(L.cost.history)&&L.cost.history.length?L.cost:null;
+const laborCut=cost=>cost?String(cost.history.map(h=>String(h.date||'')).sort().pop()||cost.as_of||'').slice(0,10):'';
+async function laborTcRead(L,logs){const after=laborCut(laborCost(L));let p=sb.from('timecards').select('owner,foreman,period_start,workers');if(after)p=p.gte('period_start',tcPeriodOf(after));
+  let cards;try{cards=(await q(p))||[]}catch(e){return null}
+  if(!S.isAdmin)cards=cards.filter(c=>c.owner===S.me.id);const K=tcJobKey(S.job);const x=tcJobLive(cards,K[0],K[1],after);
+  if(!S.isAdmin)(logs||[]).forEach(l=>{if(l.user_id===S.me.id||(after&&l.date<=after))return;const h=l.hours_by_code||{};LABOR_CODES.forEach(c=>{if(num(h[c.k]))x.by[c.k]=r2((x.by[c.k]||0)+num(h[c.k]))});const u=num(l.hours)-codeHrs(l);if(u>0)x.by.unc=r2((x.by.unc||0)+u);x.hours=r2(x.hours+num(l.hours))});
+  x.after=after;return x}
+/** Alerts use the higher of the official used and official used + time cards since the last job cost update (no job cost: time cards alone). */
+function laborEff(r,cost){const off=num(r.used);if(r.live==null)return {v:off,tc:false};const mix=(cost?off:0)+num(r.live);return mix>off+1e-9?{v:mix,tc:true}:{v:off,tc:false}}
 function laborCalc(){
   const L=S.labor||{};const hpd=num(L.hpd)||10;const budget=L.hours||{};const weeks={};let unc=0;
   const cost=L.cost&&Array.isArray(L.cost.history)&&L.cost.history.length?L.cost:null;
   if(cost){const prev={};cost.history.slice().sort((a,b)=>a.date<b.date?-1:1).forEach(hh=>{const x=weeks[hh.date]={};LABOR_CODES.forEach(c=>{const u=num((hh.used||{})[c.k]);x[c.k]=u-num(prev[c.k]);prev[c.k]=u})})}
   else (S.laborLogs||[]).forEach(l=>{const h=l.hours_by_code||{};if(!codeHrs(l)){unc+=num(l.hours);return}const w=weekEnd(l.date);weeks[w]=weeks[w]||{};LABOR_CODES.forEach(c=>{if(num(h[c.k]))weeks[w][c.k]=(weeks[w][c.k]||0)+num(h[c.k])})});
   const wk=Object.keys(weeks).sort();
-  const rows=LABOR_CODES.filter(c=>!(cost&&c.k==='142s'&&!num(budget['142s']))).map(c=>{const bh=num(budget[c.k]);const md=bh/hpd;const usedH=wk.reduce((a,w)=>a+num(weeks[w][c.k]),0);const used=usedH/hpd;return {c,bh,md,usedH,used,left:md-used,pct:md?(md-used)/md:0}});
-  const t={bh:rows.reduce((a,r)=>a+r.bh,0),md:rows.reduce((a,r)=>a+r.md,0),usedH:rows.reduce((a,r)=>a+r.usedH,0),used:rows.reduce((a,r)=>a+r.used,0)};t.left=t.md-t.used;t.pct=t.md?t.left/t.md:0;
-  return {hpd,rows,t,weeks,wk,unc,jobNo:L.job_no||'',cost,src:L.source||{}};
+  const T=S.laborTc,hide142s=!!(cost&&!num(budget['142s'])),tcH=k=>T?num(T.by[k])+(hide142s&&k==='142c'?num(T.by['142s']):0):0;
+  const rows=LABOR_CODES.filter(c=>!(hide142s&&c.k==='142s')).map(c=>{const bh=num(budget[c.k]);const md=bh/hpd;const usedH=wk.reduce((a,w)=>a+num(weeks[w][c.k]),0);const used=usedH/hpd;return {c,bh,md,usedH,used,left:md-used,pct:md?(md-used)/md:0,live:T?tcH(c.k)/hpd:null}});
+  const t={bh:rows.reduce((a,r)=>a+r.bh,0),md:rows.reduce((a,r)=>a+r.md,0),usedH:rows.reduce((a,r)=>a+r.usedH,0),used:rows.reduce((a,r)=>a+r.used,0),live:T?rows.reduce((a,r)=>a+r.live,0):null};t.left=t.md-t.used;t.pct=t.md?t.left/t.md:0;
+  return {hpd,rows,t,weeks,wk,unc,jobNo:L.job_no||'',cost,src:L.source||{},tc:T?{after:T.after,unc:num(T.by.unc)/hpd}:null};
 }
 const f1=v=>(Math.round(v*10)/10).toLocaleString(undefined,{maximumFractionDigits:1});
 const pctS=v=>Math.round(v*100)+'%';
@@ -1003,10 +1015,11 @@ function laborDone(k){const has=x=>PHASES.some(p=>p.k===x)&&S.areas&&S.areas.len
   if(k==='132'){const a=['tape','finish'].filter(has).map(avg);return a.length?Math.round(a.reduce((x,y)=>x+y,0)/a.length):null}
   if(k==='161')return has('insulation')?avg('insulation'):null;
   return null}
-function laborAlerts(C){const out=[];C.rows.forEach(r=>{if(!r.md)return;const u=r.used/r.md*100;const d=laborDone(r.c.k);r.done=d;r.alert=null;const nm=r.c.n;
-    if(u>100){r.alert='over';out.push({lvl:'over',t:nm+' is over budget: '+f1(r.used)+' of '+f1(r.md)+' man days used'+(d!=null?' with '+d+'% of the work marked done':'')+'.'});return}
-    if(d!=null&&u>=20&&u-d>=15){const proj=d>0?r.md*u/d:null;r.alert='behind';out.push({lvl:'behind',t:nm+': '+Math.round(u)+'% of the man days used but only '+d+'% of the work marked done.'+(proj?' At this pace it finishes at about '+f1(proj)+' man days ('+f1(proj-r.md)+' over).':'')});return}
-    if(d==null&&u>=80){r.alert='behind';out.push({lvl:'behind',t:nm+': '+Math.round(u)+'% of the man days used.'})}});
+function laborAlerts(C){const out=[];C.rows.forEach(r=>{if(!r.md)return;const E=laborEff(r,C.cost);const u=E.v/r.md*100;const d=laborDone(r.c.k);r.done=d;r.alert=null;const nm=r.c.n;
+    const tg=E.tc?(C.cost&&C.tc&&C.tc.after?' (incl. time cards since '+fmtWk(C.tc.after)+')':' (from time cards)'):'';
+    if(u>100){r.alert='over';out.push({lvl:'over',tc:E.tc,t:nm+' is over budget: '+f1(E.v)+' of '+f1(r.md)+' man days used'+tg+(d!=null?' with '+d+'% of the work marked done':'')+'.'});return}
+    if(d!=null&&u>=20&&u-d>=15){const proj=d>0?r.md*u/d:null;r.alert='behind';out.push({lvl:'behind',tc:E.tc,t:nm+': '+Math.round(u)+'% of the man days used'+tg+' but only '+d+'% of the work marked done.'+(proj?' At this pace it finishes at about '+f1(proj)+' man days ('+f1(proj-r.md)+' over).':'')});return}
+    if(d==null&&u>=80){r.alert='behind';out.push({lvl:'behind',tc:E.tc,t:nm+': '+Math.round(u)+'% of the man days used'+tg+'.'})}});
   return out}
 function renderLabor(){
   if(!S.loaded.labor)return '<div class="empty">Loading labor…</div>';
@@ -1015,10 +1028,11 @@ function renderLabor(){
     (!isAdminRole()?(canLog()?'<div class="row" style="margin-top:10px"><button class="btn sm primary" id="labSync">↻ Sync from SharePoint</button></div>':'')+'</div>':'<div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><button class="btn sm primary" id="labSync">↻ Sync from SharePoint</button><button class="btn sm" id="labBudget">Budget hours ✎</button><button class="btn sm" id="labDl">⬇ Download labor workbook</button></div></div>');
   if(AL.length)h+='<div class="card" style="background:#fff4f2;border-color:#f3c3ba"><b>\u26a0 Labor alerts</b>'+AL.map(a=>'<div class="small" style="margin-top:4px;color:'+(a.lvl==='over'?'#b42318':'#9a3412')+'">'+esc(a.t)+'</div>').join('')+'<div class="muted small" style="margin-top:6px">Work done comes from the crew\u2019s progress markups. Keep progress current so these stay accurate.</div></div>';
   if(noBudget)h+='<div class="card" style="background:#fff8e6"><b>No budget hours yet.</b><div class="muted small" style="margin-top:4px">'+(isAdminRole()?'Tap <b>Sync from SharePoint</b> to read the job cost sheet, or enter <b>Budget hours</b> by hand.':'The office hasn\'t entered the budget hours for this job yet.')+'</div></div>';
-  h+='<div class="card lscroll"><table class="ltab"><thead><tr><th>Code</th><th>Budget hrs</th><th>Man days</th><th>Used</th><th>Left</th><th>% left</th><th>Work done</th></tr></thead><tbody>'+
-    C.rows.map(r=>'<tr><td>'+(r.alert?'<span title="See labor alerts">\u26a0 </span>':'')+esc(C.cost&&r.c.k==='142c'?'142-Misc Labor':r.c.n)+'</td><td>'+f1(r.bh)+'</td><td>'+f1(r.md)+'</td><td class="used">'+f1(r.used)+'</td><td'+(r.left<0?' class="over"':'')+'>'+f1(r.left)+'</td><td'+(r.left<0?' class="over"':'')+'>'+(r.md?pctS(r.pct):'–')+'</td><td'+(r.alert==='behind'?' class="over"':'')+'>'+(r.done==null?'–':r.done+'%')+'</td></tr>').join('')+
-    '<tr class="tot"><td>TOTAL</td><td>'+f1(C.t.bh)+'</td><td>'+f1(C.t.md)+'</td><td class="used">'+f1(C.t.used)+'</td><td'+(C.t.left<0?' class="over"':'')+'>'+f1(C.t.left)+'</td><td>'+(C.t.md?pctS(C.t.pct):'–')+'</td><td></td></tr></tbody></table>'+
-    '<div class="muted small" style="margin-top:6px">Man days = budget hours ÷ '+C.hpd+'. '+(C.cost?(isAdminRole()?'Budget and used come from the job cost sheet: estimated and actual labor $ ÷ $'+num((S.labor||{}).rate)+'/hr.':'Budget and used come from the office\'s job cost sheet.'):'Used = hours from daily logs ÷ '+C.hpd+'.')+'</div></div>';
+  h+='<div class="card lscroll"><table class="ltab"><thead><tr><th>Code</th><th>Budget hrs</th><th>Man days</th><th>Used</th>'+(C.tc?'<th title="Live man days from time cards'+(C.cost?' since the last job cost update':'')+'">Time cards</th>':'')+'<th>Left</th><th>% left</th><th>Work done</th></tr></thead><tbody>'+
+    C.rows.map(r=>'<tr><td>'+(r.alert?'<span title="See labor alerts">\u26a0 </span>':'')+esc(C.cost&&r.c.k==='142c'?'142-Misc Labor':r.c.n)+'</td><td>'+f1(r.bh)+'</td><td>'+f1(r.md)+'</td><td class="used">'+f1(r.used)+'</td>'+(C.tc?'<td>'+(r.live?f1(r.live):'')+'</td>':'')+'<td'+(r.left<0?' class="over"':'')+'>'+f1(r.left)+'</td><td'+(r.left<0?' class="over"':'')+'>'+(r.md?pctS(r.pct):'–')+'</td><td'+(r.alert==='behind'?' class="over"':'')+'>'+(r.done==null?'–':r.done+'%')+'</td></tr>').join('')+
+    '<tr class="tot"><td>TOTAL</td><td>'+f1(C.t.bh)+'</td><td>'+f1(C.t.md)+'</td><td class="used">'+f1(C.t.used)+'</td>'+(C.tc?'<td>'+f1(C.t.live)+'</td>':'')+'<td'+(C.t.left<0?' class="over"':'')+'>'+f1(C.t.left)+'</td><td>'+(C.t.md?pctS(C.t.pct):'–')+'</td><td></td></tr></tbody></table>'+
+    '<div class="muted small" style="margin-top:6px">Man days = budget hours ÷ '+C.hpd+'. '+(C.cost?(isAdminRole()?'Budget and used come from the job cost sheet: estimated and actual labor $ ÷ $'+num((S.labor||{}).rate)+'/hr.':'Budget and used come from the office\'s job cost sheet.'):'Used = hours from daily logs ÷ '+C.hpd+'.')+'</div>'+
+    (C.tc?'<div class="muted small" style="margin-top:4px"><b>Time cards</b> = live man days on time cards '+(C.cost&&C.tc.after?'since the last job cost update ('+esc(fmtWk(C.tc.after))+'). They aren\u2019t in Used yet; it\u2019s an early warning.':'(all dates).')+(S.isAdmin?'':' Your crew\u2019s time card plus other foremen\u2019s daily reports.')+(C.tc.unc?' '+f1(C.tc.unc)+' man days have no cost code.':'')+'</div>':'')+'</div>';
   if(C.cost&&isAdminRole()&&L$dollars())h+=L$dollars();
   if(C.wk.length)h+='<h3 style="margin:16px 2px 8px">'+(C.cost?'Man days used by job cost update':'Man days by week (week ending Sat)')+'</h3><div class="card lscroll"><table class="ltab"><thead><tr><th>'+(C.cost?'Update':'Week end')+'</th>'+C.rows.map(r=>r.c).map(c=>'<th>'+esc(C.cost&&c.k==='142c'?'142':c.k.replace(/[cs]$/,m=>m==='c'?' Cln':' Sup'))+'</th>').join('')+'<th>Total</th></tr></thead><tbody>'+
     C.wk.slice().reverse().map(w=>{const x=C.weeks[w];const tot=LABOR_CODES.reduce((a,c)=>a+num(x[c.k]),0)/C.hpd;return '<tr><td>'+fmtWk(w)+'</td>'+C.rows.map(r=>r.c).map(c=>'<td>'+(num(x[c.k])?f1(num(x[c.k])/C.hpd):'')+'</td>').join('')+'<td><b>'+f1(tot)+'</b></td></tr>'}).join('')+'</tbody></table></div>';
@@ -1138,6 +1152,51 @@ const tcMoney=n=>'$'+(Math.round(n*100)/100).toLocaleString(undefined,{minimumFr
 /* ===== banked hours (office card only): pay a normal 80-hour period, using or adding to the bank ===== */
 const TC_SAT=[3,9],TC_TARGET=80,TC_DAY=8,TC_MAXDAY=10;
 const r2=n=>Math.round(n*100)/100;
+/* ===== time cards feed daily reports, the Labor tab and progress reminders (hours are entered once, on the time card) ===== */
+const tcDayIdx=(ps,iso)=>TC_OFF.indexOf(Math.round((Date.parse(iso+'T12:00:00Z')-Date.parse(ps+'T12:00:00Z'))/864e5));
+const tcLineNo=l=>(String((l&&l.job)||'').match(/^\s*0*(\d+)/)||[])[1]||'';
+const tcJobKey=j=>[tcJobNo(j&&j.name),tcJobShort(j&&j.name)||(j&&j.name)||''];
+/** Does a time card line belong to the job? Match by job number (leading digits of the line's job), or by name when the job has no number. */
+function tcIsJob(l,no,nm){if(!l||l.kind==='vac'||l.kind==='off')return false;const n=tcLineNo(l);if(no)return n===String(no).replace(/^0+(?=\d)/,'');return !n&&!!nm&&tcKey(l.name)===tcKey(nm)}
+/** Time card code -> Labor tab code. 142 is cleanup, or supervision for the card's own foreman. 162 insulation -> 161. Other codes (152 acoustical…) -> 172 Extra. Blank -> '' (no code). */
+function tcLabCode(code,sup){const s=String(code||'').trim().toLowerCase();if(!s)return '';const d=(s.match(/^(\d{3})/)||[])[1]||'';
+  if(d==='142'||(!d&&/clean|sup/.test(s))){const c=/clean|cln|^142\s*-?\s*c/.test(s),p=/sup|^142\s*-?\s*s/.test(s);return c&&!p?'142c':p&&!c?'142s':sup?'142s':'142c'}
+  if(d==='162')return '161';if(['112','122','132','161','172'].includes(d))return d;
+  if(!d){const w=[[/fram/,'112'],[/hang|board/,'122'],[/finish|tap/,'132'],[/insul|batt|caulk/,'161']].find(x=>x[0].test(s));if(w)return w[1]}
+  return '172'}
+/** One job, one date: hours from the given time cards. filled = the card has that day filled in (any job, or Off). */
+function tcJobDay(cards,iso,no,nm){const o={hours:0,by:{},unc:0,other:0,workers:0,cards:0,filled:false};
+  (cards||[]).forEach(c=>{if(!c||!c.period_start)return;const d=tcDayIdx(c.period_start,iso);if(d<0)return;o.cards++;
+    (c.workers||[]).forEach(w=>{const L=(w.days&&w.days[d])||[];let wh=0;
+      L.forEach(l=>{const h=tcHrs(l);if(h||(l&&l.kind==='off'))o.filled=true;if(!h||!tcIsJob(l,no,nm))return;wh+=h;const k=tcLabCode(l.code,tcKey(w.name)===tcKey(c.foreman));
+        if(!k)o.unc=r2(o.unc+h);else{o.by[k]=r2((o.by[k]||0)+h);if(k==='172'&&!/^\s*172/.test(String(l.code)))o.other=r2(o.other+h)}});
+      if(wh>0){o.workers++;o.hours=r2(o.hours+wh)}})});
+  return o}
+/** One job: hours by Labor code on the time cards for dates after `after` (all dates when blank). */
+function tcJobLive(cards,no,nm,after){const by={},days=new Set();let hours=0;
+  (cards||[]).forEach(c=>{if(!c||!c.period_start)return;(c.workers||[]).forEach(w=>{for(let d=0;d<12;d++){const iso=isoAddD(c.period_start,TC_OFF[d]);if(after&&iso<=after)continue;
+    ((w.days&&w.days[d])||[]).forEach(l=>{const h=tcHrs(l);if(!h||!tcIsJob(l,no,nm))return;hours+=h;days.add(iso);const k=tcLabCode(l.code,tcKey(w.name)===tcKey(c.foreman))||'unc';by[k]=r2((by[k]||0)+h)})}})});
+  return {by,hours:r2(hours),days}}
+const sameBy=(a,b)=>{a=a||{};b=b||{};return LABOR_CODES.every(c=>r2(num(a[c.k]))===r2(num(b[c.k])))};
+const labK=k=>k.replace(/[cs]$/,m=>m==='c'?' Cln':' Sup');
+/** The author's card for the date's pay period: the open card if it is that one (it may have unsaved edits), else from the server. undefined = couldn't check. */
+async function tcCardFor(owner,iso){const ps=tcPeriodOf(iso);if(TC.card&&TC.card.owner===owner&&TC.card.period_start===ps)return TC.card;
+  try{return await q(sb.from('timecards').select('*').eq('owner',owner).eq('period_start',ps).maybeSingle())}catch(e){return undefined}}
+/** After a time card saves: put its hours on that foreman's daily reports in the pay period (hours fields only). RLS may block someone else's reports; the report list recomputes at read time then. */
+async function tcFeedLogs(c){if(!c||!c.owner||!c.period_start)return;let ls;
+  try{ls=(await q(sb.from('logs').select('id,job_id,date,hours,hours_by_code').eq('user_id',c.owner).gte('date',c.period_start).lte('date',isoAddD(c.period_start,13))))||[]}catch(e){return}
+  for(const l of ls){const j=(S.jobs||[]).find(x=>x.id===l.job_id);if(!j||String(l.id).startsWith('local-'))continue;const K=tcJobKey(j);const r=tcJobDay([c],l.date,K[0],K[1]);
+    if(r.hours===num(l.hours)&&sameBy(r.by,l.hours_by_code))continue;try{await q(sb.from('logs').update({hours:r.hours,hours_by_code:r.by}).eq('id',l.id))}catch(e){}}}
+function tcOpenDay(iso){TC.start=tcPeriodOf(iso);TC.backJob=jobId();TC.openFirst=true;openTimecards()}
+function tcFeedHtml(x){const d=x.d,day=d===today()?'today’s time card':'the time card for '+fmtDay(d);const btn='<button type="button" class="btn sm'+(x.card&&x.r.hours?'':' primary')+'" data-tcopen style="margin-top:6px">⏱ Open time card for '+esc(tcFmt(d,{weekday:'short',month:'numeric',day:'numeric'}))+'</button>';
+  if(x.card===undefined)return '<div class="muted small">Couldn’t check the time card right now. Hours fill in from it once it’s saved.</div>';
+  if(tcDayIdx(tcPeriodOf(d),d)<0)return '<div class="muted small">Sundays aren’t on the time card, so no hours for this day.</div>';
+  const warn=t=>'<div style="background:#fff4e5;border:1px solid #f5c27a;border-radius:8px;padding:8px 10px">'+t+btn+'</div>';
+  if(!x.card||!x.r.filled)return warn('<b>⚠ Fill out '+day+' first — hours come from it.</b><div class="muted small">You can still save this report. Its hours fill in when the time card is saved.</div>');
+  const r=x.r;if(!r.hours)return warn('<b>⚠ Your time card has no hours on this job for this day.</b><div class="muted small">If the crew worked here, put it on the time card. The report picks it up.</div>');
+  return '<div><b>From time cards: '+f1(r.hours)+' hrs</b>'+LABOR_CODES.filter(c=>num(r.by[c.k])).map(c=>' · '+esc(labK(c.k))+': '+f1(r.by[c.k])).join('')+' · '+r.workers+' worker'+(r.workers===1?'':'s')+'</div>'+
+    (r.unc?'<div class="small" style="color:#9a3412">'+f1(r.unc)+' hrs have no cost code on the time card and aren’t in any labor code.</div>':'')+(r.other?'<div class="muted small">'+f1(r.other)+' hrs with other codes (like 152) count as 172 Extra.</div>':'')+
+    '<div class="muted small">Hours come from the time card. To change them, fix the time card and this report updates itself.</div>'+btn}
 function tcBankCalc(w){
   const b=w.bank||{},on=!!b.on,start=Math.max(0,parseFloat(b.start)||0);
   const days={},put=(d,l,h)=>{if(!(h>0))return;const L=days[d]=days[d]||[];const k=(l.kind||'job')+'|'+(l.job||'')+'|'+(l.name||'')+'|'+(l.code||'');const e=L.find(x=>x._k===k);if(e)e.hrs=r2(e.hrs+h);else L.push({_k:k,kind:l.kind||'job',job:l.job,name:l.name,code:l.code,hrs:r2(h)})};
@@ -1221,7 +1280,7 @@ async function tcPdf(c,w,x){
   return doc.output('blob');
 }
 function openTimecards(){S.view='tc';TC.start=TC.start||tcPeriodOf(tcToday());TC.open=-1;window.scrollTo(0,0);if(!tcAllowed()){TC.force=true;render();return}loadTc()}
-function closeTimecards(){tcFlush();S.view='jobs';render()}
+function closeTimecards(){tcFlush();const b=TC.backJob;TC.backJob=null;if(b&&(S.jobs||[]).some(j=>j.id===b)){S.tab='log';openJob(b);return}S.view='jobs';render()}
 async function loadTc(){
   TC.loading=true;TC.card=null;TC.loadedFor=TC.start;TC.force=true;render();
   try{
@@ -1234,7 +1293,7 @@ async function loadTc(){
       mine={id:null,owner:me,period_start:TC.start,foreman:fm,folder:p.folder||tcFirst(fm),status:'draft',teams_to:p.teams_to||null,workers:(p.workers||[]).map(w=>{const o={name:w.name||'',rate:w.rate||'',days:{}};if(w.bank)o.bank={on:!!w.bank.on,start:w.bankRes&&w.bankRes.end!=null&&p.status==='submitted'?w.bankRes.end:tcBankCalc(w).end};return o})};
       if(fm){const k=tcKey(fm),i=mine.workers.findIndex(w=>tcKey(w.name)===k);if(i>0)mine.workers.unshift(mine.workers.splice(i,1)[0]);else if(i<0)mine.workers.unshift({name:fm,rate:'',days:{}})}
     }
-    TC.card=mine;
+    TC.card=mine;if(TC.openFirst){TC.openFirst=false;if(mine.workers.length)TC.open=0}
     try{TC.roster=(await q(sb.from('crew_roster').select('*').eq('active',true).order('name')))||[]}catch(e){TC.roster=TC.roster||[]}
     tcRefreshRates();
     if(S.isAdmin&&!TC.fms){try{TC.fms=(await q(sb.rpc('foreman_accounts')))||[]}catch(e){TC.fms=[]}}
@@ -1262,6 +1321,7 @@ async function tcFlush(){
   const row={foreman:(c.foreman||'').slice(0,80),folder:(c.folder||'').slice(0,80),workers:c.workers};if(c.teams_to!=null)row.teams_to=String(c.teams_to).slice(0,120)||null;
   if(!c.id){c.id=uuid();const r=await run(sb.from('timecards').insert(Object.assign({id:c.id,period_start:c.period_start},row)));if(r==null){c.id=null;c.dirty=true}}
   else{c.updated_at=new Date().toISOString();if(await run(sb.from('timecards').update(row).eq('id',c.id))==null)c.dirty=true}
+  if(c.id&&!c.dirty)debounce('tcfeed',()=>tcFeedLogs(c),2500);
   tcStatus();
 }
 function tcStatusText(c){
@@ -1317,7 +1377,7 @@ function tcBody(){
         const iso=isoAddD(TC.start,TC_OFF[d]),lines=(w.days&&w.days[d])||[];
         h+='<div class="tcday'+(d%2?'':' alt')+'"><div class="tcdh"><b>'+esc(tcFmt(iso,{weekday:'short',month:'numeric',day:'numeric'}))+'</b><span class="muted small"><span data-dh="'+i+'-'+d+'">'+tcDayHrs(w,d)+'</span> hrs</span></div>';
         lines.forEach((l,k)=>{
-          h+='<div class="tcl"><select data-job="'+i+'-'+d+'-'+k+'">'+tcJobOptions(l)+'</select>'+(l.kind==='off'?'<span class="muted small grow">Off</span>':'<select data-code="'+i+'-'+d+'-'+k+'"><option value="">Code</option>'+TC_CODES.map(o=>'<option value="'+o[0]+'"'+(String(l.code||'')===o[0]?' selected':'')+'>'+o[1]+'</option>').join('')+'</select><input data-hrs="'+i+'-'+d+'-'+k+'" inputmode="decimal" placeholder="hrs" value="'+esc(l.hrs==null?'':String(l.hrs))+'"><span class="tchq">'+[8,10,12].map(n=>'<button type="button" data-qh="'+i+'-'+d+'-'+k+'-'+n+'"'+(String(l.hrs)===String(n)?' class="on"':'')+'>'+n+'</button>').join('')+'</span>')+'<button class="ico" data-rml="'+i+'-'+d+'-'+k+'" aria-label="Remove line">✕</button></div>';
+          h+='<div class="tcl"><select data-job="'+i+'-'+d+'-'+k+'">'+tcJobOptions(l)+'</select>'+(l.kind==='off'?'<span class="muted small grow">Off</span>':'<select data-code="'+i+'-'+d+'-'+k+'"><option value="">Code</option>'+TC_CODES.map(o=>'<option value="'+o[0]+'"'+(String(l.code||'')===o[0]?' selected':'')+'>'+o[1]+'</option>').join('')+(l.code&&!TC_CODES.some(o=>o[0]===String(l.code))?'<option value="'+esc(l.code)+'" selected>'+esc(l.code)+'</option>':'')+'</select><input data-hrs="'+i+'-'+d+'-'+k+'" inputmode="decimal" placeholder="hrs" value="'+esc(l.hrs==null?'':String(l.hrs))+'"><span class="tchq">'+[8,10,12].map(n=>'<button type="button" data-qh="'+i+'-'+d+'-'+k+'-'+n+'"'+(String(l.hrs)===String(n)?' class="on"':'')+'>'+n+'</button>').join('')+'</span>')+'<button class="ico" data-rml="'+i+'-'+d+'-'+k+'" aria-label="Remove line">✕</button></div>';
         });
         h+='<div class="tcdb">'+(lines.length<3?'<button class="btn sm" data-addl="'+i+'-'+d+'">+ Line</button>':'')+(d>0?'<button class="btn sm" data-same="'+i+'-'+d+'">Same as '+esc(tcFmt(isoAddD(TC.start,TC_OFF[d-1]),{weekday:'short'}))+'</button>':'')+'</div></div>';
       }
@@ -2250,6 +2310,7 @@ function renderLogForm(){
     '<div class="two"><label class="field"><span>Date</span><input type="date" name="date" value="'+today()+'"></label><label class="field"><span>Weather</span><input name="weather" maxlength="80" placeholder="e.g. Sunny, 45°"></label></div>'+
     ta('work','Work performed today','e.g. Framed corridor 2nd floor, hung lids in 201–204')+
     '<fieldset class="codes"><legend>Workforce</legend><div class="wf">'+WORKFORCE.map(w=>'<label class="field"><span>'+esc(w)+'</span><input type="number" inputmode="numeric" min="0" step="1" data-wf="'+esc(w)+'" placeholder="0"></label>').join('')+'</div><div class="muted small" style="margin-top:2px">Total: <b data-wft>0</b></div></fieldset>'+
+    '<fieldset class="codes"><legend>Hours</legend><div data-tch class="small"></div></fieldset>'+
     ta('problems','Problems / delays','e.g. Waiting on electrician in 205')+ta('subs','Subcontractor progress','')+ta('damage','Trade damage','')+
     '<fieldset class="codes"><legend>Equipment</legend>'+rowsEditor('equip',[{k:'name',ph:'e.g. Scissor lift'},{k:'qty',ph:'Qty',num:1}])+'</fieldset>'+
     '<fieldset class="codes"><legend>Materials delivered (PO)</legend>'+rowsEditor('mat',[{k:'text',ph:'e.g. 120 sheets 5/8 Type X'},{k:'po',ph:'PO #'}])+'</fieldset>'+
@@ -2264,7 +2325,10 @@ function renderLogForm(){
   const wfTot=()=>{$('[data-wft]',form).textContent=$$('[data-wf]',form).reduce((a,i)=>a+num(i.value),0)};
   const mine=d=>S.logs.find(l=>l.date===d&&l.user_id===S.me.id);
   const setRows=(k,vals)=>{const b=$('[data-rows="'+k+'"]',form);const t=$('[data-tpl="'+k+'"]',form).innerHTML;b.innerHTML='';(vals&&vals.length?vals:[{}]).forEach(v=>{b.insertAdjacentHTML('beforeend',t);const rw=b.lastElementChild;$$('[data-c]',rw).forEach(i=>i.value=v[i.dataset.c]!=null?v[i.dataset.c]:'')})};
-  const fill=()=>{const e=mine(form.date.value);form.who.value=(e&&e.name)||lsGet('crewplans.logName')||myName();
+  let tcX=null;const tcBox=$('[data-tch]',form);
+  const tcRef=async()=>{const d=form.date.value||today();tcX=null;tcBox.innerHTML='<span class="muted">Checking your time card\u2026</span>';const card=await tcCardFor(S.me.id,d);if((form.date.value||today())!==d||!S.job)return;
+    const K=tcJobKey(S.job);tcX={d,card,r:card?tcJobDay([card],d,K[0],K[1]):null};tcBox.innerHTML=tcFeedHtml(tcX);const b=$('[data-tcopen]',tcBox);if(b)b.onclick=()=>tcOpenDay(d)};
+  const fill=()=>{tcRef();const e=mine(form.date.value);form.who.value=(e&&e.name)||lsGet('crewplans.logName')||myName();
     form.weather.value=(e&&e.weather)||'';form.work.value=(e&&e.work)||'';form.problems.value=(e&&(e.problems||e.notes))||'';form.subs.value=(e&&e.sub_progress)||'';form.damage.value=(e&&e.trade_damage)||'';
     const wf=(e&&e.workforce)||{};$$('[data-wf]',form).forEach(i=>i.value=wf[i.dataset.wf]||'');wfTot();
     setRows('equip',e&&e.equipment);setRows('mat',(e&&e.materials)||(e&&e.deliveries?[{text:e.deliveries}]:null));setRows('extra',e&&e.extra_work);
@@ -2280,6 +2344,7 @@ function renderLogForm(){
     const o={job_id:S.job.id,user_id:S.me.id,name:nm,date:d,crew,weather:form.weather.value.trim().slice(0,80),work:form.work.value.trim().slice(0,3000),problems:form.problems.value.trim().slice(0,3000),
       sub_progress:form.subs.value.trim().slice(0,3000),trade_damage:form.damage.value.trim().slice(0,3000),workforce:wf,equipment:readRows(form,'equip'),materials:readRows(form,'mat'),extra_work:readRows(form,'extra'),
       signature:sig,send_gc:send,filed_at:null,sent_at:null,file_error:null,updated_at:new Date().toISOString()};
+    if(tcX&&tcX.d===d&&tcX.card){o.hours=tcX.r.hours;o.hours_by_code=tcX.r.by}
     const btn=$('button[type=submit]',form);btn.disabled=true;$('[data-st]',form).textContent='Making the PDF…';
     try{const blob=await reportPdf(o,S.job);o.pdf_path=await putFile(S.job.id+'/reports/'+d+'_'+S.me.id.slice(0,8)+'_'+Date.now()+'.pdf',blob,'application/pdf')}
     catch(err){o.pdf_path=null;toast("Saved, but the PDF couldn't be made: "+errMsg(err))}
@@ -2337,6 +2402,18 @@ function reportStatus(l){
   const g=l.send_gc?(l.sent_at?' · ✓ Sent to GC':' · Sending to GC…'):'';
   return '<span class="muted small">'+f+g+'</span>';
 }
+/* report hours: recomputed from the author's time card when this user can read it (catches corrections RLS kept off the saved report) */
+function logHrsHtml(l){const x=(S.logTc||{})[l.id];const h=x?x.hours:num(l.hours),by=x?x.by:(l.hours_by_code||{});
+  if(!h)return isAdminRole()?'<div class="kv" style="color:#b42318"><b>\u26a0 No hours</b> \u2013 '+(x&&x.filled?'the time card has no hours on this job this day':'no time card hours for this day')+'</div>':'';
+  return '<div class="kv"><b>Hours:</b> '+f1(h)+LABOR_CODES.filter(c=>num(by[c.k])).map(c=>' \u00b7 '+esc(labK(c.k))+': '+f1(num(by[c.k]))).join('')+(x?' <span class="muted small">(time card'+(x.workers?', '+x.workers+' worker'+(x.workers===1?'':'s'):'')+')</span>':'')+'</div>'}
+async function loadLogTc(){const id=jobId(),logs=S.logs||[];if(!id||!S.me)return;const sig=id+'|'+logs.map(l=>l.id+(l.updated_at||'')+num(l.hours)).join();if(S.logTcSig===sig)return;S.logTcSig=sig;
+  const ls=logs.filter(l=>l.user_id&&!String(l.id).startsWith('local-')&&(S.isAdmin||l.user_id===S.me.id)&&l.date>=TC_ANCHOR);const ps=[...new Set(ls.map(l=>tcPeriodOf(l.date)))].slice(0,12);if(!ps.length)return;
+  let p=sb.from('timecards').select('owner,foreman,period_start,workers');if(!S.isAdmin)p=p.eq('owner',S.me.id);p=ps.length===1?p.eq('period_start',ps[0]):p.in('period_start',ps);
+  let cards;try{cards=(await q(p))||[]}catch(e){return}if(jobId()!==id)return;
+  const K=tcJobKey(S.job),out={};
+  for(const l of ls){const c=cards.filter(x=>x.owner===l.user_id&&x.period_start===tcPeriodOf(l.date));if(!c.length)continue;const r=tcJobDay(c,l.date,K[0],K[1]);out[l.id]=r;
+    if(r.hours!==num(l.hours)||!sameBy(r.by,l.hours_by_code)){try{await q(sb.from('logs').update({hours:r.hours,hours_by_code:r.by}).eq('id',l.id))}catch(e){}}}
+  if(jobId()!==id)return;S.logTc=Object.assign(S.logTc||{},out);if(S.tab==='log')renderLogList()}
 function renderLogList(){
   const box=$('#logList');if(!box)return;
   if(!S.loaded.logs){box.innerHTML='<div class="empty">Loading reports…</div>';return}
@@ -2346,7 +2423,7 @@ function renderLogList(){
   box.innerHTML=Object.keys(byDay).sort().reverse().map(d=>{const ls=byDay[d];const crew=ls.reduce((a,l)=>a+num(l.crew),0);
     return '<div class="logday"><span>'+fmtDay(d)+'</span><span class="muted">'+crew+' on site</span></div>'+ls.map(l=>{const wf=l.workforce||{};
       return '<div class="card"><div class="row"><b class="grow">'+esc(logName(l))+'</b><span class="muted small">'+num(l.crew)+' crew'+(l.weather?' · '+esc(l.weather):'')+'</span></div>'+
-      (Object.keys(wf).length?'<div class="kv"><b>Crew:</b> '+WORKFORCE.filter(w=>num(wf[w])).map(w=>esc(w)+' '+num(wf[w])).join(' · ')+'</div>':'')+
+      logHrsHtml(l)+(Object.keys(wf).length?'<div class="kv"><b>Crew:</b> '+WORKFORCE.filter(w=>num(wf[w])).map(w=>esc(w)+' '+num(wf[w])).join(' · ')+'</div>':'')+
       (l.work?'<div class="kv"><b>Work:</b> '+esc(l.work)+'</div>':'')+((l.problems||l.notes)?'<div class="kv"><b>Problems:</b> '+esc(l.problems||l.notes)+'</div>':'')+
       (l.sub_progress?'<div class="kv"><b>Subs:</b> '+esc(l.sub_progress)+'</div>':'')+(l.trade_damage?'<div class="kv"><b>Trade damage:</b> '+esc(l.trade_damage)+'</div>':'')+
       ((l.equipment||[]).length?'<div class="kv"><b>Equipment:</b> '+l.equipment.map(x=>esc((x.name||'')+(x.qty?' ('+x.qty+')':''))).join(', ')+'</div>':'')+
@@ -2356,6 +2433,7 @@ function renderLogList(){
       ((l.user_id===S.me.id&&canWrite())?'<button class="btn sm" data-ledit="'+esc(l.id)+'">✎ Edit</button>':'')+
       ((l.user_id===S.me.id&&canWrite())||isAdminRole()?'<button class="btn sm" data-ldel="'+esc(l.id)+'" style="color:var(--danger)">Delete</button>':'')+'</div>'+
       (l.updated_at?'<div class="progress-note">Saved '+esc(fmtWhen(l.updated_at))+' by '+esc(logName(l))+'</div>':'')+'</div>'}).join('')}).join('');
+  loadLogTc();
   $$('[data-ledit]',box).forEach(b=>b.onclick=()=>{const l=S.logs.find(x=>x.id===b.dataset.ledit);const f=$('#logForm');if(l&&f&&f._edit)f._edit(l.date)});
   $$('[data-lpdf]',box).forEach(b=>b.onclick=async()=>{const l=S.logs.find(x=>x.id===b.dataset.lpdf);if(!l)return;const w=window.open('','_blank');const [u]=await urlsFor([l.pdf_path]);if(u){if(w)w.location=u;else location.href=u}else{if(w)w.close();toast("Couldn't open the PDF. Check your signal.")}});
   $$('[data-ldel]',box).forEach(b=>b.onclick=async()=>{const l=S.logs.find(x=>x.id===b.dataset.ldel);if(!l)return;
