@@ -781,6 +781,7 @@ return function(withSound){
   const params=new URLSearchParams(location.search);const inv=params.get('invite');
   const msSt=params.get('state')||'';const msRet=/^ms_/.test(msSt)?{code:params.get('code'),state:msSt,err:params.get('error_description')||params.get('error')}:null;
   if(msRet){try{history.replaceState(null,'',location.pathname)}catch(e){}}
+  if(location.hash==='#sheet'){try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}}
   let session=null;try{session=(await sb.auth.getSession()).data.session}catch(e){}
   if(!session&&!inv){const st=storedSession();if(st&&st.user&&st.refresh_token)session=st}
   if(inv){
@@ -2281,7 +2282,7 @@ function renderLogList(){
 }
 
 /* ===== sheet viewer ===== */
-let V=null;
+let V=null;let sheetHashPushed=false;
 function navList(layer){return layer==='progress'?progSheets():curSheets()}
 function progSheets(){return curSheets().filter(s=>s.on_progress)}
 async function openSheet(id,layer){
@@ -2299,7 +2300,7 @@ async function openSheet(id,layer){
     '<div class="trow" id="modeRow"><button class="tb" data-mode="pan">✋ Move</button>'+(!cw&&!sup&&canPin()?'<button class="tb" data-mode="pin">📍 Pin</button>':'')+(cw?'<button class="tb" data-mode="straight">📏 Straight</button><button class="tb" data-mode="line">🖍 Highlight</button><button class="tb" data-mode="box">▭ Area</button><button class="tb" data-mode="pin">📍 Pin</button><button class="tb" data-mode="erase">⌫ Erase</button><button class="tb" id="undoBtn">↶ Undo</button>':'')+
     '<button class="tb" id="fitBtn">⤢ Fit</button></div></div>';
   V.stage=$('#stage');V.board=$('#board');V.img=$('#planImg');
-  $('#vBack').onclick=()=>{if(location.hash==='#sheet')history.back();else closeSheet()};
+  $('#vBack').onclick=()=>{const v=V;if(location.hash==='#sheet'&&sheetHashPushed){history.back();setTimeout(()=>{if(V&&V===v)closeSheet()},400)}else closeSheet()};
   $('#vLayers').onclick=layersPanel;$('#fitBtn').onclick=fit;
   setTimeout(()=>{if(V&&V.id===id)tipsFor(cw?(layer==='progress'?'markupProg':'markup'):'viewsheet')},1400);
   const sp=$('#snPrev'),sn=$('#snNext');if(sp)sp.onclick=e=>{e.stopPropagation();stepSheet(-1)};if(sn)sn.onclick=e=>{e.stopPropagation();stepSheet(1)};
@@ -2315,7 +2316,7 @@ async function openSheet(id,layer){
   V.img.onload=()=>{if(!V)return;V.W=V.img.naturalWidth;V.H=V.img.naturalHeight;V.board.style.width=V.W+'px';V.board.style.height=V.H+'px';$('#ink').setAttribute('viewBox','0 0 '+V.W+' '+V.H);fit();drawMarks();buildPins();hint()};
   V.img.onerror=()=>{const h=$('#hint');if(h)h.textContent="Couldn't load this sheet. Check your signal."};
   bindStage();
-  try{if(location.hash!=='#sheet')location.hash='sheet'}catch(e){}
+  try{if(location.hash!=='#sheet'){location.hash='sheet';sheetHashPushed=true}}catch(e){}
   window.addEventListener('resize',onResize);
   const [u]=await urlsFor([sh.path]);if(V&&V.id===id){if(u)V.img.src=u;else V.img.onerror()}
   loadSheetData();
@@ -2347,7 +2348,7 @@ function carryNote(){
 }
 function closeSheet(keep){
   V=null;window.removeEventListener('resize',onResize);
-  if(!keep&&location.hash==='#sheet')try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}
+  if(!keep){if(location.hash==='#sheet')try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}sheetHashPushed=false}
   const el=$('#viewer');el.hidden=true;el.innerHTML='';document.body.classList.remove('noscroll');
 }
 window.addEventListener('hashchange',()=>{if(V&&location.hash!=='#sheet'){$$('.mwrap').forEach(m=>m.close());closeSheet()}});
@@ -2447,15 +2448,18 @@ function buildPins(){
   $$('.pin',L).forEach(b=>b.onclick=()=>{const p=V.pins.find(x=>x.id===b.dataset.id);if(p)pinDialog(p)});placePins();
 }
 function placePins(){if(!V||!V.W)return;$$('#pinLayer .pin').forEach(b=>{const p=V.pins.find(x=>x.id===b.dataset.id);if(!p)return;const x=clamp(num(p.x),0,1)*V.W*V.t.s+V.t.x,y=clamp(num(p.y),0,1)*V.H*V.t.s+V.t.y;b.style.transform='translate('+x+'px,'+y+'px)'})}
+let layersM=null;
 function layersPanel(){
+  if(layersM){layersM.close();return}
   const counts={};V.marks.forEach(m=>{const k=phase(m.phase).k;counts[k]=(counts[k]||0)+1});const open=V.pins.filter(p=>p.status!=='done').length;
-  const m=modal('<h2>Layers</h2>'+PHASES.map(p=>'<label class="lrow"><input type="checkbox" data-ph="'+p.k+'" '+(S.hidden.has(p.k)?'':'checked')+'><span class="dot" style="background:'+p.c+'"></span><span class="grow">'+p.n+'</span><span class="muted">'+(counts[p.k]||0)+' marks</span></label>').join('')+
+  const m=modal('<h2 style="display:flex;align-items:center"><span class="grow">Layers</span><button class="ico" data-close aria-label="Close">✕</button></h2>'+PHASES.map(p=>'<label class="lrow"><input type="checkbox" data-ph="'+p.k+'" '+(S.hidden.has(p.k)?'':'checked')+'><span class="dot" style="background:'+p.c+'"></span><span class="grow">'+p.n+'</span><span class="muted">'+(counts[p.k]||0)+' marks</span></label>').join('')+
     '<div style="margin-top:14px"><b>Pins</b> <span class="muted small">('+open+' open of '+V.pins.length+')</span></div><div class="chips" style="margin-top:8px">'+[['all','All'],['open','Open only'],['none','Hide']].map(([k,n])=>'<button class="chip'+(S.pinFilter===k?' on':'')+'" data-pf="'+k+'">'+n+'</button>').join('')+'</div>'+
     '<div class="legend"><span><span class="dot" style="background:#d32f2f"></span>Issue</span><span><span class="dot" style="background:#f59e0b"></span>Question</span><span><span class="dot" style="background:#0f766e"></span>Extra work</span><span><span class="dot" style="background:#475569"></span>Note</span><span><span class="dot" style="background:#2e7d32"></span>Done</span></div>'+
-    '<div class="mbtns"><button class="btn primary" data-x>Done</button></div>');
+    '<div class="mbtns"><button class="btn primary" data-x>Done</button></div>',()=>{layersM=null;document.removeEventListener('keydown',esc1)});
+  const esc1=e=>{if(e.key==='Escape')m.close()};document.addEventListener('keydown',esc1);layersM=m;
   $$('[data-ph]',m).forEach(c=>c.onchange=()=>{c.checked?S.hidden.delete(c.dataset.ph):S.hidden.add(c.dataset.ph);drawMarks()});
   $$('[data-pf]',m).forEach(b=>b.onclick=()=>{S.pinFilter=b.dataset.pf;$$('[data-pf]',m).forEach(x=>x.classList.toggle('on',x===b));buildPins()});
-  $('[data-x]',m).onclick=()=>m.close();
+  $('[data-x]',m).onclick=()=>m.close();$('[data-close]',m).onclick=()=>m.close();
 }
 function pinDialog(pin,at){
   const isNew=!pin;const jid=S.job.id,sheetId=V.id,lay=V.layer;const ro=V.sh.is_current===false||!(canWrite()||(S.role==='viewer'&&(isNew||pin.created_by===S.me.id)));
