@@ -480,7 +480,17 @@ async function fillImgs(root){const imgs=$$('img[data-path]',root);if(!imgs.leng
 async function putFile(path,blob,type){const {error}=await sb.storage.from(BUCKET).upload(path,blob,{contentType:type||'image/jpeg',upsert:false,cacheControl:'31536000'});if(error)throw error;return path}
 const toBlob=(c,q=.82)=>new Promise((res,rej)=>c.toBlob(b=>b?res(b):rej(new Error('Could not encode image')),'image/jpeg',q));
 function scaledCanvas(src,sw,sh,max){const k=Math.min(1,max/Math.max(sw,sh));const c=document.createElement('canvas');c.width=Math.max(1,Math.round(sw*k));c.height=Math.max(1,Math.round(sh*k));const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(src,0,0,c.width,c.height);return c}
-function loadImageFile(file){return new Promise((res,rej)=>{const u=URL.createObjectURL(file);const i=new Image();i.onload=()=>res(i);i.onerror=()=>{URL.revokeObjectURL(u);rej(new Error("Couldn't read that image"))};i.src=u})}
+function loadImg0(file){return new Promise((res,rej)=>{const u=URL.createObjectURL(file);const i=new Image();i.onload=()=>res(i);i.onerror=()=>{URL.revokeObjectURL(u);rej(new Error("Couldn't read that image"))};i.src=u})}
+const isHeic=f=>/heic|heif/i.test((f&&f.type)||'')||/\.(heic|heif)$/i.test((f&&f.name)||'');
+const isImgFile=f=>/^image\//.test((f&&f.type)||'')||isHeic(f);
+let heicP=null;function loadHeic(){if(!heicP)heicP=loadScript('https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js').catch(e=>{heicP=null;throw e});return heicP}
+async function loadImageFile(file){
+  try{return await loadImg0(file)}catch(e){
+    if(!isHeic(file)&&file.type&&!/octet/.test(file.type))throw e;
+    try{await loadHeic();const out=await window.heic2any({blob:file,toType:'image/jpeg',quality:.85});return await loadImg0(Array.isArray(out)?out[0]:out)}
+    catch(e2){throw new Error("Couldn't read that photo ("+(file.name||'image')+"). Try a different photo or take a screenshot of it.")}
+  }
+}
 async function photoFromFile(file){const img=await loadImageFile(file);const c=scaledCanvas(img,img.naturalWidth,img.naturalHeight,1600);URL.revokeObjectURL(img.src);return toBlob(c,.8)}
 
 /* ===== PDF ===== */
@@ -1474,7 +1484,7 @@ function shareLink(inv,email){
 /* plans tab */
 function renderPlans(){
   let h='';const admin=isAdminRole();
-  const addB=admin?'<label class="btn sm primary" title="Add a plan set or photos. Revised sheets are found automatically; old versions are kept.">+ Add plans<input type="file" id="planFile" accept="application/pdf,image/*" multiple hidden></label>':'';
+  const addB=admin?'<label class="btn sm primary" title="Add a plan set or photos. Revised sheets are found automatically; old versions are kept.">+ Add plans<input type="file" id="planFile" accept="application/pdf,image/*,.heic,.heif" multiple hidden></label>':'';
   const nameB=admin&&S.sheets.length?'<button class="btn sm" id="autoName" title="Read every sheet: names, revision marks, duplicate sheets and RFI / PR / ASI links. You check everything before it saves.">Organize<span class="dsk">sheets</span></button>':'';
   if(!S.loaded.sheets)return h+(addB?'<div class="pbar">'+addB+'</div>':'')+'<div class="empty">Loading sheets…</div>';
   const cs=curSheets();
@@ -1501,7 +1511,7 @@ function bindPlans(){
   const ho=$('#hideOld');if(ho)ho.onchange=()=>{const x=sheetFilter();x.old=!ho.checked;setSheetFilter(x);render()};
   const f=$('#planFile');if(f)f.onchange=()=>{const files=[...f.files];f.value='';if(files.length)addPlans(files)};
   const tb=$('#tabBody');if(f&&tb&&!tb._drop){tb._drop=1;tb.addEventListener('dragover',e=>{if(S.tab!=='plans'||!$('#planFile'))return;e.preventDefault();tb.classList.add('dropon')});tb.addEventListener('dragleave',e=>{if(!tb.contains(e.relatedTarget))tb.classList.remove('dropon')});
-    tb.addEventListener('drop',e=>{if(S.tab!=='plans'||!$('#planFile'))return;e.preventDefault();tb.classList.remove('dropon');const files=[...(e.dataTransfer&&e.dataTransfer.files||[])].filter(x=>/pdf|image/.test(x.type));if(files.length)addPlans(files);else toast('Drop PDF plan sets or images here.')})}
+    tb.addEventListener('drop',e=>{if(S.tab!=='plans'||!$('#planFile'))return;e.preventDefault();tb.classList.remove('dropon');const files=[...(e.dataTransfer&&e.dataTransfer.files||[])].filter(x=>/pdf/.test(x.type)||isImgFile(x));if(files.length)addPlans(files);else toast('Drop PDF plan sets or images here.')})}
   $$('.sheet').forEach(el=>{el.onclick=e=>{if(e.target.closest('[data-edit]'))return;openSheet(el.dataset.id)};const b=$('[data-edit]',el);if(b)b.onclick=()=>editSheet(el.dataset.id)});
 }
 function offSig(list){return (list||[]).map(s=>s.id+':'+s.path).sort().join('|')}
@@ -2165,12 +2175,12 @@ function pinDialog(pin,at){
   $$('[data-k]',m).forEach(b=>b.onclick=()=>{kind=b.dataset.k;syncK()});
   const drawPh=()=>{
     const box=$('[data-ph]',m);
-    box.innerHTML=photos.map(p=>'<img class="ph" alt="" data-path="'+esc(p)+'">').join('')+(!ro?'<label class="addph"><b>+</b>Photo<input type="file" accept="image/*" multiple hidden></label>':'')+(!photos.length&&ro?'<span class="muted small">No photos</span>':'');
+    box.innerHTML=photos.map(p=>'<img class="ph" alt="" data-path="'+esc(p)+'">').join('')+(!ro?'<label class="addph"><b>+</b>Photo<input type="file" accept="image/*,.heic,.heif" multiple hidden></label>':'')+(!photos.length&&ro?'<span class="muted small">No photos</span>':'');
     fillImgs(box);$$('.ph',box).forEach(i=>i.onclick=()=>showPhoto(i.dataset.path));
     const inp=$('input[type=file]',box);
     if(inp)inp.onchange=()=>{const fs=[...inp.files];inp.value='';addPhotos(fs)};
   };
-  const addPhotos=async fs=>{fs=fs.filter(f=>/^image\//.test(f.type));if(!fs.length||ro)return;const lab=$('.addph',m);if(lab)lab.innerHTML='<b>…</b>Uploading';
+  const addPhotos=async fs=>{fs=fs.filter(isImgFile);if(!fs.length||ro)return;const lab=$('.addph',m);if(lab)lab.innerHTML='<b>…</b>Uploading';
     for(const f of fs){try{const b=await photoFromFile(f);const path=await putFile(jid+'/photos/'+uuid()+'.jpg',b);photos.push(path)}catch(e){toast(errMsg(e))}}drawPh()};
   if(!ro){m.addEventListener('dragover',e=>{e.preventDefault();m.classList.add('dropon')});m.addEventListener('dragleave',e=>{if(!m.contains(e.relatedTarget))m.classList.remove('dropon')});
     m.addEventListener('drop',e=>{e.preventDefault();m.classList.remove('dropon');addPhotos([...(e.dataTransfer&&e.dataTransfer.files||[])])})}
