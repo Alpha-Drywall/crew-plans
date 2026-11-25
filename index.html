@@ -71,6 +71,10 @@ button{cursor:pointer}
 .tcpick{display:flex;flex-wrap:wrap;gap:8px;max-height:45vh;overflow:auto}
 .fvpill{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom));z-index:900;background:#6a1b9a;color:#fff;border:0;border-radius:999px;padding:10px 16px;font-weight:700;font-size:14px;white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,.25)}
 .dropon{outline:3px dashed var(--accent);outline-offset:-6px;background:#fff8e6}
+.tipov{position:fixed;inset:0;z-index:980}
+.tiphole{position:fixed;border-radius:10px;box-shadow:0 0 0 9999px rgba(0,0,0,.55);border:2px solid var(--accent);pointer-events:none;transition:all .15s}
+.tipbub{position:fixed;background:#fff;color:var(--ink);border-radius:12px;padding:12px 14px;box-shadow:0 8px 24px rgba(0,0,0,.3);font-size:15px;line-height:1.35}
+.tipbtns{display:flex;align-items:center;gap:8px;margin-top:10px}.tipbtns span{flex:1}
 .tcnote{background:#fff7e0;border-radius:10px;padding:8px 12px;margin:0 0 10px;font-size:14px}
 .splash{position:fixed;inset:0;z-index:9999;background:#1d232b;display:flex;align-items:center;justify-content:center;transition:opacity .3s}
 .splash.out{opacity:0}
@@ -1237,7 +1241,86 @@ function tcTotals(i,d){
   set('#tcTot',Math.round(c.workers.reduce((a,x)=>a+tcWHrs(x),0)*100)/100);set('#tcDol',tcMoney(c.workers.reduce((a,x)=>a+tcWHrs(x)*tcRate(x),0)));
 }
 function tcChanged(rerender){TC.card.dirty=true;tcSchedule();if(rerender){const y=window.scrollY;TC.force=true;render();window.scrollTo(0,y)}}
+/* ===== tips (short pointers on real buttons; on by default; English / Español) ===== */
+const TIPS={
+  home:[
+    ['.job',"Tap a job to open its plans and progress sheets.","Toca un trabajo para abrir sus planos y hojas de avance."],
+    ['#tcOpen',"Time cards for your crew are here.","Aquí están las tarjetas de tiempo de tu cuadrilla."],
+    ['#newJob',"Office: start a new job here, then add its plans.","Oficina: crea un trabajo nuevo aquí y luego agrega los planos."],
+    ['#acct',"Menu: turn tips on or off, switch to Español, and more.","Menú: activa o apaga los consejos, cambia a English, y más."]],
+  tc:[
+    ['.tcper',"This is the pay period (Wednesday to Tuesday). Use the arrows to see other periods.","Este es el periodo de pago (miércoles a martes). Usa las flechas para ver otros periodos."],
+    ['#tcForeman',"This name goes on the Excel time card.","Este nombre va en la tarjeta de tiempo de Excel."],
+    ['#tcFolderBtn',"Office: this is where the Excel file is saved. Tap to change the folder.","Oficina: aquí se guarda el archivo de Excel. Toca para cambiar la carpeta."],
+    ['[data-tog]',"Tap a worker to fill in his hours, day by day.","Toca a un trabajador para llenar sus horas, día por día."],
+    ['#tcAddW',"Add your crew. Pick names from the list or type someone new.","Agrega a tu cuadrilla. Escoge nombres de la lista o escribe uno nuevo."],
+    ['#tcSubmit',"When the period is done, tap Submit. It goes to the office and into Excel. You can fix it and submit again.","Cuando termine el periodo, toca Enviar. Se manda a la oficina y a Excel. Puedes corregirla y enviarla otra vez."],
+    ['.tcall',"Office: every foreman's card and whether it's submitted. Tap one to open it.","Oficina: la tarjeta de cada mayordomo y si ya la envió. Toca una para abrirla."]],
+  tcday:[
+    ['[data-addl]',"Tap + Line to add a job for that day. Up to 3 jobs a day.","Toca + Línea para agregar un trabajo ese día. Hasta 3 trabajos por día."],
+    ['select[data-job]',"Pick the job. \"1 - Office\", Vacation and Off are in the list too.","Escoge el trabajo. \"1 - Office\", Vacaciones y Libre también están en la lista."],
+    ['select[data-code]',"Pick the cost code: framing, hanging, finishing and so on.","Escoge el código: estructura, colocación, acabado, etc."],
+    ['.tchq',"Tap 8, 10 or 12 to fill the hours fast, or type them.","Toca 8, 10 o 12 para llenar las horas rápido, o escríbelas."],
+    ['[data-same]',"Same as the day before: copies yesterday's jobs and hours.","Igual que el día anterior: copia los trabajos y horas de ayer."],
+    ['[data-copyall]',"Copy this worker's days to the whole crew, then just fix what's different.","Copia los días de este trabajador a toda la cuadrilla y luego corrige lo que sea diferente."],
+    ['input[data-rate]',"Hourly rate. It's saved to the crew list for next time.","Pago por hora. Se guarda en la lista para la próxima vez."]],
+  markup:[
+    ['#phaseRow',"Pick the scope color first (framing, board, tape…).","Primero escoge el color del alcance (estructura, tablaroca, cinta…)."],
+    ['[data-mode="line"]',"Highlight: drag your finger along walls that are done.","Resaltar: arrastra el dedo sobre las paredes terminadas."],
+    ['[data-mode="box"]',"Area: drag a box over a finished room or ceiling.","Área: arrastra un cuadro sobre un cuarto o techo terminado."],
+    ['[data-mode="pin"]',"Pin: tap the sheet to drop a note with photos.","Pin: toca el plano para dejar una nota con fotos."],
+    ['#undoBtn',"Undo your last mark.","Deshacer tu última marca."],
+    ['[data-mode="pan"]',"Move: drag to move around, pinch to zoom.","Mover: arrastra para moverte, pellizca para hacer zoom."]],
+  viewsheet:[
+    ['[data-mode="pan"]',"Drag to move around the sheet, pinch to zoom.","Arrastra para moverte en el plano, pellizca para hacer zoom."],
+    ['[data-mode="pin"]',"Pin: tap the sheet to flag something for the foreman, with a photo.","Pin: toca el plano para avisarle algo al mayordomo, con una foto."],
+    ['#snNext',"Arrows go to the next or previous sheet.","Las flechas van a la hoja siguiente o anterior."]]
+};
+const tipsOn=()=>lsGet('acv.tips')!=='0';
+const tipLang=()=>lsGet('acv.lang')||(/^es/i.test(navigator.language||'')?'es':'en');
+let tipBusy=false;
+function tipsFor(key){
+  try{if(navigator.webdriver)return}catch(e){}
+  if(!tipsOn()||tipBusy||lsGet('acv.tipSeen.'+key)||document.querySelector('.mwrap'))return;
+  const vis=el=>{if(!el)return false;const r=el.getBoundingClientRect();return r.width>0&&r.height>0};
+  const steps=(TIPS[key]||[]).map(s=>({el:[...document.querySelectorAll(s[0])].find(vis),t:tipLang()==='es'?s[2]:s[1]})).filter(s=>s.el);
+  if(!steps.length)return;
+  lsSet('acv.tipSeen.'+key,'1');tipBusy=true;
+  const es=tipLang()==='es';let i=0;
+  const ov=document.createElement('div');ov.className='tipov';document.body.appendChild(ov);
+  const hole=document.createElement('div');hole.className='tiphole';ov.appendChild(hole);
+  const bub=document.createElement('div');bub.className='tipbub';ov.appendChild(bub);
+  const done=()=>{ov.remove();tipBusy=false};
+  const show=()=>{
+    const s=steps[i];try{s.el.scrollIntoView({block:'center',behavior:'instant'})}catch(e){s.el.scrollIntoView()}
+    setTimeout(()=>{
+      const r=s.el.getBoundingClientRect();const p=6;
+      Object.assign(hole.style,{left:(r.left-p)+'px',top:(r.top-p)+'px',width:(r.width+2*p)+'px',height:(r.height+2*p)+'px'});
+      bub.innerHTML='<div>'+esc(s.t)+'</div><div class="tipbtns"><span class="muted small">'+(i+1)+' / '+steps.length+'</span><button class="btn sm" data-skip>'+(es?'Saltar':'Skip')+'</button><button class="btn sm primary" data-next>'+(i<steps.length-1?(es?'Siguiente':'Next'):(es?'Listo':'Got it'))+'</button></div>';
+      const bw=Math.min(320,innerWidth-24);bub.style.width=bw+'px';
+      bub.style.left=Math.max(12,Math.min(innerWidth-bw-12,r.left+r.width/2-bw/2))+'px';
+      const below=r.bottom+p+12,bh=bub.offsetHeight||110;
+      bub.style.top=(below+bh<innerHeight-8?below:Math.max(8,r.top-p-12-bh))+'px';
+      $('[data-next]',bub).onclick=()=>{i++;if(i>=steps.length)done();else show()};
+      $('[data-skip]',bub).onclick=done;
+    },120);
+  };
+  show();
+}
+function tipsMenu(){
+  const es=tipLang()==='es';
+  const m=modal('<h2>'+(es?'Consejos':'Tips')+'</h2><div style="display:grid;gap:10px">'+
+    '<button class="btn" data-t>'+(tipsOn()?(es?'Consejos: activados (tocar para apagar)':'Tips: on (tap to turn off)'):(es?'Consejos: apagados (tocar para activar)':'Tips: off (tap to turn on)'))+'</button>'+
+    '<button class="btn" data-r>'+(es?'Volver a ver los consejos':'Show the tips again')+'</button>'+
+    '<button class="btn" data-l>'+(es?'Language: English':'Idioma: Español')+'</button>'+
+    '<button class="btn" data-x>'+(es?'Cerrar':'Close')+'</button></div>');
+  $('[data-x]',m).onclick=()=>m.close();
+  $('[data-t]',m).onclick=()=>{lsSet('acv.tips',tipsOn()?'0':'1');m.close();toast(tipsOn()?(es?'Consejos activados.':'Tips on.'):(es?'Consejos apagados.':'Tips off.'))};
+  $('[data-r]',m).onclick=()=>{Object.keys(TIPS).forEach(k=>lsSet('acv.tipSeen.'+k,null));lsSet('acv.tips','1');m.close();setTimeout(()=>{const k=S.view==='tc'?'tc':(V?(canWrite()?'markup':'viewsheet'):'home');tipsFor(k)},300)};
+  $('[data-l]',m).onclick=()=>{lsSet('acv.lang',es?'en':'es');m.close();tipsMenu()};
+}
 function bindTc(){
+  setTimeout(()=>{if(S.view==='tc'&&TC.card)tipsFor(TC.open>=0?'tcday':'tc')},700);
   if($('#tcBack'))$('#tcBack').onclick=closeTimecards;
   if($('#fmMake'))$('#fmMake').onclick=makeForemanLogin;
   if(!$('#tcPrev'))return;
@@ -1306,6 +1389,7 @@ function renderJobs(){
   return h+'</main>';
 }
 function bindJobs(){
+  setTimeout(()=>{if(S.view!=='job'&&S.view!=='tc')tipsFor('home')},900);
   if($('#newJob'))$('#newJob').onclick=async()=>{
     const v=await formBox('New job',[{k:'name',label:'Job name',req:true,ph:'e.g. Riverside Medical Office'},{k:'addr',label:'Address or GC (optional)',ph:'e.g. 120 Main St / Turner'},{k:'pm',label:'PM',type:'select',value:S.myOfficeId||'',options:(S.office||[]).map(o=>[o.id,o.name]).concat([['','No PM']])}],'Create job');
     if(!v)return;const d=await run(sb.from('jobs').insert({name:v.name.slice(0,120),addr:v.addr.slice(0,160),pm:v.pm||null}).select().single());
@@ -1316,10 +1400,11 @@ function bindJobs(){
   $$('[data-view]').forEach(b=>b.onclick=()=>{lsSet('crewplans.jobView',b.dataset.view);render()});
   $('#acct').onclick=()=>{
     const m=modal('<h2>Account</h2><p class="muted">'+(S.isAdmin?'Signed in as office: '+esc(S.me.email||who(S.me.id)):S.realAdmin?'Office login, looking at the field view.':isForeman()?'Signed in as foreman: '+esc(S.me.email||''):'Crew access on this phone. Your access comes from invite links; signing out would remove it from this phone.')+'</p><div style="display:grid;gap:10px;margin-top:12px">'+
-      (S.isAdmin?'<button class="btn" data-msc>Microsoft connection</button><button class="btn" data-users>Office users</button><button class="btn" data-pw>Change password</button><button class="btn" data-out>Sign out</button>':isForeman()?'<button class="btn" data-pw>Change password</button><button class="btn" data-out>Sign out</button>':'<button class="btn primary" data-fm>Make a foreman login</button><button class="btn" data-off>Office or foreman sign in on this device</button>')+(S.realAdmin?(S.isAdmin?'<button class="btn" data-vas="field">Test as a foreman (field view)</button><button class="btn" data-vas="viewer">Test as view-only crew</button>':'<button class="btn primary" data-vas="office">Switch back to office view</button>'):'')+'<button class="btn" data-intro>▶ Play intro</button><button class="btn" data-x>Close</button></div>');
+      (S.isAdmin?'<button class="btn" data-msc>Microsoft connection</button><button class="btn" data-users>Office users</button><button class="btn" data-pw>Change password</button><button class="btn" data-out>Sign out</button>':isForeman()?'<button class="btn" data-pw>Change password</button><button class="btn" data-out>Sign out</button>':'<button class="btn primary" data-fm>Make a foreman login</button><button class="btn" data-off>Office or foreman sign in on this device</button>')+(S.realAdmin?(S.isAdmin?'<button class="btn" data-vas="field">Test as a foreman (field view)</button><button class="btn" data-vas="viewer">Test as view-only crew</button>':'<button class="btn primary" data-vas="office">Switch back to office view</button>'):'')+'<button class="btn" data-tips>'+(tipLang()==='es'?'Consejos / Idioma':'Tips / Español')+'</button><button class="btn" data-intro>▶ Play intro</button><button class="btn" data-x>Close</button></div>');
     $('[data-x]',m).onclick=()=>m.close();
     const o=$('[data-out]',m);if(o)o.onclick=async()=>{if(!await okToSignOut())return;await sb.auth.signOut();await clearDeviceCache();lsSet('crewplans.lastJob',null);location.href=location.pathname+'?office'};
     $('[data-intro]',m).onclick=()=>{primeAudio();m.close();playSplash(true)};
+    $('[data-tips]',m).onclick=()=>{m.close();tipsMenu()};
     $$('[data-vas]',m).forEach(va=>va.onclick=()=>{m.close();setViewAs(va.dataset.vas)});
     const ou=$('[data-users]',m);if(ou)ou.onclick=()=>{m.close();officeUsers()};
     const msc=$('[data-msc]',m);if(msc)msc.onclick=()=>{m.close();msPanel()};
@@ -2053,6 +2138,7 @@ async function openSheet(id,layer){
   V.stage=$('#stage');V.board=$('#board');V.img=$('#planImg');
   $('#vBack').onclick=()=>{if(location.hash==='#sheet')history.back();else closeSheet()};
   $('#vLayers').onclick=layersPanel;$('#fitBtn').onclick=fit;
+  setTimeout(()=>{if(V&&V.id===id)tipsFor(cw?'markup':'viewsheet')},1400);
   const sp=$('#snPrev'),sn=$('#snNext');if(sp)sp.onclick=e=>{e.stopPropagation();stepSheet(-1)};if(sn)sn.onclick=e=>{e.stopPropagation();stepSheet(1)};
   ['pointerdown','touchstart'].forEach(t=>[sp,sn].forEach(b=>b&&b.addEventListener(t,e=>e.stopPropagation())));
   if($('#vVer'))$('#vVer').onchange=e=>switchSheet(e.target.value);
