@@ -943,6 +943,7 @@ function render(){
   else if(S.tab==='progress'){$('#tabBody').innerHTML=renderProgress();bindProgress();fillImgs($('#tabBody'))}
   else if(S.tab==='labor'){$('#tabBody').innerHTML=renderLabor();bindLabor();if(!S.loaded.labor&&!S.laborLoading)loadLabor()}
   else renderLogList();
+  clearTimeout(S.tipT);S.tipT=setTimeout(()=>{if(S.view==='job'&&!V)tipsFor(S.tab==='plans'?'job':S.tab)},1200);
 }
 
 /* labor (office edits budget; everyone on the job can view) */
@@ -1271,6 +1272,35 @@ const TIPS={
     ['[data-mode="pin"]',"Pin: tap the sheet to drop a note with photos.","Pin: toca el plano para dejar una nota con fotos."],
     ['#undoBtn',"Undo your last mark.","Deshacer tu última marca."],
     ['[data-mode="pan"]',"Move: drag to move around, pinch to zoom.","Mover: arrastra para moverte, pellizca para hacer zoom."]],
+  job:[
+    ['.tabs button[data-tab="plans"]',"Plans: every sheet for the job, always the newest version. Use it to look things up, drop pins and quick highlights.","Planos: todas las hojas del trabajo, siempre la versión más nueva. Úsalo para consultar, poner pines y marcas rápidas."],
+    ['.tabs button[data-tab="progress"]',"Progress: color in the work that's finished. This is what the office looks at to see how the job is going.","Avance: colorea el trabajo que ya está terminado. Esto es lo que la oficina revisa para ver cómo va el trabajo."],
+    ['.tabs button[data-tab="log"]',"Daily Report: fill it out every day you're on the job. It's saved as a PDF and can go to the GC.","Reporte diario: llénalo cada día que estés en el trabajo. Se guarda como PDF y se puede mandar al contratista."],
+    ['.tabs button[data-tab="labor"]',"Labor: hours used against the budget, by cost code, from the job cost sheet.","Mano de obra: horas usadas contra el presupuesto, por código, de la hoja de costos."],
+    ['#revFilt',"Pick which sheets to see: current sheets, revised sheets or RFI/ASI pages.","Escoge qué hojas ver: hojas actuales, hojas revisadas o páginas de RFI/ASI."],
+    ['#tabBody .sheet',"Tap a sheet to open it. Pinch to zoom.","Toca una hoja para abrirla. Pellizca para hacer zoom."]],
+  progress:[
+    ['#progAdd',"Add the floor plans and ceiling plans you want to track. They're copied here clean, just for progress.","Agrega los planos de piso y de techo que quieres seguir. Se copian aquí limpios, solo para el avance."],
+    ['#tabBody .sheet',"Open a sheet and color in what got done, using the scope colors. Do it at the end of each day.","Abre una hoja y colorea lo que se terminó, con los colores de cada alcance. Hazlo al final de cada día."]],
+  log:[
+    ['#logForm [name="date"]',"One report per day. Pick the day; you can go back and fix an old one.","Un reporte por día. Escoge el día; puedes regresar y corregir uno viejo."],
+    ['#logForm [name="work"]',"What your crew did today, in a few words: areas and rooms.","Lo que hizo tu cuadrilla hoy, en pocas palabras: áreas y cuartos."],
+    ['#logForm [data-wf]',"How many of each trade were on site today.","Cuántos de cada oficio estuvieron hoy en la obra."],
+    ['#logForm [name="problems"]',"Delays, missing materials, other trades in the way. This protects us later.","Retrasos, material que falta, otros oficios estorbando. Esto nos protege después."],
+    ['#logForm [data-sig]',"Type your name and sign with your finger.","Escribe tu nombre y firma con el dedo."],
+    ['#logForm .gcq',"Yes sends the report to the general contractor too.","Sí manda el reporte también al contratista general."],
+    ['#logForm button[type="submit"]',"Save it. A PDF goes into the job's Daily Reports folder.","Guárdalo. Un PDF se guarda en la carpeta de Reportes Diarios del trabajo."]],
+  labor:[
+    ['#labSync',"Pulls the latest hours and budget from the job cost sheet in SharePoint.","Trae las horas y el presupuesto más nuevos de la hoja de costos en SharePoint."],
+    ['#tabBody .ltab',"Budget, used and left, in man-days, by cost code. Red means over.","Presupuesto, usado y lo que queda, en días-hombre, por código. Rojo es que se pasó."]],
+  markupProg:[
+    ['#phaseRow',"This is a progress sheet. Pick the scope color first: framing, board, tape and so on.","Esta es una hoja de avance. Primero escoge el color del alcance: estructura, tablaroca, cinta, etc."],
+    ['[data-mode="line"]',"Highlight: drag your finger along the walls that got done today.","Resaltar: arrastra el dedo sobre las paredes que se terminaron hoy."],
+    ['[data-mode="box"]',"Area: drag a box over a finished room or ceiling.","Área: arrastra un cuadro sobre un cuarto o techo terminado."],
+    ['[data-mode="pin"]',"Pin: tap the sheet to leave a note with photos. Pins work on Plans and Progress.","Pin: toca la hoja para dejar una nota con fotos. Los pines sirven en Planos y en Avance."],
+    ['#undoBtn',"Undo your last mark.","Deshacer tu última marca."],
+    ['#vLayers',"Show or hide colors to check each scope.","Muestra u oculta colores para revisar cada alcance."],
+    ['#snNext',"Arrows go to the next progress sheet.","Las flechas van a la siguiente hoja de avance."]],
   viewsheet:[
     ['[data-mode="pan"]',"Drag to move around the sheet, pinch to zoom.","Arrastra para moverte en el plano, pellizca para hacer zoom."],
     ['[data-mode="pin"]',"Pin: tap the sheet to flag something for the foreman, with a photo.","Pin: toca el plano para avisarle algo al mayordomo, con una foto."],
@@ -1316,7 +1346,7 @@ function tipsMenu(){
     '<button class="btn" data-x>'+(es?'Cerrar':'Close')+'</button></div>');
   $('[data-x]',m).onclick=()=>m.close();
   $('[data-t]',m).onclick=()=>{lsSet('acv.tips',tipsOn()?'0':'1');m.close();toast(tipsOn()?(es?'Consejos activados.':'Tips on.'):(es?'Consejos apagados.':'Tips off.'))};
-  $('[data-r]',m).onclick=()=>{Object.keys(TIPS).forEach(k=>lsSet('acv.tipSeen.'+k,null));lsSet('acv.tips','1');m.close();setTimeout(()=>{const k=S.view==='tc'?'tc':(V?(canWrite()?'markup':'viewsheet'):'home');tipsFor(k)},300)};
+  $('[data-r]',m).onclick=()=>{Object.keys(TIPS).forEach(k=>lsSet('acv.tipSeen.'+k,null));lsSet('acv.tips','1');m.close();setTimeout(()=>{const k=S.view==='tc'?'tc':(V?(canWrite()?(V.layer==='progress'?'markupProg':'markup'):'viewsheet'):(S.view==='job'?(S.tab==='plans'?'job':S.tab):'home'));tipsFor(k)},300)};
   $('[data-l]',m).onclick=()=>{lsSet('acv.lang',es?'en':'es');m.close();tipsMenu()};
 }
 function bindTc(){
@@ -2138,7 +2168,7 @@ async function openSheet(id,layer){
   V.stage=$('#stage');V.board=$('#board');V.img=$('#planImg');
   $('#vBack').onclick=()=>{if(location.hash==='#sheet')history.back();else closeSheet()};
   $('#vLayers').onclick=layersPanel;$('#fitBtn').onclick=fit;
-  setTimeout(()=>{if(V&&V.id===id)tipsFor(cw?'markup':'viewsheet')},1400);
+  setTimeout(()=>{if(V&&V.id===id)tipsFor(cw?(layer==='progress'?'markupProg':'markup'):'viewsheet')},1400);
   const sp=$('#snPrev'),sn=$('#snNext');if(sp)sp.onclick=e=>{e.stopPropagation();stepSheet(-1)};if(sn)sn.onclick=e=>{e.stopPropagation();stepSheet(1)};
   ['pointerdown','touchstart'].forEach(t=>[sp,sn].forEach(b=>b&&b.addEventListener(t,e=>e.stopPropagation())));
   if($('#vVer'))$('#vVer').onchange=e=>switchSheet(e.target.value);
