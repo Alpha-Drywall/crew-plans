@@ -68,6 +68,7 @@ button{cursor:pointer}
 .tcrate{min-height:44px;display:flex;align-items:center;font-weight:700}
 .tcpick{display:flex;flex-wrap:wrap;gap:8px;max-height:45vh;overflow:auto}
 .fvpill{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom));z-index:900;background:#6a1b9a;color:#fff;border:0;border-radius:999px;padding:10px 16px;font-weight:700;font-size:14px;white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+.dropon{outline:3px dashed var(--accent);outline-offset:-6px;background:#fff8e6}
 .tcnote{background:#fff7e0;border-radius:10px;padding:8px 12px;margin:0 0 10px;font-size:14px}
 .splash{position:fixed;inset:0;z-index:9999;background:#1d232b;display:flex;align-items:center;justify-content:center;transition:opacity .3s}
 .splash.out{opacity:0}
@@ -1499,6 +1500,8 @@ function bindPlans(){
   const rf=$('#revFilt');if(rf)rf.onchange=()=>{const x=sheetFilter();x.rev=rf.value;setSheetFilter(x);render()};
   const ho=$('#hideOld');if(ho)ho.onchange=()=>{const x=sheetFilter();x.old=!ho.checked;setSheetFilter(x);render()};
   const f=$('#planFile');if(f)f.onchange=()=>{const files=[...f.files];f.value='';if(files.length)addPlans(files)};
+  const tb=$('#tabBody');if(f&&tb&&!tb._drop){tb._drop=1;tb.addEventListener('dragover',e=>{if(S.tab!=='plans'||!$('#planFile'))return;e.preventDefault();tb.classList.add('dropon')});tb.addEventListener('dragleave',e=>{if(!tb.contains(e.relatedTarget))tb.classList.remove('dropon')});
+    tb.addEventListener('drop',e=>{if(S.tab!=='plans'||!$('#planFile'))return;e.preventDefault();tb.classList.remove('dropon');const files=[...(e.dataTransfer&&e.dataTransfer.files||[])].filter(x=>/pdf|image/.test(x.type));if(files.length)addPlans(files);else toast('Drop PDF plan sets or images here.')})}
   $$('.sheet').forEach(el=>{el.onclick=e=>{if(e.target.closest('[data-edit]'))return;openSheet(el.dataset.id)};const b=$('[data-edit]',el);if(b)b.onclick=()=>editSheet(el.dataset.id)});
 }
 function offSig(list){return (list||[]).map(s=>s.id+':'+s.path).sort().join('|')}
@@ -2060,7 +2063,7 @@ const mid=(a,b)=>({x:(a.x+b.x)/2,y:(a.y+b.y)/2});
 function bindStage(){
   const st=V.stage;
   st.addEventListener('pointerdown',e=>{
-    if(!V||!V.W)return;try{st.setPointerCapture(e.pointerId)}catch(_){}
+    if(!V||!V.W)return;if(e.target.closest&&e.target.closest('.pin,button'))return;try{st.setPointerCapture(e.pointerId)}catch(_){}
     V.pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
     if(V.pts.size===2){if(V.g&&V.g.type==='draw')clearLive();const [a,b]=[...V.pts.values()];V.g={type:'pinch',d0:Math.max(1,dist(a,b)),c0:mid(a,b),t0:Object.assign({},V.t)}}
     else if(V.pts.size===1){const drawing=(V.mode==='line'||V.mode==='box'||V.mode==='straight')&&canWrite();const p=toImg(e.clientX,e.clientY);
@@ -2162,12 +2165,15 @@ function pinDialog(pin,at){
   $$('[data-k]',m).forEach(b=>b.onclick=()=>{kind=b.dataset.k;syncK()});
   const drawPh=()=>{
     const box=$('[data-ph]',m);
-    box.innerHTML=photos.map(p=>'<img class="ph" alt="" data-path="'+esc(p)+'">').join('')+(!ro?'<label class="addph"><b>+</b>Photo<input type="file" accept="image/*" capture="environment" hidden></label>':'')+(!photos.length&&ro?'<span class="muted small">No photos</span>':'');
+    box.innerHTML=photos.map(p=>'<img class="ph" alt="" data-path="'+esc(p)+'">').join('')+(!ro?'<label class="addph"><b>+</b>Photo<input type="file" accept="image/*" multiple hidden></label>':'')+(!photos.length&&ro?'<span class="muted small">No photos</span>':'');
     fillImgs(box);$$('.ph',box).forEach(i=>i.onclick=()=>showPhoto(i.dataset.path));
     const inp=$('input[type=file]',box);
-    if(inp)inp.onchange=async()=>{const f=inp.files[0];inp.value='';if(!f)return;const lab=inp.parentElement;lab.innerHTML='<b>…</b>Uploading';
-      try{const b=await photoFromFile(f);const path=await putFile(jid+'/photos/'+uuid()+'.jpg',b);photos.push(path)}catch(e){toast(errMsg(e))}drawPh()};
+    if(inp)inp.onchange=()=>{const fs=[...inp.files];inp.value='';addPhotos(fs)};
   };
+  const addPhotos=async fs=>{fs=fs.filter(f=>/^image\//.test(f.type));if(!fs.length||ro)return;const lab=$('.addph',m);if(lab)lab.innerHTML='<b>…</b>Uploading';
+    for(const f of fs){try{const b=await photoFromFile(f);const path=await putFile(jid+'/photos/'+uuid()+'.jpg',b);photos.push(path)}catch(e){toast(errMsg(e))}}drawPh()};
+  if(!ro){m.addEventListener('dragover',e=>{e.preventDefault();m.classList.add('dropon')});m.addEventListener('dragleave',e=>{if(!m.contains(e.relatedTarget))m.classList.remove('dropon')});
+    m.addEventListener('drop',e=>{e.preventDefault();m.classList.remove('dropon');addPhotos([...(e.dataTransfer&&e.dataTransfer.files||[])])})}
   drawPh();
   $('[data-x]',m).onclick=()=>m.close();
   const sb2=$('[data-save]',m);
