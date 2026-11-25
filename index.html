@@ -1780,7 +1780,7 @@ function shareLink(inv,email){
 function renderPlans(){
   let h='';const admin=isAdminRole();
   const addB=admin?'<label class="btn sm primary" title="Add a plan set or photos. Revised sheets are found automatically; old versions are kept.">+ Add plans<input type="file" id="planFile" accept="application/pdf,image/*,.heic,.heif" multiple hidden></label>':'';
-  const nameB=admin&&S.sheets.length?'<button class="btn sm" id="autoName" title="Reads every sheet's title block and suggests names, revisions, duplicates and RFI / PR / ASI links. Nothing changes until you tap Save.">Scan &amp; fix<span class="dsk">sheets</span></button>':'';
+  const nameB=admin&&S.sheets.length?'<button class="btn sm" id="autoName" title="Reads every sheet title block and suggests names, revisions, duplicates and RFI / PR / ASI links. Nothing changes until you tap Save.">Scan &amp; fix<span class="dsk">sheets</span></button>':'';
   if(!S.loaded.sheets)return h+(addB?'<div class="pbar">'+addB+'</div>':'')+'<div class="empty">Loading sheets…</div>';
   const cs=curSheets();
   if(!cs.length)return h+(addB?'<div class="pbar">'+addB+'</div>':'')+'<div class="empty"><b>No sheets yet</b>'+(admin?'Tap + Add plans and pick the plan set PDF.':'The office hasn\'t uploaded plans for this job yet.')+'</div>';
