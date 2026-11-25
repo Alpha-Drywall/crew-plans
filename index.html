@@ -976,10 +976,16 @@ async function syncLabor(btn){if(btn)btn.disabled=true;const pb=progressBox('Rea
   try{const {data,error}=await sb.functions.invoke('crew-sync',{body:{action:'labor',job_id:jobId()}});if(error)throw error;pb.close();
     const r=(data&&data.results&&data.results[0])||{};if(r.error)toast('Sync: '+r.error);else toast('Labor synced from SharePoint.');S.loaded.labor=false;await loadLabor();render()}
   catch(e){pb.close();let m=errMsg(e);try{const j=await e.context.json();if(j&&j.error)m=j.error}catch(_){}toast("Couldn't sync: "+m)}finally{if(btn)btn.disabled=false}}
+/* Hours per day and wage: office only; only the job's PM can change them (any office account if the job has no PM). */
+const canEditLaborRate=()=>isAdminRole()&&(!S.job||!S.job.pm||S.job.pm===S.myOfficeId);
+function laborTiles(C){const L=S.labor||{};const w=num(L.rate||30),ws=w%1?w.toFixed(2):String(w);const ed=canEditLaborRate();const lock=ed?'':' <span title="Only this job\u2019s PM can change this">\ud83d\udd12</span>';
+  const tile=(id,big,sub)=>'<'+(ed?'button type="button" id="'+id+'"':'div')+' style="flex:1;min-width:140px;text-align:left;padding:10px 12px;border:1px solid #d0d5dd;border-radius:10px;background:#fff;cursor:'+(ed?'pointer':'default')+';font:inherit;color:inherit"><div style="font-size:22px;font-weight:800;line-height:1.2">'+big+(ed?' <span style="font-size:15px;opacity:.6">\u270e</span>':lock)+'</div><div class="muted small">'+sub+'</div></'+(ed?'button':'div')+'>';
+  return '<div class="row" style="gap:10px;margin-top:10px;flex-wrap:wrap">'+tile('labHpd',C.hpd+' hrs / day','Hours in a work day')+tile('labRate','$'+ws+' /hr','Labor wage'+(L.rate_note?' \u00b7 '+esc(L.rate_note):''))+'</div>'+
+    '<div class="muted small" style="margin-top:6px">Man days = labor $ \u00f7 $'+ws+'/hr \u00f7 '+C.hpd+' hrs.'+(ed?'':' Only this job\u2019s PM can change these.')+'</div>'}
 function renderLabor(){
   if(!S.loaded.labor)return '<div class="empty">Loading labor…</div>';
   const C=laborCalc();const noBudget=!C.t.bh;
-  let h='<div class="card"><div class="row"><div class="grow"><b style="font-size:17px">Labor</b><div class="muted small">'+(C.jobNo?'Job # '+esc(C.jobNo)+' · ':'')+C.hpd+' hrs per work day'+(isAdminRole()?' <a href="#" id="labHpd">change</a>':'')+(C.cost?' · used as of '+esc(fmtDay(C.cost.as_of)):'')+'</div>'+((C.src.bid_file||C.cost)?'<div class="muted small">'+(C.cost&&C.cost.file?'From '+esc(C.cost.file)+' ('+esc(C.cost.tab||'')+')'+(isAdminRole()?' at $'+num((S.labor||{}).rate)+'/hr':''):(C.src.bid_file?'Budget: '+esc(C.src.bid_file):''))+(C.src.synced_at?'<br>Synced '+esc(fmtWhen(C.src.synced_at)):'')+'</div>':'')+'</div></div>'+
+  let h='<div class="card"><div class="row"><div class="grow"><b style="font-size:17px">Labor</b><div class="muted small">'+[C.jobNo?'Job # '+esc(C.jobNo):'',isAdminRole()?'':C.hpd+' hrs per work day',C.cost?'used as of '+esc(fmtDay(C.cost.as_of)):''].filter(Boolean).join(' · ')+'</div>'+(isAdminRole()?laborTiles(C):'')+((C.src.bid_file||C.cost)?'<div class="muted small">'+(C.cost&&C.cost.file?'From '+esc(C.cost.file)+' ('+esc(C.cost.tab||'')+')'+(isAdminRole()?' at $'+num((S.labor||{}).rate)+'/hr':''):(C.src.bid_file?'Budget: '+esc(C.src.bid_file):''))+(C.src.synced_at?'<br>Synced '+esc(fmtWhen(C.src.synced_at)):'')+'</div>':'')+'</div></div>'+
     (!isAdminRole()?(canLog()?'<div class="row" style="margin-top:10px"><button class="btn sm primary" id="labSync">↻ Sync from SharePoint</button></div>':'')+'</div>':'<div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><button class="btn sm primary" id="labSync">↻ Sync from SharePoint</button><button class="btn sm" id="labBudget">Budget hours ✎</button><button class="btn sm" id="labDl">⬇ Download labor workbook</button></div></div>');
   if(noBudget)h+='<div class="card" style="background:#fff8e6"><b>No budget hours yet.</b><div class="muted small" style="margin-top:4px">'+(isAdminRole()?'Tap <b>Sync from SharePoint</b> to read the job cost sheet, or enter <b>Budget hours</b> by hand.':'The office hasn\'t entered the budget hours for this job yet.')+'</div></div>';
   h+='<div class="card lscroll"><table class="ltab"><thead><tr><th>Code</th><th>Budget hrs</th><th>Man days</th><th>Used</th><th>Left</th><th>% left</th></tr></thead><tbody>'+
@@ -996,7 +1002,13 @@ function renderLabor(){
 function bindLabor(){
   const b=$('#labBudget');if(b)b.onclick=()=>laborBudgetEditor();
   const sy=$('#labSync');if(sy)sy.onclick=()=>syncLabor(sy);
-  const hp=$('#labHpd');if(hp)hp.onclick=async e=>{e.preventDefault();const L0=S.labor||{};
+  const rt=$('#labRate');if(rt&&canEditLaborRate())rt.onclick=async e=>{e.preventDefault();const L0=S.labor||{};const old=num(L0.rate)||30;
+    const v=await formBox('Labor wage for '+S.job.name,[{k:'rate',label:'Labor $ per hour',type:'number',value:String(old),req:true},{k:'note',label:'Note (optional)',value:L0.rate_note||'',ph:'e.g. Out-of-town, Davis-Bacon'}],'Next','Hours on the Labor tab = job cost labor $ \u00f7 this wage. Only this job\u2019s PM can change it.');
+    if(!v)return;const nr=num(v.rate);if(!(nr>0)){toast('Wage must be a number above 0.');return}const note=String(v.note||'').slice(0,40);
+    if(nr!==old&&!(await confirmBox('This recalculates every budget and used man day on this job from $'+old+'/hr to $'+nr+'/hr. Continue?','Change wage',false)))return;
+    const labor=Object.assign({},L0,{rate:nr,rate_manual:true,rate_note:note});
+    if(await run(sb.from('job_budget').upsert({job_id:S.job.id,labor},{onConflict:'job_id'}),'Saved: $'+nr+'/hr.')){S.labor=labor;if(nr!==old&&L0.cost)await syncLabor();else render()}};
+  const hp=$('#labHpd');if(hp&&canEditLaborRate())hp.onclick=async e=>{e.preventDefault();const L0=S.labor||{};
     const v=await formBox('Hours in a work day',[{k:'hpd',label:'Hours per man-day on '+S.job.name,type:'number',value:String(num(L0.hpd)||10)}],'Save','Man days on the Labor tab = hours ÷ this number. Foremen see the same number.');
     if(!v||!(num(v.hpd)>0))return;const labor=Object.assign({},L0,{hpd:num(v.hpd)});
     if(await run(sb.from('job_budget').upsert({job_id:S.job.id,labor},{onConflict:'job_id'}),'Saved: '+num(v.hpd)+' hrs per work day.')){S.labor=labor;render()}};
@@ -1036,9 +1048,9 @@ async function importLaborFile(f){
 }
 async function laborBudgetEditor(pre){
   const L0=S.labor||{};const L=pre?{job_no:pre.job_no||L0.job_no,hpd:pre.hpd||L0.hpd,hours:pre.hours}:L0;const H=L.hours||{};
-  const v=await formBox('Budget hours for '+S.job.name,[{k:'job_no',label:'Job #',value:L.job_no||((S.job.name.match(/^\s*(\d{3,})/)||[])[1]||'')},{k:'hpd',label:'Hours per man-day',type:'number',value:String(num(L.hpd)||10)},{k:'rate',label:'Labor $ per hour (job cost $ ÷ this = hours)',type:'number',value:String(num(L0.rate)||30)}].concat(LABOR_CODES.map(c=>({k:'c'+c.k,label:c.n+' – budget hours',type:'number',value:H[c.k]?String(num(H[c.k])):''}))),'Save',pre&&pre.note);
+  const v=await formBox('Budget hours for '+S.job.name,[{k:'job_no',label:'Job #',value:L.job_no||((S.job.name.match(/^\s*(\d{3,})/)||[])[1]||'')}].concat(LABOR_CODES.map(c=>({k:'c'+c.k,label:c.n+' – budget hours',type:'number',value:H[c.k]?String(num(H[c.k])):''}))),'Save',pre&&pre.note);
   if(!v)return;const hours={};LABOR_CODES.forEach(c=>{const x=num(v['c'+c.k]);if(x>0)hours[c.k]=x});
-  const labor=Object.assign({},L0,{hours,hpd:num(v.hpd)>0?num(v.hpd):10,job_no:String(v.job_no||'').slice(0,20),rate:num(v.rate)>0?num(v.rate):30,rate_manual:num(v.rate)>0&&num(v.rate)!==num(L0.rate)?true:!!L0.rate_manual});
+  const labor=Object.assign({},L0,{hours,hpd:num(L.hpd)||num(L0.hpd)||10,job_no:String(v.job_no||'').slice(0,20)});
   if(await run(sb.from('job_budget').upsert({job_id:S.job.id,labor},{onConflict:'job_id'}),'Budget hours saved.')){S.labor=labor;render()}
 }
 let excelP=null;
