@@ -1089,6 +1089,7 @@ async function loadTc(){
       const p=(prev&&prev[0])||{};let fm=p.foreman||(S.me.user_metadata||{}).full_name||myName()||'';
       if(!fm){try{fm=(((await q(sb.from('members').select('name').eq('user_id',me).order('joined_at',{ascending:false}).limit(1)))||[])[0]||{}).name||''}catch(e){}}
       mine={id:null,owner:me,period_start:TC.start,foreman:fm,folder:p.folder||tcFirst(fm),status:'draft',workers:(p.workers||[]).map(w=>({name:w.name||'',rate:w.rate||'',days:{}}))};
+      if(fm){const k=tcKey(fm),i=mine.workers.findIndex(w=>tcKey(w.name)===k);if(i>0)mine.workers.unshift(mine.workers.splice(i,1)[0]);else if(i<0)mine.workers.unshift({name:fm,rate:'',days:{}})}
     }
     TC.card=mine;
     try{TC.roster=(await q(sb.from('crew_roster').select('*').eq('active',true).order('name')))||[]}catch(e){TC.roster=TC.roster||[]}
