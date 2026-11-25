@@ -1,0 +1,15 @@
+name: App loads check
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Check the app's JavaScript for errors
+        run: node .github/scripts/check.js
