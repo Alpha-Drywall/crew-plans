@@ -879,6 +879,18 @@ function fieldPill(){if(document.getElementById('fvPill'))return;const b=documen
 function setViewAs(v){lsSet('acv.viewAs',v==='field'||v==='viewer'?v:null);try{tcFlush()}catch(e){}location.reload()}
 async function loadOffice(){try{S.office=await q(sb.rpc('office_names'))||[];S.office.forEach(o=>{if(o.user_id)S.people[o.user_id]=o.name||'Office'});const me=S.me&&S.office.find(o=>o.user_id===S.me.id);S.myOfficeId=me?me.id:null}catch(e){S.office=S.office||[]}}
 const pmName=id=>{const o=(S.office||[]).find(x=>x.id===id);return o?o.name:''};
+/* Progress reminders: a job needs progress marked when 2+ days with crew hours were logged after the last progress markup.
+   Only jobs that have progress sheets count. Everyone on the job sees it (office and foremen). */
+const NUDGE_DAYS=2;
+async function loadNudges(){try{const since=new Date(Date.now()-60*864e5);const sinceD=since.toISOString().slice(0,10);
+  const [logs,marks,areas,ps]=await Promise.all([q(sb.from('logs').select('job_id,date,hours').gte('date',sinceD)),q(sb.from('marks').select('job_id,created_at').eq('layer','progress').gte('created_at',since.toISOString())),q(sb.from('areas').select('job_id,updated_at')),q(sb.from('sheets').select('job_id').eq('on_progress',true).eq('is_current',true))]);
+  const uses=new Set((ps||[]).map(x=>x.job_id));const last={};const bump=(j,t)=>{if(t&&(!last[j]||t>last[j]))last[j]=t};
+  (marks||[]).forEach(m=>bump(m.job_id,m.created_at));(areas||[]).forEach(a=>bump(a.job_id,a.updated_at));
+  const days={};(logs||[]).forEach(l=>{if(!uses.has(l.job_id)||!(num(l.hours)>0))return;const lp=last[l.job_id]?String(last[l.job_id]).slice(0,10):'';if(l.date>lp)(days[l.job_id]=days[l.job_id]||new Set()).add(l.date)});
+  const out={};Object.keys(days).forEach(j=>{if(days[j].size>=NUDGE_DAYS)out[j]={days:days[j].size,last:last[j]||null}});
+  S.nudges=out;render()}catch(e){}}
+function nudgeBanner(){const n=S.job&&(S.nudges||{})[S.job.id];if(!n)return '';
+  return '<div class="card" id="nudgeCard" style="background:#fff4e5;border-color:#f5c27a;margin-bottom:12px"><b>\u26a0 Progress needs updating</b><div class="small" style="margin-top:4px">'+n.days+' days of crew hours logged since progress was '+(n.last?'last marked ('+esc(new Date(n.last).toLocaleDateString(undefined,{month:'short',day:'numeric'}))+')':'never marked')+'. Labor alerts and billing use these markups, so keep them current.</div>'+(S.tab!=='progress'?'<button class="btn sm primary" id="nudgeGo" style="margin-top:8px">Mark progress</button>':'')+'</div>'}
 async function loadJobs(){
   try{S.jobs=await q(sb.from('jobs').select('*').order('created_at',{ascending:false}));S.jobsLoaded=true}
   catch(e){toast(errMsg(e));S.jobsLoaded=true}
@@ -886,6 +898,7 @@ async function loadJobs(){
   if(S.job){const j=S.jobs.find(x=>x.id===S.job.id);if(!j){toast("You no longer have access to this job.");closeJob();return}S.job=j;PHASES=normScope(j.scope);
     if(!S.isAdmin&&!S.realAdmin){try{const m=await q(sb.from('members').select('role').eq('job_id',j.id).eq('user_id',S.me.id).maybeSingle());const nr=m?m.role:null;if(nr!==S.role){S.role=nr;if(V)closeSheet();render();return}}catch(e){}}}
   if(S.view!=='job'||S.job)render();
+  if(!S.nudgeT||Date.now()-S.nudgeT>60000){S.nudgeT=Date.now();loadNudges()}
 }
 const timers={};
 function debounce(k,fn,ms=350){clearTimeout(timers[k]);timers[k]=setTimeout(fn,ms)}
@@ -946,6 +959,7 @@ function render(){
   else if(S.tab==='progress'){$('#tabBody').innerHTML=renderProgress();bindProgress();fillImgs($('#tabBody'))}
   else if(S.tab==='labor'){$('#tabBody').innerHTML=renderLabor();bindLabor();if(!S.loaded.labor&&!S.laborLoading)loadLabor()}
   else renderLogList();
+  {const nb=nudgeBanner();const tb=$('#tabBody');if(nb&&tb&&!$('#nudgeCard',tb)){tb.insertAdjacentHTML('afterbegin',nb);const g=$('#nudgeGo');if(g)g.onclick=()=>{S.tab='progress';window.scrollTo(0,0);render()}}}
   clearTimeout(S.tipT);S.tipT=setTimeout(()=>{if(S.view==='job'&&!V)tipsFor(S.tab==='plans'?'job':S.tab)},1200);
 }
 
@@ -1561,7 +1575,7 @@ function renderJobs(){
   if(!S.jobsLoaded)h+='<div class="empty">Loading jobs…</div>';
   else if(!S.jobs.length)h+='<div class="empty"><b>No jobs yet</b>'+(S.isAdmin?'Add a job, upload its plan PDF, then invite your foreman from the job\'s ⋯ menu.':'Open the invite link the office texted you to get access to a job.')+'</div>';
   else{
-    const card=j=>'<div class="card job" data-id="'+esc(j.id)+'"><div class="grow"><div class="name">'+esc(j.name||'Untitled job')+'</div>'+(j.addr?'<div class="muted">'+esc(j.addr)+'</div>':'')+'</div><span class="chev">›</span></div>';
+    const card=j=>{const n=(S.nudges||{})[j.id];return '<div class="card job" data-id="'+esc(j.id)+'"><div class="grow"><div class="name">'+esc(j.name||'Untitled job')+'</div>'+(j.addr?'<div class="muted">'+esc(j.addr)+'</div>':'')+(n?'<div class="small" style="color:#9a3412;margin-top:2px">\u26a0 Progress not marked \u00b7 '+n.days+' days of hours</div>':'')+'</div><span class="chev">›</span></div>'};
     if(S.isAdmin){
       const mode=lsGet('crewplans.jobView')||'mine';
       h+='<div class="chips"><button class="chip'+(mode==='mine'?' on':'')+'" data-view="mine">My jobs</button><button class="chip'+(mode==='all'?' on':'')+'" data-view="all">All jobs</button></div>';
@@ -2479,7 +2493,7 @@ async function commitDraw(g){
   if(pts.length>3000)pts=pts.slice(0,3000);
   const row={id:uuid(),job_id:S.job.id,sheet_id:V.id,layer:V.layer,kind:V.mode==='box'?'box':'line',phase:V.phase,pts,w:penW(),created_at:new Date().toISOString()};
   V.marks.push(row);drawMarks();V.mine.push(row.id);syncTools();
-  const sheetId=V.id;const ok=await run(sb.from('marks').insert(row));
+  const sheetId=V.id;const ok=await run(sb.from('marks').insert(row));if(ok&&row.layer==='progress'&&S.nudges&&S.nudges[row.job_id]){delete S.nudges[row.job_id]}
   if(!ok&&V&&V.id===sheetId){V.marks=V.marks.filter(m=>m.id!==row.id);V.mine=V.mine.filter(i=>i!==row.id);drawMarks();syncTools()}
 }
 async function undo(){const id=V.mine.pop();syncTools();if(!id)return;V.marks=V.marks.filter(m=>m.id!==id);drawMarks();await run(sb.from('marks').delete().eq('id',id))}
