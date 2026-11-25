@@ -765,6 +765,11 @@ return function(withSound){
      if(!r)noteOnline(false);
      return {data:{session:st&&st.user?st:null},error:null}}}
   if('serviceWorker' in navigator){try{navigator.serviceWorker.register('sw.js').catch(()=>{})}catch(e){}}
+  /* new version check: when the app comes back on screen, offer a one-tap update */
+  {const vh=async()=>{try{const t=await (await fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'})).text();let h=0;for(let i=0;i<t.length;i++)h=(h*31+t.charCodeAt(i))|0;return h}catch(e){return null}};
+   let boot=null;vh().then(h=>boot=h);
+   const chk=async()=>{if(boot==null||document.getElementById('updBar'))return;const h=await vh();if(h!=null&&h!==boot){const b=document.createElement('button');b.id='updBar';b.className='fvpill';b.style.background='#1565c0';b.style.bottom='calc(64px + env(safe-area-inset-bottom))';b.textContent='New version ready · tap to update';b.onclick=()=>{try{tcFlush()}catch(e){}location.reload()};document.body.appendChild(b)}};
+   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')chk()});setInterval(chk,10*60*1000)}
   netPill();try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{})}catch(e){}
   sb.auth.onAuthStateChange(ev=>{if(ev==='PASSWORD_RECOVERY')setTimeout(()=>setPasswordBox('Set a new password'),300)});
   const params=new URLSearchParams(location.search);const inv=params.get('invite');
