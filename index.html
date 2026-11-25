@@ -428,6 +428,7 @@ const isForeman=()=>!!(S.me&&!S.me.is_anonymous&&!S.isAdmin);
 const tcAllowed=()=>S.isAdmin||(isForeman()&&S.viewAs!=='viewer');
 const canSeeTc=()=>tcAllowed()||(!!S.me&&S.me.is_anonymous&&(S.myRoles||[]).some(m=>m.role==='editor'));
 const canLog=()=>isAdminRole()||S.role==='editor';
+const canPin=()=>canWrite()||S.role==='viewer';
 const LABOR_CODES=[{k:'112',n:'112-Framing'},{k:'122',n:'122-Hanging'},{k:'132',n:'132-Finishing'},{k:'142c',n:'142-Cleanup'},{k:'142s',n:'142-Supervision'},{k:'161',n:'161-Batts & Caulk'},{k:'172',n:'172-Extra'}];
 const codeHrs=l=>{const h=(l&&l.hours_by_code)||{};return LABOR_CODES.reduce((a,c)=>a+num(h[c.k]),0)};
 function weekEnd(d){const [y,m,dd]=String(d).split('-').map(Number);const t=new Date(y,m-1,dd);t.setDate(t.getDate()+(6-t.getDay()));return t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0')}
@@ -881,11 +882,11 @@ function render(){
   if(S.view==='tc'){if(!TC.force&&tcTyping())return;TC.force=false;app.dataset.job='';app.innerHTML=renderTc();bindTc();return}
   if(S.view!=='job'||!S.job){app.dataset.job='';app.innerHTML=renderJobs();bindJobs();return}
   const j=S.job;
-  if(S.tab==='tc'||(S.tab==='log'&&!canLog()))S.tab='plans';
+  if(S.tab==='tc'||((S.tab==='log'||S.tab==='labor')&&!canLog()))S.tab='plans';
   if(!app.querySelector('[data-jobshell]')||app.dataset.job!==j.id||app.dataset.tab!==S.tab||app.dataset.role!==S.role){
     app.dataset.job=j.id;app.dataset.tab=S.tab;app.dataset.role=S.role;
     app.innerHTML='<div data-jobshell><div class="jhead"><div class="top"><button id="back" aria-label="Back">‹</button><div class="jl" id="jt2"></div><h1><div class="ttl"><span class="brand"></span>Alpha Operations</div><div class="jn" id="jt"></div></h1>'+(isAdminRole()?'<button id="jmenu" aria-label="Job menu">⋯</button>':'')+'</div>'+
-      '<div class="tabs"><button data-tab="plans">Plans</button><button data-tab="progress">Progress</button>'+(canLog()?'<button data-tab="log">Daily Report</button>':'')+'<button data-tab="labor">Labor</button></div></div><main id="tabBody"></main></div>';
+      '<div class="tabs"><button data-tab="plans">Plans</button><button data-tab="progress">Progress</button>'+(canLog()?'<button data-tab="log">Daily Report</button><button data-tab="labor">Labor</button>':'')+'</div></div><main id="tabBody"></main></div>';
     $('#back').onclick=closeJob;
     $$('.tabs button').forEach(b=>b.onclick=()=>{S.tab=b.dataset.tab;window.scrollTo(0,0);render()});
     if($('#jmenu'))$('#jmenu').onclick=jobMenu;
@@ -1988,7 +1989,7 @@ async function openSheet(id,layer){
     (sup?'<div class="supbar" id="vSup">SUPERSEDED · '+esc(revText(sh))+(curV?' — tap to open current ('+esc(revText(curV))+')':'')+'</div>':'')+
     '<div id="stage"><div id="board"><img id="planImg" alt="" draggable="false"><svg id="ink" xmlns="http://www.w3.org/2000/svg"><g id="marksG"></g><g id="liveG"></g></svg></div><div id="pinLayer"></div><div class="hint" id="hint">Loading sheet…</div>'+(ni>=0&&nl.length>1?'<button class="snav" id="snPrev" aria-label="Previous sheet"'+(ni===0?' disabled':'')+'>‹</button><button class="snav" id="snNext" aria-label="Next sheet"'+(ni===nl.length-1?' disabled':'')+'>›</button>':'')+'</div>'+
     '<div class="vtools">'+(cw?'<div class="trow" id="phaseRow">'+PHASES.map(p=>'<button class="pc" data-ph="'+p.k+'" style="background:'+p.c+'">'+p.n+'</button>').join('')+'<button class="tb" id="penBtn">Pen: Thin</button></div>':'')+
-    '<div class="trow" id="modeRow"><button class="tb" data-mode="pan">✋ Move</button>'+(cw?'<button class="tb" data-mode="straight">📏 Straight</button><button class="tb" data-mode="line">🖍 Highlight</button><button class="tb" data-mode="box">▭ Area</button><button class="tb" data-mode="pin">📍 Pin</button><button class="tb" data-mode="erase">⌫ Erase</button><button class="tb" id="undoBtn">↶ Undo</button>':'')+
+    '<div class="trow" id="modeRow"><button class="tb" data-mode="pan">✋ Move</button>'+(!cw&&!sup&&canPin()?'<button class="tb" data-mode="pin">📍 Pin</button>':'')+(cw?'<button class="tb" data-mode="straight">📏 Straight</button><button class="tb" data-mode="line">🖍 Highlight</button><button class="tb" data-mode="box">▭ Area</button><button class="tb" data-mode="pin">📍 Pin</button><button class="tb" data-mode="erase">⌫ Erase</button><button class="tb" id="undoBtn">↶ Undo</button>':'')+
     '<button class="tb" id="fitBtn">⤢ Fit</button></div></div>';
   V.stage=$('#stage');V.board=$('#board');V.img=$('#planImg');
   $('#vBack').onclick=()=>{if(location.hash==='#sheet')history.back();else closeSheet()};
@@ -2127,7 +2128,7 @@ function nearestMark(pt){
 }
 async function tap(cx,cy){
   const p=toImg(cx,cy);if(p.x<0||p.y<0||p.x>V.W||p.y>V.H)return;
-  if(V.mode==='pin'&&canWrite())pinDialog(null,{x:r4(p.x/V.W),y:r4(p.y/V.H)});
+  if(V.mode==='pin'&&canPin())pinDialog(null,{x:r4(p.x/V.W),y:r4(p.y/V.H)});
   else if(V.mode==='erase'&&canWrite()){const m=nearestMark(p);if(!m){toast('No markup there. Zoom in and tap right on it.');return}
     if(await confirmBox('Erase this '+phase(m.phase).n+' '+(m.kind==='box'?'area':'highlight')+'?','Erase')){if(V){V.marks=V.marks.filter(x=>x.id!==m.id);drawMarks()}await run(sb.from('marks').delete().eq('id',m.id))}}
 }
@@ -2149,7 +2150,7 @@ function layersPanel(){
   $('[data-x]',m).onclick=()=>m.close();
 }
 function pinDialog(pin,at){
-  const isNew=!pin;const jid=S.job.id,sheetId=V.id,lay=V.layer;const ro=!canWrite()||V.sh.is_current===false;
+  const isNew=!pin;const jid=S.job.id,sheetId=V.id,lay=V.layer;const ro=V.sh.is_current===false||!(canWrite()||(S.role==='viewer'&&(isNew||pin.created_by===S.me.id)));
   let kind=isNew?'issue':pinKind(pin.kind).k;let photos=isNew?[]:(Array.isArray(pin.photos)?pin.photos.filter(p=>typeof p==='string'):[]);
   const m=modal('<h2>'+(isNew?'New pin':esc(pinKind(pin.kind).n))+'</h2><div class="chips">'+PIN_KINDS.map(k=>'<button class="chip" data-k="'+k.k+'" '+(ro?'disabled':'')+'>'+k.n+'</button>').join('')+'</div>'+
     '<label class="field"><span>Note</span><textarea data-text '+(ro?'readonly':'')+' placeholder="What\'s going on here?">'+esc(isNew?'':pin.text||'')+'</textarea></label>'+
