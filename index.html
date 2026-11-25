@@ -425,7 +425,9 @@ const S={me:null,isAdmin:false,jobs:[],jobsLoaded:false,job:null,role:null,tab:'
 const canWrite=()=>S.role==='admin'||S.role==='editor';
 const isAdminRole=()=>S.role==='admin';
 const isForeman=()=>!!(S.me&&!S.me.is_anonymous&&!S.isAdmin);
-const tcAllowed=()=>S.isAdmin||isForeman();
+const tcAllowed=()=>S.isAdmin||(isForeman()&&S.viewAs!=='viewer');
+const canSeeTc=()=>tcAllowed()||(!!S.me&&S.me.is_anonymous&&(S.myRoles||[]).some(m=>m.role==='editor'));
+const canLog=()=>isAdminRole()||S.role==='editor';
 const LABOR_CODES=[{k:'112',n:'112-Framing'},{k:'122',n:'122-Hanging'},{k:'132',n:'132-Finishing'},{k:'142c',n:'142-Cleanup'},{k:'142s',n:'142-Supervision'},{k:'161',n:'161-Batts & Caulk'},{k:'172',n:'172-Extra'}];
 const codeHrs=l=>{const h=(l&&l.hours_by_code)||{};return LABOR_CODES.reduce((a,c)=>a+num(h[c.k]),0)};
 function weekEnd(d){const [y,m,dd]=String(d).split('-').map(Number);const t=new Date(y,m-1,dd);t.setDate(t.getDate()+(6-t.getDay()));return t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0')}
@@ -759,7 +761,7 @@ return function(withSound){
     if(!session){const r=await sb.auth.signInAnonymously();if(r.error){fatal("Couldn't open your invite: "+errMsg(r.error));return}session=r.data.session}
     const r=await sb.rpc('redeem_invite',{t:inv});
     if(r.error){await afterLogin(null);toast(r.error.message||"That invite link didn't work.");return}
-    await afterLogin(r.data);return;
+    lsSet('crewplans.lastJob',null);await afterLogin(null);return;
   }
   if(params.has('office')&&session&&session.user&&session.user.is_anonymous){await sb.auth.signOut();lsSet('crewplans.lastJob',null);session=null}
   if(!session){renderWelcome();return}
@@ -804,7 +806,7 @@ async function afterLogin(openId){
   if(!S.me){renderWelcome();return}
   S.isAdmin=false;
   if(!S.me.is_anonymous){try{S.isAdmin=!!(await q(sb.rpc('claim_office')))}catch(e){}}
-  S.realAdmin=S.isAdmin;if(S.realAdmin&&lsGet('acv.viewAs')==='field'){S.isAdmin=false;fieldPill()}
+  S.realAdmin=S.isAdmin;S.viewAs=null;if(S.realAdmin&&(lsGet('acv.viewAs')==='field'||lsGet('acv.viewAs')==='viewer')){S.viewAs=lsGet('acv.viewAs');S.isAdmin=false;fieldPill()}
   await loadOffice();
   if(!S.me.is_anonymous&&!S.isAdmin&&!S.realAdmin){
     let onJobs=false;try{onJobs=!!((await q(sb.from('members').select('job_id').eq('user_id',S.me.id).limit(1)))||[]).length}catch(e){onJobs=true}
@@ -824,13 +826,14 @@ async function afterLogin(openId){
   if(target&&S.jobs.some(j=>j.id===target)){openJob(target);return}
   render();
 }
-function fieldPill(){if(document.getElementById('fvPill'))return;const b=document.createElement('button');b.id='fvPill';b.className='fvpill';b.textContent='Field view · back to office';b.onclick=()=>setViewAs('office');document.body.appendChild(b)}
-function setViewAs(v){lsSet('acv.viewAs',v==='field'?'field':null);try{tcFlush()}catch(e){}location.reload()}
+function fieldPill(){if(document.getElementById('fvPill'))return;const b=document.createElement('button');b.id='fvPill';b.className='fvpill';b.textContent=(S.viewAs==='viewer'?'View-only view':'Field view')+' · back to office';if(S.viewAs==='viewer')b.style.background='#00695c';b.onclick=()=>setViewAs('office');document.body.appendChild(b)}
+function setViewAs(v){lsSet('acv.viewAs',v==='field'||v==='viewer'?v:null);try{tcFlush()}catch(e){}location.reload()}
 async function loadOffice(){try{S.office=await q(sb.rpc('office_names'))||[];S.office.forEach(o=>{if(o.user_id)S.people[o.user_id]=o.name||'Office'});const me=S.me&&S.office.find(o=>o.user_id===S.me.id);S.myOfficeId=me?me.id:null}catch(e){S.office=S.office||[]}}
 const pmName=id=>{const o=(S.office||[]).find(x=>x.id===id);return o?o.name:''};
 async function loadJobs(){
   try{S.jobs=await q(sb.from('jobs').select('*').order('created_at',{ascending:false}));S.jobsLoaded=true}
   catch(e){toast(errMsg(e));S.jobsLoaded=true}
+  if(S.me&&!S.realAdmin){try{S.myRoles=(await q(sb.from('members').select('job_id,role').eq('user_id',S.me.id)))||[]}catch(e){}}
   if(S.job){const j=S.jobs.find(x=>x.id===S.job.id);if(!j){toast("You no longer have access to this job.");closeJob();return}S.job=j;PHASES=normScope(j.scope);
     if(!S.isAdmin&&!S.realAdmin){try{const m=await q(sb.from('members').select('role').eq('job_id',j.id).eq('user_id',S.me.id).maybeSingle());const nr=m?m.role:null;if(nr!==S.role){S.role=nr;if(V)closeSheet();render();return}}catch(e){}}}
   if(S.view!=='job'||S.job)render();
@@ -843,7 +846,7 @@ async function openJob(id){
   const j=S.jobs.find(x=>x.id===id);if(!j)return;
   S.job=j;PHASES=normScope(j.scope);S.view='job';S.tab=S.tab||'plans';S.sheets=[];S.areas=[];S.logs=[];S.members=[];S.invites=[];S.loaded={};
   if(S.isAdmin)S.role='admin';
-  else if(S.realAdmin)S.role='editor';
+  else if(S.realAdmin)S.role=S.viewAs==='viewer'?'viewer':'editor';
   else{try{const m=await q(sb.from('members').select('role').eq('job_id',id).eq('user_id',S.me.id).maybeSingle());S.role=m?m.role:null}catch(e){S.role=null}}
   if(!S.role){toast("You don't have access to that job.");S.job=null;S.view='jobs';render();return}
   lsSet('crewplans.lastJob',id);
@@ -878,11 +881,11 @@ function render(){
   if(S.view==='tc'){if(!TC.force&&tcTyping())return;TC.force=false;app.dataset.job='';app.innerHTML=renderTc();bindTc();return}
   if(S.view!=='job'||!S.job){app.dataset.job='';app.innerHTML=renderJobs();bindJobs();return}
   const j=S.job;
-  if(S.tab==='tc')S.tab='plans';
+  if(S.tab==='tc'||(S.tab==='log'&&!canLog()))S.tab='plans';
   if(!app.querySelector('[data-jobshell]')||app.dataset.job!==j.id||app.dataset.tab!==S.tab||app.dataset.role!==S.role){
     app.dataset.job=j.id;app.dataset.tab=S.tab;app.dataset.role=S.role;
     app.innerHTML='<div data-jobshell><div class="jhead"><div class="top"><button id="back" aria-label="Back">‹</button><div class="jl" id="jt2"></div><h1><div class="ttl"><span class="brand"></span>Alpha Operations</div><div class="jn" id="jt"></div></h1>'+(isAdminRole()?'<button id="jmenu" aria-label="Job menu">⋯</button>':'')+'</div>'+
-      '<div class="tabs"><button data-tab="plans">Plans</button><button data-tab="progress">Progress</button><button data-tab="log">Daily Report</button><button data-tab="labor">Labor</button></div></div><main id="tabBody"></main></div>';
+      '<div class="tabs"><button data-tab="plans">Plans</button><button data-tab="progress">Progress</button>'+(canLog()?'<button data-tab="log">Daily Report</button>':'')+'<button data-tab="labor">Labor</button></div></div><main id="tabBody"></main></div>';
     $('#back').onclick=closeJob;
     $$('.tabs button').forEach(b=>b.onclick=()=>{S.tab=b.dataset.tab;window.scrollTo(0,0);render()});
     if($('#jmenu'))$('#jmenu').onclick=jobMenu;
@@ -1230,7 +1233,7 @@ function bindTc(){
 function renderJobs(){
   let h='<div class="top"><h1><div class="ttl"><span class="brand"></span>Alpha Operations</div></h1><button id="acct" aria-label="Account">☰</button></div><main>';
   if(S.isAdmin)h+='<button class="btn primary block" id="newJob" style="margin-bottom:10px">+ New job</button>';
-  h+='<button class="btn block" id="tcOpen" style="margin-bottom:14px">⏱ Time cards</button>';
+  if(canSeeTc())h+='<button class="btn block" id="tcOpen" style="margin-bottom:14px">⏱ Time cards</button>';
   if(!S.jobsLoaded)h+='<div class="empty">Loading jobs…</div>';
   else if(!S.jobs.length)h+='<div class="empty"><b>No jobs yet</b>'+(S.isAdmin?'Add a job, upload its plan PDF, then invite your foreman from the job\'s ⋯ menu.':'Open the invite link the office texted you to get access to a job.')+'</div>';
   else{
@@ -1256,11 +1259,11 @@ function bindJobs(){
   $$('[data-view]').forEach(b=>b.onclick=()=>{lsSet('crewplans.jobView',b.dataset.view);render()});
   $('#acct').onclick=()=>{
     const m=modal('<h2>Account</h2><p class="muted">'+(S.isAdmin?'Signed in as office: '+esc(S.me.email||who(S.me.id)):S.realAdmin?'Office login, looking at the field view.':isForeman()?'Signed in as foreman: '+esc(S.me.email||''):'Crew access on this phone. Your access comes from invite links; signing out would remove it from this phone.')+'</p><div style="display:grid;gap:10px;margin-top:12px">'+
-      (S.isAdmin?'<button class="btn" data-users>Office users</button><button class="btn" data-pw>Change password</button><button class="btn" data-out>Sign out</button>':isForeman()?'<button class="btn" data-pw>Change password</button><button class="btn" data-out>Sign out</button>':'<button class="btn primary" data-fm>Make a foreman login</button><button class="btn" data-off>Office or foreman sign in on this device</button>')+(S.realAdmin?'<button class="btn'+(S.isAdmin?'':' primary')+'" data-vas>'+(S.isAdmin?'Switch to field view (what a foreman sees)':'Switch back to office view')+'</button>':'')+'<button class="btn" data-intro>▶ Play intro</button><button class="btn" data-x>Close</button></div>');
+      (S.isAdmin?'<button class="btn" data-users>Office users</button><button class="btn" data-pw>Change password</button><button class="btn" data-out>Sign out</button>':isForeman()?'<button class="btn" data-pw>Change password</button><button class="btn" data-out>Sign out</button>':'<button class="btn primary" data-fm>Make a foreman login</button><button class="btn" data-off>Office or foreman sign in on this device</button>')+(S.realAdmin?(S.isAdmin?'<button class="btn" data-vas="field">Test as a foreman (field view)</button><button class="btn" data-vas="viewer">Test as view-only crew</button>':'<button class="btn primary" data-vas="office">Switch back to office view</button>'):'')+'<button class="btn" data-intro>▶ Play intro</button><button class="btn" data-x>Close</button></div>');
     $('[data-x]',m).onclick=()=>m.close();
     const o=$('[data-out]',m);if(o)o.onclick=async()=>{if(!await okToSignOut())return;await sb.auth.signOut();await clearDeviceCache();lsSet('crewplans.lastJob',null);location.href=location.pathname+'?office'};
     $('[data-intro]',m).onclick=()=>{primeAudio();m.close();playSplash(true)};
-    const va=$('[data-vas]',m);if(va)va.onclick=()=>{m.close();setViewAs(S.isAdmin?'field':'office')};
+    $$('[data-vas]',m).forEach(va=>va.onclick=()=>{m.close();setViewAs(va.dataset.vas)});
     const ou=$('[data-users]',m);if(ou)ou.onclick=()=>{m.close();officeUsers()};
     const pw=$('[data-pw]',m);if(pw)pw.onclick=()=>{m.close();setPasswordBox('Change password')};
     const fm=$('[data-fm]',m);if(fm)fm.onclick=()=>{m.close();makeForemanLogin()};
