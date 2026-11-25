@@ -766,6 +766,8 @@ return function(withSound){
   netPill();try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{})}catch(e){}
   sb.auth.onAuthStateChange(ev=>{if(ev==='PASSWORD_RECOVERY')setTimeout(()=>setPasswordBox('Set a new password'),300)});
   const params=new URLSearchParams(location.search);const inv=params.get('invite');
+  const msSt=params.get('state')||'';const msRet=/^ms_/.test(msSt)?{code:params.get('code'),state:msSt,err:params.get('error_description')||params.get('error')}:null;
+  if(msRet){try{history.replaceState(null,'',location.pathname)}catch(e){}}
   let session=null;try{session=(await sb.auth.getSession()).data.session}catch(e){}
   if(!session&&!inv){const st=storedSession();if(st&&st.user&&st.refresh_token)session=st}
   if(inv){
@@ -778,6 +780,7 @@ return function(withSound){
   if(params.has('office')&&session&&session.user&&session.user.is_anonymous){await sb.auth.signOut();lsSet('crewplans.lastJob',null);session=null}
   if(!session){renderWelcome();return}
   await afterLogin(null);
+  if(msRet)finishMsConnect(msRet);
 })();
 function fatal(msg){$('#app').innerHTML='<div class="top"><h1><div class="ttl"><span class="brand"></span>Alpha Operations</div></h1></div><main><div class="empty"><b>Can\'t open Alpha Operations</b>'+esc(msg)+'</div></main>'}
 function renderWelcome(){
@@ -837,6 +840,26 @@ async function afterLogin(openId){
   const target=openId||lsGet('crewplans.lastJob');
   if(target&&S.jobs.some(j=>j.id===target)){openJob(target);return}
   render();
+}
+async function finishMsConnect(r){
+  if(r.err||!r.code){toast('Microsoft sign-in was cancelled: '+(r.err||'no code'));return}
+  if(!S.realAdmin){toast('Sign in with an office login to connect Microsoft.');return}
+  const pb=progressBox('Connecting Microsoft…');
+  try{const {data,error}=await sb.functions.invoke('crew-sync',{body:{action:'ms_connect',code:r.code,state:r.state}});pb.close();
+    if(error){let m=error.message;try{const j=await error.context.json();m=j.error||m}catch(e){}throw new Error(m)}
+    modal('<h2>Microsoft connected</h2><p>The app now saves to Shared Documents and sends daily reports as <b>'+esc(data.account||'your account')+'</b>.</p><div class="mbtns"><button class="btn primary" onclick="this.closest(\'.mwrap\').close()">OK</button></div>');
+  }catch(e){pb.close();toast(errMsg(e))}
+}
+async function msPanel(){
+  const m=modal('<h2>Microsoft connection</h2><div data-b class="muted">Checking…</div><div class="mbtns"><button class="btn" data-x>Close</button></div>');
+  $('[data-x]',m).onclick=()=>m.close();
+  let st=null;try{const {data,error}=await sb.functions.invoke('crew-sync',{body:{action:'ms_status'}});if(error){let msg=error.message;try{const j=await error.context.json();msg=j.error||msg}catch(e){}throw new Error(msg)}st=data}catch(e){$('[data-b]',m).textContent=errMsg(e);return}
+  const b=$('[data-b]',m);b.className='';
+  b.innerHTML=(st.connected?'<p>✓ Connected as <b>'+esc(st.account||'?')+'</b>'+(st.connected_at?' since '+esc(fmtWhen(st.connected_at)):'')+'.</p><p class="muted small">Time cards, daily reports and labor go through this Microsoft login. If its password changes, tap Reconnect.</p>':'<p>Not connected. Time cards and daily reports are saved in the app but not copied to Shared Documents yet.</p><p class="muted small">Sign in with the Microsoft account the app should use. Files will show that person as the one who saved them.</p>')+
+    '<div style="display:grid;gap:10px;margin-top:12px"><button class="btn primary" data-c>'+(st.connected?'Reconnect':'Connect Microsoft')+'</button>'+(st.connected?'<button class="btn" data-t>Test now (file waiting time cards and reports)</button><button class="btn danger" data-d>Disconnect</button>':'')+'</div>';
+  $('[data-c]',b).onclick=async()=>{try{const {data,error}=await sb.functions.invoke('crew-sync',{body:{action:'ms_connect_url'}});if(error)throw error;location.href=data.url}catch(e){toast(errMsg(e))}};
+  const t=$('[data-t]',b);if(t)t.onclick=async()=>{t.disabled=true;t.textContent='Working…';try{const {data,error}=await sb.functions.invoke('crew-sync',{body:{action:'timecards'}});let msg='';if(error){try{const j=await error.context.json();msg=j.error}catch(e){msg=error.message}}else{const r2=await sb.functions.invoke('crew-sync',{body:{action:'reports'}});msg='Time cards: '+JSON.stringify(data.timecards||{})+(r2.data?' · Reports: '+JSON.stringify(r2.data.reports||{}):'')}modal('<h2>Test result</h2><pre style="white-space:pre-wrap;font-size:12px">'+esc(msg)+'</pre><div class="mbtns"><button class="btn primary" onclick="this.closest(\'.mwrap\').close()">OK</button></div>')}catch(e){toast(errMsg(e))}t.disabled=false;t.textContent='Test now (file waiting time cards and reports)'};
+  const d=$('[data-d]',b);if(d)d.onclick=async()=>{if(!await confirmBox('Disconnect Microsoft? Time cards and daily reports will stop copying to Shared Documents until someone connects again.','Disconnect'))return;await sb.functions.invoke('crew-sync',{body:{action:'ms_disconnect'}});m.close();toast('Disconnected.')};
 }
 function fieldPill(){if(document.getElementById('fvPill'))return;const b=document.createElement('button');b.id='fvPill';b.className='fvpill';b.textContent=(S.viewAs==='viewer'?'View-only view':'Field view')+' · back to office';if(S.viewAs==='viewer')b.style.background='#00695c';b.onclick=()=>setViewAs('office');document.body.appendChild(b)}
 function setViewAs(v){lsSet('acv.viewAs',v==='field'||v==='viewer'?v:null);try{tcFlush()}catch(e){}location.reload()}
@@ -1271,12 +1294,13 @@ function bindJobs(){
   $$('[data-view]').forEach(b=>b.onclick=()=>{lsSet('crewplans.jobView',b.dataset.view);render()});
   $('#acct').onclick=()=>{
     const m=modal('<h2>Account</h2><p class="muted">'+(S.isAdmin?'Signed in as office: '+esc(S.me.email||who(S.me.id)):S.realAdmin?'Office login, looking at the field view.':isForeman()?'Signed in as foreman: '+esc(S.me.email||''):'Crew access on this phone. Your access comes from invite links; signing out would remove it from this phone.')+'</p><div style="display:grid;gap:10px;margin-top:12px">'+
-      (S.isAdmin?'<button class="btn" data-users>Office users</button><button class="btn" data-pw>Change password</button><button class="btn" data-out>Sign out</button>':isForeman()?'<button class="btn" data-pw>Change password</button><button class="btn" data-out>Sign out</button>':'<button class="btn primary" data-fm>Make a foreman login</button><button class="btn" data-off>Office or foreman sign in on this device</button>')+(S.realAdmin?(S.isAdmin?'<button class="btn" data-vas="field">Test as a foreman (field view)</button><button class="btn" data-vas="viewer">Test as view-only crew</button>':'<button class="btn primary" data-vas="office">Switch back to office view</button>'):'')+'<button class="btn" data-intro>▶ Play intro</button><button class="btn" data-x>Close</button></div>');
+      (S.isAdmin?'<button class="btn" data-msc>Microsoft connection</button><button class="btn" data-users>Office users</button><button class="btn" data-pw>Change password</button><button class="btn" data-out>Sign out</button>':isForeman()?'<button class="btn" data-pw>Change password</button><button class="btn" data-out>Sign out</button>':'<button class="btn primary" data-fm>Make a foreman login</button><button class="btn" data-off>Office or foreman sign in on this device</button>')+(S.realAdmin?(S.isAdmin?'<button class="btn" data-vas="field">Test as a foreman (field view)</button><button class="btn" data-vas="viewer">Test as view-only crew</button>':'<button class="btn primary" data-vas="office">Switch back to office view</button>'):'')+'<button class="btn" data-intro>▶ Play intro</button><button class="btn" data-x>Close</button></div>');
     $('[data-x]',m).onclick=()=>m.close();
     const o=$('[data-out]',m);if(o)o.onclick=async()=>{if(!await okToSignOut())return;await sb.auth.signOut();await clearDeviceCache();lsSet('crewplans.lastJob',null);location.href=location.pathname+'?office'};
     $('[data-intro]',m).onclick=()=>{primeAudio();m.close();playSplash(true)};
     $$('[data-vas]',m).forEach(va=>va.onclick=()=>{m.close();setViewAs(va.dataset.vas)});
     const ou=$('[data-users]',m);if(ou)ou.onclick=()=>{m.close();officeUsers()};
+    const msc=$('[data-msc]',m);if(msc)msc.onclick=()=>{m.close();msPanel()};
     const pw=$('[data-pw]',m);if(pw)pw.onclick=()=>{m.close();setPasswordBox('Change password')};
     const fm=$('[data-fm]',m);if(fm)fm.onclick=()=>{m.close();makeForemanLogin()};
     const of=$('[data-off]',m);if(of)of.onclick=async()=>{m.close();if(!await okToSignOut())return;if(!await confirmBox('This phone or computer will stop being signed in as crew. You\'d need a new invite link to get crew access back here. Continue to office sign in?','Continue',false))return;location.href=location.pathname+'?office'};
