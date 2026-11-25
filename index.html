@@ -61,6 +61,7 @@ button{cursor:pointer}
 .tcdb{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
 .tcall{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:0 0 12px}
 .tcall summary{font-weight:700;cursor:pointer}
+.tcrow.on{background:#fff7e0}.tcview{display:flex;align-items:center;gap:10px}
 .tcrow{display:flex;align-items:center;gap:10px;padding:10px 2px;border-bottom:1px solid var(--line);cursor:pointer}
 .tcst{font-size:12px;font-weight:700;padding:3px 8px;border-radius:6px;background:#eef1f4}
 .tcst.ok{background:#dcf5e3;color:#14632e}.tcst.wait{background:#fff2d6;color:#7a4b00}
@@ -1095,6 +1096,7 @@ async function loadTc(){
     TC.card=mine;
     try{TC.roster=(await q(sb.from('crew_roster').select('*').eq('active',true).order('name')))||[]}catch(e){TC.roster=TC.roster||[]}
     tcRefreshRates();
+    if(S.isAdmin&&!TC.fms){try{TC.fms=(await q(sb.rpc('foreman_accounts')))||[]}catch(e){TC.fms=[]}}
     TC.list=S.isAdmin?(await q(sb.from('timecards').select('id,owner,foreman,folder,workers,status,submitted_at,filed_at,file_name,file_error,updated_at').eq('period_start',TC.start).order('foreman')))||[]:[];
   }catch(e){toast(errMsg(e))}
   TC.loading=false;TC.force=true;if(S.view==='tc'||(S.view==='job'&&S.tab==='tc'))render();
@@ -1150,16 +1152,13 @@ async function makeForemanLogin(){
 }
 function tcBody(){
   let h='';
-  h+='<h2 style="margin:0 0 8px">Time cards</h2>';
+  const c0=TC.card,mine0=!c0||c0.owner===S.me.id;
+  h+='<h2 style="margin:0 0 8px">'+(mine0?'My time card'+(c0&&c0.foreman?' – '+esc(c0.foreman):''):esc((c0.foreman||'Foreman'))+'\'s time card')+'</h2>';
   const end=isoAddD(TC.start,13);
   h+='<div class="tcper"><button class="btn sm" id="tcPrev" aria-label="Previous pay period">‹</button><div class="grow"><b>'+esc(tcFmt(TC.start,{weekday:'short',month:'numeric',day:'numeric'}))+' – '+esc(tcFmt(end,{weekday:'short',month:'numeric',day:'numeric',year:'2-digit'}))+'</b><div class="muted small">Pay period</div></div><button class="btn sm" id="tcNext" aria-label="Next pay period">›</button></div>';
   if(TC.loading||!TC.card)return h+'<div class="empty">Loading…</div>';
   const c=TC.card,mine=c.owner===S.me.id;
-  if(S.isAdmin){
-    const others=TC.list.filter(x=>x.owner!==S.me.id);
-    h+='<details class="tcall"'+(mine?'':' open')+'><summary>All foremen this period ('+TC.list.length+')</summary>'+(TC.list.length?TC.list.map(x=>{const hrs=(x.workers||[]).reduce((a,w)=>a+tcWHrs(w),0);const st=x.status!=='submitted'?'Draft':x.filed_at&&x.filed_at>=x.submitted_at?'Saved to Excel':x.file_error?'Not saved yet':'Submitted';return '<div class="tcrow" data-tc="'+esc(x.id)+'"><div class="grow"><b>'+esc(x.foreman||'Foreman')+'</b><div class="muted small">'+(x.workers||[]).length+' workers · '+Math.round(hrs*100)/100+' hrs</div></div><span class="tcst'+(st==='Saved to Excel'?' ok':st==='Draft'?'':' wait')+'">'+st+'</span></div>'}).join(''):'<div class="muted small" style="padding:8px 2px">No time cards yet for this period.</div>')+(mine?'':'<button class="btn sm" id="tcMine" style="margin-top:8px">Back to my card</button>')+'</details>';
-    if(!mine)h+='<div class="tcnote">Editing <b>'+esc(c.foreman||'a foreman')+'</b>\'s card.</div>';
-  }
+  if(!mine)h+='<div class="tcnote tcview"><span class="grow">Viewing <b>'+esc(c.foreman||'a foreman')+'</b>\'s card</span><button class="btn sm" id="tcMine">Back to my card</button></div>';
   h+='<div class="tchead"><label class="field"><span>Name on the time cards</span><input id="tcForeman" value="'+esc(c.foreman||'')+'" placeholder="Foreman name"></label>'+(S.isAdmin?'<label class="field"><span>Timecards folder (office sets)</span><input id="tcFolder" value="'+esc(c.folder||'')+'" placeholder="e.g. Humberto"></label>':'')+'</div>';
   h+='<button class="btn sm" id="tcRosterBtn" style="margin:0 0 10px">Crew list & rates</button>';
   const tot=c.workers.reduce((a,w)=>a+tcWHrs(w),0),dol=c.workers.reduce((a,w)=>a+tcWHrs(w)*tcRate(w),0);
@@ -1184,7 +1183,20 @@ function tcBody(){
   });
   h+='<button class="btn block" id="tcAddW" style="margin:6px 0 14px">+ Add worker</button>';
   h+='<button class="btn primary block" id="tcSubmit">'+(c.status==='submitted'?'Submit again':'Submit time cards')+'</button><p class="muted small" style="text-align:center">'+(S.isAdmin?'Submitting fills in a copy of the Excel time card in Timecards/'+esc(c.folder||'…')+'.':'Submitting sends your time cards to the office.')+' You can change it and submit again until payroll.</p>';
+  if(S.isAdmin)h+=tcCrewList(c);
   return h;
+}
+function tcCardStatus(x){if(!x)return ['Not started',''];if(x.status!=='submitted')return ['Draft',''];if(x.filed_at&&x.filed_at>=x.submitted_at)return ['Saved to Excel',' ok'];return [x.file_error?'Not saved yet':'Submitted',' wait']}
+function tcCrewList(c){
+  const rows=[];const seen=new Set([S.me.id]);
+  (TC.fms||[]).forEach(f=>{seen.add(f.user_id);rows.push({name:f.name,card:TC.list.find(x=>x.owner===f.user_id)})});
+  TC.list.forEach(x=>{if(!seen.has(x.owner)){seen.add(x.owner);rows.push({name:x.foreman||'Foreman',card:x})}});
+  rows.sort((a,b)=>a.name.localeCompare(b.name));
+  const done=rows.filter(r=>r.card&&r.card.status==='submitted').length;
+  let h='<div class="tcall" style="margin-top:18px"><b>Crew time cards</b> <span class="muted small">'+done+' of '+rows.length+' submitted</span>';
+  h+=rows.length?rows.map(r=>{const x=r.card;const [st,cl]=tcCardStatus(x);const hrs=x?(x.workers||[]).reduce((a,w)=>a+tcWHrs(w),0):0;
+    return '<div class="tcrow'+(x&&x.id===c.id?' on':'')+'"'+(x?' data-tc="'+esc(x.id)+'"':'')+'><div class="grow"><b>'+esc(r.name)+'</b><div class="muted small">'+(x?(x.workers||[]).length+' workers · '+Math.round(hrs*100)/100+' hrs':'Nothing entered yet')+'</div></div><span class="tcst'+cl+'">'+st+'</span>'+(x?'<span class="chev">›</span>':'')+'</div>'}).join(''):'<div class="muted small" style="padding:8px 2px">No foremen yet. They show up here once they make their login.</div>';
+  return h+'</div>';
 }
 function tcAddWorkers(c){
   const on=new Set(c.workers.map(w=>tcKey(w.name)));const avail=(TC.roster||[]).filter(r=>!on.has(tcKey(r.name)));const pick=new Set();
@@ -1225,7 +1237,7 @@ function bindTc(){
   const shift=n=>{tcFlush();TC.start=isoAddD(TC.start,14*n);TC.open=-1;loadTc()};
   $('#tcPrev').onclick=()=>shift(-1);$('#tcNext').onclick=()=>shift(1);
   if(!TC.card)return;const c=TC.card;
-  $$('[data-tc]').forEach(el=>el.onclick=async()=>{tcFlush();const r=await run(sb.from('timecards').select('*').eq('id',el.dataset.tc).single());if(r&&r.id){TC.card=r;TC.open=-1;TC.force=true;render()}});
+  $$('[data-tc]').forEach(el=>el.onclick=async()=>{tcFlush();const r=await run(sb.from('timecards').select('*').eq('id',el.dataset.tc).single());if(r&&r.id){TC.card=r;TC.open=-1;TC.force=true;render();window.scrollTo(0,0)}});
   if($('#tcMine'))$('#tcMine').onclick=()=>{tcFlush();loadTc()};
   $('#tcForeman').oninput=e=>{const was=tcFirst(c.foreman);c.foreman=e.target.value;if(!S.isAdmin&&(!c.folder||c.folder===was))c.folder=tcFirst(c.foreman);tcChanged()};
   if($('#tcFolder'))$('#tcFolder').oninput=e=>{c.folder=e.target.value.trim();tcChanged()};
