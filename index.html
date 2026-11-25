@@ -1955,6 +1955,7 @@ async function editSheet(id){
     if(del.length===1&&prev)await run(sb.from('sheets').update({is_current:true}).eq('id',prev.id));
     loadSheets()};
 }
+const withTimeout=(p,ms)=>Promise.race([p,new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),ms))]);
 async function addPlans(files){
   const jid=S.job.id;let order=S.sheets.reduce((a,s)=>Math.max(a,num(s.sort)),0);
   const pending=curSheets().length>0;const allMade=[];
@@ -1971,11 +1972,14 @@ async function addPlans(files){
         if(pdf.numPages>1){pb.style.display='none';pages=await pickPages(pdf,file.name);pb.style.display='';if(!pages){try{pdf.destroy()}catch(e){}continue}}
         for(let pi=0;pi<pages.length;pi++){const i=pages[pi];
           pb.set('Processing page '+i+' ('+(pi+1)+' of '+pages.length+', '+file.name+')…');
-          const page=await pdf.getPage(i);const vp1=page.getViewport({scale:1});const scale=Math.min(5,3600/Math.max(vp1.width,vp1.height));const vp=page.getViewport({scale});
-          const c=document.createElement('canvas');c.width=Math.floor(vp.width);c.height=Math.floor(vp.height);const cx=c.getContext('2d');cx.fillStyle='#fff';cx.fillRect(0,0,c.width,c.height);
-          await page.render({canvasContext:cx,viewport:vp}).promise;
-          let nm=await nameFromText(page,vp1);const rv=await revFromText(page,vp1);
-          if(!nm.num){pb.set('Reading sheet name, page '+i+' of '+pdf.numPages+'…');try{const o=await nameFromImage(c);nm={num:o.num||nm.num,title:nm.title||o.title,cands:o.cands}}catch(e){}}
+          const page=await pdf.getPage(i);const vp1=page.getViewport({scale:1});
+          // A page that is too complex to draw in time is drawn again smaller, and as a last resort added as a blank placeholder, so one bad page never stops the upload.
+          const drawAt=async(px,ms)=>{const vp=page.getViewport({scale:Math.min(5,px/Math.max(vp1.width,vp1.height))});const cv=document.createElement('canvas');cv.width=Math.floor(vp.width);cv.height=Math.floor(vp.height);const g=cv.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,cv.width,cv.height);const task=page.render({canvasContext:g,viewport:vp});try{await withTimeout(task.promise,ms);return cv}catch(e){try{task.cancel()}catch(_){}cv.width=cv.height=0;return null}};
+          let c=await drawAt(3600,45000);let slow=false;
+          if(!c){slow=true;pb.set('Page '+i+' is slow to draw, trying a smaller copy…');c=await drawAt(1800,45000)}
+          if(!c){c=document.createElement('canvas');c.width=1800;c.height=Math.round(1800*vp1.height/vp1.width);const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);g.fillStyle='#000';g.font='bold 48px sans-serif';g.fillText('Page '+i+' of '+file.name+' could not be drawn.',60,120);g.font='36px sans-serif';g.fillText('Open the original PDF for this sheet.',60,180);toast('Page '+i+" couldn't be drawn, so a placeholder was added.")}
+          let nm=slow?{}:await withTimeout(nameFromText(page,vp1),15000).catch(()=>({}));const rv=slow?{}:await withTimeout(revFromText(page,vp1),15000).catch(()=>({}));
+          if(!nm.num){pb.set('Reading sheet name, page '+i+' of '+pdf.numPages+'…');try{const o=await withTimeout(nameFromImage(c),30000);nm={num:o.num||nm.num,title:nm.title||o.title,cands:o.cands}}catch(e){}}
           const name=sheetLabel(nm.num,nm.title)||(pdf.numPages>1?base+' p'+i:base);const fp=fpOf(c);
           const sid=await storeSheet(jid,c,name,++order,pending,{rev:rv.ord||1,rev_label:rv.label||null,rev_date:rv.date});added++;page.cleanup();c.width=c.height=0;
           const rec={id:sid,num:nm.num,title:nm.title,cands:nm.cands,name,rev:rv,fp,file:file.name,page:i};made.push(rec);allMade.push(rec);
@@ -2004,13 +2008,15 @@ async function classifyNew(made){
     if(x.old){fpCache[x.old.id]=fpCache[x.old.id]||await fpOfSheet(x.old);x.diff=fpDiff(x.fp,fpCache[x.old.id])}}
   // same sheet number twice in this upload: highest revision (or the later page) wins
   const groups={};made.forEach(x=>{if(x.key)(groups[x.key]=groups[x.key]||[]).push(x)});
+  const LOOKS_DIFFERENT=3; // % of thumbnail pixels; revisions measured ~1-1.5, different sheets 3.4+
   Object.values(groups).forEach(g=>{if(g.length<2)return;g.sort((a,b)=>(num(a.rev.ord,0)-num(b.rev.ord,0))||((a.rev.date||'')<(b.rev.date||'')?-1:(a.rev.date||'')>(b.rev.date||'')?1:0));
-    const top=g[g.length-1];g.forEach(x=>{if(x!==top){x.dupOf=top;x.dupDiff=fpDiff(x.fp,top.fp)}})});
+    const top=g[g.length-1];g.forEach(x=>{if(x!==top){const d=fpDiff(x.fp,top.fp);if(d<=LOOKS_DIFFERENT){x.dupOf=top;x.dupDiff=d}}})});
   for(const x of made){const o=x.old;const oOrd=o?(revOrd(String(o.rev_label||'').replace(/^Rev\s+/i,''))??num(o.rev,1)):0;
     const lbl=x.rev.label||(x.rev.date?'Issued '+usDate(x.rev.date):'');
     const sameRev=(p,q)=>(p.label||'')===(q.label||'')&&(p.date||'')===(q.date||'');
     if(x.dupOf){if(x.dupDiff<0.05&&sameRev(x.rev,x.dupOf.rev)){x.pick='__skip';x.why='Same page twice in this upload'}else{x.pick=o?'__older:'+o.id:'__skip';x.why='Older copy of '+(x.num||x.name)+' in this upload'+(o?'':' — not needed')}continue}
     if(!o){x.pick='__new';x.why='New sheet';continue}
+    if(x.diff>LOOKS_DIFFERENT){x.pick='__new';x.why='Same number as '+o.name+' but the drawing looks different, so it was added as a new sheet. Pick Replaces if it really is a revision.';continue}
     const same=x.diff<0.05&&(!x.rev.label||x.rev.label===(o.rev_label||''))&&(!x.rev.date||x.rev.date===(o.rev_date||'')),newer=x.rev.ord!=null&&x.rev.ord>oOrd,older=x.rev.ord!=null&&x.rev.ord<oOrd;
     if(older){x.pick='__older:'+o.id;x.why='Older than the current '+revText(o)+' — kept as an old version'}
     else if(same&&!newer){x.pick='__skip';x.why='Looks the same as the current '+revText(o)+' — not needed'}
