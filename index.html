@@ -1780,7 +1780,7 @@ function shareLink(inv,email){
 function renderPlans(){
   let h='';const admin=isAdminRole();
   const addB=admin?'<label class="btn sm primary" title="Add a plan set or photos. Revised sheets are found automatically; old versions are kept.">+ Add plans<input type="file" id="planFile" accept="application/pdf,image/*,.heic,.heif" multiple hidden></label>':'';
-  const nameB=admin&&S.sheets.length?'<button class="btn sm" id="autoName" title="Read every sheet: names, revision marks, duplicate sheets and RFI / PR / ASI links. You check everything before it saves.">Organize<span class="dsk">sheets</span></button>':'';
+  const nameB=admin&&S.sheets.length?'<button class="btn sm" id="autoName" title="Reads every sheet's title block and suggests names, revisions, duplicates and RFI / PR / ASI links. Nothing changes until you tap Save.">Scan &amp; fix<span class="dsk">sheets</span></button>':'';
   if(!S.loaded.sheets)return h+(addB?'<div class="pbar">'+addB+'</div>':'')+'<div class="empty">Loading sheets…</div>';
   const cs=curSheets();
   if(!cs.length)return h+(addB?'<div class="pbar">'+addB+'</div>':'')+'<div class="empty"><b>No sheets yet</b>'+(admin?'Tap + Add plans and pick the plan set PDF.':'The office hasn\'t uploaded plans for this job yet.')+'</div>';
@@ -1865,7 +1865,7 @@ async function autoNameSheets(){
     m.close();toast('Renamed '+n+' sheet'+(n===1?'':'s')+'.');loadSheets();
   };
 }
-/* ===== Organize sheets (office only): names, revision marks, duplicates, RFI/PR/ASI links ===== */
+/* ===== Scan & fix sheets (office only): names, revision marks, duplicates, RFI/PR/ASI links ===== */
 const DOC_RE=/^(RFI|ASI|PR|CCD|PCO|ADD(?:ENDUM)?|BULLETIN|SK)\s*#?\s*(\d{1,4})(?:\s*R(?:EV)?\s*(\d{1,2}))?(?=[-\s–_.]|$)/i;
 function docInfo(s){const m=String(sheetNo(s)||s.name||'').match(DOC_RE);if(!m)return null;let ty=m[1].toUpperCase();if(/^ADD/.test(ty))ty='Addendum';if(ty==='BULLETIN')ty='Bulletin';return {key:ty+m[2]+(m[3]?'R'+m[3]:''),label:ty+' '+(+m[2])+(m[3]?' Rev '+(+m[3]):'')}}
 const genericName=s=>!/\s[–-]\s/.test(s.name||'')||/^(sheet|page)\s*\d+/i.test(s.name||'');
@@ -1910,7 +1910,7 @@ async function organizeSheets(){
   if(!total){toast('Read '+list.length+' sheets. Everything already looks organized.');return}
   const row=(k,i,on,body)=>'<div class="orow"><input type="checkbox" data-k="'+k+'" data-i="'+i+'"'+(on?' checked':'')+'><div class="grow">'+body+'</div></div>';
   const sec=(t,n,h)=>n?'<h3 class="osec">'+t+' <span class="muted small">('+n+')</span></h3>'+h:'';
-  const m=modal('<h2>Organize sheets</h2><p class="muted" style="margin-top:0">I read all '+list.length+' sheets. Check what you want changed, fix anything the reader got wrong, then tap Save. Unticked items stay as they are.</p><div class="olist">'+
+  const m=modal('<h2>Scan &amp; fix sheets</h2><p class="muted" style="margin-top:0">I read all '+list.length+' sheets. Check what you want changed, fix anything the reader got wrong, then tap Save. Unticked items stay as they are.</p><div class="olist">'+
     sec('Sheet names',P.names.length,P.names.map((x,i)=>row('names',i,x.on,'<div class="muted small">'+esc(x.s.name)+'</div><input data-v="names" data-i="'+i+'" value="'+esc(x.v)+'">')).join(''))+
     sec('Revision marks found on the sheet',P.revs.length,P.revs.map((x,i)=>row('revs',i,x.on,'<div><b>'+esc(x.s.name)+'</b>'+(x.was?' <span class="muted small">now: '+esc(x.was)+'</span>':'')+'</div><input data-v="revs" data-i="'+i+'" value="'+esc(x.v)+'">')).join(''))+
     sec('Same sheet added more than once',P.dups.length,P.dups.map((x,i)=>{const lab=s=>{const pr=P.revs.find(r=>r.s.id===s.id);const rl=pr?pr.v:s.rev_label;return esc(s.name)+' <span class="muted small">('+(rl?esc(rl)+', ':'')+'added '+esc(new Date(s.created_at||Date.now()).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}))+')</span>'};return row('dups',i,x.on,'<b>'+esc(sheetNo(x.keep))+'</b>: keep '+lab(x.keep)+' as current. '+x.old.map(lab).join(', ')+' become'+(x.old.length>1?'':'s')+' old version'+(x.old.length>1?'s':'')+'.')}).join(''))+
