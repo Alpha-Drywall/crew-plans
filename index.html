@@ -1159,7 +1159,8 @@ function tcBody(){
   if(TC.loading||!TC.card)return h+'<div class="empty">Loading…</div>';
   const c=TC.card,mine=c.owner===S.me.id;
   if(!mine)h+='<div class="tcnote tcview"><span class="grow">Viewing <b>'+esc(c.foreman||'a foreman')+'</b>\'s card</span><button class="btn sm" id="tcMine">Back to my card</button></div>';
-  h+='<div class="tchead"><label class="field"><span>Name on the time cards</span><input id="tcForeman" value="'+esc(c.foreman||'')+'" placeholder="Foreman name"></label>'+(S.isAdmin?'<label class="field"><span>Timecards folder (office sets)</span><input id="tcFolder" value="'+esc(c.folder||'')+'" placeholder="e.g. Humberto"></label>':'')+'</div>';
+  h+='<div class="tchead"><label class="field"><span>Name on the time cards</span><input id="tcForeman" value="'+esc(c.foreman||'')+'" placeholder="Foreman name"></label></div>';
+  if(S.isAdmin)h+='<div class="muted small" style="margin:-4px 0 10px">Saves to <b>Timecards/'+esc(c.folder||'?')+'</b> · <a href="#" id="tcFolderBtn">Change folder</a></div>';
   h+='<button class="btn sm" id="tcRosterBtn" style="margin:0 0 10px">Crew list & rates</button>';
   const tot=c.workers.reduce((a,w)=>a+tcWHrs(w),0),dol=c.workers.reduce((a,w)=>a+tcWHrs(w)*tcRate(w),0);
   h+='<div class="tcsum"><span><b id="tcTot">'+Math.round(tot*100)/100+'</b> hrs</span><span id="tcDol">'+tcMoney(dol)+'</span><span>'+c.workers.length+' workers</span></div>';
@@ -1171,7 +1172,7 @@ function tcBody(){
       h+='<div class="tcwb"><div class="tcwf"><label class="field"><span>Name</span><input data-name="'+i+'" value="'+esc(w.name||'')+'"></label><label class="field" style="max-width:110px"><span>Rate $/hr</span><input data-rate="'+i+'" inputmode="decimal" value="'+esc(w.rate==null?'':String(w.rate))+'"></label></div>';
       for(let d=0;d<12;d++){
         const iso=isoAddD(TC.start,TC_OFF[d]),lines=(w.days&&w.days[d])||[];
-        h+='<div class="tcday'+(d%2?' alt':'')+'"><div class="tcdh"><b>'+esc(tcFmt(iso,{weekday:'short',month:'numeric',day:'numeric'}))+'</b><span class="muted small"><span data-dh="'+i+'-'+d+'">'+tcDayHrs(w,d)+'</span> hrs</span></div>';
+        h+='<div class="tcday'+(d%2?'':' alt')+'"><div class="tcdh"><b>'+esc(tcFmt(iso,{weekday:'short',month:'numeric',day:'numeric'}))+'</b><span class="muted small"><span data-dh="'+i+'-'+d+'">'+tcDayHrs(w,d)+'</span> hrs</span></div>';
         lines.forEach((l,k)=>{
           h+='<div class="tcl"><select data-job="'+i+'-'+d+'-'+k+'">'+tcJobOptions(l)+'</select>'+(l.kind==='off'?'<span class="muted small grow">Off</span>':'<select data-code="'+i+'-'+d+'-'+k+'"><option value="">Code</option>'+TC_CODES.map(o=>'<option value="'+o[0]+'"'+(String(l.code||'')===o[0]?' selected':'')+'>'+o[1]+'</option>').join('')+'</select><input data-hrs="'+i+'-'+d+'-'+k+'" inputmode="decimal" placeholder="hrs" value="'+esc(l.hrs==null?'':String(l.hrs))+'"><span class="tchq">'+[8,10,12].map(n=>'<button type="button" data-qh="'+i+'-'+d+'-'+k+'-'+n+'"'+(String(l.hrs)===String(n)?' class="on"':'')+'>'+n+'</button>').join('')+'</span>')+'<button class="ico" data-rml="'+i+'-'+d+'-'+k+'" aria-label="Remove line">✕</button></div>';
         });
@@ -1240,7 +1241,7 @@ function bindTc(){
   $$('[data-tc]').forEach(el=>el.onclick=async()=>{tcFlush();const r=await run(sb.from('timecards').select('*').eq('id',el.dataset.tc).single());if(r&&r.id){TC.card=r;TC.open=-1;TC.force=true;render();window.scrollTo(0,0)}});
   if($('#tcMine'))$('#tcMine').onclick=()=>{tcFlush();loadTc()};
   $('#tcForeman').oninput=e=>{const was=tcFirst(c.foreman);c.foreman=e.target.value;if(!S.isAdmin&&(!c.folder||c.folder===was))c.folder=tcFirst(c.foreman);tcChanged()};
-  if($('#tcFolder'))$('#tcFolder').oninput=e=>{c.folder=e.target.value.trim();tcChanged()};
+  if($('#tcFolderBtn'))$('#tcFolderBtn').onclick=async e=>{e.preventDefault();const f=await formBox('Timecards folder',[{k:'f',label:'Folder name inside Timecards',value:c.folder||'',req:true,ph:'e.g. Humberto'}],'Save','The Excel time card is saved in Shared Documents/Timecards/<this folder>. It carries over to future pay periods.');if(!f)return;c.folder=f.f.replace(/^\/+|\/+$/g,'').slice(0,80);tcChanged(true)};
   if($('#tcRosterBtn'))$('#tcRosterBtn').onclick=tcRosterPanel;
   $$('[data-tog]').forEach(el=>el.onclick=()=>{const i=+el.dataset.tog;TC.open=TC.open===i?-1:i;TC.force=true;render();const n=$('[data-w="'+i+'"]');if(n&&TC.open===i)n.scrollIntoView({block:'start'})});
   $$('input[data-name]').forEach(el=>el.oninput=()=>{const i=+el.dataset.name;c.workers[i].name=el.value;const b=$('[data-w="'+i+'"] .tcwh b');if(b)b.textContent=el.value||'New worker';tcChanged()});
