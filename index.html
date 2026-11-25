@@ -978,8 +978,8 @@ async function syncLabor(btn){if(btn)btn.disabled=true;const pb=progressBox('Rea
 function renderLabor(){
   if(!S.loaded.labor)return '<div class="empty">Loading labor…</div>';
   const C=laborCalc();const noBudget=!C.t.bh;
-  let h='<div class="card"><div class="row"><div class="grow"><b style="font-size:17px">Labor</b><div class="muted small">'+(C.jobNo?'Job # '+esc(C.jobNo)+' · ':'')+C.hpd+' hrs per day'+(C.cost?' · used as of '+esc(fmtDay(C.cost.as_of)):'')+'</div>'+((C.src.bid_file||C.cost)?'<div class="muted small">'+(C.cost&&C.cost.file?'From '+esc(C.cost.file)+' ('+esc(C.cost.tab||'')+')'+(isAdminRole()?' at $'+num((S.labor||{}).rate)+'/hr':''):(C.src.bid_file?'Budget: '+esc(C.src.bid_file):''))+(C.src.synced_at?'<br>Synced '+esc(fmtWhen(C.src.synced_at)):'')+'</div>':'')+'</div></div>'+
-    (!isAdminRole()?'</div>':'<div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><button class="btn sm primary" id="labSync">↻ Sync from SharePoint</button><button class="btn sm" id="labBudget">Budget hours ✎</button><button class="btn sm" id="labDl">⬇ Download labor workbook</button></div></div>');
+  let h='<div class="card"><div class="row"><div class="grow"><b style="font-size:17px">Labor</b><div class="muted small">'+(C.jobNo?'Job # '+esc(C.jobNo)+' · ':'')+C.hpd+' hrs per work day'+(isAdminRole()?' <a href="#" id="labHpd">change</a>':'')+(C.cost?' · used as of '+esc(fmtDay(C.cost.as_of)):'')+'</div>'+((C.src.bid_file||C.cost)?'<div class="muted small">'+(C.cost&&C.cost.file?'From '+esc(C.cost.file)+' ('+esc(C.cost.tab||'')+')'+(isAdminRole()?' at $'+num((S.labor||{}).rate)+'/hr':''):(C.src.bid_file?'Budget: '+esc(C.src.bid_file):''))+(C.src.synced_at?'<br>Synced '+esc(fmtWhen(C.src.synced_at)):'')+'</div>':'')+'</div></div>'+
+    (!isAdminRole()?(canLog()?'<div class="row" style="margin-top:10px"><button class="btn sm primary" id="labSync">↻ Sync from SharePoint</button></div>':'')+'</div>':'<div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><button class="btn sm primary" id="labSync">↻ Sync from SharePoint</button><button class="btn sm" id="labBudget">Budget hours ✎</button><button class="btn sm" id="labDl">⬇ Download labor workbook</button></div></div>');
   if(noBudget)h+='<div class="card" style="background:#fff8e6"><b>No budget hours yet.</b><div class="muted small" style="margin-top:4px">'+(isAdminRole()?'Tap <b>Sync from SharePoint</b> to read the job cost sheet, or enter <b>Budget hours</b> by hand.':'The office hasn\'t entered the budget hours for this job yet.')+'</div></div>';
   h+='<div class="card lscroll"><table class="ltab"><thead><tr><th>Code</th><th>Budget hrs</th><th>Man days</th><th>Used</th><th>Left</th><th>% left</th></tr></thead><tbody>'+
     C.rows.map(r=>'<tr><td>'+esc(C.cost&&r.c.k==='142c'?'142-Misc Labor':r.c.n)+'</td><td>'+f1(r.bh)+'</td><td>'+f1(r.md)+'</td><td class="used">'+f1(r.used)+'</td><td'+(r.left<0?' class="over"':'')+'>'+f1(r.left)+'</td><td'+(r.left<0?' class="over"':'')+'>'+(r.md?pctS(r.pct):'–')+'</td></tr>').join('')+
@@ -995,6 +995,10 @@ function renderLabor(){
 function bindLabor(){
   const b=$('#labBudget');if(b)b.onclick=()=>laborBudgetEditor();
   const sy=$('#labSync');if(sy)sy.onclick=()=>syncLabor(sy);
+  const hp=$('#labHpd');if(hp)hp.onclick=async e=>{e.preventDefault();const L0=S.labor||{};
+    const v=await formBox('Hours in a work day',[{k:'hpd',label:'Hours per man-day on '+S.job.name,type:'number',value:String(num(L0.hpd)||10)}],'Save','Man days on the Labor tab = hours ÷ this number. Foremen see the same number.');
+    if(!v||!(num(v.hpd)>0))return;const labor=Object.assign({},L0,{hpd:num(v.hpd)});
+    if(await run(sb.from('job_budget').upsert({job_id:S.job.id,labor},{onConflict:'job_id'}),'Saved: '+num(v.hpd)+' hrs per work day.')){S.labor=labor;render()}};
   const im=$('#labImp'),lf=$('#labFile');if(im&&lf){im.onclick=()=>lf.click();lf.onchange=()=>{const f=lf.files[0];lf.value='';if(f)importLaborFile(f)}}
   const d=$('#labDl');if(d)d.onclick=downloadLabor;
 }
