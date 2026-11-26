@@ -2767,8 +2767,8 @@ const billCut=cost=>cost?String(cost.as_of||laborCut(cost)||'').slice(0,10):'';
 function billHoursByCode(C,T){if(!C||!C.cost||!T)return hoursByCode(C);const o={};
   (C.rows||[]).forEach(r=>{const k=r.c.k;if(!HRS_CODES.includes(k)||!(num(r.bh)>0))return;const off=num(r.usedH),pre=num((T.pre||{})[k]),post=num((T.post||{})[k]);
     const used=r2(Math.max(off,pre)+post);o[k]={pct:Math.min(100,Math.max(0,Math.round(used/num(r.bh)*100))),used,bh:num(r.bh),cost:r2(off),tcAll:pre>off,tc:r2(pre>off?pre+post:post)}});return o}
-/* "112: 54 of 262 hrs (54 time cards)" under a line's % from hours */
-function billHrsNote(k,x){if(!x)return '';const s=k+': '+f0(x.used)+' of '+f0(x.bh)+' hrs';if(x.cost==null)return s;
+/* "54 of 262 hrs (54 time cards)" under a line's % from hours (the row already says which trade, so no cost code) */
+function billHrsNote(k,x){if(!x)return '';const s=f0(x.used)+' of '+f0(x.bh)+' hrs';if(x.cost==null)return s;
   return s+(x.tcAll?' ('+f0(x.tc)+' time cards)':x.tc>0?' ('+f0(x.cost)+' job cost + '+f0(x.tc)+' time cards)':' (job cost)')}
 /* a pay app line's % from hours: null = no matching code or no budget (keep last month). Mobilization / Submittals = 100 once any trade line is above 0.
    Material lines get none: time card hours say nothing about material on site, so the office types those %s. */
