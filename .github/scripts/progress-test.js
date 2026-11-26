@@ -18,7 +18,7 @@ function grab(name) {
   return lines.slice(i, j).join('\n');
 }
 const names = ['num', 'clamp', 'esc', 'money', 'f0', 'isAdminRole', 'canEditLaborRate', 'LABOR_CODES', 'codeHrs', 'weekEnd', 'LABOR_SHOW_TC', 'laborCalc',
-  'PCT_SKIP', 'pctGroupName', 'pctCode', 'HRS_CODES', 'lineCode', 'hoursByCode', 'billHoursPct', 'hoursDone', 'billMonth', 'billAdd', 'billSel', 'billMonthText',
+  'PCT_SKIP', 'pctGroupName', 'pctCode', 'HRS_CODES', 'lineCode', 'hoursByCode', 'BILL_MAT', 'billHoursPct', 'hoursDone', 'billMonth', 'billAdd', 'billSel', 'billMonthText',
   'r2', 'laborCut', 'billCut', 'billHoursByCode', 'billHrsNote', 'billKey', 'billPcts', 'billingCard',
   'tcKey', 'TC_ANCHOR', 'isoAddD', 'tcHrs', 'tcLineNo', 'tcIsJob', 'tcLabCode', 'tcJobNo', 'tcJobShort', 'tcJobKey', 'tcJobSplit'];
 const code = names.map(grab).join('\n') + '\n;({' + names.join(',') + '})';
@@ -61,10 +61,11 @@ t('hours by code: used / budget from laborCalc, whole %, capped at 100, no budge
   deq(T.hoursByCode(null), {});
 });
 
-t('billing %: Labor and Material and every area of a trade get the same %, no code or budget = no suggestion', () => {
+t('billing %: every area of a trade gets the labor %; Material lines get none (typed by the office); no code or budget = no suggestion', () => {
   const h = H(labor({ '112': 1000, '122': 500, '132': 800 }, { '112': 600, '122': 125 }));
-  deq(ONE.map(l => T.billHoursPct(l, h, ONE)), [100, 100, 60, 60, 25, 25, 0, 0, null, null]); // 161 has no budget: keep last month
-  deq(TWO.map(l => T.billHoursPct(l, h, TWO)), [100, 60, 60, 60, 60, 25, 25]);
+  deq(ONE.map(l => T.billHoursPct(l, h, ONE)), [100, 100, 60, null, 25, null, 0, null, null, null]); // material lines: none (office types them) // 161 has no budget: keep last month
+  deq(TWO.map(l => T.billHoursPct(l, h, TWO)), [100, 60, null, 60, null, 25, null]);
+  assert.strictEqual(T.billHoursPct({ n: 'Framing Mat\'l' }, h, ONE), null); assert.strictEqual(T.billHoursPct({ n: 'Insulation Materials' }, h, ONE), null);
   assert.strictEqual(T.billHoursPct({ n: 'ACT Labor' }, h, ONE), null);
 });
 
@@ -79,7 +80,7 @@ t('billing %: Mobilization / Submittals 100 once any trade line is above 0, othe
 t('job Done %: line %s weighted by pay app $, Mob / Submittals and lines without a suggestion left out', () => {
   const h = H(labor({ '112': 1000, '122': 500, '132': 800 }, { '112': 600, '122': 125 }));
   // Framing $60k at 60, Hanging $30k at 25, Finishing $30k at 0; Insulation (no budget) left out
-  assert.strictEqual(T.hoursDone(ONE, h), 36); // (36000 + 7500) / 120000 = 36.25
+  assert.strictEqual(T.hoursDone(ONE, h), 34); // labor lines only: (40000*60 + 20000*25 + 25000*0) / 85000 = 34.1
   assert.strictEqual(T.hoursDone(ONE, {}), null);
   assert.strictEqual(T.hoursDone([{ n: 'Framing', v: 0 }, { n: 'Hanging', v: 0 }], h), 43); // no $: plain average of 60 and 25
   // no pay app lines: each trade code weighted by its budgeted hours (142 / 172 not counted)
@@ -97,11 +98,11 @@ t('billing card: "Billing" title, "% from hours" column, help line, never below 
   S.billTc = { pre: {}, post: {} }; // time cards read, none on this job
   const h = T.billingCard(); S.billTc = null;
   assert.ok(h.includes('% from hours')); assert.ok(!h.includes('% complete (office)')); assert.ok(!h.includes('Crew progress'));
-  assert.ok(h.includes('% from hours = time card hours on each cost code vs. the job’s budgeted hours, for reference. Type this month’s % for each line, then Confirm.'));
+  assert.ok(h.includes('% from hours = time card hours on each cost code vs. the job’s budgeted hours, for reference (labor lines only; type the material %s yourself). Type this month’s % for each line, then Confirm.'));
   assert.ok(h.includes('>Billing · ')); assert.ok(!/suggest/i.test(h), 'no “suggestion” wording on the card');
   assert.ok(h.includes('112: 600 of 1,000 hrs (job cost)')); assert.ok(h.includes('122: 125 of 500 hrs (job cost)')); assert.ok(h.includes('id="billCard"'));
   const vals = [...h.matchAll(/data-bp="(\d+)"[^>]*value="(\d+)"/g)].map(x => +x[2]);
-  deq(vals, [100, 100, 70, 70, 25, 25, 0, 0, 30, 30]); // Framing 60 < last 70 -> stays 70; Insulation no budget -> keeps 30
+  deq(vals, [100, 100, 70, 70, 25, 10, 0, 0, 30, 30]); // Framing 60 < last 70 -> stays 70; Hanging Material has no % from hours -> keeps last 10; Insulation no budget -> keeps 30
   assert.ok(h.includes('(below last)'));
 });
 
@@ -148,7 +149,7 @@ t('billing card on Dalling: 112 shows 54 of 262 hrs (54 time cards), not 0', () 
   const h = T.billingCard();
   assert.ok(h.includes('112: 54 of 262 hrs (54 time cards)'), h.slice(0, 200)); assert.ok(!h.includes('112: 0 of 262'));
   assert.ok(h.includes('122: 0 of 300 hrs (job cost)'));
-  deq([...h.matchAll(/data-bp="(\d+)"[^>]*value="([\d.]+)"/g)].map(x => +x[2]), [100, 21, 21, 0]);
+  deq([...h.matchAll(/data-bp="(\d+)"[^>]*value="([\d.]+)"/g)].map(x => +x[2]), [100, 21, 0, 0]);
   S.billTc = null;
 });
 
