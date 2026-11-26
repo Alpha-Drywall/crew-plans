@@ -15,3 +15,5 @@ jobs:
         run: node .github/scripts/check.js
       - name: Test the time card hours math
         run: node .github/scripts/timecards-test.js
+      - name: Test view-as (read-only) and practice mode
+        run: node .github/scripts/viewas-test.js

@@ -289,7 +289,7 @@ function fmtWhen(v){if(!v)return '';const d=new Date(v);if(isNaN(d))return '';re
 function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
 function lsSet(k,v){try{v==null?localStorage.removeItem(k):localStorage.setItem(k,v)}catch(e){}}
 let toastT=null;
-function toast(msg){let t=$('#toast');if(!t){t=document.createElement('div');t.id='toast';t.className='toast';document.body.appendChild(t)}t.textContent=msg;t.style.display='block';clearTimeout(toastT);toastT=setTimeout(()=>t.style.display='none',4000)}
+function toast(msg){if(S.roT&&Date.now()<S.roT&&msg!==roMsg())return;let t=$('#toast');if(!t){t=document.createElement('div');t.id='toast';t.className='toast';document.body.appendChild(t)}t.textContent=msg;t.style.display='block';clearTimeout(toastT);toastT=setTimeout(()=>t.style.display='none',4000)}
 function errMsg(e){const m=String((e&&e.message)||e||'');if(/row-level security|permission denied|42501|Unauthorized|403/i.test(m+(e&&e.code||'')+(e&&e.statusCode||'')))return "You don't have permission to change that.";if(/Failed to fetch|NetworkError|network|Load failed/i.test(m))return 'No connection. Check your signal and try again.';return m||'Something went wrong.'}
 async function q(p){const r=await p;if(r.error)throw r.error;return r.data}
 async function run(p,okMsg){try{const d=await q(p);if(okMsg)toast(okMsg);return d==null?true:d}catch(e){toast(errMsg(e));return null}}
@@ -297,7 +297,7 @@ async function run(p,okMsg){try{const d=await q(p);if(okMsg)toast(okMsg);return 
 /* ===== offline: local cache + outbox ===== */
 const OFF={db:null,ops:[],flushing:false,online:navigator.onLine!==false,ready:null};
 const OFF_TABLES=['marks','pins','logs','areas','timecards'];
-const OFF_DEFAULTS={timecards:{workers:[],status:'draft'},pins:{layer:'plans',kind:'issue',text:'',photos:[],status:'open',done_by:null,done_at:null},marks:{w:0.006,layer:'plans'},areas:{pct:{}},logs:{crew:0,hours:0,work:'',deliveries:'',notes:'',name:'',hours_by_code:{},weather:'',problems:'',sub_progress:'',trade_damage:'',workforce:{},equipment:[],materials:[],extra_work:[],signature:null,send_gc:false,pdf_path:null,filed_at:null,sent_at:null,file_error:null}};
+const OFF_DEFAULTS={crew_roster:{active:true},timecards:{workers:[],status:'draft'},pins:{layer:'plans',kind:'issue',text:'',photos:[],status:'open',done_by:null,done_at:null},marks:{w:0.006,layer:'plans'},areas:{pct:{}},logs:{crew:0,hours:0,work:'',deliveries:'',notes:'',name:'',hours_by_code:{},weather:'',problems:'',sub_progress:'',trade_damage:'',workforce:{},equipment:[],materials:[],extra_work:[],signature:null,send_gc:false,pdf_path:null,filed_at:null,sent_at:null,file_error:null}};
 function idb(){if(OFF.db)return OFF.db;OFF.db=new Promise((res,rej)=>{try{const r=indexedDB.open('alpha-crew-view',1);r.onupgradeneeded=()=>{const d=r.result;d.createObjectStore('resp');d.createObjectStore('img');d.createObjectStore('outbox',{keyPath:'n',autoIncrement:true})};r.onsuccess=()=>{const d=r.result;d.onclose=()=>{OFF.db=null};d.onversionchange=()=>{try{d.close()}catch(e){}OFF.db=null};res(d)};r.onerror=()=>{OFF.db=null;rej(r.error)}}catch(e){OFF.db=null;rej(e)}});return OFF.db}
 function idbOnce(store,mode,fn){return idb().then(d=>new Promise((res,rej)=>{const tx=d.transaction(store,mode);const r=fn(tx.objectStore(store));let out;if(r)r.onsuccess=()=>{out=r.result};tx.oncomplete=()=>res(out);tx.onerror=tx.onabort=()=>rej(tx.error)}))}
 async function idbDo(store,mode,fn){try{return await idbOnce(store,mode,fn)}catch(e){OFF.db=null;return await idbOnce(store,mode,fn)}}
@@ -316,7 +316,7 @@ const rowHit=(r,f)=>f.every(([k,v])=>r&&String(r[k])===v);
 function jsonRes(obj,status){return new Response(obj==null?null:JSON.stringify(obj),{status:status||200,headers:{'content-type':'application/json'}})}
 function applyOps(table,rows,filters){
   const me=S.me&&S.me.id;
-  for(const op of OFF.ops){
+  for(const op of OFF.ops.concat(PR.ops)){
     if(me&&op.sub!==me)continue;
     if(op.table!==table&&!(op.kind==='rpc'&&table==='areas'))continue;
     const now=new Date(op.t).toISOString();
@@ -333,7 +333,7 @@ function applyOps(table,rows,filters){
 }
 function sortRows(rows,order){if(!order)return rows;const [col,dir]=order.split(',')[0].split('.');const d=dir==='desc'?-1:1;return rows.sort((a,b)=>{const x=a[col],y=b[col];return x==y?0:(x==null?-1:y==null?1:(x<y?-1:1))*d})}
 function overlay(table,u,body,status,ct){
-  if(!myOps().length||!OFF_TABLES.includes(table))return new Response(body,{status,headers:{'content-type':ct||'application/json'}});
+  if(!(myOps().length||PR.ops.length)||!(isPractice()?PR_TABLES:OFF_TABLES).includes(table))return new Response(body,{status,headers:{'content-type':ct||'application/json'}});
   let data;try{data=JSON.parse(body)}catch(e){return new Response(body,{status,headers:{'content-type':ct||'application/json'}})}
   if(!Array.isArray(data))return new Response(body,{status,headers:{'content-type':ct||'application/json'}});
   return jsonRes(sortRows(applyOps(table,data,urlFilters(u)),u.searchParams.get('order')),status);
@@ -341,6 +341,7 @@ function overlay(table,u,body,status,ct){
 async function offlineFetch(input,init){
   init=init||{};const url=typeof input==='string'?input:input.url;let u;try{u=new URL(url)}catch(e){return fetch(input,init)}
   const method=String(init.method||(typeof input!=='string'&&input.method)||'GET').toUpperCase();
+  if(S.asUser&&roKind(u,method)==='block')return roDeny(u);
   const rest=u.pathname.startsWith('/rest/v1/'),stor=u.pathname.startsWith('/storage/v1/object/')&&!u.pathname.startsWith('/storage/v1/object/sign');
   if(!rest&&!stor)return fetch(input,init);
   const hdr=new Headers(init.headers||{});const name=rest?decodeURIComponent(u.pathname.slice(9)):'';const rpc=name.startsWith('rpc/')?name.slice(4):'';
@@ -357,7 +358,7 @@ async function offlineFetch(input,init){
     throw new TypeError('Failed to fetch: not saved on this device yet');
   }
   const objPath=stor?decodeURIComponent(u.pathname.replace(/^\/storage\/v1\/object\/[^/]+\//,'')):'';
-  const queueable=rest?(rpc?rpc==='set_area_pct':OFF_TABLES.includes(name)):(method==='POST'&&/\/(photos|reports)\//.test(objPath));
+  const queueable=rest?(rpc?rpc==='set_area_pct':(isPractice()?PR_TABLES:OFF_TABLES).includes(name)):(method==='POST'&&/\/(photos|reports)\//.test(objPath));
   if(!queueable)return fetch(input,init);
   await OFF.ready;
   const sub=(S.me&&S.me.id)||jwtSub(hdr);const prefer=hdr.get('prefer')||'';
@@ -375,12 +376,13 @@ async function offlineFetch(input,init){
   else if(method==='PATCH'){op.kind='update';op.filters=urlFilters(u);try{op.patch=JSON.parse(body)}catch(e){op.patch={}}op.body=body}
   else if(method==='DELETE'){op.kind='delete';op.filters=urlFilters(u);op.body=null;
     const lid=op.filters.find(([k,v])=>k==='id'&&v.startsWith('local-'));
-    if(lid){const n=Number(lid[1].slice(6));const i=OFF.ops.findIndex(o=>o.n===n);if(i>=0){OFF.ops.splice(i,1);await idbDel('outbox',n);netPill()}return jsonRes(null,204)}}
+    if(lid&&!isPractice()){const n=Number(lid[1].slice(6));const i=OFF.ops.findIndex(o=>o.n===n);if(i>=0){OFF.ops.splice(i,1);await idbDel('outbox',n);netPill()}return jsonRes(null,204)}}
   else return fetch(input,init);
   op.tries=0;
+  if(isPractice()){if(stor)prFile(objPath);else prPush(op);}else{
   const n=await idbPut('outbox',op);
   if(n==null){if(navigator.onLine===false)throw new TypeError('Failed to fetch: could not save on this device');return netFetch(url,init,20000)}
-  op.n=n;if(!OFF.ops.some(o=>o.n===n))OFF.ops.push(op);netPill();setTimeout(flushOutbox,0);
+  op.n=n;if(!OFF.ops.some(o=>o.n===n))OFF.ops.push(op);netPill();setTimeout(flushOutbox,0);}
   if(stor)return jsonRes({Id:uuid(),Key:u.pathname.split('/object/')[1]},200);
   const wantsObj=/vnd\.pgrst\.object/.test(hdr.get('accept')||'');const rep=/return=representation/.test(prefer);
   if(op.kind==='insert'||op.kind==='upsert'){const rows=op.rows.map(r=>Object.assign({created_at:new Date(op.t).toISOString(),created_by:sub},OFF_DEFAULTS[op.table]||{},r));if(wantsObj)return jsonRes(rows[0],201);if(rep)return jsonRes(rows,201)}
@@ -388,7 +390,7 @@ async function offlineFetch(input,init){
 }
 async function flushOutbox(){
   await OFF.ready;
-  if(OFF.flushing||!myOps().length||!sb||!S.me||navigator.onLine===false)return;
+  if(S.asUser||OFF.flushing||!myOps().length||!sb||!S.me||navigator.onLine===false)return;
   if(navigator.locks&&navigator.locks.request&&!OFF.inLock){return navigator.locks.request('acv-flush',{ifAvailable:true},async l=>{if(!l)return;OFF.inLock=true;try{OFF.ops=((await idbAll('outbox'))||[]).sort((x,y)=>x.n-y.n);await flushOutbox()}finally{OFF.inLock=false}}).catch(()=>{})}
   OFF.flushing=true;netPill();let sent=0,dropped=0,gaveUp=0;
   try{
@@ -425,6 +427,36 @@ window.addEventListener('offline',()=>{OFF.online=false;netPill()});
 setInterval(()=>{if(myOps().length)flushOutbox()},20000);
 async function okToSignOut(){const n=myOps().length;if(!n)return true;return await confirmBox(n+' change'+(n>1?'s':'')+" made on this device haven't uploaded yet. If you sign out now they'll be lost. Sign out anyway?",'Sign out')}
 async function clearDeviceCache(){try{await idbDo('resp','readwrite',st=>st.clear());await idbDo('img','readwrite',st=>st.clear())}catch(e){}S.urls={}}
+
+/* ===== office tools: view as a person (read-only) and practice mode =====
+   Every Supabase call (database, storage, edge functions, auth) goes through offlineFetch, so roKind() there is the one gate.
+   View as a person: reads run on the office login (office reads every row); every write is refused with a toast.
+   Practice: writes to marks, pins, logs, areas, timecards and crew_roster go to PR (this browser only) and are laid over reads; everything else is refused. */
+const PRACTICE_ID='00000000-0000-4000-8000-00000000fe11';
+const PR={ops:[],files:[],n:0};
+const PR_TABLES=OFF_TABLES.concat(['crew_roster']);
+const RO_RPC=['office_names','foreman_accounts','labor_budget'];
+const isPractice=()=>!!(S.asUser&&S.asUser.practice);
+const roView=()=>!!(S.asUser&&!S.asUser.practice);
+const roMsg=()=>!S.asUser?'':S.asUser.practice?'Not available in practice mode.':'Viewing as '+S.asUser.name+' — read-only.';
+function roKind(u,method){const p=u.pathname;
+  if(p.startsWith('/functions/'))return 'block';
+  if(method==='GET'||method==='HEAD'||method==='OPTIONS')return 'read';
+  if(p.startsWith('/rest/v1/rpc/')){const r=decodeURIComponent(p.slice(13));return RO_RPC.includes(r)?'read':isPractice()&&r==='set_area_pct'?'practice':'block'}
+  if(p.startsWith('/rest/v1/'))return isPractice()&&method!=='PUT'&&PR_TABLES.includes(decodeURIComponent(p.slice(9)))?'practice':'block';
+  if(p.startsWith('/storage/v1/object/sign/')||p.startsWith('/storage/v1/object/list/'))return 'read';
+  if(p.startsWith('/storage/v1/object/'))return isPractice()&&method==='POST'&&/\/(photos|reports)\//.test(p)?'practice':'block';
+  if(p==='/auth/v1/token')return 'read';
+  return 'block';
+}
+function roDeny(){const m=roMsg();S.roT=0;toast(m);S.roT=Date.now()+2500;debounce('roSync',roResync,900);return jsonRes({message:m,msg:m,error:m,code:'read_only'},400)}
+function roResync(){if(S.view==='tc'){if(!isPractice())loadTc()}else if(S.view==='job'&&S.job)reloadJob();if(V)loadSheetData()}
+function prLoad(){try{const o=JSON.parse(lsGet('acv.practice')||'null');if(o){PR.ops=o.ops||[];PR.files=o.files||[];PR.n=o.n||0}}catch(e){}}
+function prSave(){lsSet('acv.practice',JSON.stringify({n:PR.n,ops:PR.ops,files:PR.files}))}
+function prPush(op){delete op.url;delete op.headers;delete op.body;op.n=++PR.n;const last=PR.ops[PR.ops.length-1];
+  if(op.kind==='update'&&last&&last.kind==='update'&&last.table===op.table&&JSON.stringify(last.filters)===JSON.stringify(op.filters)){Object.assign(last.patch,op.patch);last.t=op.t}else PR.ops.push(op);prSave()}
+function prFile(path){if(!PR.files.includes(path))PR.files.push(path);prSave()}
+async function prClear(){if(!PR.ops.length&&!PR.files.length)prLoad();for(const f of PR.files){await idbDel('img',f);if(S.urls[f])delete S.urls[f]}PR.ops=[];PR.files=[];PR.n=0;lsSet('acv.practice',null)}
 
 /* ===== state ===== */
 let sb=null;
@@ -835,9 +867,10 @@ async function afterLogin(openId){
   if(!S.me){renderWelcome();return}
   S.isAdmin=false;
   if(!S.me.is_anonymous){try{S.isAdmin=!!(await q(sb.rpc('claim_office')))}catch(e){}}
-  S.realAdmin=S.isAdmin;S.viewAs=null;if(S.realAdmin&&(lsGet('acv.viewAs')==='field'||lsGet('acv.viewAs')==='viewer')){S.viewAs=lsGet('acv.viewAs');S.isAdmin=false;fieldPill()}
+  S.realAdmin=S.isAdmin;S.viewAs=null;S.asUser=null;if(S.realAdmin&&(lsGet('acv.viewAs')==='field'||lsGet('acv.viewAs')==='viewer')){S.viewAs=lsGet('acv.viewAs');S.isAdmin=false;fieldPill()}
+  else if(S.realAdmin&&lsGet('acv.viewAs')==='person'){let u=null;try{u=JSON.parse(lsGet('acv.viewAsUser')||'null')}catch(e){}if(u&&(u.practice||u.id))asUserStart(u);else lsSet('acv.viewAs',null)}
   await loadOffice();
-  if(!S.me.is_anonymous&&!S.isAdmin&&!S.realAdmin){
+  if(!S.me.is_anonymous&&!S.isAdmin&&!S.realAdmin&&!S.asUser){
     let onJobs=false;try{onJobs=!!((await q(sb.from('members').select('job_id').eq('user_id',S.me.id).limit(1)))||[]).length}catch(e){onJobs=true}
     if(!onJobs){
     $('#app').innerHTML='<div class="top"><h1><div class="ttl"><span class="brand"></span>Alpha Operations</div></h1></div><main><div class="empty"><b>No jobs on this login yet</b>'+esc(S.me.email||'This login')+' isn\'t on any jobs yet. Foremen: ask the office to add you to your jobs, or open the invite link they sent you. Office: ask a PM to add you under ☰ → Office users, then sign in again.<div style="margin-top:14px"><button class="btn" id="so">Sign out</button></div></div></main>';
@@ -876,14 +909,44 @@ async function msPanel(){
   const d=$('[data-d]',b);if(d)d.onclick=async()=>{if(!await confirmBox('Disconnect Microsoft? Time cards and daily reports will stop copying to Shared Documents until someone connects again.','Disconnect'))return;await sb.functions.invoke('crew-sync',{body:{action:'ms_disconnect'}});m.close();toast('Disconnected.')};
 }
 function fieldPill(){if(document.getElementById('fvPill'))return;const b=document.createElement('button');b.id='fvPill';b.className='fvpill';b.textContent=(S.viewAs==='viewer'?'View-only view':'Field view')+' · back to office';if(S.viewAs==='viewer')b.style.background='#00695c';b.onclick=()=>setViewAs('office');document.body.appendChild(b)}
-function setViewAs(v){lsSet('acv.viewAs',v==='field'||v==='viewer'?v:null);try{tcFlush()}catch(e){}location.reload()}
+async function setViewAs(v,u){if(lsGet('acv.viewAs')==='person'){let o=null;try{o=JSON.parse(lsGet('acv.viewAsUser')||'null')}catch(e){}if(o&&o.practice)await prClear()}
+  lsSet('acv.viewAsUser',v==='person'&&u?JSON.stringify(u):null);lsSet('acv.viewAs',v==='field'||v==='viewer'||v==='person'?v:null);if(!S.asUser){try{tcFlush()}catch(e){}}location.reload()}
+/* view as a real person, or practice as Test Foreman / Test Viewer: the app runs as that user id (S.me) on the office login; S.asUser marks it and offlineFetch blocks writes */
+function asUserStart(u){const pr=!!u.practice,role=u.role==='viewer'?'viewer':'foreman';
+  S.asUser={id:pr?PRACTICE_ID:String(u.id),name:pr?(role==='viewer'?'Test Viewer':'Test Foreman'):String(u.name||'Crew member').slice(0,60),role,practice:pr};
+  S.me={id:S.asUser.id,is_anonymous:pr?role==='viewer':!!u.anon,email:'',user_metadata:{full_name:S.asUser.name,pw_set:true},app_metadata:{}};
+  S.people[S.me.id]=S.asUser.name;S.isAdmin=false;S.realAdmin=false;if(pr)prLoad();asPill()}
+function asPill(){if(document.getElementById('fvPill'))return;const b=document.createElement('button');b.id='fvPill';b.className='fvpill';b.style.cssText='background:'+(isPractice()?'#b45309':'#334155')+';max-width:calc(100vw - 24px);overflow:hidden;text-overflow:ellipsis';
+  b.textContent=isPractice()?'Practice mode — nothing is saved · Exit':'Viewing as '+S.asUser.name+' (read-only) · Exit';b.onclick=()=>isPractice()?asMenu():setViewAs('office');document.body.appendChild(b)}
+function asMenu(){const pr=isPractice(),n=esc(S.asUser.name);
+  const m=modal('<h2>'+(pr?'Practice mode':'Viewing as '+n)+'</h2><p class="muted">'+(pr?'You’re practicing as <b>'+n+'</b> ('+(S.asUser.role==='viewer'?'view-only crew':'foreman')+') on the real jobs. Time cards, daily reports, markups and pins you make stay in this browser only. Nothing goes to the database, the office, the GC or SharePoint. Exit clears it.':'You see what <b>'+n+'</b> sees: their jobs, their time card and their daily reports. It’s read-only. Nothing can be changed while you’re viewing as them.')+'</p><div style="display:grid;gap:10px;margin-top:12px">'+
+    (pr?'<button class="btn" data-reset>Reset practice data</button>':'')+'<button class="btn primary" data-exit>Exit to office view</button><button class="btn" data-x>Close</button></div>');
+  $('[data-x]',m).onclick=()=>m.close();$('[data-exit]',m).onclick=()=>{m.close();setViewAs('office')};
+  const r=$('[data-reset]',m);if(r)r.onclick=async()=>{m.close();if(!await confirmBox('Clear your practice time cards, reports, markups and pins and start over?','Reset'))return;await prClear();location.reload()}}
+/* people the office can view as: foreman logins, time card owners and job members (office users left out) */
+async function viewAsPicker(){
+  const pb=progressBox('Loading people…');let fa=[],mem=[],cards=[];
+  await Promise.all([q(sb.rpc('foreman_accounts')).then(d=>{fa=d||[]},()=>{}),q(sb.from('members').select('user_id,name,role,job_id')).then(d=>{mem=d||[]},()=>{}),
+    q(sb.from('timecards').select('owner,foreman,period_start').gte('period_start',isoAddD(tcPeriodOf(tcToday()),-182))).then(d=>{cards=d||[]},()=>{})]);pb.close();
+  const skip=new Set((S.office||[]).map(o=>o.user_id).filter(Boolean));if(S.me)skip.add(S.me.id);const P={};
+  const get=(id,n)=>{if(!id||skip.has(id))return null;const p=P[id]=P[id]||{id,name:'',jobs:new Set(),ed:0,acct:false,tc:false};if(n&&!p.name)p.name=String(n).trim();return p};
+  fa.forEach(f=>{const p=get(f.user_id,f.name);if(p)p.acct=true});cards.forEach(c=>{const p=get(c.owner,c.foreman);if(p)p.tc=true});
+  mem.forEach(x=>{const p=get(x.user_id,x.name);if(!p)return;p.jobs.add(x.job_id);if(x.role!=='viewer')p.ed++});
+  const list=Object.values(P).map(p=>({id:p.id,name:p.name||'Crew member',role:p.acct||p.tc||p.ed?'foreman':'viewer',anon:!(p.acct||p.tc),jobs:p.jobs.size})).sort((a,b)=>a.name.localeCompare(b.name));
+  const row=p=>'<button class="btn verrow" data-p="'+esc(p.id)+'" style="width:100%;margin-bottom:6px;text-align:left"><b class="grow">'+esc(p.name)+'</b><span class="muted small">'+p.jobs+' job'+(p.jobs===1?'':'s')+(p.role==='foreman'?(p.anon?' · invite link only':' · has a login'):'')+'</span></button>';
+  const sec=(t,a)=>a.length?'<h3 style="margin:12px 0 6px">'+t+'</h3>'+a.map(row).join(''):'';
+  const m=modal('<h2>View as…</h2><p class="small muted" style="margin:-4px 0 10px">See the app the way this person does: only their jobs, their time card and their daily reports. Read-only, nothing can be changed.</p><label class="field"><span>Search</span><input data-f placeholder="Name"></label><div data-l style="max-height:55vh;overflow:auto"></div><div class="mbtns"><button class="btn" data-x>Cancel</button></div>');
+  const draw=()=>{const f=tcKey($('[data-f]',m).value);const a=list.filter(p=>!f||tcKey(p.name).includes(f));
+    $('[data-l]',m).innerHTML=list.length?(sec('Foremen',a.filter(p=>p.role==='foreman'))+sec('View-only crew',a.filter(p=>p.role==='viewer'))||'<div class="muted">No one matches.</div>'):'<div class="muted">Couldn’t find anyone on jobs yet.</div>';
+    $$('[data-p]',m).forEach(b=>b.onclick=()=>{const p=list.find(x=>x.id===b.dataset.p);if(!p)return;m.close();setViewAs('person',{id:p.id,name:p.name,role:p.role,anon:p.anon})})};
+  $('[data-f]',m).oninput=draw;$('[data-x]',m).onclick=()=>m.close();draw()}
 async function loadOffice(){try{S.office=await q(sb.rpc('office_names'))||[];S.office.forEach(o=>{if(o.user_id)S.people[o.user_id]=o.name||'Office'});const me=S.me&&S.office.find(o=>o.user_id===S.me.id);S.myOfficeId=me?me.id:null}catch(e){S.office=S.office||[]}}
 const pmName=id=>{const o=(S.office||[]).find(x=>x.id===id);return o?o.name:''};
 /* Progress reminders: a job needs progress marked when 2+ days with crew hours (daily reports or time cards) were logged after the last progress markup.
    Only jobs that have progress sheets count. Everyone on the job sees it (office and foremen). */
 const NUDGE_DAYS=2;
 async function loadNudges(){try{const since=new Date(Date.now()-60*864e5);const sinceD=since.toISOString().slice(0,10);
-  const [logs,marks,areas,ps,cards]=await Promise.all([q(sb.from('logs').select('job_id,date,hours').gte('date',sinceD)),q(sb.from('marks').select('job_id,created_at').eq('layer','progress').gte('created_at',since.toISOString())),q(sb.from('areas').select('job_id,updated_at')),q(sb.from('sheets').select('job_id').eq('on_progress',true).eq('is_current',true)),q(sb.from('timecards').select('owner,foreman,period_start,workers').gte('period_start',tcPeriodOf(sinceD))).catch(()=>[])]);
+  const [logs,marks,areas,ps,cards]=await Promise.all([q(sb.from('logs').select('job_id,date,hours').gte('date',sinceD)),q(sb.from('marks').select('job_id,created_at').eq('layer','progress').gte('created_at',since.toISOString())),q(sb.from('areas').select('job_id,updated_at')),q(sb.from('sheets').select('job_id').eq('on_progress',true).eq('is_current',true)),q(sb.from('timecards').select('owner,foreman,period_start,workers').gte('period_start',tcPeriodOf(sinceD))).then(c=>S.asUser?(c||[]).filter(x=>x.owner===S.me.id):c).catch(()=>[])]);
   const uses=new Set((ps||[]).map(x=>x.job_id));const last={};const bump=(j,t)=>{if(t&&(!last[j]||t>last[j]))last[j]=t};
   (marks||[]).forEach(m=>bump(m.job_id,m.created_at));(areas||[]).forEach(a=>bump(a.job_id,a.updated_at));
   const days={};(logs||[]).forEach(l=>{if(!uses.has(l.job_id)||!(num(l.hours)>0))return;const lp=last[l.job_id]?String(last[l.job_id]).slice(0,10):'';if(l.date>lp)(days[l.job_id]=days[l.job_id]||new Set()).add(l.date)});
@@ -896,8 +959,10 @@ async function loadJobs(){
   try{S.jobs=await q(sb.from('jobs').select('*').order('created_at',{ascending:false}));S.jobsLoaded=true}
   catch(e){toast(errMsg(e));S.jobsLoaded=true}
   if(S.me&&!S.realAdmin){try{S.myRoles=(await q(sb.from('members').select('job_id,role').eq('user_id',S.me.id)))||[]}catch(e){}}
+  if(isPractice())S.myRoles=S.jobs.map(j=>({job_id:j.id,role:S.asUser.role==='viewer'?'viewer':'editor'}));
+  else if(S.asUser){const ids=new Set((S.myRoles||[]).map(m=>m.job_id));S.jobs=S.jobs.filter(j=>ids.has(j.id))}
   if(S.job){const j=S.jobs.find(x=>x.id===S.job.id);if(!j){toast("You no longer have access to this job.");closeJob();return}S.job=j;PHASES=normScope(j.scope);
-    if(!S.isAdmin&&!S.realAdmin){try{const m=await q(sb.from('members').select('role').eq('job_id',j.id).eq('user_id',S.me.id).maybeSingle());const nr=m?m.role:null;if(nr!==S.role){S.role=nr;if(V)closeSheet();render();return}}catch(e){}}}
+    if(!S.isAdmin&&!S.realAdmin&&!isPractice()){try{const m=await q(sb.from('members').select('role').eq('job_id',j.id).eq('user_id',S.me.id).maybeSingle());const nr=m?m.role:null;if(nr!==S.role){S.role=nr;if(V)closeSheet();render();return}}catch(e){}}}
   if(S.view!=='job'||S.job)render();
   if(!S.nudgeT||Date.now()-S.nudgeT>60000){S.nudgeT=Date.now();loadNudges()}
 }
@@ -910,6 +975,7 @@ async function openJob(id){
   S.job=j;PHASES=normScope(j.scope);S.view='job';S.tab=S.tab||'plans';S.sheets=[];S.areas=[];S.logs=[];S.members=[];S.invites=[];S.loaded={};
   if(S.isAdmin)S.role='admin';
   else if(S.realAdmin)S.role=S.viewAs==='viewer'?'viewer':'editor';
+  else if(isPractice())S.role=S.asUser.role==='viewer'?'viewer':'editor';
   else{try{const m=await q(sb.from('members').select('role').eq('job_id',id).eq('user_id',S.me.id).maybeSingle());S.role=m?m.role:null}catch(e){S.role=null}}
   if(!S.role){toast("You don't have access to that job.");S.job=null;S.view='jobs';render();return}
   lsSet('crewplans.lastJob',id);
@@ -966,7 +1032,8 @@ function render(){
 
 /* labor (office edits budget; everyone on the job can view) */
 async function laborBudgetRead(id){if(isAdminRole()){const b=await q(sb.from('job_budget').select('labor').eq('job_id',id).maybeSingle());return (b&&b.labor)||{}}
-  return (await q(sb.rpc('labor_budget',{j:id},{get:true})))||{}}
+  try{const r=(await q(sb.rpc('labor_budget',{j:id},{get:true})))||{};if(!S.asUser||Object.keys(r).length)return r}catch(e){if(!S.asUser)throw e}
+  const b=await q(sb.from('job_budget').select('labor').eq('job_id',id).maybeSingle());const L=Object.assign({},(b&&b.labor)||{});['cost_dollars','rate','rate_note','billing'].forEach(k=>delete L[k]);return L}
 async function loadLabor(){const id=jobId();if(!id)return;S.laborLoading=true;
   try{const [lb,ls]=await Promise.all([laborBudgetRead(id),q(sb.from('logs').select('date,hours,hours_by_code,user_id').eq('job_id',id).order('date'))]);
     if(jobId()!==id)return;const tc=await laborTcRead(lb||{},ls||[]);if(jobId()!==id)return;S.labor=lb||{};S.laborLogs=ls||[];S.laborTc=tc;S.loaded.labor=true}catch(e){toast(errMsg(e))}finally{S.laborLoading=false}
@@ -1292,6 +1359,7 @@ async function loadTc(){
       const p=(prev&&prev[0])||{};let fm=p.foreman||(S.me.user_metadata||{}).full_name||myName()||'';
       if(!fm){try{fm=(((await q(sb.from('members').select('name').eq('user_id',me).order('joined_at',{ascending:false}).limit(1)))||[])[0]||{}).name||''}catch(e){}}
       mine={id:null,owner:me,period_start:TC.start,foreman:fm,folder:p.folder||tcFirst(fm),status:'draft',teams_to:p.teams_to||null,workers:(p.workers||[]).map(w=>{const o={name:w.name||'',rate:w.rate||'',days:{}};if(w.bank)o.bank={on:!!w.bank.on,start:w.bankRes&&w.bankRes.end!=null&&p.status==='submitted'?w.bankRes.end:tcBankCalc(w).end};return o})};
+      if(isPractice()&&!mine.workers.length)mine.workers=['Sample Framer','Sample Hanger','Sample Taper'].map(n=>({name:n,rate:'',days:{}}));
       if(fm){const k=tcKey(fm),i=mine.workers.findIndex(w=>tcKey(w.name)===k);if(i>0)mine.workers.unshift(mine.workers.splice(i,1)[0]);else if(i<0)mine.workers.unshift({name:fm,rate:'',days:{}})}
     }
     TC.card=mine;if(TC.openFirst){TC.openFirst=false;if(mine.workers.length)TC.open=0}
@@ -1304,7 +1372,7 @@ async function loadTc(){
 }
 function tcRefreshRates(force){const c=TC.card;if(!c||!force&&c.status==='submitted'&&!S.isAdmin)return;let ch=false;
   (c.workers||[]).forEach(w=>{const r=tcRoster(w.name);if(r&&r.rate!=null&&String(r.rate)!==String(w.rate)){w.rate=String(r.rate);ch=true}});
-  if(ch&&c.id){c.dirty=true;tcSchedule()}}
+  if(ch&&c.id&&!roView()){c.dirty=true;tcSchedule()}}
 async function tcRosterSave(name,rate){
   name=String(name||'').trim().slice(0,60);if(!name)return;const r=tcRoster(name);
   const rv=rate!==undefined&&String(rate).trim()!==''&&isFinite(+rate)?+rate:null;
@@ -1328,6 +1396,7 @@ async function tcFlush(){
 function tcStatusText(c){
   if(!c)return '';
   if(c.dirty||TC.saveT)return 'Saving…';
+  if(isPractice())return c.status==='submitted'?'Submitted (practice). Nothing was sent to the office or Excel.':'Practice card. Saved in this browser only.';
   if(c.status!=='submitted')return c.id?'Saved on this card. Not submitted yet.':'Fill in hours. It saves as you go.';
   const changed=c.updated_at&&c.submitted_at&&c.updated_at>c.submitted_at&&(Date.parse(c.updated_at)-Date.parse(c.submitted_at))>5000;
   if(changed)return 'Changed since you submitted. Submit again to update the Excel file.';
@@ -1623,8 +1692,8 @@ function bindTc(){
     c.dirty=true;await tcFlush();if(!c.id)return;
     const now=new Date().toISOString();up.submitted_at=now;
     if(await run(sb.from('timecards').update(up).eq('id',c.id))==null)return;
-    Object.assign(c,up,{updated_at:now});TC.force=true;render();toast(up.pdf_path?'Submitted. Your PDF is going to '+c.teams_to+' in Teams.':'Time cards submitted.');
-    if(navigator.onLine!==false)sb.functions.invoke('crew-sync',{body:{action:'timecards'}}).then(async()=>{const r=await q(sb.from('timecards').select('status,submitted_at,filed_at,file_name,file_error,updated_at,teams_sent_at,teams_error').eq('id',c.id).single()).catch(()=>null);if(r&&TC.card&&TC.card.id===c.id){Object.assign(TC.card,r);tcStatus()}}).catch(()=>{});
+    Object.assign(c,up,{updated_at:now});TC.force=true;render();toast(isPractice()?'Practice card submitted. Nothing was sent to the office.':up.pdf_path?'Submitted. Your PDF is going to '+c.teams_to+' in Teams.':'Time cards submitted.');
+    if(navigator.onLine!==false&&!S.asUser)sb.functions.invoke('crew-sync',{body:{action:'timecards'}}).then(async()=>{const r=await q(sb.from('timecards').select('status,submitted_at,filed_at,file_name,file_error,updated_at,teams_sent_at,teams_error').eq('id',c.id).single()).catch(()=>null);if(r&&TC.card&&TC.card.id===c.id){Object.assign(TC.card,r);tcStatus()}}).catch(()=>{});
   };
 }
 
@@ -1634,7 +1703,7 @@ function renderJobs(){
   if(S.isAdmin)h+='<button class="btn primary block" id="newJob" style="margin-bottom:10px">+ New job</button>';
   if(canSeeTc())h+='<button class="btn block" id="tcOpen" style="margin-bottom:14px">⏱ Time cards</button>';
   if(!S.jobsLoaded)h+='<div class="empty">Loading jobs…</div>';
-  else if(!S.jobs.length)h+='<div class="empty"><b>No jobs yet</b>'+(S.isAdmin?'Add a job, upload its plan PDF, then invite your foreman from the job\'s ⋯ menu.':'Open the invite link the office texted you to get access to a job.')+'</div>';
+  else if(!S.jobs.length)h+='<div class="empty"><b>No jobs yet</b>'+(S.asUser?esc(S.asUser.name)+' isn’t on any jobs right now.':S.isAdmin?'Add a job, upload its plan PDF, then invite your foreman from the job\'s ⋯ menu.':'Open the invite link the office texted you to get access to a job.')+'</div>';
   else{
     const card=j=>{const n=(S.nudges||{})[j.id];return '<div class="card job" data-id="'+esc(j.id)+'"><div class="grow"><div class="name">'+esc(j.name||'Untitled job')+'</div>'+(j.addr?'<div class="muted">'+esc(j.addr)+'</div>':'')+(n?'<div class="small" style="color:#9a3412;margin-top:2px">\u26a0 Progress not marked \u00b7 '+n.days+' days of hours</div>':'')+'</div><span class="chev">›</span></div>'};
     if(S.isAdmin){
@@ -1658,13 +1727,16 @@ function bindJobs(){
   if($('#tcOpen'))$('#tcOpen').onclick=openTimecards;
   $$('[data-view]').forEach(b=>b.onclick=()=>{lsSet('crewplans.jobView',b.dataset.view);render()});
   $('#acct').onclick=()=>{
+    if(S.asUser){asMenu();return}
     const m=modal('<h2>Account</h2><p class="muted">'+(S.isAdmin?'Signed in as office: '+esc(S.me.email||who(S.me.id)):S.realAdmin?'Office login, looking at the field view.':isForeman()?'Signed in as foreman: '+esc(S.me.email||''):'Crew access on this phone. Your access comes from invite links; signing out would remove it from this phone.')+'</p><div style="display:grid;gap:10px;margin-top:12px">'+
-      (S.isAdmin?'<button class="btn" data-msc>Microsoft connection</button><button class="btn" data-users>Office users</button><button class="btn" data-pw>Change password</button><button class="btn" data-out>Sign out</button>':isForeman()?'<button class="btn" data-pw>Change password</button><button class="btn" data-out>Sign out</button>':'<button class="btn primary" data-fm>Make a foreman login</button><button class="btn" data-off>Office or foreman sign in on this device</button>')+(S.realAdmin?(S.isAdmin?'<button class="btn" data-vas="field">Test as a foreman (field view)</button><button class="btn" data-vas="viewer">Test as view-only crew</button>':'<button class="btn primary" data-vas="office">Switch back to office view</button>'):'')+'<button class="btn" data-tips>'+(tipLang()==='es'?'Consejos / Idioma':'Tips / Español')+'</button><button class="btn" data-intro>▶ Play intro</button><button class="btn" data-x>Close</button></div>');
+      (S.isAdmin?'<button class="btn" data-msc>Microsoft connection</button><button class="btn" data-users>Office users</button><button class="btn" data-pw>Change password</button><button class="btn" data-out>Sign out</button>':isForeman()?'<button class="btn" data-pw>Change password</button><button class="btn" data-out>Sign out</button>':'<button class="btn primary" data-fm>Make a foreman login</button><button class="btn" data-off>Office or foreman sign in on this device</button>')+(S.realAdmin?(S.isAdmin?'<button class="btn" data-vas="field">Test as a foreman (field view)</button><button class="btn" data-vas="viewer">Test as view-only crew</button><button class="btn" data-vap>View as a foreman or crew member (read-only)…</button><button class="btn" data-prac="foreman">Practice as Test Foreman</button><button class="btn" data-prac="viewer">Practice as Test Viewer</button>':'<button class="btn primary" data-vas="office">Switch back to office view</button>'):'')+'<button class="btn" data-tips>'+(tipLang()==='es'?'Consejos / Idioma':'Tips / Español')+'</button><button class="btn" data-intro>▶ Play intro</button><button class="btn" data-x>Close</button></div>');
     $('[data-x]',m).onclick=()=>m.close();
     const o=$('[data-out]',m);if(o)o.onclick=async()=>{if(!await okToSignOut())return;await sb.auth.signOut();await clearDeviceCache();lsSet('crewplans.lastJob',null);location.href=location.pathname+'?office'};
     $('[data-intro]',m).onclick=()=>{primeAudio();m.close();playSplash(true)};
     $('[data-tips]',m).onclick=()=>{m.close();tipsMenu()};
     $$('[data-vas]',m).forEach(va=>va.onclick=()=>{m.close();setViewAs(va.dataset.vas)});
+    const vp=$('[data-vap]',m);if(vp)vp.onclick=()=>{m.close();viewAsPicker()};
+    $$('[data-prac]',m).forEach(b=>b.onclick=()=>{m.close();setViewAs('person',{practice:true,role:b.dataset.prac})});
     const ou=$('[data-users]',m);if(ou)ou.onclick=()=>{m.close();officeUsers()};
     const msc=$('[data-msc]',m);if(msc)msc.onclick=()=>{m.close();msPanel()};
     const pw=$('[data-pw]',m);if(pw)pw.onclick=()=>{m.close();setPasswordBox('Change password')};
@@ -2351,7 +2423,7 @@ function renderLogForm(){
     try{const blob=await reportPdf(o,S.job);o.pdf_path=await putFile(S.job.id+'/reports/'+d+'_'+S.me.id.slice(0,8)+'_'+Date.now()+'.pdf',blob,'application/pdf')}
     catch(err){o.pdf_path=null;toast("Saved, but the PDF couldn't be made: "+errMsg(err))}
     btn.disabled=false;
-    if(await run(sb.from('logs').upsert(o,{onConflict:'job_id,user_id,date'}),send?'Report saved. It will be emailed to the GC and filed in the job folder.':'Report saved. It will be filed in the job folder.')){touched=false;$('[data-st]',form).textContent='Editing your saved report for this day.';loadLogs();nudgeReports()}
+    if(await run(sb.from('logs').upsert(o,{onConflict:'job_id,user_id,date'}),isPractice()?'Practice report saved in this browser only. Nothing is filed or emailed.':send?'Report saved. It will be emailed to the GC and filed in the job folder.':'Report saved. It will be filed in the job folder.')){touched=false;$('[data-st]',form).textContent='Editing your saved report for this day.';loadLogs();nudgeReports()}
     else $('[data-st]',form).textContent='';
   };
 }
@@ -2397,8 +2469,9 @@ async function reportPdf(o,job){
   const pages=doc.getNumberOfPages();for(let p=1;p<=pages;p++){doc.setPage(p);doc.setFontSize(8);doc.setFont('helvetica','bold');doc.text('Alpha Drywall, LLC',W/2,748,{align:'center'});doc.setFont('helvetica','italic');doc.text('Drywall -- Metal Stud Framing-- Suspended Ceilings',W/2,758,{align:'center'});doc.setFont('helvetica','bolditalic');doc.text('2724 S. 3600 W. Suite L, West Valley City, UT 84119',W/2,768,{align:'center'});doc.text('Office#(801) 682-4447/Fax#(801) 683-2847',W/2,778,{align:'center'})}
   return doc.output('blob');
 }
-let nudgeT=0;function nudgeReports(){if(navigator.onLine===false||Date.now()-nudgeT<20000)return;nudgeT=Date.now();setTimeout(()=>{sb.functions.invoke('crew-sync',{body:{action:'reports'}}).then(r=>{if(r&&r.data&&r.data.reports&&r.data.reports.length)setTimeout(loadLogs,500)}).catch(()=>{})},1500)}
+let nudgeT=0;function nudgeReports(){if(S.asUser||navigator.onLine===false||Date.now()-nudgeT<20000)return;nudgeT=Date.now();setTimeout(()=>{sb.functions.invoke('crew-sync',{body:{action:'reports'}}).then(r=>{if(r&&r.data&&r.data.reports&&r.data.reports.length)setTimeout(loadLogs,500)}).catch(()=>{})},1500)}
 function reportStatus(l){
+  if(isPractice()&&String(l.id).startsWith('local-'))return '<span class="muted small">Practice report. Saved in this browser only; not filed or emailed.</span>';
   if(!l.pdf_path)return '<span class="muted small">No PDF</span>';
   const f=l.filed_at?'✓ In job folder':(l.file_error?'⚠ Not filed: '+esc(l.file_error):'Filing to job folder…');
   const g=l.send_gc?(l.sent_at?' · ✓ Sent to GC':' · Sending to GC…'):'';
@@ -2414,7 +2487,7 @@ async function loadLogTc(){const id=jobId(),logs=S.logs||[];if(!id||!S.me)return
   let cards;try{cards=(await q(p))||[]}catch(e){return}if(jobId()!==id)return;
   const K=tcJobKey(S.job),out={};
   for(const l of ls){const c=cards.filter(x=>x.owner===l.user_id&&x.period_start===tcPeriodOf(l.date));if(!c.length)continue;const r=tcJobDay(c,l.date,K[0],K[1]);out[l.id]=r;
-    if(r.hours!==num(l.hours)||!sameBy(r.by,l.hours_by_code)){try{await q(sb.from('logs').update({hours:r.hours,hours_by_code:r.by}).eq('id',l.id))}catch(e){}}}
+    if(!S.asUser&&(r.hours!==num(l.hours)||!sameBy(r.by,l.hours_by_code))){try{await q(sb.from('logs').update({hours:r.hours,hours_by_code:r.by}).eq('id',l.id))}catch(e){}}}
   if(jobId()!==id)return;S.logTc=Object.assign(S.logTc||{},out);if(S.tab==='log')renderLogList()}
 function renderLogList(){
   const box=$('#logList');if(!box)return;
