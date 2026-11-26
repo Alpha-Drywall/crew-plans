@@ -2770,8 +2770,10 @@ function billHoursByCode(C,T){if(!C||!C.cost||!T)return hoursByCode(C);const o={
 /* "112: 54 of 262 hrs (54 time cards)" under a line's % from hours */
 function billHrsNote(k,x){if(!x)return '';const s=k+': '+f0(x.used)+' of '+f0(x.bh)+' hrs';if(x.cost==null)return s;
   return s+(x.tcAll?' ('+f0(x.tc)+' time cards)':x.tc>0?' ('+f0(x.cost)+' job cost + '+f0(x.tc)+' time cards)':' (job cost)')}
-/* a pay app line's % from hours: null = no matching code or no budget (keep last month). Mobilization / Submittals = 100 once any trade line is above 0. */
-function billHoursPct(line,H,lines){const n=String(line&&line.n||'');const h=H||{};
+/* a pay app line's % from hours: null = no matching code or no budget (keep last month). Mobilization / Submittals = 100 once any trade line is above 0.
+   Material lines get none: time card hours say nothing about material on site, so the office types those %s. */
+const BILL_MAT=/\bmat(?:erials?|\u2019l|'l)?\b/i;
+function billHoursPct(line,H,lines){const n=String(line&&line.n||'');const h=H||{};if(BILL_MAT.test(n))return null;
   if(PCT_SKIP.test(n))return (lines||[]).some(l=>{const c=!PCT_SKIP.test(String(l&&l.n||''))&&lineCode(l&&l.n);return c&&h[c]&&h[c].pct>0})?100:null;
   const c=lineCode(n);return c&&h[c]?h[c].pct:null}
 /* job Done %: the line %s weighted by pay app $ (lines without a suggestion and Mob / Submittals left out); no pay app lines -> each trade code weighted by its budgeted hours */
@@ -2806,13 +2808,13 @@ function billingCard(){const B=S.billing;
   const prev=hist.filter(h=>h.period<cur).pop();const mine=hist.find(h=>h.period===cur);const ed=canEditLaborRate();
   const pv=prev?billPcts(prev,B.lines):null,mv=mine?billPcts(mine,B.lines):null;
   const C=S.loaded.labor&&S.labor?laborCalc():null;const H=billHoursByCode(C,S.billTc);const noHrs=!Object.keys(H).length;
-  const rows=B.lines.map((l,i)=>{const last=pv?pv[i]:0;const crew=now?billHoursPct(l,H,B.lines):null;const code=PCT_SKIP.test(String(l.n||''))?null:lineCode(l.n);const sug=Math.min(100,Math.max(last,crew==null?last:crew));const val=mv?mv[i]:sug;return {l,i,last,crew,code,sug,val}});
+  const rows=B.lines.map((l,i)=>{const last=pv?pv[i]:0;const crew=now?billHoursPct(l,H,B.lines):null;const code=PCT_SKIP.test(String(l.n||''))||BILL_MAT.test(String(l.n||''))?null:lineCode(l.n);const sug=Math.min(100,Math.max(last,crew==null?last:crew));const val=mv?mv[i]:sug;return {l,i,last,crew,code,sug,val}});
   const tot=B.lines.reduce((a,l)=>a+num(l.v),0);
   const c0=billMonth();const canPrev=cur>billAdd(c0,-24),canNext=cur<billAdd(c0,1);
   return '<div class="card" id="billCard" style="margin-bottom:12px"><div class="row" style="gap:6px;align-items:center"><button class="btn sm" data-bmon="-1" aria-label="Previous month"'+(canPrev?'':' disabled')+'>‹</button><b class="grow" style="font-size:17px;text-align:center">Billing · '+esc(billMonthText(cur))+'</b>'+(mine?'<span class="badge">Confirmed</span>':'')+'<button class="btn sm" data-bmon="1" aria-label="Next month"'+(canNext?'':' disabled')+'>›</button></div>'+
     (!now?'<div class="small" style="margin:4px 0;padding:6px 8px;border-radius:8px;background:#eef3fb;color:#1d3f91">Looking at '+esc(billMonthText(cur))+(cur<c0?' (past month)':' (next month)')+'. % from hours is only shown for this month. <a href="#" data-bmon="0">Back to '+esc(billMonthText(c0))+'</a></div>':'')+
     (B.source?'<div class="muted small">Lines from '+esc(B.source)+(B.loaded_at?' · loaded '+esc(fmtWhen(B.loaded_at)):'')+'</div>':'')+
-    '<div class="muted small" style="margin:2px 0 8px">% from hours = time card hours on each cost code vs. the job’s budgeted hours, for reference. Type this month’s % for each line, then '+(ed?'Confirm.':'the job’s PM confirms.')+' Never below last month.</div>'+
+    '<div class="muted small" style="margin:2px 0 8px">% from hours = time card hours on each cost code vs. the job’s budgeted hours, for reference (labor lines only; type the material %s yourself). Type this month’s % for each line, then '+(ed?'Confirm.':'the job’s PM confirms.')+' Never below last month.</div>'+
     (!now?'':!S.loaded.labor?'<div class="muted small" style="margin:-4px 0 8px">Loading hours…</div>':noHrs?'<div class="small" style="margin:-4px 0 8px;padding:6px 8px;border-radius:8px;background:#fff4e5;color:#9a3412">No budget hours on the Labor tab yet, so there’s no % from hours. Last month’s % is filled in.</div>':'')+
     '<div style="overflow-x:auto"><table class="ltab" id="billTab"><thead><tr><th>Line</th><th>Scheduled</th><th>Last billed</th><th>% from hours</th><th>This month %</th><th>To date</th></tr></thead><tbody>'+
     rows.map(r=>'<tr><td>'+esc(r.l.n)+'</td><td>'+money(r.l.v)+'</td><td>'+r2(r.last)+'%</td><td>'+(r.crew==null?'–':r.crew+'%')+(r.code&&H[r.code]?'<div class="muted small" style="white-space:normal;min-width:88px">'+esc(billHrsNote(r.code,H[r.code]))+'</div>':'')+(r.crew!=null&&r.crew<r.last?' <span class="muted small">(below last)</span>':'')+'</td><td>'+(ed?'<input data-bp="'+r.i+'" type="number" inputmode="decimal" min="0" max="100" step="any" value="'+r2(r.val)+'" style="width:70px;border:1px solid var(--line);border-radius:8px;padding:6px;text-align:right">':r2(r.val)+'%')+'</td><td data-bd="'+r.i+'">'+money(num(r.l.v)*r.val/100)+'</td></tr>').join('')+

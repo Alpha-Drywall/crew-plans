@@ -14,7 +14,7 @@ function grab(name) {
   return lines.slice(i, j).join('\n');
 }
 const names = ['num', 'clamp', 'areaPct', 'SCOPE_CATALOG', 'CUSTOM_COLORS', 'DEFAULT_SCOPE', 'normScope',
-  'PCT_SKIP', 'pctGroupName', 'pctCode', 'HRS_CODES', 'lineCode', 'hoursByCode', 'billHoursPct', 'hoursDone',
+  'PCT_SKIP', 'pctGroupName', 'pctCode', 'HRS_CODES', 'lineCode', 'hoursByCode', 'BILL_MAT', 'billHoursPct', 'hoursDone',
   'LABOR_CODES', 'codeHrs', 'weekEnd', 'f1', 'fmtWk', 'LABOR_SHOW_TC', 'laborEff', 'laborCost', 'laborCalc', 'LABOR_WARN', 'laborAlerts',
   'DASH_UNDERBILL', 'r2', 'laborCut', 'billCut', 'billHoursByCode', 'billKey', 'billPcts', 'dashBill', 'dashCalc',
   'tcKey', 'TC_ANCHOR', 'isoAddD', 'tcHrs', 'tcLineNo', 'tcIsJob', 'tcLabCode', 'tcJobNo', 'tcJobShort', 'tcJobKey', 'tcJobSplit'];
@@ -35,9 +35,9 @@ t('Done %: hours used / budget per trade code, weighted by pay app $; by budget 
   // Framing $100k at 112 = 80%, Hanging $50k at 122 = 40%, Finishing $50k at 132 = 0%
   const L = hrs({ '112': 1000, '122': 500, '132': 500 }, { '112': 800, '122': 200 }, Object.assign({ billing: { lines: LINES } }, OLDP));
   assert.strictEqual(T.dashCalc(job('a', null), L, [], false, [], null).done, 50); // (80*100 + 40*50) / 200
-  // Labor + Material lines both count with their own $; Mobilization left out
+  // Labor lines count with their own $; Material lines (no % from hours) and Mobilization left out: (60000*100 + 100000*50) / 160000
   const LM = [{ n: 'Mobilization', v: 5000 }, { n: 'Framing Labor', v: 60000 }, { n: 'Framing Material', v: 40000 }, { n: 'Insulation Labor', v: 100000 }];
-  assert.strictEqual(T.dashCalc(job('a', null), hrs({ '112': 100, '161': 100 }, { '112': 150, '161': 50 }, { billing: { lines: LM } }), [], false, [], null).done, 75);
+  assert.strictEqual(T.dashCalc(job('a', null), hrs({ '112': 100, '161': 100 }, { '112': 150, '161': 50 }, { billing: { lines: LM } }), [], false, [], null).done, 69);
   // a line whose code has no budget is left out of the weighting
   assert.strictEqual(T.dashCalc(job('a', null), hrs({ '112': 100 }, { '112': 30 }, { billing: { lines: LM } }), [], false, [], null).done, 30);
   // no pay app lines: trade codes weighted by budget hours
