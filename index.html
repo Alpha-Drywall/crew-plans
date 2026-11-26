@@ -1177,10 +1177,11 @@ function render(){
   if(S.view!=='job'||!S.job){app.dataset.job='';app.innerHTML=renderJobs();bindJobs();return}
   const j=S.job;
   if(S.tab==='tc'||((S.tab==='log'||S.tab==='labor'||S.tab==='mat')&&!canLog()))S.tab='plans';
+  if(S.tab==='billing'&&!billTabOk())S.tab='progress';
   if(!app.querySelector('[data-jobshell]')||app.dataset.job!==j.id||app.dataset.tab!==S.tab||app.dataset.role!==S.role){
     app.dataset.job=j.id;app.dataset.tab=S.tab;app.dataset.role=S.role;
     app.innerHTML='<div data-jobshell><div class="jhead"><div class="top"><button id="back" aria-label="Back">‹</button><div class="jl" id="jt2"></div><h1><div class="ttl"><span class="brand"></span>Alpha Operations</div><div class="jn" id="jt"></div></h1>'+(isAdminRole()?'<button id="jmenu" aria-label="Job menu">⋯</button>':'')+'</div>'+
-      '<div class="tabs"><button data-tab="plans">Plans</button><button data-tab="progress">Progress</button>'+(canLog()?'<button data-tab="log">Daily Report</button><button data-tab="labor">Labor</button><button data-tab="mat">Materials</button>':'')+'</div></div><main id="tabBody"></main></div>';
+      '<div class="tabs"><button data-tab="plans">Plans</button><button data-tab="progress">Progress</button>'+(billTabOk()?'<button data-tab="billing">Billing</button>':'')+(canLog()?'<button data-tab="log">Daily Report</button><button data-tab="labor">Labor</button><button data-tab="mat">Materials</button>':'')+'</div></div><main id="tabBody"></main></div>';
     $('#back').onclick=closeJob;
     $$('.tabs button').forEach(b=>b.onclick=()=>{S.tab=b.dataset.tab;window.scrollTo(0,0);render()});
     if($('#jmenu'))$('#jmenu').onclick=jobMenu;
@@ -1190,6 +1191,7 @@ function render(){
   $$('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===S.tab));
   if(S.tab==='plans'){$('#tabBody').innerHTML=renderPlans();bindPlans();fillImgs($('#tabBody'))}
   else if(S.tab==='progress'){$('#tabBody').innerHTML=renderProgress();bindProgress();fillImgs($('#tabBody'))}
+  else if(S.tab==='billing'){$('#tabBody').innerHTML=renderBilling();bindBillingTab()}
   else if(S.tab==='labor'){$('#tabBody').innerHTML=renderLabor();bindLabor();if(!S.loaded.labor&&!S.laborLoading)loadLabor()}
   else if(S.tab==='mat'){$('#tabBody').innerHTML=renderMat();bindMat();if(!matHere())loadMat()}
   else renderLogList();
@@ -1256,34 +1258,36 @@ function laborAlerts(C){const out=[];C.rows.forEach(r=>{if(!r.md)return;const E=
     if(u>100){r.alert='over';out.push({lvl:'over',tc:E.tc,t:nm+' is over budget: '+f1(E.v)+' of '+f1(r.md)+' man days used ('+Math.round(u)+'% of the budgeted hours)'+tg+'.'});return}
     if(u>=LABOR_WARN){r.alert='near';out.push({lvl:'near',tc:E.tc,t:nm+': '+Math.round(u)+'% of the budgeted hours used'+tg+', '+f1(r.md-E.v)+' man days left.'})}});
   return out}
-/* ===== All jobs at a glance (office only): one row per job with Done % (from hours, same as the billing suggestion), % billed, % man days used, contract $ and flags ===== */
+/* ===== All jobs at a glance (office only): one row per job with Done % (from hours, same as the Billing tab), % billed, % man days used, contract $ and flags ===== */
 const DASH_UNDERBILL=10;
 const dashOk=()=>!!(S.isAdmin&&!S.asUser&&!isPractice()&&!S.viewAs);
 /* last confirmed billing month: $ billed to date (sum of line $ x confirmed %) over the contract (sum of the pay app lines) */
 function dashBill(L){const B=(L&&L.billing)||{};const lines=Array.isArray(B.lines)?B.lines:[];const contract=lines.reduce((a,l)=>a+num(l.v),0);
   const last=(Array.isArray(B.history)?B.history:[]).filter(h=>h&&h.period&&Array.isArray(h.pcts)).sort((a,b)=>a.period<b.period?-1:1).pop()||null;
   if(!last||!contract)return {contract,billed:null,pct:null,period:last?last.period:null};
-  const billed=lines.reduce((a,l,i)=>a+num(l.v)*clamp(num(last.pcts[i]),0,100)/100,0);return {contract,billed,pct:billed/contract*100,period:last.period}}
-/* one job's row, using the Labor tab math (laborCalc/laborAlerts) and the hours-based billing % (hoursByCode/hoursDone) by pointing them at this job's data for a moment */
-function dashCalc(j,L,areas,hasProg,logs,nudge){const sv=[S.labor,S.laborLogs,S.laborTc,S.areas,PHASES];
+  const lp=billPcts(last,lines);const billed=lines.reduce((a,l,i)=>a+num(l.v)*clamp(lp[i],0,100)/100,0);return {contract,billed,pct:billed/contract*100,period:last.period}}
+/* one job's row, using the Labor tab math (laborCalc/laborAlerts) and the Billing tab's % from hours (billHoursByCode/hoursDone; tc = tcJobSplit at the job cost date) by pointing them at this job's data for a moment */
+function dashCalc(j,L,areas,hasProg,logs,nudge,tc){const sv=[S.labor,S.laborLogs,S.laborTc,S.areas,PHASES];
   try{S.labor=L||{};S.laborLogs=logs||[];S.laborTc=null;S.areas=areas||[];PHASES=normScope(j.scope);
-    const C=laborCalc();const H=hoursByCode(C);const done=hoursDone(((S.labor.billing||{}).lines)||[],H,C);const AL=C.t.md?laborAlerts(C):[];
+    const C=laborCalc();const H=billHoursByCode(C,tc);const done=hoursDone(((S.labor.billing||{}).lines)||[],H,C);const AL=C.t.md?laborAlerts(C):[];
     const used=C.t.md?C.t.used/C.t.md*100:null;const b=dashBill(L);
     const r={id:j.id,done,used,usedMd:C.t.used,md:C.t.md,cost:!!C.cost,contract:b.contract,billed:b.pct,billed$:b.billed,period:b.period,
       over:AL.filter(a=>a.lvl==='over').length,near:AL.filter(a=>a.lvl==='near').length,nudge:nudge||null};
     r.under=done!=null&&b.contract>0&&done-num(b.pct)>=DASH_UNDERBILL?Math.round(done-num(b.pct)):0;
     r.flags=r.over+r.near+(r.nudge?1:0)+(r.under?1:0);
-    r.tab=r.over||r.near?'labor':'progress';return r}
+    r.tab=r.over||r.near?'labor':r.under?'billing':'progress';return r}
   finally{[S.labor,S.laborLogs,S.laborTc,S.areas,PHASES]=sv}}
 /* batch loads: one query per table for every job (logs only for jobs without a job cost sheet, which is all the Labor tab uses them for) */
 async function loadDash(){if(!dashOk()||S.dashLoading)return;S.dashLoading=true;S.dashErr='';render();
   try{const [bud,ps]=await Promise.all([q(sb.from('job_budget').select('job_id,labor')),q(sb.from('sheets').select('job_id').eq('on_progress',true).eq('is_current',true)).catch(()=>[])]);
-    const L={};(bud||[]).forEach(r=>{L[r.job_id]=r.labor||{}});const A={};
+    const L={};(bud||[]).forEach(r=>{L[r.job_id]=r.labor||{}});const A={};const T={};
+    const wc=(S.jobs||[]).filter(j=>laborCost(L[j.id]));
+    if(wc.length){const cards=await q(sb.from('timecards').select('owner,foreman,period_start,workers')).catch(()=>null);if(cards)wc.forEach(j=>{const K=tcJobKey(j);T[j.id]=tcJobSplit(cards,K[0],K[1],billCut(laborCost(L[j.id])))})}
     const need=(S.jobs||[]).filter(j=>!laborCost(L[j.id])).map(j=>j.id);const G={};
     if(need.length){const lg=await q(sb.from('logs').select('job_id,date,hours,hours_by_code').in('job_id',need).order('date')).catch(()=>[]);(lg||[]).forEach(l=>{(G[l.job_id]=G[l.job_id]||[]).push(l)})}
     await loadNudges();
     const Z={};Object.keys(L).forEach(id=>{const t=dashBill(L[id]).contract;if(t>0)Z[id]=t});S.jobSize=Z;
-    S.dash={L,A,G,prog:new Set((ps||[]).map(x=>x.job_id)),at:Date.now()}}
+    S.dash={L,A,G,T,prog:new Set((ps||[]).map(x=>x.job_id)),at:Date.now()}}
   catch(e){S.dashErr=errMsg(e)}finally{S.dashLoading=false}
   if(S.view==='dash')render()}
 function openDash(){if(!dashOk())return;S.view='dash';window.scrollTo(0,0);render();if(!S.dash)loadDash()}
@@ -1300,7 +1304,7 @@ function renderDash(){
   if(!S.dash)return h+'<div class="empty">'+(S.dashErr?'Couldn’t load: '+esc(S.dashErr):'Loading every job…')+'</div></main>';
   const D=S.dash;const mode=lsGet('crewplans.jobView')||'mine';const sm=lsGet('crewplans.dashSort')||'att';
   let jobs=(S.jobs||[]).slice();if(mode==='mine')jobs=jobs.filter(j=>j.pm&&j.pm===S.myOfficeId);
-  const R={};jobs.forEach(j=>{R[j.id]=dashCalc(j,D.L[j.id],D.A[j.id],D.prog.has(j.id),D.G[j.id],(S.nudges||{})[j.id])});
+  const R={};jobs.forEach(j=>{R[j.id]=dashCalc(j,D.L[j.id],D.A[j.id],D.prog.has(j.id),D.G[j.id],(S.nudges||{})[j.id],(D.T||{})[j.id])});
   jobs=sm==='att'?sortJobs(jobs,'num').sort((x,y)=>R[y.id].flags-R[x.id].flags||R[y.id].over-R[x.id].over):sortJobs(jobs,sm);
   const att=jobs.filter(j=>R[j.id].flags).length;
   h+='<div class="chips"><button class="chip'+(mode==='mine'?' on':'')+'" data-dview="mine">My jobs</button><button class="chip'+(mode==='all'?' on':'')+'" data-dview="all">All jobs</button></div>';
@@ -1315,11 +1319,11 @@ function renderDash(){
         '<td'+(r.used!=null&&r.used>100?' class="over"':'')+'>'+dashP(r.used)+(r.md?'<div class="muted small">'+f0(r.usedMd)+' of '+f0(r.md)+'</div>':'')+'</td>'+
         '<td class="dcon">'+(r.contract?money(r.contract):'–')+'</td></tr>'}).join('')+'</tbody></table></div>';
   h+='<details class="card small"><summary><b>What the columns mean</b></summary><div style="margin-top:6px;display:grid;gap:4px">'+
-    '<div><b>Done</b> = labor hours used ÷ budgeted hours on each trade’s cost code (112 Framing, 122 Hanging, 132 Finishing, 161 Insulation), capped at 100% and weighted by pay app $, the same % as the billing suggestion. No pay app lines: weighted by each code’s budgeted hours. – = no budget hours.</div>'+
+    '<div><b>Done</b> = labor hours used ÷ budgeted hours on each trade’s cost code (112 Framing, 122 Hanging, 132 Finishing, 161 Insulation), job cost sheet used plus time card hours it hasn’t caught up to yet, capped at 100% and weighted by pay app $, the same “% from hours” as the Billing tab. No pay app lines: weighted by each code’s budgeted hours. – = no budget hours.</div>'+
     '<div><b>Billed</b> = $ billed to date on the last confirmed billing month ÷ contract (pay app lines). Month shown below.</div>'+
     '<div><b>Man days used</b> = used ÷ budget man days from the job cost sheet, same as the Labor tab.</div>'+
     '<div><b>Under-billed</b> = Done is '+DASH_UNDERBILL+'+ points ahead of Billed. <b>Over budget / near budget</b> = the Labor tab alerts (a cost code over 100% / at '+LABOR_WARN+'%+ of its budgeted hours). <b>Progress not marked</b> = '+NUDGE_DAYS+'+ days of crew hours since the last progress markup.</div>'+
-    '<div>Tap a job to open it (Labor tab for labor flags, Progress tab otherwise).</div></div></details>'+
+    '<div>Tap a job to open it (Labor tab for labor flags, Billing tab for under-billed, Progress tab otherwise).</div></div></details>'+
     '<div class="muted small" style="text-align:center">Loaded '+esc(fmtWhen(D.at))+(S.dashLoading?' · refreshing…':'')+'</div>';
   return h+'</main>'}
 function bindDash(){
@@ -1497,6 +1501,11 @@ function tcJobLive(cards,no,nm,after){const by={},days=new Set();let hours=0;
   (cards||[]).forEach(c=>{if(!c||!c.period_start)return;(c.workers||[]).forEach(w=>{for(let d=0;d<12;d++){const iso=isoAddD(c.period_start,TC_OFF[d]);if(after&&iso<=after)continue;
     ((w.days&&w.days[d])||[]).forEach(l=>{const h=tcHrs(l);if(!h||!tcIsJob(l,no,nm))return;hours+=h;days.add(iso);const k=tcLabCode(l.code,tcKey(w.name)===tcKey(c.foreman))||'unc';by[k]=r2((by[k]||0)+h)})}})});
   return {by,hours:r2(hours),days}}
+/** One job: time card hours by Labor code split at `cut` (YYYY-MM-DD): pre = days on or before it, post = days after it (no cut: all in post). Lines with no code or 001 Office never count. */
+function tcJobSplit(cards,no,nm,cut){const pre={},post={};
+  (cards||[]).forEach(c=>{if(!c||!c.period_start)return;(c.workers||[]).forEach(w=>{for(let d=0;d<12;d++){const iso=isoAddD(c.period_start,TC_OFF[d]);const o=cut&&iso<=cut?pre:post;
+    ((w.days&&w.days[d])||[]).forEach(l=>{const h=tcHrs(l);if(!h||!tcIsJob(l,no,nm))return;const k=tcLabCode(l.code,tcKey(w.name)===tcKey(c.foreman));if(!k)return;o[k]=r2((o[k]||0)+h)})}})});
+  return {pre,post,cut:cut||''}}
 const sameBy=(a,b)=>{a=a||{};b=b||{};return LABOR_CODES.every(c=>r2(num(a[c.k]))===r2(num(b[c.k])))};
 const labK=k=>k.replace(/[cs]$/,m=>m==='c'?' Cln':' Sup');
 /** The author's card for the date's pay period: the open card if it is that one (it may have unsaved edits), else from the server. undefined = couldn't check. */
@@ -1794,15 +1803,18 @@ const TIPS={
   job:[
     ['.tabs button[data-tab="plans"]',"Plans: every sheet for the job, always the newest version. Use it to look things up, drop pins and quick highlights.","Planos: todas las hojas del trabajo, siempre la versión más nueva. Úsalo para consultar, poner pines y marcas rápidas."],
     ['.tabs button[data-tab="progress"]',"Progress: color in the work that's finished. This is what the office looks at to see how the job is going.","Avance: colorea el trabajo que ya está terminado. Esto es lo que la oficina revisa para ver cómo va el trabajo."],
+    ['.tabs button[data-tab="billing"]',"Office: Billing is this month’s % on each pay app line. Load the GC pay app here, then confirm the %s.","Oficina: Facturación es el % de este mes en cada línea de la solicitud de pago. Carga la solicitud aquí y luego confirma los %."],
     ['.tabs button[data-tab="log"]',"Daily Report: fill it out every day you're on the job. It's saved as a PDF and can go to the GC.","Reporte diario: llénalo cada día que estés en el trabajo. Se guarda como PDF y se puede mandar al contratista."],
     ['.tabs button[data-tab="mat"]',"Materials: what was ordered on the PO and what has shown up so far. Log deliveries on the daily report.","Material: lo que se pidió en la orden y lo que ya llegó. Anota las entregas en el reporte diario."],
     ['.tabs button[data-tab="labor"]',"Labor: hours used against the budget, by cost code, from the job cost sheet.","Mano de obra: horas usadas contra el presupuesto, por código, de la hoja de costos."],
     ['#revFilt',"Pick which sheets to see: current sheets, revised sheets or RFI/ASI pages.","Escoge qué hojas ver: hojas actuales, hojas revisadas o páginas de RFI/ASI."],
     ['#tabBody .sheet',"Tap a sheet to open it. Pinch to zoom.","Toca una hoja para abrirla. Pellizca para hacer zoom."]],
   progress:[
-    ['#billCard',"Office: the billing suggestion comes from time card hours on each cost code vs. the job’s budgeted hours. Check it against the field before confirming.","Oficina: la sugerencia de facturación sale de las horas de las tarjetas de tiempo en cada código de costo contra las horas presupuestadas del trabajo. Compárala con el campo antes de confirmar."],
     ['#progAdd',"Add the floor plans and ceiling plans you want to track. They're copied here clean, just for progress.","Agrega los planos de piso y de techo que quieres seguir. Se copian aquí limpios, solo para el avance."],
     ['#tabBody .sheet',"Open a sheet and color in what got done, using the scope colors. Do it at the end of each day.","Abre una hoja y colorea lo que se terminó, con los colores de cada alcance. Hazlo al final de cada día."]],
+  billing:[
+    ['#payAppLoad',"Load the GC pay app (.xlsx): its Continuation Sheet lines become this job’s billing lines, and that month is recorded as billed.","Carga la solicitud de pago del contratista (.xlsx): sus líneas de la hoja de continuación se vuelven las líneas de facturación, y ese mes queda como facturado."],
+    ['#billCard',"% from hours = time card hours on each cost code vs. the job’s budgeted hours, for reference. Type this month’s % for each line, then Confirm.","% por horas = horas de las tarjetas de tiempo en cada código contra las horas presupuestadas, como referencia. Escribe el % de este mes en cada línea y luego Confirma."]],
   log:[
     ['#logForm [name="date"]',"One report per day. Pick the day; you can go back and fix an old one.","Un reporte por día. Escoge el día; puedes regresar y corregir uno viejo."],
     ['#logForm [name="work"]',"What your crew did today, in a few words: areas and rooms.","Lo que hizo tu cuadrilla hoy, en pocas palabras: áreas y cuartos."],
@@ -2744,6 +2756,16 @@ const HRS_CODES=['112','122','132','161'];
 const lineCode=n=>{const g=pctGroupName(n);return g?pctCode(g):null};
 /* per trade cost code: {pct, used, bh} from laborCalc rows; codes without budget hours are left out */
 function hoursByCode(C){const o={};((C&&C.rows)||[]).forEach(r=>{const k=r.c.k;if(HRS_CODES.includes(k)&&num(r.bh)>0)o[k]={pct:Math.min(100,Math.max(0,Math.round(num(r.usedH)/num(r.bh)*100))),used:num(r.usedH),bh:num(r.bh)}});return o}
+/* Billing "% from hours" (and All jobs Done %): with a job cost sheet, used per code = max(job cost used as of its date, time card hours on or before that date) + time card hours after it,
+   so time cards count while accounting catches up. T = tcJobSplit(...) at billCut(cost). No job cost sheet (or no time cards read): hoursByCode as before (daily reports, filled from time cards).
+   The Labor tab itself stays on the official job cost numbers (LABOR_SHOW_TC). */
+const billCut=cost=>cost?String(cost.as_of||laborCut(cost)||'').slice(0,10):'';
+function billHoursByCode(C,T){if(!C||!C.cost||!T)return hoursByCode(C);const o={};
+  (C.rows||[]).forEach(r=>{const k=r.c.k;if(!HRS_CODES.includes(k)||!(num(r.bh)>0))return;const off=num(r.usedH),pre=num((T.pre||{})[k]),post=num((T.post||{})[k]);
+    const used=r2(Math.max(off,pre)+post);o[k]={pct:Math.min(100,Math.max(0,Math.round(used/num(r.bh)*100))),used,bh:num(r.bh),cost:r2(off),tcAll:pre>off,tc:r2(pre>off?pre+post:post)}});return o}
+/* "112: 54 of 262 hrs (54 time cards)" under a line's % from hours */
+function billHrsNote(k,x){if(!x)return '';const s=k+': '+f0(x.used)+' of '+f0(x.bh)+' hrs';if(x.cost==null)return s;
+  return s+(x.tcAll?' ('+f0(x.tc)+' time cards)':x.tc>0?' ('+f0(x.cost)+' job cost + '+f0(x.tc)+' time cards)':' (job cost)')}
 /* a pay app line's % from hours: null = no matching code or no budget (keep last month). Mobilization / Submittals = 100 once any trade line is above 0. */
 function billHoursPct(line,H,lines){const n=String(line&&line.n||'');const h=H||{};
   if(PCT_SKIP.test(n))return (lines||[]).some(l=>{const c=!PCT_SKIP.test(String(l&&l.n||''))&&lineCode(l&&l.n);return c&&h[c]&&h[c].pct>0})?100:null;
@@ -2753,41 +2775,139 @@ function hoursDone(lines,H,C){const h=H||{};const ls=(lines||[]).filter(l=>!PCT_
   if(ls.length){const rs=ls.map(l=>({v:num(l.v),p:billHoursPct(l,h,lines)})).filter(r=>r.p!=null);if(!rs.length)return null;
     const tw=rs.reduce((a,r)=>a+r.v,0);return Math.round(tw>0?rs.reduce((a,r)=>a+r.v*r.p,0)/tw:rs.reduce((a,r)=>a+r.p,0)/rs.length)}
   const ks=Object.keys(h);if(!ks.length)return null;const tb=ks.reduce((a,k)=>a+h[k].bh,0);return Math.round(ks.reduce((a,k)=>a+h[k].bh*h[k].pct,0)/tb)}
-/* ===== Billing suggestion (office only): time card hours vs. budgeted hours suggest this month's % per pay app line; the PM confirms ===== */
-async function loadBilling(){const id=jobId();if(!id||!isAdminRole())return;try{const [d]=await Promise.all([q(sb.from('job_budget').select('labor').eq('job_id',id).maybeSingle()),S.loaded.labor||S.laborLoading?null:loadLabor()]);if(jobId()!==id)return;const L=(d&&d.labor)||{};S.billing=L.billing||null}catch(e){S.billing=null}S.loaded.billing=true;if(S.tab==='progress')render()}
+/* ===== Billing tab (office only): this month’s % per pay app line. "% from hours" = hours used on each cost code vs. budgeted hours, for reference; the PM types the %s and confirms ===== */
+const billTabOk=()=>!!(isAdminRole()&&S.isAdmin&&!S.asUser&&!S.viewAs&&!isPractice());
+/* every time card (office reads all), split at the job cost sheet date for billHoursByCode; null = no job cost sheet or couldn’t read */
+async function billTcRead(L){const cost=laborCost(L);if(!cost||!S.job)return null;
+  try{const cards=(await q(sb.from('timecards').select('owner,foreman,period_start,workers')))||[];const K=tcJobKey(S.job);return tcJobSplit(cards,K[0],K[1],billCut(cost))}catch(e){return null}}
+async function loadBilling(){const id=jobId();if(!id||!isAdminRole())return;try{const [d]=await Promise.all([q(sb.from('job_budget').select('labor').eq('job_id',id).maybeSingle()),S.loaded.labor||S.laborLoading?null:loadLabor()]);if(jobId()!==id)return;const L=(d&&d.labor)||{};S.billing=L.billing||null;
+    const T=await billTcRead(L);if(jobId()!==id)return;S.billTc=T}catch(e){S.billing=null}S.loaded.billing=true;if(S.tab==='billing')render()}
 const billMonth=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')};
 const billMonthText=p=>{const [y,m]=String(p).split('-').map(Number);return new Date(y,m-1,1).toLocaleDateString(undefined,{month:'short',year:'numeric'})};
+/* a history entry’s % for each current line: by line name when the entry carries its line names (pay app loads and confirms save them) or old line names are given, else by position (missing = 0) */
+const billKey=n=>String(n||'').toLowerCase().replace(/[^a-z0-9#]+/g,' ').trim();
+function billPcts(h,lines,oldNames){const p=h&&Array.isArray(h.pcts)?h.pcts:[];const ls=lines||[];
+  const nm=h&&Array.isArray(h.names)&&h.names.length===p.length?h.names:Array.isArray(oldNames)&&oldNames.length===p.length?oldNames:null;
+  if(!nm)return ls.map((l,i)=>i<p.length?num(p[i]):0);
+  const used=new Set();return ls.map((l,i)=>{const k=billKey(l&&l.n);let j=nm.findIndex((x,jj)=>!used.has(jj)&&billKey(x)===k);if(j<0&&nm.length===ls.length&&!used.has(i)&&!ls.some(o=>billKey(o&&o.n)===billKey(nm[i])))j=i;if(j<0)return 0;used.add(j);return num(p[j])})}
 function billingCard(){const B=S.billing;
   if(!S.loaded.billing)return '<div class="card muted small" style="margin-bottom:12px">Loading billing…</div>';
-  if(!B||!Array.isArray(B.lines)||!B.lines.length)return '<div class="card" style="margin-bottom:12px"><b>Billing suggestion</b><div class="muted small">No pay app lines for this job yet. They come from the job’s BILLING pay app.</div></div>';
+  if(!B||!Array.isArray(B.lines)||!B.lines.length)return '<div class="card" id="billCard" style="margin-bottom:12px"><b>Billing</b><div class="muted small">No pay app lines for this job yet. Tap <b>Load pay app (.xlsx)</b> to read them from the GC pay app, or they come from the job’s BILLING pay app.</div></div>';
   const hist=(B.history||[]).slice().sort((a,b)=>a.period<b.period?-1:1);const cur=billMonth();
   const prev=hist.filter(h=>h.period<cur).pop();const mine=hist.find(h=>h.period===cur);const ed=canEditLaborRate();
-  const C=S.loaded.labor&&S.labor?laborCalc():null;const H=hoursByCode(C);const noHrs=!Object.keys(H).length;
-  const rows=B.lines.map((l,i)=>{const last=prev?num(prev.pcts[i]):0;const crew=billHoursPct(l,H,B.lines);const code=PCT_SKIP.test(String(l.n||''))?null:lineCode(l.n);const sug=Math.min(100,Math.max(last,crew==null?last:crew));const val=mine?num(mine.pcts[i]):sug;return {l,i,last,crew,code,sug,val}});
+  const pv=prev?billPcts(prev,B.lines):null,mv=mine?billPcts(mine,B.lines):null;
+  const C=S.loaded.labor&&S.labor?laborCalc():null;const H=billHoursByCode(C,S.billTc);const noHrs=!Object.keys(H).length;
+  const rows=B.lines.map((l,i)=>{const last=pv?pv[i]:0;const crew=billHoursPct(l,H,B.lines);const code=PCT_SKIP.test(String(l.n||''))?null:lineCode(l.n);const sug=Math.min(100,Math.max(last,crew==null?last:crew));const val=mv?mv[i]:sug;return {l,i,last,crew,code,sug,val}});
   const tot=B.lines.reduce((a,l)=>a+num(l.v),0);
-  return '<div class="card" id="billCard" style="margin-bottom:12px"><div class="row"><b class="grow" style="font-size:17px">Billing suggestion · '+esc(billMonthText(cur))+'</b>'+(mine?'<span class="badge">Confirmed</span>':'')+'</div>'+
-    '<div class="muted small" style="margin:2px 0 8px">Suggested from time card hours on each cost code vs. the job’s budgeted hours. Check it against the field before confirming. Never below last month; change any %, then '+(ed?'tap Confirm.':'the job’s PM confirms.')+'</div>'+
-    (!S.loaded.labor?'<div class="muted small" style="margin:-4px 0 8px">Loading hours…</div>':noHrs?'<div class="small" style="margin:-4px 0 8px;padding:6px 8px;border-radius:8px;background:#fff4e5;color:#9a3412">No budget hours on the Labor tab yet, so there’s no suggestion. Last month’s % is filled in.</div>':'')+
+  return '<div class="card" id="billCard" style="margin-bottom:12px"><div class="row"><b class="grow" style="font-size:17px">Billing · '+esc(billMonthText(cur))+'</b>'+(mine?'<span class="badge">Confirmed</span>':'')+'</div>'+
+    (B.source?'<div class="muted small">Lines from '+esc(B.source)+(B.loaded_at?' · loaded '+esc(fmtWhen(B.loaded_at)):'')+'</div>':'')+
+    '<div class="muted small" style="margin:2px 0 8px">% from hours = time card hours on each cost code vs. the job’s budgeted hours, for reference. Type this month’s % for each line, then '+(ed?'Confirm.':'the job’s PM confirms.')+' Never below last month.</div>'+
+    (!S.loaded.labor?'<div class="muted small" style="margin:-4px 0 8px">Loading hours…</div>':noHrs?'<div class="small" style="margin:-4px 0 8px;padding:6px 8px;border-radius:8px;background:#fff4e5;color:#9a3412">No budget hours on the Labor tab yet, so there’s no % from hours. Last month’s % is filled in.</div>':'')+
     '<div style="overflow-x:auto"><table class="ltab" id="billTab"><thead><tr><th>Line</th><th>Scheduled</th><th>Last billed</th><th>% from hours</th><th>This month %</th><th>To date</th></tr></thead><tbody>'+
-    rows.map(r=>'<tr><td>'+esc(r.l.n)+'</td><td>'+money(r.l.v)+'</td><td>'+r.last+'%</td><td>'+(r.crew==null?'–':r.crew+'%')+(r.code&&H[r.code]?'<div class="muted small" style="white-space:normal;min-width:88px">'+esc(r.code)+': '+f0(H[r.code].used)+' of '+f0(H[r.code].bh)+' hrs</div>':'')+(r.crew!=null&&r.crew<r.last?' <span class="muted small">(below last)</span>':'')+'</td><td>'+(ed?'<input data-bp="'+r.i+'" type="number" inputmode="decimal" min="0" max="100" step="1" value="'+r.val+'" style="width:70px;border:1px solid var(--line);border-radius:8px;padding:6px;text-align:right">':r.val+'%')+'</td><td data-bd="'+r.i+'">'+money(num(r.l.v)*r.val/100)+'</td></tr>').join('')+
+    rows.map(r=>'<tr><td>'+esc(r.l.n)+'</td><td>'+money(r.l.v)+'</td><td>'+r2(r.last)+'%</td><td>'+(r.crew==null?'–':r.crew+'%')+(r.code&&H[r.code]?'<div class="muted small" style="white-space:normal;min-width:88px">'+esc(billHrsNote(r.code,H[r.code]))+'</div>':'')+(r.crew!=null&&r.crew<r.last?' <span class="muted small">(below last)</span>':'')+'</td><td>'+(ed?'<input data-bp="'+r.i+'" type="number" inputmode="decimal" min="0" max="100" step="any" value="'+r2(r.val)+'" style="width:70px;border:1px solid var(--line);border-radius:8px;padding:6px;text-align:right">':r2(r.val)+'%')+'</td><td data-bd="'+r.i+'">'+money(num(r.l.v)*r.val/100)+'</td></tr>').join('')+
     '</tbody><tfoot><tr><th>Total</th><th>'+money(tot)+'</th><th></th><th></th><th></th><th data-btot></th></tr></tfoot></table></div>'+
     '<div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap"><span class="grow muted small" data-bthis></span>'+(ed?'<button class="btn sm primary" id="billOk">'+(mine?'Update':'Confirm')+' for '+esc(billMonthText(cur))+'</button>':'')+'</div>'+
-    (hist.length?'<div class="muted small" style="margin-top:6px">Confirmed: '+hist.map(h=>esc(billMonthText(h.period))+(h.by?' ('+esc(who(h.by))+')':'')).join(', ')+'</div>':'')+'</div>'}
+    (hist.length?'<div class="muted small" style="margin-top:6px">Confirmed: '+hist.map(h=>esc(billMonthText(h.period))+(h.from?' ('+esc(h.from)+')':h.by?' ('+esc(who(h.by))+')':'')).join(', ')+'</div>':'')+'</div>'}
 function bindBilling(){const B=S.billing;if(!B||!B.lines||!$('#billTab'))return;
-  const hist=(B.history||[]).slice().sort((a,b)=>a.period<b.period?-1:1);const cur=billMonth();const prev=hist.filter(h=>h.period<cur).pop();
-  const vals=()=>B.lines.map((l,i)=>{const el=$('[data-bp="'+i+'"]');const mine=hist.find(h=>h.period===cur);return el?Math.min(100,Math.max(0,num(el.value))):(mine?num(mine.pcts[i]):0)});
-  const upd=()=>{const v=vals();let td=0,th=0;B.lines.forEach((l,i)=>{const d=num(l.v)*v[i]/100;td+=d;th+=d-num(l.v)*(prev?num(prev.pcts[i]):0)/100;const c=$('[data-bd="'+i+'"]');if(c)c.textContent=money(d)});const t=$('[data-btot]');if(t)t.textContent=money(td);const x=$('[data-bthis]');if(x)x.textContent='Billed to date '+money(td)+' · this month '+money(th)};
+  const hist=(B.history||[]).slice().sort((a,b)=>a.period<b.period?-1:1);const cur=billMonth();const prev=hist.filter(h=>h.period<cur).pop();const pv=prev?billPcts(prev,B.lines):null;
+  const vals=()=>{const mine=hist.find(h=>h.period===cur);const mv=mine?billPcts(mine,B.lines):null;return B.lines.map((l,i)=>{const el=$('[data-bp="'+i+'"]');return el?Math.min(100,Math.max(0,r2(num(el.value)))):(mv?mv[i]:0)})};
+  const upd=()=>{const v=vals();let td=0,th=0;B.lines.forEach((l,i)=>{const d=num(l.v)*v[i]/100;td+=d;th+=d-num(l.v)*(pv?pv[i]:0)/100;const c=$('[data-bd="'+i+'"]');if(c)c.textContent=money(d)});const t=$('[data-btot]');if(t)t.textContent=money(td);const x=$('[data-bthis]');if(x)x.textContent='Billed to date '+money(td)+' · this month '+money(th)};
   $$('[data-bp]').forEach(el=>el.oninput=upd);upd();
   const ok=$('#billOk');if(ok&&canEditLaborRate())ok.onclick=async()=>{const v=vals();
-    const low=B.lines.findIndex((l,i)=>prev&&v[i]<num(prev.pcts[i]));if(low>=0&&!(await confirmBox(B.lines[low].n+' is below what was billed last month. Confirm anyway?','Confirm',false)))return;
+    const low=B.lines.findIndex((l,i)=>pv&&v[i]<pv[i]);if(low>=0&&!(await confirmBox(B.lines[low].n+' is below what was billed last month. Confirm anyway?','Confirm',false)))return;
     const d=await q(sb.from('job_budget').select('labor').eq('job_id',S.job.id).maybeSingle());const L=(d&&d.labor)||{};const bill=Object.assign({},L.billing||B);
-    bill.history=(bill.history||[]).filter(h=>h.period!==cur).concat([{period:cur,pcts:v,at:new Date().toISOString(),by:S.me&&S.me.id}]);
+    bill.history=(bill.history||[]).filter(h=>h.period!==cur).concat([{period:cur,pcts:v,names:B.lines.map(l=>l.n),at:new Date().toISOString(),by:S.me&&S.me.id}]);
     if(await run(sb.from('job_budget').upsert({job_id:S.job.id,labor:Object.assign({},L,{billing:bill})},{onConflict:'job_id'}),'Billing confirmed for '+billMonthText(cur)+'.')){S.billing=bill;if(S.labor)S.labor.billing=bill;render()}}}
+function renderBilling(){
+  if(!billTabOk())return '<div class="empty">Office only.</div>';
+  if(!S.loaded.billing&&!S.billLoading){S.billLoading=true;loadBilling().finally(()=>{S.billLoading=false})}
+  return '<div class="row" style="margin:0 2px 10px;gap:8px;flex-wrap:wrap"><span class="grow muted small">Pay app lines and this month’s billing. Office only.</span><label class="btn sm primary" id="payAppLoad" title="Read the GC pay app workbook: its Continuation Sheet lines and the Payment sheet’s application # and period.">📄 Load pay app (.xlsx)<input type="file" id="payAppFile" accept=".xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden></label></div>'+billingCard()}
+function bindBillingTab(){const f=$('#payAppFile');if(f)f.onchange=()=>{const x=f.files&&f.files[0];f.value='';if(x)billLoadPayApp(x)};bindBilling()}
+
+/* ===== Load pay app (.xlsx, office): Continuation Sheet (G703) lines + Payment sheet (G702) application #, period and contract sum. Cached values only (no formulas are run). ===== */
+const payTxt=v=>String(v==null?'':v).replace(/\s+/g,' ').trim().toUpperCase();
+const payNum=v=>{if(typeof v==='number')return isFinite(v)?v:null;if(v==null||v instanceof Date)return null;const s=String(v).replace(/[$,\s]/g,'');if(!s||s==='-')return null;const m=s.match(/^\((.*)\)$/);const n=Number(m?m[1]:s);return isFinite(n)?(m?-n:n):null};
+const PAY_TOT=/^(ORIGINAL CONTRACT|CHANGE ORDERS?|REVISED CONTRACT|GRAND|CONTRACT) TOTALS?\b|^TOTALS?:?$/;
+const PAY_MON=['January','February','March','April','May','June','July','August','September','October','November','December'];
+/* a cell as YYYY-MM-DD: Date (read as UTC, the way Excel dates come in), Excel serial number, or text like 11/30/2026 or 2026-11-30 */
+function payDate(v){if(v==null||v==='')return '';if(v instanceof Date)return isNaN(v)?'':v.toISOString().slice(0,10);
+  if(typeof v==='number'){if(v<1||v>2958465)return '';return new Date(Math.round((v-25569)*864e5)).toISOString().slice(0,10)}
+  const s=String(v).trim();let m=s.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);if(m)return m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0');
+  m=s.match(/(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})/);if(m){const y=m[3].length===2?'20'+m[3]:m[3];return y+'-'+m[1].padStart(2,'0')+'-'+m[2].padStart(2,'0')}
+  const t=Date.parse(s);return isNaN(t)?'':new Date(t).toISOString().slice(0,10)}
+function payHeadRow(rows){for(let r=0;r<rows.length;r++){const t=(rows[r]||[]).map(payTxt);if(t.some(x=>x.includes('DESCRIPTION OF WORK'))&&t.some(x=>x.includes('SCHEDULED VALUE')))return r}return -1}
+/* sheets = [{name, rows:[[cell values]]}] (0-based). Lines: rows after the header with a description and a scheduled value, up to ORIGINAL CONTRACT TOTALS; after it, change order rows only if their scheduled value isn’t 0; total rows skipped; stop at REVISED CONTRACT TOTALS. */
+function payAppLines(sheets){
+  const sh=(sheets||[]).find(s=>/continuation/i.test(s.name||'')&&payHeadRow(s.rows||[])>=0)||(sheets||[]).find(s=>payHeadRow(s.rows||[])>=0);
+  if(!sh)throw new Error('No Continuation Sheet found (no sheet with a DESCRIPTION OF WORK and SCHEDULED VALUE header).');
+  const rows=sh.rows,hr=payHeadRow(rows);
+  const col=re=>{for(const r of [hr,hr+1,hr-1]){const t=(rows[r]||[]).map(payTxt);const i=t.findIndex(x=>re.test(x));if(i>=0)return i}return -1};
+  const C={item:col(/LINE ITEM|ITEM NO|^ITEM\b/),desc:col(/DESCRIPTION OF WORK/),sv:col(/SCHEDULED VALUE/),prev:col(/FROM PREVIOUS/),per:col(/THIS PERIOD/),stored:col(/PRESENTLY STORED/),todate:col(/COMPLETED AND STORED TO DATE|COMPLETED & STORED TO DATE/)};
+  const lines=[];let co=false,origTot=null,coTot=null,revTot=null;const cell=(row,c)=>c>=0?row[c]:null;
+  for(let r=hr+1;r<rows.length;r++){const row=rows[r]||[];const tot=row.map(payTxt).find(x=>PAY_TOT.test(x));
+    if(tot){const v=payNum(cell(row,C.sv));if(/^ORIGINAL/.test(tot)){origTot=v;co=true}else if(/^CHANGE/.test(tot))coTot=v;else{revTot=v;break}continue}
+    const d=String(cell(row,C.desc)==null?'':cell(row,C.desc)).replace(/\s+/g,' ').trim();const it=String(cell(row,C.item)==null?'':cell(row,C.item)).replace(/\s+/g,' ').trim();const v=payNum(cell(row,C.sv));
+    if(!d||v==null||/^DESCRIPTION OF WORK/i.test(d))continue;if(co&&!v)continue;
+    const g=payNum(cell(row,C.todate));const to=g!=null?g:[C.prev,C.per,C.stored].reduce((a,c)=>a+num(payNum(cell(row,c))),0);
+    const n=/^C\.?\s*O\.?\s*#?\s*\d/i.test(it)&&billKey(d).indexOf(billKey(it))!==0?it+' '+d:d;
+    lines.push({n,v:r2(v),to:r2(to),pct:v?Math.min(100,Math.max(0,r2(to/v*100))):0,row:r+1,co})}
+  return {sheet:sh.name,headRow:hr+1,lines,origTot,coTot,revTot}}
+/* Payment sheet (G702): APPLICATION NO., FOR WORK THROUGH (or PERIOD TO) and CONTRACT SUM TO DATE: the first value right of each label; on a sheet named Payment, N2 / N4 / F21 if a label isn’t found */
+function payAppG702(sheets){const sh=(sheets||[]).find(s=>/payment|g702/i.test(s.name||''))||(sheets||[]).find(s=>!/continuation/i.test(s.name||'')&&(s.rows||[]).some(r=>(r||[]).some(x=>/CONTRACT SUM TO DATE/.test(payTxt(x)))));if(!sh)return null;
+  const rows=sh.rows||[];const right=(re,ok)=>{for(let r=0;r<rows.length;r++){const row=rows[r]||[];for(let c=0;c<row.length;c++){if(!re.test(payTxt(row[c])))continue;for(let k=c+1;k<row.length;k++){const v=row[k];if(v==null||String(v).trim()===''||/^[:#]$/.test(String(v).trim()))continue;if(ok&&!ok(v))continue;return v}}}return null};
+  const at=(r,c)=>(rows[r]||[])[c];const fixed=/payment/i.test(sh.name);
+  let no=right(/APPLICATION (NO|NUMBER|#)/,v=>payNum(v)!=null||/\d/.test(String(v)));if(no==null&&fixed)no=at(1,13);
+  let thru=right(/FOR WORK THROUGH|PERIOD TO|WORK THRU/,v=>!!payDate(v));if(thru==null&&fixed)thru=at(3,13);
+  let sum=right(/CONTRACT SUM TO DATE/,v=>payNum(v)!=null);if(sum==null&&fixed)sum=at(20,5);
+  const nn=payNum(no);return {sheet:sh.name,no:nn!=null?String(nn):no==null?'':String(no).trim(),thru:payDate(thru),sum:payNum(sum)}}
+/* the whole pay app: lines + G702 + source text, period (YYYY-MM from FOR WORK THROUGH) and the total check */
+function payAppParse(sheets){const P=payAppLines(sheets);const G=payAppG702(sheets);P.g702=G;
+  P.total=r2(P.lines.reduce((a,l)=>a+l.v,0));P.no=G&&G.no||'';P.thru=G&&G.thru||'';P.period=P.thru?P.thru.slice(0,7):'';
+  P.sum=G&&G.sum!=null?G.sum:null;P.match=P.sum==null?null:Math.abs(P.sum-P.total)<0.005;
+  P.source='Pay App'+(P.no?' '+P.no:'')+(P.period?' '+PAY_MON[+P.period.slice(5,7)-1]+' '+P.period.slice(0,4):'');return P}
+/* new labor.billing from a parsed pay app: its lines, source, loaded_at and history with that period’s entry set (pcts = to date / scheduled); other months kept, re-matched to the new lines by name */
+function payAppBilling(old,P,by,now){const lines=P.lines.map(l=>({n:l.n,v:l.v}));const names=lines.map(l=>l.n);const per=P.period||billMonth();
+  const oldNames=old&&Array.isArray(old.lines)?old.lines.map(l=>l&&l.n):null;
+  const history=((old&&old.history)||[]).filter(h=>h&&h.period&&h.period!==per).map(h=>Object.assign({},h,{pcts:billPcts(h,lines,oldNames),names}));
+  history.push({period:per,pcts:P.lines.map(l=>l.pct),names,at:now,by:by||null,from:P.source});history.sort((a,b)=>a.period<b.period?-1:1);
+  return {lines,source:P.source,loaded_at:now,history}}
+/* ExcelJS workbook -> sheets of cached values (formula results, rich text joined, errors blank) */
+const payCell=v=>{if(v==null)return null;if(v instanceof Date||typeof v!=='object')return v;if('result' in v)return payCell(v.result);if(Array.isArray(v.richText))return v.richText.map(t=>t.text).join('');if('text' in v)return v.text;return null};
+function payXlsSheets(wb){return (wb.worksheets||[]).map(ws=>{const rows=[];ws.eachRow({includeEmpty:false},(row,rn)=>{const a=[];row.eachCell({includeEmpty:false},(c,cn)=>{a[cn-1]=payCell(c.value)});rows[rn-1]=a});return {name:ws.name,rows}})}
+async function billSavePayApp(P){if(!billTabOk()||!S.job)return false;const id=S.job.id;let L;
+  try{const d=await q(sb.from('job_budget').select('labor').eq('job_id',id).maybeSingle());L=(d&&d.labor)||{}}catch(e){toast(errMsg(e));return false}
+  const bill=payAppBilling(L.billing,P,S.me&&S.me.id,new Date().toISOString());
+  const ok=await run(sb.from('job_budget').upsert({job_id:id,labor:Object.assign({},L,{billing:bill})},{onConflict:'job_id'}),'Loaded '+P.lines.length+' pay app line'+(P.lines.length===1?'':'s')+' from '+P.source+'.');
+  if(ok&&jobId()===id){S.billing=bill;if(S.labor)S.labor.billing=bill;if(S.jobSize)S.jobSize[id]=P.total;render()}return !!ok}
+async function billLoadPayApp(file,opt){opt=opt||{};
+  if(!billTabOk()){toast(roMsg()||'Only the office can load a pay app.');return null}
+  if(!file||!/\.(xlsx|xlsm)$/i.test(file.name||'')){toast('Pick the pay app as an .xlsx file.');return null}
+  const pb=opt.autoSave?null:progressBox('Reading the pay app…');let P;
+  try{await loadExcel();const wb=new window.ExcelJS.Workbook();await wb.xlsx.load(await file.arrayBuffer());P=payAppParse(payXlsSheets(wb))}
+  catch(e){if(pb)pb.close();toast('Couldn’t read that pay app: '+errMsg(e));return null}
+  if(pb)pb.close();
+  const out={lines:P.lines.length,total:P.total,sum:P.sum,match:P.match,no:P.no,period:P.period,source:P.source};
+  if(!P.lines.length){toast('No pay app lines found on '+P.sheet+'.');return out}
+  if(opt.autoSave){out.saved=await billSavePayApp(P);return out}
+  payAppBox(P);out.preview=true;return out}
+window.billLoadPayApp=billLoadPayApp;
+function payAppBox(P){const B=S.billing;const repl=B&&Array.isArray(B.lines)&&B.lines.length;
+  const info=[P.no?'Application # '+P.no:'',P.thru?'work through '+fmtDay(P.thru):'',P.sheet].filter(Boolean).join(' · ');
+  const chk=P.sum==null?'<div class="small muted">No Payment sheet contract sum found to check against.</div>'
+    :P.match?'<div class="small" style="color:#027a48">✓ Lines total '+money(P.total)+' = contract sum to date '+money(P.sum)+'.</div>'
+    :'<div class="small" style="color:#b42318;font-weight:700">⚠ Lines total '+money(P.total)+' but the contract sum to date is '+money(P.sum)+' (off by '+money(Math.abs(P.sum-P.total))+'). Check the pay app before saving.</div>';
+  const m=modal('<h2>Load pay app</h2><div class="muted small" style="margin:-4px 0 8px">'+esc(info)+'</div>'+
+    '<div style="overflow-x:auto;max-height:50vh"><table class="ltab" id="payPrev"><thead><tr><th>Line</th><th>Scheduled</th><th>Billed to date</th></tr></thead><tbody>'+
+    P.lines.map(l=>'<tr><td>'+esc(l.n)+'</td><td>'+money(l.v)+'</td><td>'+l.pct+'%<div class="muted small">'+money(l.to)+'</div></td></tr>').join('')+
+    '</tbody><tfoot><tr><th>Total</th><th>'+money(P.total)+'</th><th>'+money(P.lines.reduce((a,l)=>a+l.to,0))+'</th></tr></tfoot></table></div>'+
+    '<div style="margin-top:8px">'+chk+'</div>'+
+    '<div class="small muted" style="margin-top:6px">Saving sets the job’s pay app lines'+(repl?' (replacing the '+B.lines.length+' there now)':'')+' and records '+esc(P.period?billMonthText(P.period):'this month')+' as billed at these %s'+(P.period?'':' (no FOR WORK THROUGH date found)')+'. Other months are kept.</div>'+
+    '<div class="mbtns"><button class="btn" data-x>Cancel</button><button class="btn primary" data-ok>Save '+P.lines.length+' line'+(P.lines.length===1?'':'s')+'</button></div>');
+  $('[data-x]',m).onclick=()=>m.close();$('[data-ok]',m).onclick=async e=>{e.target.disabled=true;if(await billSavePayApp(P))m.close();else e.target.disabled=false}}
 function renderProgress(){
   if(!S.loaded.sheets)return '<div class="empty">Loading sheets…</div>';
-  const admin=isAdminRole();const ps=progSheets();
-  if(admin&&!S.loaded.billing&&!S.billLoading){S.billLoading=true;loadBilling().finally(()=>{S.billLoading=false})}
-  let h=(admin?billingCard():'')+'<p class="muted small" style="margin:0 2px 10px">'+(canWrite()?'Open a sheet and highlight the work as it gets done, by scope color.':'Sheets the crew highlights as work gets done.')+'</p>';
+  const ps=progSheets();
+  let h='<p class="muted small" style="margin:0 2px 10px">'+(canWrite()?'Open a sheet and highlight the work as it gets done, by scope color.':'Sheets the crew highlights as work gets done.')+'</p>';
   if(canWrite()&&curSheets().length)h+='<button class="btn primary block" id="progAdd" style="margin-bottom:12px">+ Add sheets from Plans</button>';
   if(!ps.length)return h+'<div class="empty"><b>No progress sheets yet</b>'+(canWrite()?'Use the button above to pick the floor plans and ceiling plans to mark up.':'The office hasn\'t picked the progress sheets for this job yet.')+'</div>';
   return h+'<div class="grid">'+ps.map(s=>'<div class="sheet" data-pid="'+esc(s.id)+'"><img loading="lazy" alt="" data-path="'+esc(s.thumb_path||s.path)+'"><div class="sname">'+esc(s.name||'Sheet')+'</div>'+(canWrite()?'<button class="prm" data-prm="'+esc(s.id)+'" aria-label="Remove from Progress">×</button>':'')+'</div>').join('')+'</div>';
@@ -2795,7 +2915,6 @@ function renderProgress(){
 function bindProgress(){
   $$('[data-pid]').forEach(el=>el.onclick=e=>{if(e.target.closest('[data-prm]'))return;openSheet(el.dataset.pid,'progress')});
   const pa=$('#progAdd');if(pa)pa.onclick=pickProgressSheets;
-  bindBilling();
   $$('[data-prm]').forEach(b=>b.onclick=async e=>{e.stopPropagation();const s=S.sheets.find(x=>x.id===b.dataset.prm);if(!s)return;
     if(!await confirmBox('Take '+s.name+' off the Progress tab? The progress markups on it are kept and come back if you add it again.','Remove'))return;
     await setProgress([s.id],false)});
