@@ -217,6 +217,11 @@ t('tkCodeWidth / tkItemWidthIn: full wall thickness (stud + 5/8" per board layer
   close(T.tkCodeWidth('362S162-25 FF14 G4'), 3.625 + 2.5, 'G4 = 4 layers (two each side)');
   close(T.tkCodeWidth('P 250CH-25 FH12 GYP12 LINER12'), 2.5 + 0.625 + 1, 'shaft wall: CH stud, one layer, 1" liner');
   close(T.tkCodeWidth('M GYP30'), 5.5 + 1.25, 'board only: 2x6 wood + one layer each side');
+  close(T.tkCodeWidth('H GYP10', 10), 1, 'one layer, framing by others: one face, 1" line');
+  close(T.tkCodeWidth('H GYP9', 9), 1, 'one layer at 9 ft');
+  close(T.tkCodeWidth('C GYP20', 10), 5.5 + 1.25, 'two layers: both faces, full wall');
+  close(T.tkCodeWidth('DG12'), 1, 'sheathing only');
+  close(T.tkCodeWidth('SOUNDBOARD 1/2'), 1, 'sound board only');
   close(T.tkCodeWidth('600S162-33 PH8'), 6 + 1.25, 'no board code: one layer each side');
   close(T.tkCodeWidth('9A4 362S125-18 BR12 GYP24 FR3'), 3.625 + 1.25, 'stud part not first');
   close(T.tkCodeWidth('9A4 362S125-18 BR12 GYP48 FR3'), 3.625 + 2.5, 'GYP48 on 12 ft = 4 layers');
