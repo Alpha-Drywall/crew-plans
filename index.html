@@ -328,6 +328,22 @@ body:has(#fvPill) .mcard{padding-bottom:72px}#tmLog{scroll-margin-top:140px}
 .tkit .c{font-weight:700;font-size:13px;word-break:break-word}
 .tkit .q{text-align:right;font-size:13px;font-weight:700;white-space:nowrap}
 .tkeye,.tkdot{border:0;background:none;font-size:14px;padding:2px 4px;color:var(--muted)}
+.tkgh{cursor:pointer;user-select:none;-webkit-user-select:none}
+.tkchev{display:inline-block;width:1.2em;color:var(--muted)}
+.tksec{display:flex;justify-content:space-between;align-items:center;gap:6px;font-weight:700;font-size:12px;letter-spacing:.03em;text-transform:uppercase;margin:10px 0 4px;padding:6px 4px;border-radius:6px;background:#f1f3f5}
+.tksec .muted{font-weight:500;text-transform:none;letter-spacing:0;white-space:nowrap}
+.tkit.hl{border-color:#f9a825;background:#fff8e1}
+.tkhl{position:absolute;left:10px;top:52px;display:none;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:999px;padding:4px 6px 4px 12px;box-shadow:0 2px 10px #0003;z-index:5;font-size:13px;max-width:calc(100% - 20px);flex-wrap:wrap}
+.tkhl .sw{width:12px;height:12px;border-radius:3px;flex:0 0 auto}
+.chip.sm{min-height:30px;padding:3px 10px;font-size:13px}
+.chip:disabled{opacity:.35}
+.tkseg{display:inline-flex}
+.tkctx{position:fixed;z-index:1000;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 6px 24px #0004;padding:4px;min-width:220px;max-width:320px;max-height:75vh;overflow:auto;display:flex;flex-direction:column}
+.tkctx button{border:0;background:none;text-align:left;padding:9px 12px;border-radius:6px;font-size:14px;display:flex;align-items:center;gap:8px;color:inherit}
+.tkctx button:hover{background:#f1f3f5}.tkctx button.on{font-weight:700;background:#e8eefc}
+.tkctx .sw{width:12px;height:12px;border-radius:3px;flex:0 0 auto}
+.tkctxh{font-size:12px;color:var(--muted);padding:6px 12px 2px}
+.tkctxrow{display:flex;gap:2px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin:3px 0;padding:3px 0}.tkctxrow button{flex:1;justify-content:center;padding:8px 6px}
 @media (max-width:760px){.tkwrap{flex-direction:column}.tkside{width:auto;max-height:34vh;border-left:0;border-top:1px solid var(--line)}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js"></script>
@@ -2665,9 +2681,10 @@ async function addPlans(files){
           if(!c){slow=true;pb.set('Page '+i+' is slow to draw, trying a smaller copy…');c=await drawAt(1800,45000)}
           if(!c){c=document.createElement('canvas');c.width=1800;c.height=Math.round(1800*vp1.height/vp1.width);const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);g.fillStyle='#000';g.font='bold 48px sans-serif';g.fillText('Page '+i+' of '+file.name+' could not be drawn.',60,120);g.font='36px sans-serif';g.fillText('Open the original PDF for this sheet.',60,180);toast('Page '+i+" couldn't be drawn, so a placeholder was added.")}
           let nm=slow?{}:await withTimeout(nameFromText(page,vp1),15000).catch(()=>({}));const rv=slow?{}:await withTimeout(revFromText(page,vp1),15000).catch(()=>({}));
+          const stx=slow?null:await withTimeout(tkScaleFromPage(page),15000).catch(()=>null);
           if(!nm.num){pb.set('Reading sheet name, page '+i+' of '+pdf.numPages+'…');try{const o=await withTimeout(nameFromImage(c),30000);nm={num:o.num||nm.num,title:nm.title||o.title,cands:o.cands}}catch(e){}}
           const name=sheetLabel(nm.num,nm.title)||(pdf.numPages>1?base+' p'+i:base);const fp=fpOf(c);
-          const sid=await storeSheet(jid,c,name,++order,pending,{rev:rv.ord||1,rev_label:rv.label||null,rev_date:rv.date,pw:Math.round(vp1.width/72*100)/100,ph:Math.round(vp1.height/72*100)/100});added++;page.cleanup();c.width=c.height=0;
+          const sid=await storeSheet(jid,c,name,++order,pending,{rev:rv.ord||1,rev_label:rv.label||null,rev_date:rv.date,pw:Math.round(vp1.width/72*100)/100,ph:Math.round(vp1.height/72*100)/100,...(stx?{scale_text:stx}:{})});added++;page.cleanup();c.width=c.height=0;
           const rec={id:sid,num:nm.num,title:nm.title,cands:nm.cands,name,rev:rv,fp,file:file.name,page:i};made.push(rec);allMade.push(rec);
         }
         const before=made.map(x=>x.num);harmonizeNums(made);
@@ -3658,8 +3675,9 @@ function renderLogList(){
 
 /* ===== Takeoff (office only): measure walls (LF), ceilings/soffits (SF) and counts (EA) on plan sheets, send rows to the bid sheet's TAKEOFF tab.
    Stored in table takeoffs (one row per job, office-only RLS): data = {v,items[],shapes[],scales{},sent{}}.
-   item  = {id,n,code,desc,sec,unit:'LF'|'SF'|'EA',h,w (line width in inches, optional; blank = stud depth from the code),color}
-   shape = {id,item,sheet,k:'line'|'poly'|'count',p:[x0,y0,x1,y1,...] (0-1 of the sheet image),by,at}
+   item  = {id,n,code,desc,sec,unit:'LF'|'SF'|'EA',h,w (line width in inches, optional; blank = full wall thickness from the code: framing + 5/8" per board layer),color}
+   shape = {id,item,sheet,k:'line'|'poly'|'count',p:[x0,y0,x1,y1,...] (0-1 of the sheet image),by,at, deduct:true on a poly = cut-out that subtracts its area}
+   sheets.scale_text = the printed scale(s) read at upload (PDF text) or later by OCR, best first, '; ' between; '' = looked, none found
    scales[sheetId] = {fpp:feet per image pixel,label,how:'cal'|'preset'}
    Claude (or anyone in the signed-in app page) can use window.alphaTakeoff — see the end of this section. ===== */
 const TK_SECS=['INTERIOR','EXTERIOR','CEILINGS','HMDFS','ALTERNATES'];
@@ -3691,11 +3709,11 @@ function tkAreaPx(p,W,H){
   for(let i=0;i<n;i++){const j=(i+1)%n;a+=p[2*i]*W*p[2*j+1]*H-p[2*j]*W*p[2*i+1]*H}
   return Math.abs(a)/2;
 }
-/* quantity of one shape in its item's unit; null when the sheet has no scale (counts never need one) */
+/* quantity of one shape in its item's unit; null when the sheet has no scale (counts never need one); a deduct area (cut-out) is negative */
 function tkShapeQty(sh,sheet,scale){
   if(!sh)return 0;if(sh.k==='count')return 1;
   const fpp=scale&&+scale.fpp;if(!fpp||!sheet||!sheet.w||!sheet.h)return null;
-  if(sh.k==='poly')return tkAreaPx(sh.p||[],sheet.w,sheet.h)*fpp*fpp;
+  if(sh.k==='poly')return (sh.deduct?-1:1)*tkAreaPx(sh.p||[],sheet.w,sheet.h)*fpp*fpp;
   return tkLenPx(sh.p||[],sheet.w,sheet.h)*fpp;
 }
 /* feet per image pixel for a printed scale (feet per paper inch) on a sheet of paper width pw inches drawn W pixels wide */
@@ -3708,10 +3726,46 @@ function tkGuessPaper(W,H){
 function tkCodeHeight(code){const m=String(code||'').toUpperCase().match(/(?:^|\s)(?:FF|FH|BR|PH|PP|BP|SP|SW|PW|SF|FA|BH|EP|HT|DW)(\d{1,2}(?:\.\d+)?)(?=\s|$)/);return m?parseFloat(m[1]):0}
 /* round up to the next even foot (wall heights) */
 function tkEvenUp(h){h=+h||0;if(h<=0)return 0;const c=Math.ceil(h-1e-9);return c%2?c+1:c}
-/* wall width in inches from the stud part of the code (362S162-25 -> 3-5/8", 600S -> 6"); 4.5" when the code has no stud size */
-function tkCodeWidth(code){const m=String(code||'').toUpperCase().match(/(?:^|[^0-9])(\d{3})S(?=\d|\s|-|$)/);if(!m)return 4.5;const d=parseInt(m[1],10)/100;return d>0?Math.round(d*8)/8:4.5}
-/* an item's line width in inches: its own w, else from the code */
-function tkItemWidthIn(it){return it&&+it.w>0?+it.w:tkCodeWidth(it&&it.code)}
+/* full wall thickness in inches, for the line width: framing + board.
+   Framing: the stud part (362S162-25 -> 3-5/8", 600S -> 6", 250CH -> 2-1/2"), else a 2x4/2x6 in the code, else 5-1/2" (board-only code, taken as a 2x6 wood wall).
+   Board: 5/8" per gypsum layer. G<n> = layers when n is 1-6 (G2 = one layer each side); G<n>/GYP<n> above that are feet of board, so layers = n / wall height
+   (height from the code's tag, else h). With no height (or no board code at all) it is one layer each side. MR/HI/DG count like GYP, TB is 1/2".
+   RC adds 1/2" per side (RC2 = both sides), LINER (shaft liner) adds 1". */
+function tkCodeWidth(code,h){
+  const c=String(code||'').toUpperCase();const H=tkCodeHeight(c)||(+h>0?+h:0);
+  const m=c.match(/(?:^|[^0-9])(\d{3})(?:S|CH|CW|T)(?=\d|\s|-|\(|$)/);const wd=c.match(/(?:^|[^0-9])2\s*X\s*(4|6|8|10|12)(?![0-9])/);
+  let w=m&&parseInt(m[1],10)>0?parseInt(m[1],10)/100:wd?{4:3.5,6:5.5,8:7.25,10:9.25,12:11.25}[wd[1]]:5.5;
+  let known=0,unknown=false,any=false;const re=/(?:^|\s)(GYP|G|MR|HI|DG|TB)(\d{1,3}(?:\.\d+)?)?(?=\s|$)/g;let t;
+  while((t=re.exec(c))){any=true;const n=t[2]?parseFloat(t[2]):0,th=t[1]==='TB'?.5:.625;
+    if(!(n>0)){unknown=true;continue}
+    if(t[1]==='G'&&n<=6&&(!H||n<H)){known+=Math.min(n,8)*th;continue}
+    if(H>0){known+=Math.min(8,Math.max(1,Math.round(n/H)))*th;continue}
+    unknown=true}
+  const liner=/(?:^|\s)LINER\d*(?=\s|$)/.test(c);
+  if(unknown||(!any&&!liner))known=Math.max(known,1.25);
+  w+=known;if(liner)w+=1;
+  const rc=c.match(/(?:^|\s)(?:\(\d+\))?RC(\d)?(?=\s|$)/);if(rc)w+=.5*Math.min(2,+(rc[1]||1));
+  return Math.round(w*16)/16;
+}
+/* an item's line width in inches: its own w, else the full wall thickness from the code */
+function tkItemWidthIn(it){return it&&+it.w>0?+it.w:tkCodeWidth(it&&it.code,it&&it.h)}
+/* printed plan scales found in text (PDF text or OCR): [{label,ftPerIn,count}] best first (most often, then labeled "SCALE", then first seen).
+   Reads 3/32" = 1'-0", 1/8"=1', SCALE: 1/4" = 1'-0", 1 1/2" = 1'-0", 1" = 20'-0", curly quotes and primes; NOT TO SCALE / NTS give nothing. */
+function tkParseScales(text){
+  let t=String(text||'').replace(/[’‘′`´]/g,"'").replace(/[”“″]|''/g,'"').replace(/⁄/g,'/');
+  const uf={'½':' 1/2','¼':' 1/4','¾':' 3/4','⅛':' 1/8','⅜':' 3/8','⅝':' 5/8','⅞':' 7/8'};t=t.replace(/[½¼¾⅛⅜⅝⅞]/g,x=>uf[x]);
+  const re=/(SCALE\s*:?\s*)?(?<![\d/.])(1[\s-]+1\/2|\d{1,2}\/\d{1,3}|\d{1,2}(?:\.\d+)?)\s*"?\s*=\s*(\d{1,4}(?:\.\d+)?)\s*'(?:\s*-?\s*(\d{1,2})\s*")?/gi;
+  const by={},order=[];let m,k=0;
+  while((m=re.exec(t))){
+    const ps=m[2].trim().replace(/\s*-\s*|\s+/,' ');const pm=ps.match(/^(?:(\d+) )?(\d+)\/(\d+)$/);
+    const pin=pm?(+(pm[1]||0))+(+pm[3]>0?pm[2]/pm[3]:NaN):parseFloat(ps);const ft=parseFloat(m[3])+(m[4]?+m[4]/12:0);
+    if(!(pin>0)||!(ft>0))continue;const fpi=ft/pin;if(fpi<0.05||fpi>2000)continue;
+    const key=fpi.toFixed(4);
+    if(!by[key]){const lbl=ft===1&&!m[4]?ps+'" = 1\'-0"':pin===1&&!m[4]?'1" = '+m[3]+'\'-0"':ps+'" = '+m[3]+'\'-'+(m[4]||0)+'"';by[key]={label:lbl,ftPerIn:fpi,count:0,lab:0,i:k++};order.push(key)}
+    by[key].count++;if(m[1])by[key].lab++;
+  }
+  return order.map(x=>by[x]).sort((a,b)=>b.count-a.count||b.lab-a.lab||a.i-b.i).map(x=>({label:x.label,ftPerIn:x.ftPerIn,count:x.count}));
+}
 /* inches typed as 3-5/8, 3 5/8, 3.625, 5/8 or 6" -> number, NaN if not understood */
 function tkInches(s){const t=String(s==null?'':s).trim().replace(/[″”"]/g,'').trim();const m=t.match(/^(?:(\d+(?:\.\d+)?)(?:[\s-]+(\d+)\/(\d+))?|(\d+)\/(\d+))$/);if(!m)return NaN;if(m[4])return +m[5]>0?m[4]/m[5]:NaN;return +m[1]+(m[2]&&+m[3]>0?m[2]/m[3]:0)}
 /* inches to 3-5/8" (nearest 1/16) */
@@ -3786,6 +3840,14 @@ function tkSheets(){return curSheets()}
 function tkScaleOf(sid){return TK&&TK.data.scales[sid]}
 function tkFmtQty(q,unit){if(q==null)return '—';return (unit==='EA'?Math.round(q):Math.round(q*10)/10).toLocaleString()+' '+unit}
 /* ---- Takeoff tab ---- */
+/* collapsed groups (Takeoff tab sections, Sheets, and the viewer's side list 'v:'+section), remembered on this device */
+function tkColl(){try{return JSON.parse(lsGet('acv.tkCollapsed')||'{}')||{}}catch(e){return {}}}
+function tkIsColl(k){return !!tkColl()[k]}
+function tkToggleColl(k){const c=tkColl();if(c[k])delete c[k];else c[k]=1;lsSet('acv.tkCollapsed',Object.keys(c).length?JSON.stringify(c):null)}
+/* "216 LF · 5,120 SF · 3 EA" for a list of items */
+function tkSumText(its,tot){const u={};its.forEach(it=>{const q=(tot[it.id]||{}).qty||0;u[it.unit||'LF']=(u[it.unit||'LF']||0)+q});return ['LF','SF','EA'].filter(k=>k in u).map(k=>tkFmtQty(u[k],k)).join(' · ')}
+function tkGroupHd(key,title,right,cls){const c=tkIsColl(key);return '<div class="'+(cls||'logday')+' tkgh'+(c?' shut':'')+'" data-tkg="'+esc(key)+'" role="button" tabindex="0" aria-expanded="'+(!c)+'"><span><span class="tkchev">'+(c?'▸':'▾')+'</span>'+esc(title)+'</span><span class="muted">'+right+'</span></div>'}
+function tkBindGroups(root,redraw){$$('[data-tkg]',root).forEach(el=>{const go=()=>{tkToggleColl(el.dataset.tkg);redraw()};el.onclick=go;el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go()}}})}
 function renderTakeoff(){
   return '<div id="tkBody"><div class="empty">Loading takeoff…</div></div>';
 }
@@ -3801,30 +3863,34 @@ function tkRenderBody(){
     '<p class="small muted" style="margin:8px 0 0">Add an item (your code for the TAKEOFF tab, like <b>362S162-25 FF14 G28 FR4</b>), then open a sheet below and click along the walls. '+(d.sent&&d.sent.at?'Last sent to '+esc(d.sent.file||'the bid sheet')+' '+esc(fmtWhen(d.sent.at))+'.':'')+' <span id="tkSaved" class="muted">'+(TK.ops.length?'Saving…':'Saved')+'</span></p></div>';
   if(!d.items.length)h+='<div class="empty"><b>No takeoff items yet</b>Tap + Takeoff item. Walls are LF, ceilings and soffit faces are SF, door frames and other counts are EA.</div>';
   TK_SECS.forEach(sec=>{const its=(bySec[sec]||[]).sort((a,b)=>(a.n||0)-(b.n||0));if(!its.length)return;
-    h+='<div class="logday"><span>'+esc(sec)+'</span><span class="muted">'+its.length+' item'+(its.length===1?'':'s')+'</span></div>';
+    h+=tkGroupHd(sec,sec,its.length+' item'+(its.length===1?'':'s')+' · '+esc(tkSumText(its,tot)));if(tkIsColl(sec))return;
     h+=its.map(it=>{const t=tot[it.id]||{qty:0,sheets:0,unscaled:0};return '<div class="card job" data-tki="'+esc(it.id)+'" style="padding:10px 12px"><span style="width:16px;height:16px;border-radius:4px;background:'+esc(it.color)+';flex:0 0 auto;margin-right:10px"></span><div class="grow"><div class="name" style="font-size:15px">'+esc(it.code||'(no code)')+'</div><div class="small muted">'+esc(it.desc||'')+(it.h?' · '+esc(tkFtIn(+it.h))+' high':'')+' · '+t.sheets+' sheet'+(t.sheets===1?'':'s')+(t.unscaled?' · <span style="color:#c62828">'+t.unscaled+' on sheets with no scale</span>':'')+'</div></div><div style="text-align:right"><b>'+esc(tkFmtQty(t.qty,it.unit))+'</b>'+(t.wallSf?'<div class="small muted">'+Math.round(t.wallSf).toLocaleString()+' SF wall face</div>':'')+'</div></div>'}).join('');
   });
-  h+='<div class="logday"><span>Sheets</span><span class="muted">tap to take off</span></div>';
+  const cnt={};d.shapes.forEach(s=>cnt[s.sheet]=(cnt[s.sheet]||0)+1);const noSc=sheets.filter(s=>!d.scales[s.id]).length;
+  h+=tkGroupHd('SHEETS','Sheets',sheets.length+' sheet'+(sheets.length===1?'':'s')+(noSc?' · '+noSc+' with no scale':'')+' · tap to take off');
   if(!sheets.length)h+='<div class="empty">Upload the plans on the Plans tab first.</div>';
-  const cnt={};d.shapes.forEach(s=>cnt[s.sheet]=(cnt[s.sheet]||0)+1);
-  h+=sheets.map(s=>{const sc=d.scales[s.id];return '<div class="card job" data-tks="'+esc(s.id)+'" style="padding:10px 12px"><div class="grow"><div class="name" style="font-size:15px">'+esc(s.name||'Sheet')+'</div><div class="small '+(sc?'muted':'')+'" style="'+(sc?'':'color:#c62828')+'">'+(sc?'Scale '+esc(sc.label||'set'):'No scale yet')+(cnt[s.id]?' · '+cnt[s.id]+' takeoff mark'+(cnt[s.id]===1?'':'s'):'')+'</div></div><span class="chev">›</span></div>'}).join('');
+  if(!tkIsColl('SHEETS'))h+=sheets.map(s=>{const sc=d.scales[s.id];return '<div class="card job" data-tks="'+esc(s.id)+'" style="padding:10px 12px"><div class="grow"><div class="name" style="font-size:15px">'+esc(s.name||'Sheet')+'</div><div class="small '+(sc?'muted':'')+'" style="'+(sc?'':'color:#c62828')+'">'+(sc?'Scale '+esc(sc.label||'set'):'No scale yet')+(cnt[s.id]?' · '+cnt[s.id]+' takeoff mark'+(cnt[s.id]===1?'':'s'):'')+'</div></div><span class="chev">›</span></div>'}).join('');
   b.innerHTML=h;
   $('#tkAdd').onclick=()=>tkItemForm(null);
   $('#tkSend').onclick=tkSendBid;$('#tkPdf').onclick=tkMarkupPdf;$('#tkXls').onclick=tkDownloadRows;
   $$('[data-tki]',b).forEach(el=>el.onclick=()=>tkItemMenu(tkItem(el.dataset.tki)));
   $$('[data-tks]',b).forEach(el=>el.onclick=()=>tkOpen(el.dataset.tks));
+  tkBindGroups(b,tkRenderBody);
 }
-async function tkItemForm(it){
-  const isNew=!it;const d=TK.data;
-  const v=await formBox(isNew?'New takeoff item':'Takeoff item',[
+async function tkItemForm(it,pre){
+  const isNew=!it;const d=TK.data;pre=pre||{};
+  const fp=formBox(isNew?'New takeoff item':'Takeoff item',[
     {k:'code',label:'Code for the TAKEOFF tab (column A, same as you type it in the bid sheet)',value:it?it.code:'',req:true,ph:'362S162-25 FF14 G28 FR4'},
     {k:'desc',label:'Description (column B, optional)',value:it?it.desc:'',ph:'Corridor and office walls'},
-    {k:'sec',label:'Section',type:'select',value:it?it.sec:'INTERIOR',options:TK_SECS.map(s=>[s,s.charAt(0)+s.slice(1).toLowerCase()])},
-    {k:'unit',label:'Measure',type:'select',value:it?it.unit:'LF',options:[['LF','Walls, soffits, lines (LF)'],['SF','Ceilings, areas (SF)'],['EA','Counts, door frames (EA)']]},
+    {k:'sec',label:'Section',type:'select',value:it?it.sec:pre.sec||'INTERIOR',options:TK_SECS.map(s=>[s,s.charAt(0)+s.slice(1).toLowerCase()])},
+    {k:'unit',label:'Measure',type:'select',value:it?it.unit:pre.unit||'LF',options:[['LF','Walls, soffits, lines (LF)'],['SF','Ceilings, areas (SF)'],['EA','Counts, door frames (EA)']]},
     {k:'h',label:'Height for wall SF (blank = from the code\'s height tag, like FF14)',value:it&&it.h&&Math.abs(+it.h-tkCodeHeight(it.code))>1e-6?tkFtIn(+it.h):'',ph:'from the code'},
-    {k:'w',label:'Line width (inches, blank = from the code)',value:it&&+it.w>0?tkInStr(+it.w):'',ph:'from the code ('+tkInStr(tkCodeWidth(it?it.code:''))+' with no stud size)'},
+    {k:'w',label:'Line width (inches, blank = full wall thickness from the code: stud + 5/8" per board layer)',value:it&&+it.w>0?tkInStr(+it.w):'',ph:'auto: '+tkInStr(tkCodeWidth(it?it.code:'',it&&it.h))},
     {k:'color',label:'Color',type:'select',value:it?it.color:TK_COLORS[d.items.length%TK_COLORS.length],options:TK_COLORS.map((c,i)=>[c,['Red','Blue','Green','Orange','Purple','Teal','Pink','Brown','Indigo','Lime','Deep orange','Sea green','Violet','Olive','Sky','Slate'][i]])}
   ],isNew?'Add':'Save');
+  {const ws=$$('.mwrap'),m=ws[ws.length-1],ci=m&&$('[name=code]',m),hi=m&&$('[name=h]',m),wi=m&&$('[name=w]',m);
+    if(ci&&wi){const upd=()=>{const hv=hi&&hi.value?tkFeet(hi.value):0;wi.placeholder='auto: '+tkInStr(tkCodeWidth(ci.value,hv>0?hv:0))};ci.addEventListener('input',upd);if(hi)hi.addEventListener('input',upd);upd()}}
+  const v=await fp;
   if(!v)return null;
   const h=v.h?tkFeet(v.h):tkCodeHeight(v.code);if(v.h&&!(h>0)){toast('Check the height: '+v.h);return null}
   const wi=v.w?tkInches(v.w):0;if(v.w&&!(wi>0&&wi<=48)){toast('Check the line width (inches): '+v.w);return null}
@@ -3834,10 +3900,15 @@ async function tkItemForm(it){
   return nv;
 }
 async function tkItemMenu(it){
-  if(!it)return;const m=modal('<h2>'+esc(it.code)+'</h2><div style="display:grid;gap:10px"><button class="btn" data-a="edit">Edit</button><button class="btn danger" data-a="del">Delete item and its marks</button><button class="btn" data-a="x">Close</button></div>');
+  if(!it)return;const shs=tkItemSheets(it.id);const m=modal('<h2>'+esc(it.code)+'</h2><div style="display:grid;gap:10px">'+(shs.length&&!TKV?'<button class="btn primary" data-a="show">Show on sheets ('+shs.length+' sheet'+(shs.length===1?'':'s')+')</button>':'')+'<button class="btn" data-a="edit">Edit</button><button class="btn danger" data-a="del">Delete item and its marks</button><button class="btn" data-a="x">Close</button></div>');
   $('[data-a=x]',m).onclick=()=>m.close();$('[data-a=edit]',m).onclick=()=>{m.close();tkItemForm(it)};
+  const sb2=$('[data-a=show]',m);if(sb2)sb2.onclick=()=>{m.close();tkShowItem(it.id)};
   $('[data-a=del]',m).onclick=async()=>{m.close();const n=TK.data.shapes.filter(s=>s.item===it.id).length;if(!await confirmBox('Delete "'+it.code+'"'+(n?' and its '+n+' mark'+(n===1?'':'s'):'')+'?'))return;tkDo({t:'del_item',id:it.id});if(TKV){if(TKV.item===it.id)TKV.item=null;tkvPaint()}else tkRenderBody()};
 }
+/* sheets (in plan order) that have marks of this item */
+function tkItemSheets(iid){if(!TK)return [];const on={};TK.data.shapes.forEach(s=>{if(s.item===iid)on[s.sheet]=1});return tkSheets().filter(s=>on[s.id])}
+/* open the first sheet with this item's marks, highlighted */
+function tkShowItem(iid){const l=tkItemSheets(iid);if(!l.length){toast('No marks for this item yet.');return}TKV={item:iid,hl:iid};tkOpen(l[0].id)}
 /* ---- takeoff sheet viewer ---- */
 let TKV=null;
 const TK_WMULS=[0.5,1,1.5,2,3];
@@ -3849,18 +3920,21 @@ function tkvWidths(){if(!TKV)return;const mn=1.2/TKV.t.s;$$('#tkShapes [data-w]'
 async function tkOpen(sid){
   const sh=S.sheets.find(s=>s.id===sid);if(!sh||!TK)return;
   const list=tkSheets();const ni=list.findIndex(s=>s.id===sid);
-  TKV={id:sid,sh,list,ni,W:0,H:0,t:{x:0,y:0,s:1},minS:.05,mode:'draw',item:TKV&&TKV.item||null,draft:[],cur:null,pts:new Map(),g:null,sel:null,hide:{},wmul:tkWmulGet()};
+  TKV={id:sid,sh,list,ni,W:0,H:0,t:{x:0,y:0,s:1},minS:.05,mode:'draw',item:TKV&&TKV.item||null,draft:[],cur:null,pts:new Map(),g:null,sel:null,hide:{},wmul:tkWmulGet(),hl:TKV&&TKV.hl||null,mine:[],lm:['seg','area'].includes(lsGet('acv.tkLineMode'))?lsGet('acv.tkLineMode'):'run',last:TKV&&TKV.last||{},dNext:false};
+  if(TKV.hl&&!tkItem(TKV.hl))TKV.hl=null;
   if(!TKV.item||!tkItem(TKV.item)){const f=TK.data.items[0];TKV.item=f?f.id:null}
+  {const ci=tkItem(TKV.item);if(ci&&ci.unit==='SF')TKV.lm='area';else if(ci&&ci.unit==='LF'&&TKV.lm==='area')TKV.lm='run'}
   const el=document.createElement('div');el.id='tkv';el.className='tkv';document.body.appendChild(el);document.body.classList.add('noscroll');
   el.innerHTML='<div class="vbar"><button id="tkBack">‹ Takeoff</button><div class="vt">'+esc(sh.name||'Sheet')+(ni>=0&&list.length>1?' <span style="font-weight:400;opacity:.7">('+(ni+1)+'/'+list.length+')</span>':'')+'</div><button id="tkPrev"'+(ni<=0?' disabled':'')+'>‹</button><button id="tkNext"'+(ni<0||ni>=list.length-1?' disabled':'')+'>›</button></div>'+
-    '<div class="tkwrap"><div id="tkStage"><div id="tkBoard"><img id="tkImg" alt="" draggable="false"><svg id="tkInk" xmlns="http://www.w3.org/2000/svg"><g id="tkShapes"></g><g id="tkLive"></g></svg></div><div class="hint" id="tkHint">Loading sheet…</div><div class="tkread" id="tkRead"></div></div>'+
+    '<div class="tkwrap"><div id="tkStage"><div id="tkBoard"><img id="tkImg" alt="" draggable="false"><svg id="tkInk" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="tkHatch" patternUnits="userSpaceOnUse" width="24" height="24" patternTransform="rotate(45)"><rect width="24" height="24" fill="#fff" fill-opacity=".55"/><line x1="0" y1="0" x2="0" y2="24" stroke="#c62828" stroke-width="5" stroke-opacity=".6"/></pattern></defs><g id="tkShapes"></g><g id="tkLive"></g></svg></div><div class="hint" id="tkHint">Loading sheet…</div><div class="tkread" id="tkRead"></div><div class="tkhl" id="tkHl"></div></div>'+
     '<div class="tkside" id="tkSide"></div></div>'+
-    '<div class="vtools"><div class="trow"><button class="tb" data-tm="draw">✏ Take off</button><button class="tb" data-tm="pan">✋ Move</button><button class="tb" data-tm="select">☝ Select</button><button class="tb" data-tm="scale">📐 Scale</button><button class="tb" data-tm="measure">📏 Measure</button><button class="tb" id="tkDone">✓ Finish</button><button class="tb" id="tkUndo">↶ Undo point</button><button class="tb" id="tkSnap">Snap: on</button><button class="tb" id="tkWm" title="Draw takeoff lines thinner or thicker">Line: 1x</button><button class="tb" id="tkCopy">⧉ Copy to sheet…</button><button class="tb" id="tkFit">⤢ Fit</button></div></div>';
+    '<div class="vtools"><div class="trow"><button class="tb" data-tm="draw">✏ Take off</button><button class="tb" data-tm="pan">✋ Move</button><button class="tb" data-tm="select">☝ Select</button><button class="tb" data-tm="scale">📐 Scale</button><button class="tb" data-tm="measure">📏 Measure</button><button class="tb" id="tkDone">✓ Finish</button><button class="tb" id="tkUndo">↶ Undo point</button><button class="tb" id="tkSnap">Snap: on</button><span class="tkseg" title="Run: each click adds a corner until ✓ Finish. Segments: every 2 clicks make one straight piece. Area: click the corners, or drag a rectangle."><button class="tb" data-lm="run">Run</button><button class="tb" data-lm="seg">Segments</button><button class="tb" data-lm="area">Area</button></span><button class="tb" id="tkWm" title="Draw takeoff lines thinner or thicker">Line: 1x</button><button class="tb" id="tkCopy">⧉ Copy to sheet…</button><button class="tb" id="tkFit">⤢ Fit</button></div></div>';
   $('#tkBack').onclick=tkClose;$('#tkFit').onclick=tkvFit;
   $('#tkPrev').onclick=()=>tkStep(-1);$('#tkNext').onclick=()=>tkStep(1);
   $$('[data-tm]',el).forEach(b=>b.onclick=()=>tkvMode(b.dataset.tm));
   $('#tkDone').onclick=tkvFinish;$('#tkUndo').onclick=tkvUndoPt;$('#tkCopy').onclick=tkvCopy;
   TKV.snap=lsGet('acv.tkSnap')!=='off';$('#tkSnap').onclick=()=>{TKV.snap=!TKV.snap;lsSet('acv.tkSnap',TKV.snap?null:'off');tkvTools()};
+  $$('[data-lm]',el).forEach(b=>b.onclick=()=>tkvSetLm(b.dataset.lm));
   $('#tkWm').onclick=()=>{const i=TK_WMULS.indexOf(TKV.wmul);TKV.wmul=TK_WMULS[(i+1)%TK_WMULS.length];lsSet('acv.tkWmul',TKV.wmul===1?null:String(TKV.wmul));tkvPaint()};
   TKV.stage=$('#tkStage');TKV.board=$('#tkBoard');TKV.img=$('#tkImg');
   TKV.img.onload=()=>{if(!TKV)return;TKV.W=TKV.img.naturalWidth;TKV.H=TKV.img.naturalHeight;TKV.board.style.width=TKV.W+'px';TKV.board.style.height=TKV.H+'px';$('#tkInk').setAttribute('viewBox','0 0 '+TKV.W+' '+TKV.H);tkvFit();tkvPaint();if(!tkScaleOf(sid))setTimeout(()=>{if(TKV&&TKV.id===sid&&!tkScaleOf(sid))tkScaleBox()},300)};
@@ -3870,10 +3944,43 @@ async function tkOpen(sid){
   tkLoad(TK.job,true).then(()=>{if(TKV&&TKV.id===sid){tkvSide();tkvPaint()}});
 }
 function tkClose(){
-  const el=$('#tkv');if(el)el.remove();TKV=null;document.body.classList.remove('noscroll');window.removeEventListener('keydown',tkvKey);
+  tkCtxClose();const el=$('#tkv');if(el)el.remove();TKV=null;document.body.classList.remove('noscroll');window.removeEventListener('keydown',tkvKey);window.removeEventListener('keyup',tkvKeyUp);
   tkFlush();if(S.tab==='takeoff')tkRenderBody();
 }
-function tkStep(d){if(!TKV)return;const n=TKV.list[TKV.ni+d];if(!n)return;const it=TKV.item;const el=$('#tkv');if(el)el.remove();window.removeEventListener('keydown',tkvKey);TKV={item:it};tkOpen(n.id)}
+function tkStep(d){if(!TKV)return;tkGo(TKV.list[TKV.ni+d])}
+function tkGo(n){if(!TKV||!n)return;tkCtxClose();const it=TKV.item,hl=TKV.hl,last=TKV.last;const el=$('#tkv');if(el)el.remove();window.removeEventListener('keydown',tkvKey);window.removeEventListener('keyup',tkvKeyUp);TKV={item:it,hl,last};tkOpen(n.id)}
+/* jump to the previous/next sheet that has the highlighted item */
+function tkHlStep(d){if(!TKV||!TKV.hl)return;const l=tkItemSheets(TKV.hl);const i=l.findIndex(s=>s.id===TKV.id);let n;
+  if(i>=0)n=l[i+d];else{const pos=TKV.ni;n=d>0?l.find(s=>TKV.list.indexOf(s)>pos):l.filter(s=>TKV.list.indexOf(s)<pos).pop()}
+  if(n)tkGo(n)}
+/* drawing mode: Run / Segments (LF items) or Area (SF items); switching to the other kind picks the last item of that kind, or asks */
+async function tkvSetLm(m){
+  if(!TKV)return;tkCtxClose();if(TKV.draft.length&&TKV.mode==='draw')tkvFinish();const it=tkItem(TKV.item),u=m==='area'?'SF':'LF';
+  if(!it||it.unit!==u){const x=await tkvPickUnit(u);if(!x||!TKV)return;TKV.item=x.id}
+  TKV.lm=m;TKV.dNext=false;lsSet('acv.tkLineMode',m==='run'?null:m);if(m!=='area')lsSet('acv.tkLineMode2',m==='seg'?'seg':null);TKV.mode='draw';tkvPaint();
+}
+/* the item to draw with for a unit: the last one used, the only one, or ask (with + New) */
+async function tkvPickUnit(u){
+  const last=TKV.last&&tkItem(TKV.last[u]);if(last&&last.unit===u)return last;
+  const c=TK.data.items.filter(x=>x.unit===u).sort((a,b)=>TK_SECS.indexOf(a.sec)-TK_SECS.indexOf(b.sec)||(a.n||0)-(b.n||0));if(c.length===1)return c[0];
+  if(c.length){const v=await formBox(u==='SF'?'Pick an area (SF) item':'Pick a wall (LF) item',[{k:'it',label:u==='SF'?'Area marks go on ceiling / SF items':'Lines go on wall / LF items',type:'select',value:c[0].id,options:c.map(x=>[x.id,x.code+(x.desc?' — '+x.desc:'')]).concat([['__new','+ New '+u+' item…']])}],'Use');
+    if(!v)return null;if(v.it!=='__new')return tkItem(v.it)}
+  else toast(u==='SF'?'Add an area (SF) item first, like a ceiling.':'Add a wall (LF) item first.');
+  return await tkItemForm(null,{unit:u,sec:u==='SF'?'CEILINGS':'INTERIOR'});
+}
+/* make an item the active one; Area goes with SF items, Run/Segments with LF items */
+function tkvUseItem(id){const it=tkItem(id);if(!it)return;TKV.item=id;if(it.unit==='SF')TKV.lm='area';else if(it.unit==='LF'&&TKV.lm==='area')TKV.lm=lsGet('acv.tkLineMode2')==='seg'?'seg':'run';if(it.unit!=='EA')lsSet('acv.tkLineMode',TKV.lm==='run'?null:TKV.lm);TKV.dNext=false}
+/* highlight one item's marks (others dim); the bar shows Show all and ‹ › to other sheets with this item */
+function tkvHlBar(){
+  const b=$('#tkHl');if(!b||!TKV)return;const it=TKV.hl&&tkItem(TKV.hl);if(!it){b.style.display='none';b.innerHTML='';return}
+  const l=tkItemSheets(it.id),i=l.findIndex(s=>s.id===TKV.id),pos=TKV.ni;
+  const hasPrev=i>0||(i<0&&l.some(s=>TKV.list.indexOf(s)<pos)),hasNext=i>=0?i<l.length-1:l.some(s=>TKV.list.indexOf(s)>pos);
+  b.innerHTML='<span class="sw" style="background:'+esc(it.color)+'"></span><b>'+esc(it.code)+'</b><span class="muted">'+(i>=0?'sheet '+(i+1)+' of '+l.length:'not on this sheet · on '+l.length)+'</span>'+
+    (l.length>1||i<0?'<button class="chip sm" id="tkHlP" title="Previous sheet with this item"'+(hasPrev?'':' disabled')+'>‹</button><button class="chip sm" id="tkHlN" title="Next sheet with this item"'+(hasNext?'':' disabled')+'>›</button>':'')+
+    '<button class="chip sm" id="tkHlX">Show all</button>';
+  b.style.display='flex';b.onpointerdown=e=>e.stopPropagation();
+  $('#tkHlX').onclick=()=>{TKV.hl=null;tkvPaint()};const p=$('#tkHlP'),n=$('#tkHlN');if(p)p.onclick=()=>tkHlStep(-1);if(n)n.onclick=()=>tkHlStep(1);
+}
 function tkvFit(){const V2=TKV;if(!V2||!V2.W)return;const r=V2.stage.getBoundingClientRect();const s=Math.min(r.width/V2.W,r.height/V2.H)*.97;V2.minS=s*.5;V2.t={s,x:(r.width-V2.W*s)/2,y:(r.height-V2.H*s)/2};tkvT()}
 function tkvT(){TKV.board.style.transform='translate('+TKV.t.x+'px,'+TKV.t.y+'px) scale('+TKV.t.s+')';tkvWidths();tkvLive()}
 function tkvImg(cx,cy){const r=TKV.stage.getBoundingClientRect();return {x:(cx-r.left-TKV.t.x)/TKV.t.s,y:(cy-r.top-TKV.t.y)/TKV.t.s}}
@@ -3889,36 +3996,49 @@ function tkvTools(){
   const un=$('#tkUndo');if(un)un.disabled=!TKV.draft.length;
   const sn=$('#tkSnap');if(sn)sn.textContent='Snap: '+(TKV.snap?'on':'off');
   const wm=$('#tkWm');if(wm)wm.textContent='Line: '+(TKV.wmul||1)+'x';
+  $$('#tkv [data-lm]').forEach(b=>b.classList.toggle('on',TKV.mode==='draw'&&!!it&&it.unit!=='EA'&&b.dataset.lm===(it.unit==='SF'?'area':TKV.lm==='seg'?'seg':'run')));
   const h=$('#tkHint');if(!h||!TKV.W)return;
   const sc=tkScaleOf(TKV.id);
   h.textContent=!sc&&TKV.mode!=='scale'?'No scale on this sheet yet: tap 📐 Scale':
-    TKV.mode==='draw'?(it?(it.unit==='LF'?'Click each corner along the wall · double-click or ✓ Finish to end the run · drag to move':it.unit==='SF'?'Click the corners of the area · ✓ Finish closes it · drag to move':'Click each item to count it · drag to move'):'Pick a takeoff item on the right'):
+    TKV.mode==='draw'?(it?(it.unit==='LF'?(TKV.lm==='seg'?'Segments: click both ends of each wall piece · right-click for more · drag to move':'Click each corner along the wall · double-click or ✓ Finish to end the run · right-click for more · drag to move'):it.unit==='SF'?(TKV.dNext?'Deduct: click the corners of the cut-out (or drag a rectangle) · ✓ Finish':'Area: click the corners (click the first one or ✓ Finish to close) or drag a rectangle · Alt+drag/click = deduct · space+drag to move'):'Click each item to count it · drag to move'):'Pick a takeoff item on the right'):
     TKV.mode==='pan'?'Drag to move · wheel or pinch to zoom':TKV.mode==='select'?'Click a mark to change or delete it':TKV.mode==='scale'?'Click both ends of a dimension you know, then ✓ Finish':'Click points to measure (not saved) · ✓ Finish';
   h.style.display='block';
 }
 function tkvSide(){
   const el=$('#tkSide');if(!el||!TK)return;const d=TK.data,tot=tkTotals(d,S.sheets.filter(s=>s.id===TKV.id)),all=tkTotals(d,tkSheets());const sc=tkScaleOf(TKV.id);
+  const row=it=>{const t=tot[it.id]||{},a=all[it.id]||{};return '<div class="tkit'+(it.id===TKV.item?' on':'')+(TKV.hl===it.id?' hl':'')+'" data-it="'+esc(it.id)+'"><button class="tkeye" data-eye="'+esc(it.id)+'" title="Show/hide">'+(TKV.hide[it.id]?'◌':'●')+'</button><span class="sw" style="background:'+esc(it.color)+'"></span><div class="grow"><div class="c">'+esc(it.code)+'</div><div class="small muted">'+(it.h?esc(tkFtIn(+it.h)):'')+(it.unit==='LF'?(it.h?' · ':'')+esc(tkInStr(tkItemWidthIn(it)))+' wide':'')+'</div></div><div class="q"><div>'+esc(tkFmtQty(t.qty||0,it.unit))+'</div><div class="small muted">all: '+esc(tkFmtQty(a.qty||0,it.unit))+'</div></div><button class="tkdot" data-ed="'+esc(it.id)+'" title="Edit">⋯</button></div>'};
+  let list='';
+  TK_SECS.forEach(sec=>{const its=d.items.filter(it=>(TK_SECS.includes(it.sec)?it.sec:'INTERIOR')===sec).sort((a,b)=>(a.n||0)-(b.n||0));if(!its.length)return;const k='v:'+sec;
+    list+=tkGroupHd(k,sec.charAt(0)+sec.slice(1).toLowerCase(),its.length+' · '+esc(tkSumText(its,tot)||'—'),'tksec');
+    if(!tkIsColl(k))list+=its.map(row).join('')});
   el.innerHTML='<div class="tkhd"><b>Items</b><button class="btn sm" id="tkNew">+ Item</button></div>'+
     '<div class="small muted" style="margin:0 0 8px">'+(sc?'Scale '+esc(sc.label||'set')+' · <a href="#" id="tkSc">change</a>':'<span style="color:#c62828">No scale</span> · <a href="#" id="tkSc">set scale</a>')+'</div>'+
-    (d.items.length?d.items.slice().sort((a,b)=>TK_SECS.indexOf(a.sec)-TK_SECS.indexOf(b.sec)||(a.n||0)-(b.n||0)).map(it=>{const t=tot[it.id]||{},a=all[it.id]||{};return '<div class="tkit'+(it.id===TKV.item?' on':'')+'" data-it="'+esc(it.id)+'"><button class="tkeye" data-eye="'+esc(it.id)+'" title="Show/hide">'+(TKV.hide[it.id]?'◌':'●')+'</button><span class="sw" style="background:'+esc(it.color)+'"></span><div class="grow"><div class="c">'+esc(it.code)+'</div><div class="small muted">'+esc(String(it.sec||'interior').toLowerCase())+(it.h?' · '+esc(tkFtIn(+it.h)):'')+(it.unit==='LF'?' · '+esc(tkInStr(tkItemWidthIn(it)))+' wide':'')+'</div></div><div class="q"><div>'+esc(tkFmtQty(t.qty||0,it.unit))+'</div><div class="small muted">all: '+esc(tkFmtQty(a.qty||0,it.unit))+'</div></div><button class="tkdot" data-ed="'+esc(it.id)+'" title="Edit">⋯</button></div>'}).join(''):'<div class="small muted">No items yet. Tap + Item.</div>');
+    (TKV.hl&&tkItem(TKV.hl)?'<div style="margin:0 0 8px"><button class="chip sm" id="tkShowAll">Show all</button> <span class="small muted">tap the item again to show all</span></div>':'')+
+    (d.items.length?list:'<div class="small muted">No items yet. Tap + Item.</div>');
   $('#tkNew').onclick=()=>tkItemForm(null).then(it=>{if(it&&TKV){TKV.item=it.id;tkvMode('draw');tkvSide()}});
   $('#tkSc').onclick=e=>{e.preventDefault();tkScaleBox()};
-  $$('[data-it]',el).forEach(r=>r.onclick=e=>{if(e.target.closest('[data-ed],[data-eye]'))return;if(TKV.draft.length)tkvFinish();TKV.item=r.dataset.it;if(TKV.mode!=='draw')TKV.mode='draw';tkvTools();tkvSide();tkvPaint()});
+  const sa=$('#tkShowAll');if(sa)sa.onclick=()=>{TKV.hl=null;tkvPaint()};
+  $$('[data-it]',el).forEach(r=>r.onclick=e=>{if(e.target.closest('[data-ed],[data-eye]'))return;if(TKV.draft.length)tkvFinish();const id=r.dataset.it;
+    TKV.hl=TKV.hl===id&&TKV.item===id?null:id;tkvUseItem(id);if(TKV.mode!=='draw')TKV.mode='draw';tkvPaint()});
   $$('[data-ed]',el).forEach(b=>b.onclick=()=>tkItemMenu(tkItem(b.dataset.ed)));
   $$('[data-eye]',el).forEach(b=>b.onclick=()=>{TKV.hide[b.dataset.eye]=!TKV.hide[b.dataset.eye];tkvSide();tkvPaint()});
+  tkBindGroups(el,tkvSide);
 }
 function tkvPaint(){
   if(!TKV||!TKV.W||!TK)return;const g=$('#tkShapes');if(!g)return;const W=TKV.W,H=TKV.H,M=Math.max(W,H),sw=M*.004;
   const its={};TK.data.items.forEach(i=>its[i.id]=i);
+  const hl=TKV.hl&&its[TKV.hl]?TKV.hl:null;{const ci=its[TKV.item];if(ci)TKV.last[ci.unit]=ci.id}
   g.innerHTML=TK.data.shapes.filter(s=>s.sheet===TKV.id&&its[s.item]&&!TKV.hide[s.item]).map(s=>{const it=its[s.item],c=esc(it.color),p=(s.p||[]).map(Number),sel=TKV.sel===s.id;
+    const dim=hl&&s.item!==hl&&!sel?' opacity="0.2" data-dim="1"':'';
     const pts=[];for(let i=0;i+1<p.length;i+=2)pts.push((p[i]*W).toFixed(1)+','+(p[i+1]*H).toFixed(1));
     const op=it.id===TKV.item?.75:.5;
-    if(s.k==='count')return '<g><circle cx="'+(p[0]*W).toFixed(1)+'" cy="'+(p[1]*H).toFixed(1)+'" r="'+(M*.007).toFixed(1)+'" fill="'+c+'" fill-opacity="'+op+'" stroke="'+(sel?'#000':c)+'" stroke-width="'+(sw*(sel?.8:.4)).toFixed(1)+'"/></g>';
-    if(s.k==='poly')return '<polygon points="'+pts.join(' ')+'" fill="'+c+'" fill-opacity="'+(op*.4).toFixed(2)+'" stroke="'+(sel?'#000':c)+'" stroke-width="'+(sw*(sel?.8:.5)).toFixed(1)+'" stroke-linejoin="round"/>';
+    if(s.k==='count')return '<g'+dim+'><circle cx="'+(p[0]*W).toFixed(1)+'" cy="'+(p[1]*H).toFixed(1)+'" r="'+(M*.007).toFixed(1)+'" fill="'+c+'" fill-opacity="'+op+'" stroke="'+(sel?'#000':c)+'" stroke-width="'+(sw*(sel?.8:.4)).toFixed(1)+'"/></g>';
+    if(s.k==='poly'&&s.deduct)return '<polygon'+dim+' data-deduct="1" points="'+pts.join(' ')+'" fill="url(#tkHatch)" stroke="'+(sel?'#000':c)+'" stroke-width="'+(sw*(sel?.8:.5)).toFixed(1)+'" stroke-dasharray="'+(sw*2.5).toFixed(1)+' '+(sw*1.5).toFixed(1)+'" stroke-linejoin="round"/>';
+    if(s.k==='poly')return '<polygon'+dim+' points="'+pts.join(' ')+'" fill="'+c+'" fill-opacity="'+(op*.4).toFixed(2)+'" stroke="'+(sel?'#000':c)+'" stroke-width="'+(sw*(sel?.8:.5)).toFixed(1)+'" stroke-linejoin="round"/>';
     const lw=tkvLineW(it,0)*(sel?1.15:1);
-    return '<polyline points="'+pts.join(' ')+'" fill="none" stroke="'+(sel?'#000':c)+'" stroke-opacity="'+(sel?.85:it.id===TKV.item?.9:.7)+'" data-w="'+lw.toFixed(2)+'" stroke-width="'+Math.max(lw,1.2/TKV.t.s).toFixed(2)+'" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4"/>';
+    return '<polyline'+dim+' points="'+pts.join(' ')+'" fill="none" stroke="'+(sel?'#000':c)+'" stroke-opacity="'+(sel?.85:it.id===TKV.item?.9:.7)+'" data-w="'+lw.toFixed(2)+'" stroke-width="'+Math.max(lw,1.2/TKV.t.s).toFixed(2)+'" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4"/>';
   }).join('');
-  tkvLive();tkvSide();tkvTools();
+  tkvLive();tkvSide();tkvTools();tkvHlBar();
 }
 /* live drawing, rubber band to the cursor and the running length/area */
 function tkvLive(){
@@ -3929,7 +4049,7 @@ function tkvLive(){
   if(pts.length){const ps=pts.map(p=>p.x.toFixed(1)+','+p.y.toFixed(1)).join(' ');
     const poly=TKV.mode==='draw'&&it&&it.unit==='SF';
     const lf=TKV.mode==='draw'&&it&&it.unit==='LF',lw=lf?tkvLineW(it,1.5):sw;
-    s+=poly&&pts.length>2?'<polygon points="'+ps+'" fill="'+c+'" fill-opacity=".18" stroke="'+c+'" stroke-width="'+sw+'" stroke-dasharray="'+(sw*3)+' '+(sw*2)+'"/>':'<polyline points="'+ps+'" fill="none" stroke="'+c+'"'+(lf?' stroke-opacity=".7"':'')+' stroke-width="'+lw.toFixed(2)+'" stroke-linecap="'+(lf?'butt':'round')+'" stroke-linejoin="'+(lf?'miter':'round')+'"/>';
+    s+=poly&&pts.length>2&&TKV.dDraft?'<polygon points="'+ps+'" fill="url(#tkHatch)" stroke="#c62828" stroke-width="'+sw+'" stroke-dasharray="'+(sw*3)+' '+(sw*2)+'"/>':poly&&pts.length>2?'<polygon points="'+ps+'" fill="'+c+'" fill-opacity=".18" stroke="'+c+'" stroke-width="'+sw+'" stroke-dasharray="'+(sw*3)+' '+(sw*2)+'"/>':'<polyline points="'+ps+'" fill="none" stroke="'+c+'"'+(lf?' stroke-opacity=".7"':'')+' stroke-width="'+lw.toFixed(2)+'" stroke-linecap="'+(lf?'butt':'round')+'" stroke-linejoin="'+(lf?'miter':'round')+'"/>';
     s+=TKV.draft.map(p=>'<circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="'+(M*.0025/Math.max(.2,TKV.t.s*3)+M*.0012).toFixed(1)+'" fill="#fff" stroke="'+c+'" stroke-width="'+(sw*.6)+'"/>').join('');
   }
   g.innerHTML=s;
@@ -3938,7 +4058,7 @@ function tkvLive(){
   const np=[];pts.forEach(p=>np.push(p.x/W,p.y/H));let txt='';
   if(TKV.mode==='scale')txt=Math.round(tkLenPx(np,W,H))+' px — click the other end, then ✓ Finish';
   else if(!sc)txt='Set the scale to see feet';
-  else if(TKV.mode==='draw'&&it&&it.unit==='SF')txt=(pts.length>2?Math.round(tkAreaPx(np,W,H)*sc.fpp*sc.fpp).toLocaleString()+' SF':'…');
+  else if(TKV.mode==='draw'&&it&&it.unit==='SF')txt=(pts.length>2?(TKV.dDraft?'Deduct −':'')+Math.round(tkAreaPx(np,W,H)*sc.fpp*sc.fpp).toLocaleString()+' SF':TKV.dDraft?'Deduct…':'…');
   else if(TKV.mode==='draw'&&it&&it.unit==='EA')txt='';
   else{const L=tkLenPx(np,W,H)*sc.fpp;const last=pts.length>1?Math.hypot(pts[pts.length-1].x-pts[pts.length-2].x,pts[pts.length-1].y-pts[pts.length-2].y)*sc.fpp:0;txt=tkFtIn(L)+(pts.length>2?'  (this leg '+tkFtIn(last)+')':'')}
   rd.textContent=txt;rd.style.display=txt?'block':'none';
@@ -3958,7 +4078,10 @@ function tkvBind(){
     if(!TKV||!TKV.W)return;try{st.setPointerCapture(e.pointerId)}catch(_){}
     TKV.pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
     if(TKV.pts.size===2){const [a,b]=[...TKV.pts.values()];TKV.g={type:'pinch',d0:Math.max(1,dist(a,b)),c0:mid(a,b),t0:Object.assign({},TKV.t)}}
-    else if(TKV.pts.size===1)TKV.g={type:'pan',sx:e.clientX,sy:e.clientY,t0:Object.assign({},TKV.t),moved:false,time:Date.now(),btn:e.ctrlKey?2:e.button};
+    else if(TKV.pts.size===1){const it=tkItem(TKV.item);TKV.g={type:'pan',sx:e.clientX,sy:e.clientY,t0:Object.assign({},TKV.t),moved:false,time:Date.now(),btn:TKV.space?1:e.ctrlKey?2:e.button,alt:e.altKey,
+      rect:!TKV.space&&e.button===0&&!e.ctrlKey&&TKV.mode==='draw'&&!!it&&it.unit==='SF'&&!TKV.draft.length&&!!tkScaleOf(TKV.id)}}
+    clearTimeout(TKV.lp);
+    if(e.pointerType!=='mouse'&&TKV.pts.size===1){const g0=TKV.g,x=e.clientX,y=e.clientY;TKV.lp=setTimeout(()=>{if(TKV&&TKV.g===g0&&!g0.moved&&TKV.pts.size===1){g0.long=true;tkCtx(x,y)}},500)}
     const h=$('#tkHint');if(h)h.style.display='none';
   });
   st.addEventListener('pointermove',e=>{
@@ -3966,27 +4089,37 @@ function tkvBind(){
     if(!TKV.pts.has(e.pointerId)){if(e.pointerType==='mouse'&&TKV.draft.length){const p=tkvImg(e.clientX,e.clientY);TKV.cur=tkvSnapPt(p);tkvLive()}return}
     TKV.pts.set(e.pointerId,{x:e.clientX,y:e.clientY});const g=TKV.g;if(!g)return;
     if(g.type==='pinch'&&TKV.pts.size>=2){const [a,b]=[...TKV.pts.values()];const c=mid(a,b);const r=st.getBoundingClientRect();const s=clamp(g.t0.s*dist(a,b)/g.d0,TKV.minS,6);const ix=(g.c0.x-r.left-g.t0.x)/g.t0.s,iy=(g.c0.y-r.top-g.t0.y)/g.t0.s;TKV.t={s,x:c.x-r.left-ix*s,y:c.y-r.top-iy*s};tkvT()}
-    else if(g.type==='pan'){const dx=e.clientX-g.sx,dy=e.clientY-g.sy;if(Math.hypot(dx,dy)>6)g.moved=true;if(g.moved){TKV.t=Object.assign({},g.t0,{x:g.t0.x+dx,y:g.t0.y+dy});tkvT()}}
+    else if(g.type==='rect'||(g.type==='pan'&&g.rect&&Math.hypot(e.clientX-g.sx,e.clientY-g.sy)>10)){
+      clearTimeout(TKV.lp);if(g.type!=='rect'){g.type='rect';g.a=tkvSnapPt(tkvImg(g.sx,g.sy));TKV.dDraft=!!(g.alt||e.altKey||TKV.dNext)}
+      const a=g.a,b=tkvImg(e.clientX,e.clientY);b.x=clamp(b.x,0,TKV.W);b.y=clamp(b.y,0,TKV.H);TKV.draft=[a,{x:b.x,y:a.y},b,{x:a.x,y:b.y}];TKV.cur=null;tkvLive()}
+    else if(g.type==='pan'){const dx=e.clientX-g.sx,dy=e.clientY-g.sy;if(Math.hypot(dx,dy)>6){g.moved=true;clearTimeout(TKV.lp)}if(g.moved){TKV.t=Object.assign({},g.t0,{x:g.t0.x+dx,y:g.t0.y+dy});tkvT()}}
   });
   const end=e=>{
-    if(!TKV||!TKV.pts.has(e.pointerId))return;TKV.pts.delete(e.pointerId);const g=TKV.g;if(!g)return;
+    if(!TKV||!TKV.pts.has(e.pointerId))return;TKV.pts.delete(e.pointerId);clearTimeout(TKV.lp);const g=TKV.g;if(!g)return;
     if(g.type==='pinch'){if(TKV.pts.size===1){const [a]=[...TKV.pts.values()];TKV.g={type:'pan',sx:a.x,sy:a.y,t0:Object.assign({},TKV.t),moved:true,time:0}}else if(!TKV.pts.size)TKV.g=null;return}
-    TKV.g=null;if(g.type==='pan'&&!g.moved&&e.type!=='pointercancel'&&g.btn!==2)tkvTap(e.clientX,e.clientY);
+    TKV.g=null;if(TKV.skipTap){TKV.skipTap=false;return}
+    if(g.type==='rect'){const q=TKV.draft;if(e.type==='pointercancel'||q.length!==4||Math.abs(q[2].x-q[0].x)*TKV.t.s<6||Math.abs(q[2].y-q[0].y)*TKV.t.s<6){TKV.draft=[];TKV.dDraft=false;tkvLive();tkvTools()}else tkvFinish();return}
+    if(g.type==='pan'&&!g.moved&&!g.long&&e.type!=='pointercancel'&&g.btn!==2&&g.btn!==1)tkvTap(e.clientX,e.clientY,g.alt||e.altKey);
   };
   st.addEventListener('pointerup',end);st.addEventListener('pointercancel',end);
   st.addEventListener('dblclick',e=>{e.preventDefault();if(TKV&&TKV.draft.length)tkvFinish()});
-  st.addEventListener('contextmenu',e=>{e.preventDefault();if(TKV&&TKV.draft.length)tkvFinish()});
+  st.addEventListener('contextmenu',e=>{e.preventDefault();if(!TKV||!TKV.W)return;if($('#tkCtx')&&Date.now()-(TKV.ctxAt||0)<800)return;if(TKV.g)TKV.g.long=true;tkCtx(e.clientX,e.clientY)});
   st.addEventListener('wheel',e=>{if(!TKV||!TKV.W)return;e.preventDefault();const r=st.getBoundingClientRect();const s=clamp(TKV.t.s*Math.exp(-e.deltaY*.0015),TKV.minS,6);const ix=(e.clientX-r.left-TKV.t.x)/TKV.t.s,iy=(e.clientY-r.top-TKV.t.y)/TKV.t.s;TKV.t={s,x:e.clientX-r.left-ix*s,y:e.clientY-r.top-iy*s};tkvT()},{passive:false});
-  window.addEventListener('keydown',tkvKey);
+  window.addEventListener('keydown',tkvKey);window.addEventListener('keyup',tkvKeyUp);
 }
+/* space held = pan with a drag, in any mode */
+function tkvKeyUp(e){if(TKV&&e.key===' ')TKV.space=false}
 function tkvKey(e){
   if(!TKV||$('.mwrap')||/INPUT|TEXTAREA|SELECT/.test((e.target&&e.target.tagName)||''))return;
+  if($('#tkCtx')){if(e.key==='Escape'){e.preventDefault();tkCtxClose()}return}
+  if(e.key===' '){e.preventDefault();TKV.space=true;return}
+  if(e.key==='Escape'&&!TKV.draft.length&&!TKV.sel&&TKV.hl){TKV.hl=null;tkvPaint();return}
   if(e.key==='Enter'){e.preventDefault();tkvFinish()}
-  else if(e.key==='Escape'){if(TKV.draft.length){TKV.draft=[];tkvLive();tkvTools()}else if(TKV.sel){TKV.sel=null;tkvPaint()}}
+  else if(e.key==='Escape'){if(TKV.draft.length){TKV.draft=[];TKV.dDraft=false;tkvLive();tkvTools()}else if(TKV.dNext){TKV.dNext=false;tkvTools()}else if(TKV.sel){TKV.sel=null;tkvPaint()}}
   else if(e.key==='Backspace'||e.key==='Delete'){if(TKV.draft.length){e.preventDefault();tkvUndoPt()}else if(TKV.sel){e.preventDefault();const id=TKV.sel;TKV.sel=null;tkDo({t:'del_shape',id});tkvPaint()}}
   else if(e.key==='z'&&(e.ctrlKey||e.metaKey)){e.preventDefault();tkvUndoPt()}
 }
-function tkvTap(cx,cy){
+function tkvTap(cx,cy,alt){
   const p0=tkvImg(cx,cy);if(p0.x<0||p0.y<0||p0.x>TKV.W||p0.y>TKV.H)return;
   if(TKV.mode==='pan')return;
   if(TKV.mode==='select'){TKV.sel=tkvHit(p0);tkvPaint();if(TKV.sel)tkvShapeMenu(TKV.sel);return}
@@ -3994,15 +4127,62 @@ function tkvTap(cx,cy){
   if(TKV.mode==='draw'){
     if(!it){toast('Pick a takeoff item first.');return}
     if(!tkScaleOf(TKV.id)&&it.unit!=='EA'){tkScaleBox();return}
-    if(it.unit==='EA'){tkDo({t:'shape',v:{id:uuid(),item:it.id,sheet:TKV.id,k:'count',p:[r4(p0.x/TKV.W),r4(p0.y/TKV.H)],by:'office',at:new Date().toISOString()}});tkvPaint();return}
+    if(it.unit==='EA'){const id=uuid();tkDo({t:'shape',v:{id,item:it.id,sheet:TKV.id,k:'count',p:[r4(p0.x/TKV.W),r4(p0.y/TKV.H)],by:'office',at:new Date().toISOString()}});TKV.mine.push(id);tkvPaint();return}
   }
   const p=tkvSnapPt(p0);
+  const segs=TKV.mode==='draw'&&it&&it.unit==='LF'&&TKV.lm==='seg';
+  if(TKV.mode==='draw'&&it&&it.unit==='SF'&&!TKV.draft.length)TKV.dDraft=!!(alt||TKV.dNext);
+  if(segs&&TKV.draft.length===1&&Math.hypot(TKV.draft[0].x-p.x,TKV.draft[0].y-p.y)<4/TKV.t.s)return;
   if(it&&TKV.mode==='draw'&&it.unit==='SF'&&TKV.draft.length>2){const f=TKV.draft[0];if(Math.hypot(f.x-p.x,f.y-p.y)<12/TKV.t.s){tkvFinish();return}}
   TKV.draft.push(p);TKV.cur=null;
   if(TKV.mode==='scale'&&TKV.draft.length===2){tkvFinish();return}
+  if(segs&&TKV.draft.length===2){tkvFinish();return}
   tkvLive();tkvTools();
 }
 function tkvUndoPt(){if(!TKV||!TKV.draft.length)return;TKV.draft.pop();tkvLive();tkvTools()}
+/* right-click (or long-press on a tablet) menu on the sheet, at the cursor. Never adds a point. */
+function tkCtxClose(){const m=$('#tkCtx');if(m)m.remove();document.removeEventListener('pointerdown',tkCtxOut,true)}
+function tkCtxOut(e){const m=$('#tkCtx');if(!m||m.contains(e.target))return;if(TKV&&TKV.stage&&TKV.stage.contains(e.target))TKV.skipTap=true;tkCtxClose()}
+function tkCtx(cx,cy,sub){
+  if(!TKV||!TKV.W)return;tkCtxClose();TKV.ctxAt=Date.now();const p0=tkvImg(cx,cy),it=tkItem(TKV.item),dr=TKV.draft.length,draw=TKV.mode==='draw';
+  const hit=tkvHit(p0),last=TKV.mine.slice().reverse().find(id=>TK.data.shapes.some(s=>s.id===id&&s.sheet===TKV.id));
+  const A=[];const add=(k,t,on)=>{if(on!==false)A.push('<button data-c="'+k+'">'+t+'</button>')};
+  if(sub){A.push('<div class="tkctxh">Switch item</div>');TK.data.items.slice().sort((a,b)=>TK_SECS.indexOf(a.sec)-TK_SECS.indexOf(b.sec)||(a.n||0)-(b.n||0)).forEach(x=>A.push('<button data-si="'+esc(x.id)+'"'+(x.id===TKV.item?' class="on"':'')+'><span class="sw" style="background:'+esc(x.color)+'"></span>'+esc(x.code)+' <span class="muted">'+esc(x.unit)+'</span></button>'));add('back','‹ Back')}
+  else{
+    add('undo','↶ Undo last point',dr>0);
+    add('fin','✓ Finish run',dr>=2&&(TKV.mode!=='draw'||!it||it.unit==='LF'));
+    add('newseg','New segment here',draw&&!!it&&it.unit==='LF');
+    add('close','Close area',draw&&!!it&&it.unit==='SF'&&dr>=3);
+    add('deduct',TKV.dNext?'Deduct: on (next area is a cut-out) → off':'Deduct area (cut-out)',draw&&!!it&&it.unit==='SF'&&!dr);
+    add('cancel','✕ Cancel drawing',dr>0);
+    add('umark','Undo last mark',!!last);
+    add('del','Delete mark under cursor',!!hit);
+    add('items','Switch item ▸',TK.data.items.length>0);
+    add('snap','Snap: '+(TKV.snap?'on → off':'off → on'));
+    const cur=it&&it.unit==='SF'?'area':TKV.lm==='seg'?'seg':'run';
+    A.push('<div class="tkctxrow">'+[['run','Run'],['seg','Segments'],['area','Area']].map(([k,t])=>'<button data-lm2="'+k+'"'+(k===cur&&draw?' class="on"':'')+'>'+t+'</button>').join('')+'</div>');
+    add('meas','📏 Measure from here');
+  }
+  const m=document.createElement('div');m.id='tkCtx';m.className='tkctx';m.innerHTML=A.join('');(($('#tkv'))||document.body).appendChild(m);
+  const r=m.getBoundingClientRect();m.style.left=Math.max(4,Math.min(cx,innerWidth-r.width-4))+'px';m.style.top=Math.max(4,Math.min(cy,innerHeight-r.height-4))+'px';
+  m.addEventListener('contextmenu',e=>e.preventDefault());
+  setTimeout(()=>document.addEventListener('pointerdown',tkCtxOut,true),0);
+  $$('[data-lm2]',m).forEach(b=>b.onclick=()=>{tkCtxClose();tkvSetLm(b.dataset.lm2)});
+  $$('[data-si]',m).forEach(b=>b.onclick=()=>{tkCtxClose();if(TKV.draft.length&&TKV.mode==='draw')tkvFinish();tkvUseItem(b.dataset.si);TKV.mode='draw';tkvPaint()});
+  $$('[data-c]',m).forEach(b=>b.onclick=()=>{const c=b.dataset.c;
+    if(c==='items'||c==='back'){tkCtx(cx,cy,c==='items');return}
+    tkCtxClose();
+    if(c==='undo')tkvUndoPt();
+    else if(c==='fin'||c==='close')tkvFinish();
+    else if(c==='cancel'){TKV.draft=[];TKV.cur=null;TKV.dDraft=false;tkvLive();tkvTools()}
+    else if(c==='deduct'){TKV.dNext=!TKV.dNext;tkvTools()}
+    else if(c==='newseg'){if(TKV.draft.length)tkvFinish();if(!tkScaleOf(TKV.id)){tkScaleBox();return}TKV.draft=[tkvSnapPt(p0)];TKV.cur=null;tkvLive();tkvTools()}
+    else if(c==='umark'){TKV.mine=TKV.mine.filter(id=>id!==last);tkDo({t:'del_shape',id:last});if(TKV.sel===last)TKV.sel=null;tkvPaint()}
+    else if(c==='del'){tkDo({t:'del_shape',id:hit});TKV.mine=TKV.mine.filter(id=>id!==hit);if(TKV.sel===hit)TKV.sel=null;tkvPaint()}
+    else if(c==='snap'){TKV.snap=!TKV.snap;lsSet('acv.tkSnap',TKV.snap?null:'off');tkvTools()}
+    else if(c==='meas'){tkvMode('measure');TKV.draft=[tkvSnapPt(p0)];tkvLive();tkvTools()}
+  });
+}
 async function tkvFinish(){
   if(!TKV)return;const d=TKV.draft;TKV.draft=[];TKV.cur=null;tkvLive();tkvTools();
   const np=[];d.forEach(p=>np.push(r4(p.x/TKV.W),r4(p.y/TKV.H)));
@@ -4010,7 +4190,11 @@ async function tkvFinish(){
   if(TKV.mode==='measure'){if(d.length<2)return;const sc=tkScaleOf(TKV.id);toast(sc?'Measured '+tkFtIn(tkLenPx(np,TKV.W,TKV.H)*sc.fpp):'Set the scale first.');return}
   if(TKV.mode!=='draw')return;const it=tkItem(TKV.item);if(!it)return;
   if(it.unit==='LF'&&d.length<2)return;if(it.unit==='SF'&&d.length<3){if(d.length)toast('An area needs at least 3 corners.');return}
-  tkDo({t:'shape',v:{id:uuid(),item:it.id,sheet:TKV.id,k:it.unit==='SF'?'poly':'line',p:np,by:'office',at:new Date().toISOString()}});tkvPaint();
+  const v={id:uuid(),item:it.id,sheet:TKV.id,k:it.unit==='SF'?'poly':'line',p:np,by:'office',at:new Date().toISOString()};
+  if(it.unit==='SF'&&TKV.dDraft){v.deduct=true;let cx=0,cy=0;d.forEach(p=>{cx+=p.x;cy+=p.y});const c={x:cx/d.length,y:cy/d.length};
+    const host=TK.data.shapes.find(s=>s.sheet===TKV.id&&s.k==='poly'&&!s.deduct&&tkItem(s.item)&&tkItem(s.item).unit==='SF'&&tkInPoly(c,s.p||[],TKV.W,TKV.H));if(host)v.item=host.item;
+    TKV.dNext=false;toast('Deducted '+(tkScaleOf(TKV.id)?Math.round(tkAreaPx(np,TKV.W,TKV.H)*tkScaleOf(TKV.id).fpp**2).toLocaleString()+' SF ':'')+'from '+(tkItem(v.item)||it).code)}
+  TKV.dDraft=false;tkDo({t:'shape',v});TKV.mine.push(v.id);tkvPaint();
 }
 function tkvHit(p){
   const W=TKV.W,H=TKV.H,tol=14/TKV.t.s;let best=null,bd=tol;
@@ -4025,18 +4209,38 @@ function tkInPoly(p,q,W,H){let inside=false;const n=q.length/2;for(let i=0,j=n-1
 function tkvShapeMenu(id){
   const s=TK.data.shapes.find(x=>x.id===id);if(!s)return;const it=tkItem(s.item);const q=tkShapeQty(s,TKV.sh,tkScaleOf(TKV.id));
   const others=TK.data.items.filter(x=>x.id!==s.item&&x.unit===(it&&it.unit));
-  const m=modal('<h2>'+esc(it?it.code:'Mark')+'</h2><p class="muted">'+(s.k==='count'?'1 EA':q==null?'No scale on this sheet':s.k==='poly'?Math.round(q).toLocaleString()+' SF':tkFtIn(q)+' ('+(Math.round(q*10)/10)+' LF)')+(s.by&&s.by!=='office'?' · drawn by '+esc(s.by):'')+'</p><div style="display:grid;gap:10px">'+(others.length?'<label class="field"><span>Move to item</span><select data-mv><option value="">—</option>'+others.map(o=>'<option value="'+esc(o.id)+'">'+esc(o.code)+'</option>').join('')+'</select></label>':'')+'<button class="btn danger" data-a="del">Delete this mark</button><button class="btn" data-a="x">Close</button></div>');
+  const m=modal('<h2>'+esc(it?it.code:'Mark')+'</h2><p class="muted">'+(s.k==='count'?'1 EA':q==null?'No scale on this sheet':s.k==='poly'?(s.deduct?'Deduct (cut-out) ':'')+Math.round(q).toLocaleString()+' SF':tkFtIn(q)+' ('+(Math.round(q*10)/10)+' LF)')+(s.by&&s.by!=='office'?' · drawn by '+esc(s.by):'')+'</p><div style="display:grid;gap:10px">'+(others.length?'<label class="field"><span>Move to item</span><select data-mv><option value="">—</option>'+others.map(o=>'<option value="'+esc(o.id)+'">'+esc(o.code)+'</option>').join('')+'</select></label>':'')+'<button class="btn danger" data-a="del">Delete this mark</button><button class="btn" data-a="x">Close</button></div>');
   $('[data-a=x]',m).onclick=()=>m.close();
   $('[data-a=del]',m).onclick=()=>{m.close();tkDo({t:'del_shape',id});if(TKV){TKV.sel=null;tkvPaint()}};
   const mv=$('[data-mv]',m);if(mv)mv.onchange=()=>{if(!mv.value)return;m.close();tkDo({t:'shape',v:{id,item:mv.value}});if(TKV){TKV.sel=null;tkvPaint()}};
+}
+/* printed scale(s) in a PDF page's text, stored on the sheet as sheets.scale_text: best first, '; ' between, e.g. 3/32" = 1'-0"; 1/4" = 1'-0" */
+async function tkScaleFromPage(page){
+  const tc=await page.getTextContent();const strs=(tc.items||[]).map(i=>String(i.str||''));
+  let r=tkParseScales(strs.join(' '));if(!r.length)r=tkParseScales(strs.join(''));
+  return r.length?r.slice(0,4).map(x=>x.label).join('; '):null;
+}
+/* sheets uploaded before scales were read (scale_text null): read the scale label off the picture, lower half first, and save it ('' = none found) */
+const TK_SCALE_OCR={};
+function tkScaleOcr(sh){
+  if(TK_SCALE_OCR[sh.id])return TK_SCALE_OCR[sh.id];
+  return TK_SCALE_OCR[sh.id]=(async()=>{
+    const img=await sheetImage(sh);const W=img.naturalWidth||img.width;const sc=Math.min(1,4200/Math.max(1,W));let found=[];
+    for(const [y0,y1] of [[.5,1],[0,.5]]){const lines=await ocrLines(cropFrom(img,0,y0,1,y1,0,sc),11);found=tkParseScales(lines.join('\n'));if(found.length)break}
+    const txt=found.slice(0,4).map(x=>x.label).join('; ');
+    try{await q(sb.from('sheets').update({scale_text:txt}).eq('id',sh.id));sh.scale_text=txt;const o=S.sheets.find(x=>x.id===sh.id);if(o)o.scale_text=txt}catch(e){}
+    return txt;
+  })().catch(e=>{delete TK_SCALE_OCR[sh.id];throw e});
 }
 /* scale: from a measured line (pxLen given) or a printed scale + paper size */
 async function tkScaleBox(pxLen){
   if(!TKV)return;const sh=TKV.sh,W=TKV.W||sh.w,H=TKV.H||sh.h;
   const paper=sh.pw&&sh.ph?[Math.round(sh.pw*10)/10,Math.round(sh.ph*10)/10]:tkGuessPaper(W,H);
   const same=tkSheets().filter(s=>s.id!==sh.id&&s.w===sh.w&&s.h===sh.h&&!tkScaleOf(s.id));
+  const opts=TK_SCALES.map(x=>[x[0],x[1]]);const cur=tkScaleOf(sh.id);
+  const idxOf=f=>{let i=opts.findIndex(o=>Math.abs(o[1]-f)<1e-3);if(i<0){opts.push(['',f]);i=opts.length-1}return i};
   const m=modal('<h2>Sheet scale</h2>'+(pxLen?'<label class="field"><span>That line is how long? (e.g. 24\'-0")</span><input data-len inputmode="decimal" placeholder="24\'-0&quot;"></label>':
-    '<label class="field"><span>Scale printed on the sheet</span><select data-sc>'+TK_SCALES.map((s,i)=>'<option value="'+i+'"'+(i===2?' selected':'')+'>'+esc(s[0])+'</option>').join('')+'</select></label>'+
+    '<label class="field"><span>Scale printed on the sheet</span><select data-sc></select></label><p class="small" data-read style="margin:-4px 0 10px"></p>'+
     '<label class="field"><span>Paper size (inches, as printed full size)</span><input data-pp value="'+paper[0]+' x '+paper[1]+'"></label>'+
     '<p class="small muted">Most accurate: close this, tap 📐 Scale, and click both ends of a long dimension string.</p>')+
     (same.length?'<label style="display:flex;gap:8px;align-items:center;margin:8px 0"><input type="checkbox" data-all> Also use this scale on '+same.length+' other sheet'+(same.length===1?'':'s')+' the same size with no scale yet (only if they\'re drawn at the same scale; enlarged plans usually aren\'t)</label>':'')+
@@ -4044,10 +4248,26 @@ async function tkScaleBox(pxLen){
   $('[data-x]',m).onclick=()=>m.close();
   const cal=$('[data-cal]',m);if(cal)cal.onclick=()=>{m.close();tkvMode('scale')};
   setTimeout(()=>{const i=$('[data-len]',m);if(i)i.focus()},50);
+  const sel=$('[data-sc]',m),rd=$('[data-read]',m);let touched=false;
+  /* fill the list; pick = option index or -1 (nothing picked yet) */
+  const fill=pick=>{if(!sel)return;sel.innerHTML='<option value=""'+(pick<0?' selected':'')+'>Choose the scale printed on the sheet</option>'+opts.map((o,i)=>'<option value="'+i+'"'+(i===pick?' selected':'')+'>'+esc(o[0])+'</option>').join('')};
+  const useText=txt=>{const f=tkParseScales(txt);if(!f.length)return false;const best=idxOf(f[0].ftPerIn);if(!opts[best][0])opts[best][0]=f[0].label;f.slice(1).forEach(x=>{const k=idxOf(x.ftPerIn);if(!opts[k][0])opts[k][0]=x.label});
+    rd.innerHTML='Read from the sheet: <b>'+esc(f[0].label)+'</b>'+(f.length>1?'<br><span style="color:#b26a00">This sheet has more than one scale ('+f.map(x=>esc(x.label)).join(', ')+'), likely enlarged plans or details. Picked '+(f[0].count>1?'the most common':'the first')+' one; check it matches the drawing you take off.</span>':'');
+    return best};
+  if(sel){sel.onchange=()=>{touched=true};
+    let pick=-1;
+    if(cur&&cur.how==='preset'){const k=opts.findIndex(o=>o[0]===cur.label);if(k>=0)pick=k}
+    const st=sh.scale_text;
+    if(st){const b=useText(st);if(pick<0&&b!==false)pick=b}
+    if(st==null&&!pxLen){rd.innerHTML='<span class="muted">Reading the scale from the sheet…</span>';
+      tkScaleOcr(sh).then(txt=>{if(!m.isConnected)return;const b=txt?useText(txt):false;if(b===false){rd.innerHTML='<span class="muted">Couldn\'t read a scale on this sheet. Pick the one printed under the drawing title.</span>';return}
+        if(!touched&&!(cur&&cur.how==='preset')){const v=sel.value;fill(b);if(v&&v!==String(b))sel.value=v}else{const v=sel.value;fill(-1);sel.value=v}}).catch(()=>{if(m.isConnected)rd.innerHTML=''})}
+    else if(st===''&&pick<0)rd.innerHTML='<span class="muted">No scale label found on this sheet. Pick the one printed under the drawing title.</span>';
+    fill(pick);}
   $('[data-ok]',m).onclick=()=>{
     let v;
     if(pxLen){const ft=tkFeet($('[data-len]',m).value);if(!(ft>0)){toast('Type the length, like 24\'-0"');return}v={fpp:ft/pxLen,label:'measured '+tkFtIn(ft),how:'cal'}}
-    else{const s=TK_SCALES[+$('[data-sc]',m).value];const pp=String($('[data-pp]',m).value).match(/(\d+(?:\.\d+)?)\s*[x×X]\s*(\d+(?:\.\d+)?)/);if(!pp){toast('Paper size like 36 x 24');return}
+    else{if(sel.value===''){toast('Pick the scale printed on the sheet.');return}const s=opts[+sel.value];const pp=String($('[data-pp]',m).value).match(/(\d+(?:\.\d+)?)\s*[x×X]\s*(\d+(?:\.\d+)?)/);if(!pp){toast('Paper size like 36 x 24');return}
       const pw=parseFloat(pp[1]),ph=parseFloat(pp[2]);const pwFit=(W>=H)===(pw>=ph)?pw:ph;v={fpp:tkPresetFpp(s[1],pwFit,W),label:s[0],how:'preset',paper:[pw,ph]}}
     const ops=[{t:'scale',sheet:sh.id,v}];const all=$('[data-all]',m);if(all&&all.checked)same.forEach(s=>ops.push({t:'scale',sheet:s.id,v:{...v,fpp:v.fpp*W/s.w}}));
     tkDo(ops);m.close();toast('Scale set'+(ops.length>1?' on '+ops.length+' sheets':'')+'.');if(TKV){if(TKV.mode==='scale')TKV.mode='draw';tkvPaint()}
@@ -4103,7 +4323,8 @@ async function tkMarkupPdf(){
       const labels=[];d.shapes.filter(s=>s.sheet===sh.id).forEach(s=>{const it=d.items.find(x=>x.id===s.item);if(!it)return;const p=s.p||[];g.strokeStyle=it.color;g.fillStyle=it.color;
         if(s.k==='count'){g.globalAlpha=.6;g.beginPath();g.arc(p[0]*W,p[1]*H,M*.007,0,7);g.fill();labels.push([num[it.id],p[0]*W+M*.009,p[1]*H]);return}
         g.beginPath();for(let i=0;i+1<p.length;i+=2){const x=p[i]*W,yy=p[i+1]*H;if(i)g.lineTo(x,yy);else g.moveTo(x,yy)}
-        if(s.k==='poly'){g.closePath();g.globalAlpha=.25;g.fill();g.globalAlpha=.8;g.lineWidth=M*.002;g.stroke();let cx=0,cy=0;const n=p.length/2;for(let i=0;i<n;i++){cx+=p[2*i];cy+=p[2*i+1]}labels.push([num[it.id],cx/n*W,cy/n*H])}
+        if(s.k==='poly'&&s.deduct){g.closePath();g.globalAlpha=.85;g.fillStyle='#fff';g.fill();g.setLineDash([M*.004,M*.003]);g.lineWidth=M*.002;g.stroke();g.setLineDash([]);let cx=0,cy=0;const n=p.length/2;for(let i=0;i<n;i++){cx+=p[2*i];cy+=p[2*i+1]}labels.push(['-'+num[it.id],cx/n*W,cy/n*H])}
+        else if(s.k==='poly'){g.closePath();g.globalAlpha=.25;g.fill();g.globalAlpha=.8;g.lineWidth=M*.002;g.stroke();let cx=0,cy=0;const n=p.length/2;for(let i=0;i<n;i++){cx+=p[2*i];cy+=p[2*i+1]}labels.push([num[it.id],cx/n*W,cy/n*H])}
         else{g.globalAlpha=.55;g.lineWidth=scl&&+scl.fpp>0?Math.max(tkItemWidthIn(it)/12/scl.fpp*wmul,M*.0006,1.5):M*.0055*wmul;g.lineCap='butt';g.lineJoin='miter';g.stroke();g.lineCap='round';g.lineJoin='round';const i=Math.floor((p.length/2-1)/2)*2;labels.push([num[it.id],(p[i]+p[i+2])/2*W,(p[i+1]+p[i+3])/2*H])}});
       g.globalCompositeOperation='source-over';g.globalAlpha=1;const fs=Math.round(M*.011);g.font='bold '+fs+'px sans-serif';g.textAlign='center';g.textBaseline='middle';
       labels.forEach(([n,x,yy])=>{const t=String(n);const w=g.measureText(t).width+fs*.6;g.fillStyle='#fff';g.strokeStyle='#000';g.lineWidth=Math.max(1,fs*.08);g.beginPath();g.rect(x-w/2,yy-fs*.65,w,fs*1.3);g.fill();g.stroke();g.fillStyle='#000';g.fillText(t,x,yy)});
@@ -4114,7 +4335,7 @@ async function tkMarkupPdf(){
 }
 /* ---- for Claude (or a script) working in the signed-in app page:
    await alphaTakeoff.load(jobId) -> data; alphaTakeoff.sheets(jobId) -> [{id,name,w,h,pw,ph}];
-   await alphaTakeoff.apply(jobId,[ops]) with ops like {t:'item',v:{id,code,desc,sec,unit,h,w,color}}, {t:'shape',v:{id,item,sheet,k:'line'|'poly'|'count',p:[...0-1],by:'Claude'}},
+   await alphaTakeoff.apply(jobId,[ops]) with ops like {t:'item',v:{id,code,desc,sec,unit,h,w,color}}, {t:'shape',v:{id,item,sheet,k:'line'|'poly'|'count',p:[...0-1],by:'Claude',deduct?:true}},
    {t:'scale',sheet,v:{fpp,label,how}}, {t:'del_shape',id}, {t:'del_item',id}; alphaTakeoff.rows(jobId) -> bid sheet rows; alphaTakeoff.fpp(ftPerIn,paperWidthIn,imageW). */
 window.alphaTakeoff={
   load:async jid=>{const r=await q(sb.from('takeoffs').select('data,rev').eq('job_id',jid).maybeSingle());return tkApply(r?r.data:{},[])},
