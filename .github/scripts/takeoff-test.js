@@ -12,7 +12,7 @@ function grab(name) {
   if (!lines[i].startsWith('const ')) while (j < lines.length && /^(\s|\})/.test(lines[j])) j++;
   return lines.slice(i, j).join('\n');
 }
-const names = ['TK_SECS', 'TK_PAPER', 'TK_SCALES', 'tkFeet', 'tkFtIn', 'tkLenPx', 'tkAreaPx', 'tkShapeQty', 'tkPresetFpp', 'tkGuessPaper', 'tkEvenUp', 'tkCodeHeight',
+const names = ['TK_SECS', 'TK_PAPER', 'TK_SCALES', 'tkFeet', 'tkFtIn', 'tkLenPx', 'tkAreaPx', 'tkShapeQty', 'tkPresetFpp', 'tkGuessPaper', 'tkEvenUp', 'tkCodeHeight', 'tkCodeWidth', 'tkItemWidthIn', 'tkInches', 'tkInStr',
   'tkApply', 'tkTotals', 'tkRows', 'tkCopyShapes'];
 const T = vm.runInNewContext(names.map(grab).join('\n') + '\n;({' + names.join(',') + '})', { Math, Date, String, Number, Set, Object, Array, JSON, isFinite, parseFloat, NaN });
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok - ' + name); };
@@ -187,6 +187,38 @@ t('tkCopyShapes: one sheet\'s shapes onto another with new ids, originals untouc
   assert.deepStrictEqual(plain(T.tkCopyShapes(DOC, 'none', 's3', mk)), []);
   const D = T.tkApply(DOC, T.tkCopyShapes(DOC, 's1', 's2', mk).map(v => ({ t: 'shape', v })));
   assert.strictEqual(D.shapes.length, DOC.shapes.length + 6, 'copied shapes save through tkApply');
+});
+
+t('tkCodeWidth / tkItemWidthIn: line width in inches from the stud size, item override wins', () => {
+  const close = (a, b, m) => assert.ok(Math.abs(a - b) <= 0.01, (m || '') + ' expected ' + b + ', got ' + a);
+  close(T.tkCodeWidth('362S162-25 FF14 G28 FR4'), 3.625);
+  close(T.tkCodeWidth('600S162-33 PH8'), 6);
+  close(T.tkCodeWidth('162S125-18 FF10'), 1.625);
+  close(T.tkCodeWidth('250S125-18'), 2.5);
+  close(T.tkCodeWidth('9A4 362S125-18 BR12 GYP24 FR3'), 3.625, 'stud part not first');
+  close(T.tkCodeWidth('800S200-54'), 8);
+  close(T.tkCodeWidth('550S162-43 SW12'), 5.5);
+  close(T.tkCodeWidth('GYP CLG'), 4.5, 'no stud part');
+  close(T.tkCodeWidth(''), 4.5);
+  close(T.tkItemWidthIn({ code: 'GYP CLG', unit: 'LF' }), 4.5);
+  close(T.tkItemWidthIn({ code: '362S162-25 FF14', unit: 'LF', w: 8 }), 8, 'override');
+  close(T.tkItemWidthIn({ code: '362S162-25 FF14', unit: 'LF', w: null }), 3.625, 'blank override');
+  close(T.tkItemWidthIn({ code: '362S162-25 FF14', unit: 'LF', w: 0 }), 3.625, 'zero override');
+});
+
+t('tkInches / tkInStr: inches typed and shown as fractions', () => {
+  near(T.tkInches('3-5/8'), 3.625);
+  near(T.tkInches('3 5/8"'), 3.625);
+  near(T.tkInches('3.625'), 3.625);
+  near(T.tkInches('5/8'), 0.625);
+  near(T.tkInches('6"'), 6);
+  assert.ok(Number.isNaN(T.tkInches('abc')));
+  assert.ok(Number.isNaN(T.tkInches('')));
+  assert.strictEqual(T.tkInStr(3.625), '3-5/8"');
+  assert.strictEqual(T.tkInStr(6), '6"');
+  assert.strictEqual(T.tkInStr(0.625), '5/8"');
+  assert.strictEqual(T.tkInStr(4.5), '4-1/2"');
+  assert.strictEqual(T.tkInStr(0), '');
 });
 
 t('tkCodeHeight: wall height from the code\'s height tag', () => {
