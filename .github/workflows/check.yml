@@ -29,3 +29,5 @@ jobs:
         run: node .github/scripts/progress-test.js
       - name: Test Load pay app (.xlsx) on the Billing tab (continuation sheet lines, G702, history)
         run: node .github/scripts/payapp-test.js
+      - name: Test the takeoff math (feet parsing, LF/SF, scale, totals, bid sheet rows, saving edits)
+        run: node .github/scripts/takeoff-test.js
