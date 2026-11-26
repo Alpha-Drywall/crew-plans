@@ -1050,6 +1050,8 @@ async function laborTcRead(L,logs){const after=laborCut(laborCost(L));let p=sb.f
   if(!S.isAdmin)(logs||[]).forEach(l=>{if(l.user_id===S.me.id||(after&&l.date<=after))return;const h=l.hours_by_code||{};LABOR_CODES.forEach(c=>{if(num(h[c.k]))x.by[c.k]=r2((x.by[c.k]||0)+num(h[c.k]))});const u=num(l.hours)-codeHrs(l);if(u>0)x.by.unc=r2((x.by.unc||0)+u);x.hours=r2(x.hours+num(l.hours))});
   x.after=after;return x}
 /** Alerts use the higher of the official used and official used + time cards since the last job cost update (no job cost: time cards alone). */
+/* Live time card hours on the Labor tab (column + alerts). Off: the Labor tab uses the official job cost numbers only. Daily reports still fill from time cards. */
+const LABOR_SHOW_TC=false;
 function laborEff(r,cost){const off=num(r.used);if(r.live==null)return {v:off,tc:false};const mix=(cost?off:0)+num(r.live);return mix>off+1e-9?{v:mix,tc:true}:{v:off,tc:false}}
 function laborCalc(){
   const L=S.labor||{};const hpd=num(L.hpd)||10;const budget=L.hours||{};const weeks={};let unc=0;
@@ -1057,7 +1059,7 @@ function laborCalc(){
   if(cost){const prev={};cost.history.slice().sort((a,b)=>a.date<b.date?-1:1).forEach(hh=>{const x=weeks[hh.date]={};LABOR_CODES.forEach(c=>{const u=num((hh.used||{})[c.k]);x[c.k]=u-num(prev[c.k]);prev[c.k]=u})})}
   else (S.laborLogs||[]).forEach(l=>{const h=l.hours_by_code||{};if(!codeHrs(l)){unc+=num(l.hours);return}const w=weekEnd(l.date);weeks[w]=weeks[w]||{};LABOR_CODES.forEach(c=>{if(num(h[c.k]))weeks[w][c.k]=(weeks[w][c.k]||0)+num(h[c.k])})});
   const wk=Object.keys(weeks).sort();
-  const T=S.laborTc,hide142s=!!(cost&&!num(budget['142s'])),tcH=k=>T?num(T.by[k])+(hide142s&&k==='142c'?num(T.by['142s']):0):0;
+  const T=LABOR_SHOW_TC?S.laborTc:null,hide142s=!!(cost&&!num(budget['142s'])),tcH=k=>T?num(T.by[k])+(hide142s&&k==='142c'?num(T.by['142s']):0):0;
   const rows=LABOR_CODES.filter(c=>!(hide142s&&c.k==='142s')).map(c=>{const bh=num(budget[c.k]);const md=bh/hpd;const usedH=wk.reduce((a,w)=>a+num(weeks[w][c.k]),0);const used=usedH/hpd;return {c,bh,md,usedH,used,left:md-used,pct:md?(md-used)/md:0,live:T?tcH(c.k)/hpd:null}});
   const t={bh:rows.reduce((a,r)=>a+r.bh,0),md:rows.reduce((a,r)=>a+r.md,0),usedH:rows.reduce((a,r)=>a+r.usedH,0),used:rows.reduce((a,r)=>a+r.used,0),live:T?rows.reduce((a,r)=>a+r.live,0):null};t.left=t.md-t.used;t.pct=t.md?t.left/t.md:0;
   return {hpd,rows,t,weeks,wk,unc,jobNo:L.job_no||'',cost,src:L.source||{},tc:T?{after:T.after,unc:num(T.by.unc)/hpd}:null};
