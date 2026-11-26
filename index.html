@@ -245,6 +245,12 @@ input[type=range]{width:100%;height:32px}
 .wf{display:grid;grid-template-columns:repeat(2,1fr);gap:0 10px}
 .wf .field{margin-bottom:6px}
 .lrow{display:flex;gap:6px;margin-bottom:6px;align-items:center}.lrow input{flex:1;min-width:0}
+.lrow.mrow{display:grid;grid-template-columns:1fr 1fr 1fr 36px;gap:6px;padding:8px 0;margin:0;border-bottom:1px solid var(--line);align-items:center}
+.lrow.mrow input{width:auto;height:auto;min-width:0;min-height:40px;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:#fff;font-size:15px}
+.mrow [data-c=text]{grid-column:1/4}.mrow [data-rm]{grid-column:4;grid-row:1}.mrow .mshort,.mrow [data-c=note]{grid-column:1/-1}
+.mshort{display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px}.lrow.mrow .mshort input{width:20px;height:20px;min-height:0;flex:none}
+.mline{padding:10px 0;border-top:1px solid var(--line)}.mline[data-ml]{cursor:pointer}
+.mbar{height:8px;background:#e8ebef;border-radius:99px;overflow:hidden;margin:6px 0 4px}.mbar i{display:block;height:100%;border-radius:99px}
 canvas.sig{display:block;width:100%;height:120px;border:1px dashed #9aa4af;border-radius:10px;background:#fff;touch-action:none;margin:4px 0}
 .seg{display:flex;gap:16px;margin:4px 0}.seg label{display:flex;align-items:center;gap:6px;font-weight:600}.seg input{width:20px;height:20px}
 .snav{position:absolute;top:50%;transform:translateY(-50%);z-index:6;width:44px;height:64px;border:0;border-radius:12px;background:#1d232bcc;color:#fff;font-size:30px;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px #0004}
@@ -263,6 +269,46 @@ body.noscroll .netpill{bottom:auto;top:calc(56px + env(safe-area-inset-top))}
 .offok b{color:var(--ok)}
 .progress-note{font-size:13px;color:var(--muted);margin-top:4px}
 .welcome{max-width:420px;margin:30px auto}
+.tmt{display:block;width:100%;text-align:left;font:inherit;color:inherit;border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:8px;background:#fff}
+.tmt.old{border-color:#e8a0a0;background:#fff5f5}
+.tmst{display:inline-block;font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px;background:#e7ebef;color:#475569;white-space:nowrap}
+.tmst.unsigned{background:#fdecea;color:#b42318}.tmst.signed{background:#e6f4ea;color:#1e7b34}.tmst.sent{background:#e3f0fb;color:#1565c0}.tmst.approved{background:#1e7b34;color:#fff}.tmst.rejected{background:#475569;color:#fff}
+.tmsig img{display:block;max-width:100%;height:90px;border:1px solid var(--line);border-radius:8px;background:#fff}
+.tmed [data-row].lrow{padding:0;border:0;margin-bottom:6px}.tmed [data-row].lrow input{height:auto;min-height:40px;width:0;flex:1 1 0;min-width:0;border:1px solid var(--line);border-radius:8px;padding:8px 10px}.tmed fieldset{min-width:0}
+body:has(#fvPill) .mcard{padding-bottom:72px}#tmLog{scroll-margin-top:140px}
+.tmtab{width:100%;border-collapse:collapse;font-size:14px;margin:4px 0}.tmtab td,.tmtab th{border-bottom:1px solid var(--line);padding:4px 2px;text-align:left}.tmtab td+td,.tmtab th+th{text-align:right}
+.lkm{max-width:1240px}
+.lkgrid{overflow-x:auto;background:#fff;border:1px solid var(--line);border-radius:12px;-webkit-overflow-scrolling:touch}
+.lkt{border-collapse:separate;border-spacing:0;font-size:13px;min-width:100%}
+.lkt th,.lkt td{border-bottom:1px solid var(--line);border-right:1px solid #eef0f3;padding:2px 1px;text-align:center;height:36px;min-width:46px}
+.lkt thead th{background:#f6f7f9;font-size:11.5px;color:#5d6670;font-weight:700;line-height:1.15;padding:4px 2px}
+.lkt thead th span{font-weight:500}
+.lkt thead th.td{background:#fff0cc;color:var(--ink)}
+.lkt .lkn{position:sticky;left:0;z-index:2;background:#fff;text-align:left;padding:0 8px;min-width:88px;max-width:128px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;border-right:2px solid var(--line)}
+.lkt thead .lkn{z-index:3;background:#f6f7f9}
+.lkt .lkn.fm{font-weight:800}.lkt .lkn.fm::after{content:' FM';font-size:10px;color:#5d6670;font-weight:700}
+.lkt tr.lkg td{background:#f1f2f4;text-align:left;font-size:12px;font-weight:700;color:#5d6670;height:24px;padding:0}
+.lkt tr.lkg td span{position:sticky;left:8px}
+.lkt .wk{border-left:2px solid #8a939d}
+.lkt tfoot td{font-size:11.5px;color:#5d6670;background:#f6f7f9;height:28px}
+.lkc{cursor:pointer;user-select:none;-webkit-user-select:none}
+.lkc b{display:inline-block;min-width:34px;padding:3px 4px;border-radius:6px;color:#fff;font-size:12px;font-weight:700;line-height:1.2}
+.lkc.td{background:#fffcf2}
+.lkc.idle{background:#fff7ea}
+.lkc.past b{opacity:.6}
+.lkc.dbl{background:#fde8e8;box-shadow:inset 0 0 0 2px #c62828}
+.lkc.dbl b{min-width:0;display:block;margin:1px 2px;padding:1px 3px;font-size:10.5px}
+.lkc i{display:block;font-style:normal;font-size:10px;line-height:1.15;color:#8a939d;margin-top:1px}
+.lkc i.ok{color:#2e7d32}.lkc i.mm{color:#b45309;font-weight:700}
+.lkc.sel,.lkc.drag{box-shadow:inset 0 0 0 3px var(--accent)}
+.lkc.zero{background:#fff4e5;color:#9a3412;font-weight:700}
+.lkm.multi .lkc{touch-action:none}
+.lkdot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.lkbar{position:sticky;bottom:calc(8px + env(safe-area-inset-bottom));display:flex;gap:8px;align-items:center;background:var(--head);color:#fff;border-radius:12px;padding:8px 10px;margin-top:8px;z-index:5}
+.lkck{display:flex;gap:8px;align-items:center;margin:10px 0;font-size:15px}.lkck input{width:20px;height:20px}
+.lkjobs .chip i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}.lkjobs .chip span{font-weight:500;font-size:13px}
+.lksel{width:100%;min-height:42px;border:1px solid var(--line);border-radius:10px;padding:6px 8px;background:#fff;font-size:15px;margin-top:10px}
+.lkwarn summary{cursor:pointer;font-size:14px}.lkwh{font-weight:700;margin:8px 0 2px}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js"></script>
 </head>
@@ -1111,7 +1157,7 @@ function jobId(){return S.job&&S.job.id}
 async function loadSheets(){const id=jobId();if(!id)return;try{const d=await q(sb.from('sheets').select('*').eq('job_id',id).order('sort'));if(jobId()!==id)return;S.sheets=d;S.loaded.sheets=true;if(S.tab==='plans')render()}catch(e){toast(errMsg(e))}}
 async function loadBudget(){const id=jobId();if(!id||!isAdminRole()){S.budget=null;return}try{const d=await q(sb.from('job_budget').select('amounts').eq('job_id',id).maybeSingle());if(jobId()===id)S.budget=d?d.amounts||{}:null}catch(e){S.budget=null}}
 async function loadAreas(){const id=jobId();if(!id)return;await loadBudget();try{const d=await q(sb.from('areas').select('*').eq('job_id',id).order('created_at'));if(jobId()!==id)return;S.areas=d;S.loaded.areas=true;if(S.tab==='progress')render()}catch(e){toast(errMsg(e))}}
-async function loadLogs(){const id=jobId();if(!id)return;if(S.tab!=='labor')S.loaded.labor=false;try{const d=await q(sb.from('logs').select('*').eq('job_id',id).order('date',{ascending:false}).limit(300));if(jobId()!==id)return;S.logs=d;S.loaded.logs=true;if(S.tab==='log'){renderLogList();const b=$('#logForm');if(b&&b._fillIfEmpty)b._fillIfEmpty()}}catch(e){toast(errMsg(e))}}
+async function loadLogs(){const id=jobId();if(!id)return;if(S.tab!=='labor')S.loaded.labor=false;try{const d=await q(sb.from('logs').select('*').eq('job_id',id).order('date',{ascending:false}).limit(300));if(jobId()!==id)return;S.logs=d;S.loaded.logs=true;loadMat();if(S.tab!=='log')tmNagSync();if(S.tab==='log'){renderLogList();const b=$('#logForm');if(b&&b._fillIfEmpty)b._fillIfEmpty()}}catch(e){toast(errMsg(e))}}
 async function loadMembers(){const id=jobId();if(!id)return;try{const d=await q(sb.from('members').select('*').eq('job_id',id).order('joined_at'));if(jobId()!==id)return;S.members=d;d.forEach(m=>S.people[m.user_id]=m.name);render();if(V)buildPins()}catch(e){}}
 async function loadInvites(){const id=jobId();if(!id||!isAdminRole())return [];try{S.invites=await q(sb.from('invites').select('*').eq('job_id',id).order('created_at',{ascending:false}))}catch(e){toast(errMsg(e))}return S.invites}
 function closeJob(){
@@ -1127,25 +1173,29 @@ function render(){
   const app=$('#app');
   if(S.view==='tc'){if(!TC.force&&tcTyping())return;TC.force=false;app.dataset.job='';app.innerHTML=renderTc();bindTc();return}
   if(S.view==='dash'){app.dataset.job='';app.innerHTML=renderDash();bindDash();return}
+  if(S.view==='look'){app.dataset.job='';app.innerHTML=renderLook();bindLook();return}
   if(S.view!=='job'||!S.job){app.dataset.job='';app.innerHTML=renderJobs();bindJobs();return}
   const j=S.job;
-  if(S.tab==='tc'||((S.tab==='log'||S.tab==='labor')&&!canLog()))S.tab='plans';
+  if(S.tab==='tc'||((S.tab==='log'||S.tab==='labor'||S.tab==='mat')&&!canLog()))S.tab='plans';
   if(!app.querySelector('[data-jobshell]')||app.dataset.job!==j.id||app.dataset.tab!==S.tab||app.dataset.role!==S.role){
     app.dataset.job=j.id;app.dataset.tab=S.tab;app.dataset.role=S.role;
     app.innerHTML='<div data-jobshell><div class="jhead"><div class="top"><button id="back" aria-label="Back">‹</button><div class="jl" id="jt2"></div><h1><div class="ttl"><span class="brand"></span>Alpha Operations</div><div class="jn" id="jt"></div></h1>'+(isAdminRole()?'<button id="jmenu" aria-label="Job menu">⋯</button>':'')+'</div>'+
-      '<div class="tabs"><button data-tab="plans">Plans</button><button data-tab="progress">Progress</button>'+(canLog()?'<button data-tab="log">Daily Report</button><button data-tab="labor">Labor</button>':'')+'</div></div><main id="tabBody"></main></div>';
+      '<div class="tabs"><button data-tab="plans">Plans</button><button data-tab="progress">Progress</button>'+(canLog()?'<button data-tab="log">Daily Report</button><button data-tab="labor">Labor</button><button data-tab="mat">Materials</button>':'')+'</div></div><main id="tabBody"></main></div>';
     $('#back').onclick=closeJob;
     $$('.tabs button').forEach(b=>b.onclick=()=>{S.tab=b.dataset.tab;window.scrollTo(0,0);render()});
     if($('#jmenu'))$('#jmenu').onclick=jobMenu;
-    if(S.tab==='log'){$('#tabBody').innerHTML='<div id="logForm"></div><div id="logList"></div>';renderLogForm()}
+    if(S.tab==='log'){$('#tabBody').innerHTML='<div id="tmLog"></div><div id="logForm"></div><div id="logList"></div>';renderLogForm()}
   }
   $('#jt').innerHTML=esc(j.name||'Job')+'<div class="sub">'+(j.addr?esc(j.addr)+' · ':'')+(pmName(j.pm)?'PM '+esc(pmName(j.pm))+' · ':'')+(S.role==='viewer'?'View only':S.role==='editor'?'Editor':'Office')+'</div>';$('#jt2').innerHTML=$('#jt').innerHTML;
   $$('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===S.tab));
   if(S.tab==='plans'){$('#tabBody').innerHTML=renderPlans();bindPlans();fillImgs($('#tabBody'))}
   else if(S.tab==='progress'){$('#tabBody').innerHTML=renderProgress();bindProgress();fillImgs($('#tabBody'))}
   else if(S.tab==='labor'){$('#tabBody').innerHTML=renderLabor();bindLabor();if(!S.loaded.labor&&!S.laborLoading)loadLabor()}
+  else if(S.tab==='mat'){$('#tabBody').innerHTML=renderMat();bindMat();if(!matHere())loadMat()}
   else renderLogList();
   {const nb=nudgeBanner();const tb=$('#tabBody');if(nb&&tb&&!$('#nudgeCard',tb)){tb.insertAdjacentHTML('afterbegin',nb);const g=$('#nudgeGo');if(g)g.onclick=()=>{S.tab='progress';window.scrollTo(0,0);render()}}}
+  matPaint();
+  tmNagSync();
   clearTimeout(S.tipT);S.tipT=setTimeout(()=>{if(S.view==='job'&&!V)tipsFor(S.tab==='plans'?'job':S.tab)},1200);
 }
 
@@ -1737,6 +1787,7 @@ const TIPS={
     ['.tabs button[data-tab="plans"]',"Plans: every sheet for the job, always the newest version. Use it to look things up, drop pins and quick highlights.","Planos: todas las hojas del trabajo, siempre la versión más nueva. Úsalo para consultar, poner pines y marcas rápidas."],
     ['.tabs button[data-tab="progress"]',"Progress: color in the work that's finished. This is what the office looks at to see how the job is going.","Avance: colorea el trabajo que ya está terminado. Esto es lo que la oficina revisa para ver cómo va el trabajo."],
     ['.tabs button[data-tab="log"]',"Daily Report: fill it out every day you're on the job. It's saved as a PDF and can go to the GC.","Reporte diario: llénalo cada día que estés en el trabajo. Se guarda como PDF y se puede mandar al contratista."],
+    ['.tabs button[data-tab="mat"]',"Materials: what was ordered on the PO and what has shown up so far. Log deliveries on the daily report.","Material: lo que se pidió en la orden y lo que ya llegó. Anota las entregas en el reporte diario."],
     ['.tabs button[data-tab="labor"]',"Labor: hours used against the budget, by cost code, from the job cost sheet.","Mano de obra: horas usadas contra el presupuesto, por código, de la hoja de costos."],
     ['#revFilt',"Pick which sheets to see: current sheets, revised sheets or RFI/ASI pages.","Escoge qué hojas ver: hojas actuales, hojas revisadas o páginas de RFI/ASI."],
     ['#tabBody .sheet',"Tap a sheet to open it. Pinch to zoom.","Toca una hoja para abrirla. Pellizca para hacer zoom."]],
@@ -1747,6 +1798,7 @@ const TIPS={
     ['#logForm [name="date"]',"One report per day. Pick the day; you can go back and fix an old one.","Un reporte por día. Escoge el día; puedes regresar y corregir uno viejo."],
     ['#logForm [name="work"]',"What your crew did today, in a few words: areas and rooms.","Lo que hizo tu cuadrilla hoy, en pocas palabras: áreas y cuartos."],
     ['#logForm [data-wf]',"How many of each trade were on site today.","Cuántos de cada oficio estuvieron hoy en la obra."],
+    ['#logForm [data-rows="mat"]',"Materials that came today: pick the item from the order list, enter the qty, and check Short if something didn't come.","Material que llegó hoy: escoge el artículo de la lista de la orden, pon la cantidad y marca Short si algo no llegó."],
     ['#logForm [name="problems"]',"Delays, missing materials, other trades in the way. This protects us later.","Retrasos, material que falta, otros oficios estorbando. Esto nos protege después."],
     ['#logForm [data-sig]',"Type your name and sign with your finger.","Escribe tu nombre y firma con el dedo."],
     ['#logForm .gcq',"Yes sends the report to the general contractor too.","Sí manda el reporte también al contratista general."],
@@ -1897,11 +1949,206 @@ function bindTc(){
 }
 
 /* jobs list */
+/* ===== crew lookahead (office only): who is planned on which job for the next two weeks =====
+   Plans live per job in job_budget.labor.lookahead = {date:[worker names]}. Every labor write in the app copies the whole labor object
+   (Object.assign({},L0,…)) and the lookahead save re-reads labor first, so the key survives wage/hrs/budget/billing saves and the SharePoint sync. */
+const LK={start:'',mode:'people',plans:{},loaded:false,loading:false,roster:[],cards:[],fms:[],sel:[],multi:false,sat:false,sx:0,q:null,M:null,addJobs:[]};
+const LK_COLORS=['#1f6feb','#d97706','#16a34a','#9333ea','#dc2626','#0891b2','#a16207','#db2777','#4f46e5','#059669','#ea580c','#475569'];
+const lookCan=()=>!!(S.isAdmin&&S.realAdmin&&!S.asUser&&!S.viewAs);
+const lookDow=iso=>new Date(iso+'T12:00:00Z').getUTCDay();
+/** Monday that starts the board: this week’s Monday; on Saturday or Sunday the coming Monday. */
+function lookMonday(iso){const d=lookDow(iso);return isoAddD(iso,d===0?1:d===6?2:1-d)}
+/** The board’s work days: Mon–Fri for two weeks from the Monday. A Saturday is added only when sat(iso) says so (something planned, or Saturdays switched on). Never Sundays. */
+function lookDays(mon,sat){const out=[];for(let w=0;w<2;w++)for(let d=0;d<6;d++){const iso=isoAddD(mon,w*7+d);if(d<5||(sat&&sat(iso)))out.push(iso)}return out}
+/** The rest of that week after a day, through Friday, from today on (for Repeat for the week). */
+function lookWeekRest(d,td){const out=[d];for(let x=isoAddD(d,1);lookDow(x)>=1&&lookDow(x)<=5;x=isoAddD(x,1))if(x>=td)out.push(x);return out}
+/** Plans by person: {nameKey:{n:name,d:{date:[jobIds]}}} from {jobId:{date:[names]}}. */
+function lookByPerson(plans){const o={};Object.keys(plans||{}).forEach(j=>{const p=plans[j]||{};Object.keys(p).forEach(d=>(p[d]||[]).forEach(n=>{const k=tcKey(n);if(!k)return;const P=o[k]=o[k]||{n:String(n).trim(),d:{}};const a=P.d[d]=P.d[d]||[];if(!a.includes(j))a.push(j)}))});return o}
+/** Plan a job (or null = nothing) for these names on these dates. keep=true keeps their other jobs that day (split day); otherwise they come off other jobs that day. Returns new plans. */
+function lookSet(plans,job,names,dates,keep){const P=JSON.parse(JSON.stringify(plans||{}));const ks=names.map(tcKey);
+  dates.forEach(d=>{Object.keys(P).forEach(j=>{if(j===job||(keep&&job))return;const a=P[j][d];if(a){P[j][d]=a.filter(n=>!ks.includes(tcKey(n)));if(!P[j][d].length)delete P[j][d]}});
+    if(job){const p=P[job]=P[job]||{};const a=p[d]=p[d]||[];names.forEach(n=>{if(!a.some(x=>tcKey(x)===tcKey(n)))a.push(String(n).trim())})}});
+  return P}
+/** Take these names off one job on these dates (other jobs untouched). */
+function lookDrop(plans,job,names,dates){const P=JSON.parse(JSON.stringify(plans||{}));const ks=names.map(tcKey);const p=P[job];if(!p)return P;
+  dates.forEach(d=>{if(!p[d])return;p[d]=p[d].filter(n=>!ks.includes(tcKey(n)));if(!p[d].length)delete p[d]});return P}
+/** Copy last week: each person planned in the week starting `from` goes on the same job, same weekday, in the week starting `to` (dates before minIso are skipped). People not planned in the source week keep what they have. */
+function lookCopyWeek(plans,from,to,minIso){let P=plans||{};const by=lookByPerson(P);
+  for(let d=0;d<6;d++){const s=isoAddD(from,d),t=isoAddD(to,d);if(t<minIso)continue;
+    Object.keys(by).forEach(k=>{const js=by[k].d[s];if(!js||!js.length)return;P=lookSet(P,js[0],[by[k].n],[t],false);js.slice(1).forEach(j=>{P=lookSet(P,j,[by[k].n],[t],true)})})}
+  return P}
+/** What each worker worked most recently on the time cards: {nameKey:{job,date,name}} = the app job with the most hours that day. Lines that match no job (office, vacation) are skipped. Only days before `before`. */
+function lookLastWorked(cards,jobs,before){const keys=(jobs||[]).map(j=>[j.id,tcJobKey(j)]);const o={};
+  (cards||[]).forEach(c=>{if(!c||!c.period_start)return;(c.workers||[]).forEach(w=>{const k=tcKey(w.name);if(!k)return;for(let d=0;d<12;d++){const iso=isoAddD(c.period_start,TC_OFF[d]);if(before&&iso>=before)continue;if(o[k]&&o[k].date>=iso)continue;
+    const h={};((w.days&&w.days[d])||[]).forEach(l=>{const x=tcHrs(l);if(!x)return;const m=keys.find(J=>tcIsJob(l,J[1][0],J[1][1]));if(m)h[m[0]]=(h[m[0]]||0)+x});
+    const top=Object.keys(h).sort((a,b)=>h[b]-h[a])[0];if(top)o[k]={job:top,date:iso,name:w.name}}})});
+  return o}
+/** Same as time card: put each person on the job he last worked, on the empty Mon–Fri days in `dates` from minIso on. Days already planned are left alone. */
+function lookPrefill(plans,people,dates,last,minIso){let P=plans||{};const by=lookByPerson(P);
+  people.forEach(n=>{const k=tcKey(n),L=last[k];if(!L)return;const b=by[k];dates.forEach(d=>{const w=lookDow(d);if(d<minIso||w<1||w>5)return;if(b&&b.d[d]&&b.d[d].length)return;P=lookSet(P,L.job,[n],[d],true)})});
+  return P}
+/** Time card jobs on one date: {nameKey:[jobIds]} (hours > 0; 'other' = lines that match no job in the app, like office or vacation). null when no card covers that date. */
+function lookActual(cards,jobs,iso){const keys=(jobs||[]).map(j=>[j.id,tcJobKey(j)]);const o={};let seen=false;
+  (cards||[]).forEach(c=>{if(!c||!c.period_start)return;const d=tcDayIdx(c.period_start,iso);if(d<0)return;seen=true;
+    (c.workers||[]).forEach(w=>{const k=tcKey(w.name);((w.days&&w.days[d])||[]).forEach(l=>{if(!tcHrs(l))return;const m=keys.find(J=>tcIsJob(l,J[1][0],J[1][1]));const id=m?m[0]:'other';const a=o[k]=o[k]||[];if(!a.includes(id))a.push(id)})})});
+  return seen?o:null}
+/** Board warnings. dbl: a person on 2+ jobs the same day. idle: nothing planned on a Mon–Fri from today on. empty: an active job with nobody planned on any board day from today on.
+    miss: a past day where the time card differs from the plan (planned job not on the card, or worked an app job with no plan). actual = {date:lookActual(…)}. */
+function lookWarn(plans,people,days,td,active,actual){const by=lookByPerson(plans),out={dbl:[],idle:[],empty:[],miss:[]};
+  people.forEach(n=>{const b=(by[tcKey(n)]||{d:{}}).d;days.forEach(d=>{const js=b[d]||[],w=lookDow(d);if(js.length>1)out.dbl.push({name:n,date:d,jobs:js});
+    if(!js.length&&d>=td&&w>=1&&w<=5)out.idle.push({name:n,date:d});
+    const A=d<td&&actual&&actual[d];if(A){const a=A[tcKey(n)]||[];if(js.some(j=>!a.includes(j))||(!js.length&&a.some(j=>j!=='other')))out.miss.push({name:n,date:d,plan:js,act:a})}})});
+  const fut=days.filter(d=>d>=td);if(fut.length)(active?[...active]:[]).forEach(j=>{const p=(plans||{})[j]||{};if(!fut.some(d=>(p[d]||[]).length))out.empty.push(j)});
+  return out}
+/** Board rows: [{fm, names}] grouped by foreman. A worker goes under the foreman whose time card had him most recently; a foreman heads his own group.
+    Crew list names never on a card (and planned names not on the list) go in the last group (fm ''). Cards owned by office logins (skip) are left out. */
+function lookGroups(cards,roster,fms,skip,extra){const fmOf={},nm={},isFm=new Set();const add=n=>{const k=tcKey(n);if(k&&!nm[k])nm[k]=String(n).trim();return k};
+  (fms||[]).forEach(f=>{const k=f&&add(f.name);if(k)isFm.add(k)});
+  (cards||[]).filter(c=>c&&!(skip||[]).includes(c.owner)).sort((a,b)=>String(a.period_start).localeCompare(String(b.period_start))).forEach(c=>{const fk=add(c.foreman);if(!fk)return;isFm.add(fk);(c.workers||[]).forEach(w=>{const k=add(w.name);if(k&&k!==fk)fmOf[k]=fk})});
+  (roster||[]).forEach(r=>add(r&&r.name!=null?r.name:r));(extra||[]).forEach(add);
+  const G={};Object.keys(nm).forEach(k=>{const g=isFm.has(k)?k:(fmOf[k]||'');(G[g]=G[g]||[]).push(k)});
+  return Object.keys(G).sort((a,b)=>!a?1:!b?-1:nm[a].localeCompare(nm[b])).map(g=>({fm:g?nm[g]:'',names:G[g].sort((a,b)=>a===g?-1:b===g?1:nm[a].localeCompare(nm[b])).map(k=>nm[k])}))}
+/** Which job/date plans changed between two plan sets: {jobId:{date:names or null}}. */
+function lookDiff(a,b){const o={};a=a||{};b=b||{};new Set(Object.keys(a).concat(Object.keys(b))).forEach(j=>{const x=a[j]||{},y=b[j]||{};
+    new Set(Object.keys(x).concat(Object.keys(y))).forEach(d=>{if(JSON.stringify(x[d]||[])!==JSON.stringify(y[d]||[]))(o[j]=o[j]||{})[d]=(y[d]&&y[d].length)?y[d]:null})});
+  return o}
+const lookShort=j=>tcJobNo(j&&j.name)||String((j&&j.name)||'?').slice(0,4);
+const lkJob=id=>(S.jobs||[]).find(j=>j.id===id);
+function lookClean(la){const o={};if(!la||typeof la!=='object'||Array.isArray(la))return o;Object.keys(la).forEach(d=>{if(/^\d{4}-\d\d-\d\d$/.test(d)&&Array.isArray(la[d])){const a=la[d].filter(n=>typeof n==='string'&&n.trim());if(a.length)o[d]=a}});return o}
+function openLook(){if(!lookCan())return;S.view='look';LK.start=LK.start||lookMonday(tcToday());LK.sel=[];LK.multi=false;window.scrollTo(0,0);loadLook()}
+function closeLook(){S.view='jobs';LK.sel=[];LK.multi=false;render()}
+async function loadLook(){LK.loading=true;if(S.view==='look')render();
+  try{const since=tcPeriodOf(isoAddD(LK.start,-35));
+    const [bud,ro,cards,fms]=await Promise.all([q(sb.from('job_budget').select('job_id,lookahead:labor->lookahead')),q(sb.from('crew_roster').select('name').eq('active',true).order('name')).catch(()=>[]),
+      q(sb.from('timecards').select('owner,foreman,period_start,workers').gte('period_start',since)).catch(()=>[]),q(sb.rpc('foreman_accounts')).catch(()=>[])]);
+    const ids=new Set((S.jobs||[]).map(j=>j.id));const P={};(bud||[]).forEach(r=>{const la=lookClean(r.lookahead);if(ids.has(r.job_id)&&Object.keys(la).length)P[r.job_id]=la});
+    LK.plans=P;LK.roster=ro||[];LK.cards=cards||[];LK.fms=fms||[];LK.loaded=true}catch(e){toast(errMsg(e))}
+  LK.loading=false;if(S.view==='look')render()}
+/** Save: show the change now, then per changed job re-read labor and write back only the changed dates into labor.lookahead (other labor keys and other dates stay). Saves run one after another. */
+function lookSave(next,msg){const prev=LK.plans;LK.plans=next;LK.sel=[];render();LK.q=(LK.q||Promise.resolve()).then(()=>lookWrite(prev,next,msg));return LK.q}
+async function lookWrite(prev,next,msg){const ch=lookDiff(prev,next);const ids=Object.keys(ch);if(!ids.length)return;let bad=false;
+  for(const j of ids){try{const b=await q(sb.from('job_budget').select('labor').eq('job_id',j).maybeSingle());const L=(b&&b.labor)||{};const la=lookClean(L.lookahead);
+      Object.keys(ch[j]).forEach(d=>{if(ch[j][d])la[d]=ch[j][d];else delete la[d]});const cut=isoAddD(tcToday(),-70);Object.keys(la).forEach(d=>{if(d<cut)delete la[d]});
+      await q(sb.from('job_budget').upsert({job_id:j,labor:Object.assign({},L,{lookahead:la})},{onConflict:'job_id'}));if(S.labor&&S.job&&S.job.id===j)S.labor.lookahead=la}catch(e){bad=true;toast(errMsg(e))}}
+  if(bad)loadLook();else if(msg)toast(msg)}
+function lookModel(){const td=tcToday(),jobs=S.jobs||[];const by=lookByPerson(LK.plans);
+  const days=lookDays(LK.start,iso=>LK.sat||Object.keys(by).some(k=>(by[k].d[iso]||[]).length));
+  const offIds=(S.office||[]).map(o=>o.user_id).filter(Boolean);const groups=lookGroups(LK.cards,LK.roster,LK.fms,offIds,Object.keys(by).map(k=>by[k].n));
+  const people=[].concat(...groups.map(g=>g.names));const act={};days.forEach(d=>{if(d<td)act[d]=lookActual(LK.cards,jobs,d)});
+  const since=isoAddD(td,-14),active=new Set();jobs.forEach(j=>{const K=tcJobKey(j);const a=S.jobAct&&S.jobAct[j.id];if(tcJobLive(LK.cards,K[0],K[1],since).days.size||(a&&String(a).slice(0,10)>=since))active.add(j.id)});
+  const W=lookWarn(LK.plans,people,days,td,active,act);const miss={};W.miss.forEach(x=>miss[tcKey(x.name)+'|'+x.date]=x);
+  const num0=j=>+(tcJobNo(j.name)||1e9);const shown=jobs.filter(j=>active.has(j.id)||LK.addJobs.includes(j.id)||days.some(d=>((LK.plans[j.id]||{})[d]||[]).length)).sort((a,b)=>num0(a)-num0(b)||String(a.name).localeCompare(String(b.name)));
+  const col={},short={other:'oth'};jobs.forEach(j=>short[j.id]=lookShort(j));shown.forEach((j,i)=>col[j.id]=LK_COLORS[i%LK_COLORS.length]);jobs.forEach(j=>{if(!col[j.id])col[j.id]='#475569'});
+  return LK.M={td,days,by,groups,people,act,active,W,miss,shown,col,short}}
+function renderLook(){let h='<div class="top"><button id="lkBack" aria-label="Back">‹</button><h1><div class="ttl"><span class="brand"></span>Alpha Operations</div></h1></div><main class="lkm'+(LK.multi?' multi':'')+'">';
+  if(!lookCan())return h+'<div class="empty"><b>Office only</b>The crew lookahead is for the office login.</div></main>';
+  if(!LK.loaded)return h+'<div class="empty">Loading crew lookahead…</div></main>';
+  const M=lookModel(),d0=M.days[0],d1=M.days[M.days.length-1];
+  h+='<div class="card" style="padding:12px"><div class="row" style="flex-wrap:wrap;gap:8px"><div class="grow"><b style="font-size:18px">🗓 Crew lookahead</b><div class="muted small">'+esc(tcFmt(d0,{month:'short',day:'numeric'})+' – '+tcFmt(d1,{month:'short',day:'numeric'}))+(LK.loading?' · loading…':'')+'</div></div>'+
+    '<div class="row" style="gap:6px"><button class="btn sm" id="lkPrev" aria-label="Earlier week">‹</button><button class="btn sm" id="lkNow">This week</button><button class="btn sm" id="lkNext" aria-label="Later week">›</button></div></div>'+
+    '<div class="chips" style="margin:10px 0 8px"><button class="chip'+(LK.mode==='people'?' on':'')+'" data-lkm="people">By person</button><button class="chip'+(LK.mode==='jobs'?' on':'')+'" data-lkm="jobs">By job</button></div>'+
+    '<div class="row lktools" style="flex-wrap:wrap;gap:6px">'+(LK.mode==='people'?'<button class="btn sm'+(LK.multi?' primary':'')+'" id="lkMulti">'+(LK.multi?'✓ Selecting':'Select several')+'</button>':'')+
+    '<button class="btn sm" id="lkCopy">Copy last week</button><button class="btn sm" id="lkSame">Same as time card</button><button class="btn sm" id="lkSat">'+(LK.sat?'Hide':'Show')+' Saturdays</button></div></div>';
+  h+=lookWarnCard(M);
+  h+=LK.mode==='jobs'?lookJobGrid(M):lookPeopleGrid(M);
+  h+='<p class="muted small" style="margin:8px 2px">'+(LK.mode==='jobs'?'Numbers = people planned. Tap a day to pick who’s on that job. Amber 0 = active job with nobody planned.':'Tap a cell to plan. '+(LK.multi?'Tap or drag cells to select, then Assign.':'Drag with a mouse, or tap Select several, to plan many at once.')+' Past days: ✓ time card matches · ≠ worked a different job · no hrs = nothing on the time card · grey # = worked but wasn’t planned.')+'</p>';
+  if(LK.multi&&LK.mode==='people')h+='<div class="lkbar"><span class="grow">'+LK.sel.length+' selected</span><button class="btn sm" id="lkSelClr">Clear</button><button class="btn sm primary" id="lkSelGo"'+(LK.sel.length?'':' disabled')+'>Assign…</button></div>';
+  return h+'</main>'}
+/** Board days as short ranges: 11/30–12/2, 12/4 (consecutive board days join up). */
+function lookRanges(ds,all){const ix=ds.map(d=>all.indexOf(d)).sort((a,b)=>a-b),out=[];let s=null,p=null;ix.concat([null]).forEach(i=>{if(s!=null&&i===p+1){p=i;return}if(s!=null)out.push(tcFmt(all[s])+(p>s?'–'+tcFmt(all[p]):''));s=p=i});return out.join(', ')}
+function lookWarnCard(M){const W=M.W,nm=j=>{const x=lkJob(j);if(!x)return '?';const t=(tcJobNo(x.name)?tcJobNo(x.name)+' ':'')+(tcJobShort(x.name)||x.name);return t.length>26?t.slice(0,25)+'…':t},dt=d=>tcFmt(d,{weekday:'short',month:'numeric',day:'numeric'});
+  const parts=[];if(W.dbl.length)parts.push('<span style="color:#b42318">'+W.dbl.length+' double-booked</span>');if(W.empty.length)parts.push('<span style="color:#9a3412">'+W.empty.length+' active job'+(W.empty.length===1?'':'s')+' with nobody planned</span>');
+  const idleP={};W.idle.forEach(x=>(idleP[x.name]=idleP[x.name]||[]).push(x.date));const ip=Object.keys(idleP);if(ip.length)parts.push('<span style="color:#9a3412">'+ip.length+' with open days</span>');if(W.miss.length)parts.push('<span class="muted">'+W.miss.length+' plan ≠ time card</span>');
+  if(!parts.length)return '<div class="card small" style="padding:10px 12px;color:#2e7d32">✓ Everyone is planned and nobody is double-booked.</div>';
+  let b='';if(W.dbl.length)b+='<div class="lkwh" style="color:#b42318">Double-booked</div>'+W.dbl.map(x=>'<div>'+esc(x.name)+' · '+esc(dt(x.date))+': '+esc(x.jobs.map(nm).join(' + '))+'</div>').join('');
+  if(W.empty.length)b+='<div class="lkwh" style="color:#9a3412">Active job, nobody planned</div>'+W.empty.map(j=>'<div>'+esc(nm(j))+' <span class="muted">(crew hours or progress in the last 2 weeks)</span></div>').join('');
+  if(ip.length)b+='<div class="lkwh" style="color:#9a3412">Nothing planned (idle)</div>'+ip.map(p=>'<div>'+esc(p)+': '+(idleP[p].length>=M.days.filter(d=>d>=M.td&&lookDow(d)<6).length?'every day':esc(lookRanges(idleP[p],M.days)))+'</div>').join('');
+  if(W.miss.length)b+='<div class="lkwh muted">Plan vs. time card (past days)</div>'+W.miss.map(x=>'<div class="muted">'+esc(x.name)+' · '+esc(dt(x.date))+': planned '+esc(x.plan.length?x.plan.map(j=>M.short[j]).join('+'):'nothing')+', worked '+esc(x.act.length?x.act.map(j=>M.short[j]||'?').join('+'):'no hours')+'</div>').join('');
+  return '<details class="card lkwarn"'+(LK.wOpen?' open':'')+'><summary><b>⚠</b> '+parts.join(' · ')+'</summary><div class="small" style="margin-top:6px">'+b+'</div></details>'}
+function lookHead(M){return M.days.map((d,i)=>'<th class="'+(i&&lookDow(d)===1?'wk':'')+(d===M.td?' td':'')+(lookDow(d)===6?' sat':'')+'">'+esc(tcFmt(d,{weekday:'short'}))+'<br><span>'+esc(tcFmt(d))+'</span></th>').join('')}
+function lookPeopleGrid(M){if(!M.people.length)return '<div class="empty"><b>No crew yet</b>Add people to the crew list (⏱ Time cards → Crew list & rates).</div>';
+  let h='<div class="lkgrid" id="lkGrid"><table class="lkt"><thead><tr><th class="lkn">Crew</th>'+lookHead(M)+'</tr></thead><tbody>';let r=0;
+  M.groups.forEach(g=>{h+='<tr class="lkg"><td colspan="'+(M.days.length+1)+'"><span>'+esc(g.fm?g.fm+'’s crew':'Not on a recent time card')+'</span></td></tr>';
+    g.names.forEach(n=>{const k=tcKey(n),b=(M.by[k]||{d:{}}).d;h+='<tr><td class="lkn'+(g.fm&&k===tcKey(g.fm)?' fm':'')+'" title="'+esc(n)+'">'+esc(n)+'</td>'+M.days.map((d,c)=>lookCell(M,n,k,b[d]||[],d,r,c)).join('')+'</tr>';r++})});
+  const cnt=d=>M.people.filter(n=>((M.by[tcKey(n)]||{d:{}}).d[d]||[]).length).length;
+  return h+'</tbody><tfoot><tr><td class="lkn">Planned</td>'+M.days.map((d,i)=>'<td class="lkf'+(i&&lookDow(d)===1?' wk':'')+'">'+cnt(d)+'/'+M.people.length+'</td>').join('')+'</tr></tfoot></table></div>'}
+function lookCell(M,n,k,js,d,r,c){const past=d<M.td,w=lookDow(d);let cls='lkc'+(c&&w===1?' wk':'')+(d===M.td?' td':'')+(past?' past':'')+(js.length>1?' dbl':'')+(LK.sel.includes(n+'|'+d)?' sel':'');
+  let x=js.map(j=>'<b style="background:'+M.col[j]+'">'+esc(M.short[j]||'?')+'</b>').join('');
+  if(!js.length&&!past&&w>=1&&w<=5)cls+=' idle';
+  const A=past&&M.act[d];if(A){const a=A[k]||[],mm=M.miss[k+'|'+d];
+    if(js.length&&!mm)x+='<i class="ok" title="Time card matches">✓</i>';
+    else if(js.length&&mm)x+='<i class="mm" title="Time card: '+esc(a.length?a.map(j=>M.short[j]||'?').join('+'):'no hours')+'">'+(a.length?'≠'+esc(a.map(j=>M.short[j]||'?').join('+')):'no hrs')+'</i>';
+    else if(a.length)x+='<i class="un" title="Worked, not planned">'+esc(a.map(j=>M.short[j]||'?').join('+'))+'</i>'}
+  return '<td class="'+cls+'" data-c="'+r+','+c+'" data-n="'+esc(n)+'" data-d="'+d+'">'+x+'</td>'}
+function lookJobGrid(M){const opts=sortJobs((S.jobs||[]).filter(j=>!M.shown.includes(j)));
+  let h='';if(!M.shown.length)h+='<div class="empty"><b>No jobs planned yet</b>Pick a job below, or plan people in By person.</div>';
+  else{h+='<div class="lkgrid" id="lkGrid"><table class="lkt"><thead><tr><th class="lkn">Job</th>'+lookHead(M)+'</tr></thead><tbody>';
+    M.shown.forEach(j=>{const p=LK.plans[j.id]||{};h+='<tr><td class="lkn" title="'+esc(j.name)+'"><i class="lkdot" style="background:'+M.col[j.id]+'"></i>'+esc(lookShort(j))+' <span class="muted">'+esc(tcJobShort(j.name)||'')+'</span></td>'+
+      M.days.map((d,i)=>{const c=(p[d]||[]).length,zero=!c&&d>=M.td&&M.active.has(j.id)&&lookDow(d)<6;return '<td class="lkc lkj'+(i&&lookDow(d)===1?' wk':'')+(d===M.td?' td':'')+(d<M.td?' past':'')+(zero?' zero':'')+'" data-j="'+esc(j.id)+'" data-d="'+d+'">'+(c?'<b style="background:'+M.col[j.id]+'">'+c+'</b>':(zero?'0':''))+'</td>'}).join('')+'</tr>'});
+    h+='</tbody></table></div>'}
+  return h+(opts.length?'<select id="lkAddJob" class="lksel"><option value="">+ Plan another job…</option>'+opts.map(j=>'<option value="'+esc(j.id)+'">'+esc(j.name)+'</option>').join('')+'</select>':'')}
+/** Job list for the picker: active and planned jobs first (as chips), then the rest. */
+function lookPickJobs(M){const top=M.shown.slice();const rest=sortJobs((S.jobs||[]).filter(j=>!top.includes(j)));return [top,rest]}
+function lookPick(cells){if(!cells.length)return;const M=LK.M||lookModel();const ns=[...new Set(cells.map(x=>x.n))],ds=[...new Set(cells.map(x=>x.d))].sort();const [top,rest]=lookPickJobs(M);
+  const cur=cells.length===1?((M.by[tcKey(cells[0].n)]||{d:{}}).d[cells[0].d]||[]):[];
+  const m=modal('<h2>'+esc(ns.length===1?ns[0]:ns.length+' people')+'</h2><p class="muted small" style="margin:-4px 0 10px">'+esc(ds.length===1?fmtDay(ds[0]):ds.length+' days · '+tcFmt(ds[0])+' – '+tcFmt(ds[ds.length-1]))+(cur.length?' · now on '+cur.map(j=>M.short[j]).join(' + '):'')+'</p>'+
+    '<div class="chips lkjobs">'+top.map(j=>'<button type="button" class="chip'+(cur.includes(j.id)?' on':'')+'" data-j="'+esc(j.id)+'"><i style="background:'+M.col[j.id]+'"></i>'+esc(lookShort(j))+' <span>'+esc(tcJobShort(j.name)||'')+'</span></button>').join('')+'</div>'+
+    (rest.length?'<select class="lksel" data-other><option value="">'+(top.length?'Other job…':'Pick a job…')+'</option>'+rest.map(j=>'<option value="'+esc(j.id)+'">'+esc(j.name)+'</option>').join('')+'</select>':'')+
+    '<label class="lkck"><input type="checkbox" data-rep> Repeat for the week (through Friday)</label><label class="lkck"><input type="checkbox" data-keep> Split day: keep their other job too</label>'+
+    '<div class="mbtns"><button class="btn" data-clr>Nothing planned</button><button class="btn" data-x>Cancel</button></div>');
+  const apply=job=>{const rep=$('[data-rep]',m).checked,keep=$('[data-keep]',m).checked;let P=LK.plans;
+    ns.forEach(n=>{let dd=cells.filter(x=>x.n===n).map(x=>x.d);if(rep)dd=[...new Set([].concat(...dd.map(d=>lookWeekRest(d,M.td))))];P=lookSet(P,job,[n],dd,keep&&!!job)});
+    m.close();lookSave(P,job?'Planned on '+(lookShort(lkJob(job))||'job')+'.':'Cleared.')};
+  $$('[data-j]',m).forEach(b=>b.onclick=()=>apply(b.dataset.j));const o=$('[data-other]',m);if(o)o.onchange=()=>{if(o.value)apply(o.value)};
+  $('[data-clr]',m).onclick=()=>apply(null);$('[data-x]',m).onclick=()=>m.close()}
+function lookJobDay(j,d){const M=LK.M||lookModel(),job=lkJob(j);if(!job)return;const on=new Set(((LK.plans[j]||{})[d]||[]).map(tcKey));
+  const m=modal('<h2>'+esc(lookShort(job)+' '+(tcJobShort(job.name)||''))+'</h2><p class="muted small" style="margin:-4px 0 6px">'+esc(fmtDay(d))+' · tap who’s on this job</p>'+
+    M.groups.map(g=>'<div class="small muted" style="margin:8px 0 4px;font-weight:700">'+esc(g.fm?g.fm+'’s crew':'Others')+'</div><div class="chips" style="margin-bottom:4px">'+g.names.map(n=>{const o=((M.by[tcKey(n)]||{d:{}}).d[d]||[]).filter(x=>x!==j);
+      return '<button type="button" class="chip'+(on.has(tcKey(n))?' on':'')+'" data-p="'+esc(n)+'">'+esc(n)+(o.length?' <small style="opacity:.7">'+esc(o.map(x=>M.short[x]).join('/'))+'</small>':'')+'</button>'}).join('')+'</div>').join('')+
+    '<label class="lkck"><input type="checkbox" data-rep> Repeat for the week (through Friday)</label><label class="lkck"><input type="checkbox" data-keep> Split day: keep people on their other job too</label>'+
+    '<div class="mbtns"><button class="btn" data-x>Cancel</button><button class="btn primary" data-ok>Save</button></div>');
+  $$('[data-p]',m).forEach(b=>b.onclick=()=>b.classList.toggle('on'));$('[data-x]',m).onclick=()=>m.close();
+  $('[data-ok]',m).onclick=()=>{const sel=$$('[data-p].on',m).map(b=>b.dataset.p),off=$$('[data-p]:not(.on)',m).map(b=>b.dataset.p);const dd=$('[data-rep]',m).checked?lookWeekRest(d,M.td):[d];
+    let P=lookDrop(LK.plans,j,off,dd);if(sel.length)P=lookSet(P,j,sel,dd,$('[data-keep]',m).checked);m.close();lookSave(P,'Saved '+lookShort(job)+'.')}}
+function lookCopyBox(){const M=LK.M||lookModel(),a=LK.start,b=isoAddD(a,7),f=d=>tcFmt(d,{month:'short',day:'numeric'});
+  const m=modal('<h2>Copy last week</h2><p class="muted small" style="margin:-4px 0 10px">Each person goes on the same job, same weekday. Past days aren’t changed. People with nothing planned last week keep what they have.</p><div style="display:grid;gap:8px">'+
+    '<button class="btn" data-w="'+isoAddD(a,-7)+'|'+a+'">Week of '+esc(f(isoAddD(a,-7)))+' → week of '+esc(f(a))+'</button><button class="btn" data-w="'+a+'|'+b+'">Week of '+esc(f(a))+' → week of '+esc(f(b))+'</button></div><div class="mbtns"><button class="btn" data-x>Cancel</button></div>');
+  $('[data-x]',m).onclick=()=>m.close();$$('[data-w]',m).forEach(x=>x.onclick=async()=>{const [s,t]=x.dataset.w.split('|');m.close();
+    const P=lookCopyWeek(LK.plans,s,t,M.td);const n=Object.keys(lookDiff(LK.plans,P)).length;
+    if(!n){toast('Nothing to copy: no plan that week (or those days are past).');return}lookSave(P,'Copied the week of '+f(s)+'.')})}
+async function lookSameBox(){const M=LK.M||lookModel();const last=lookLastWorked(LK.cards,S.jobs,isoAddD(M.td,1));const P=lookPrefill(LK.plans,M.people,M.days,last,M.td);
+  const ch=lookDiff(LK.plans,P);let cells=0;const B=lookByPerson(P),A=M.by;Object.keys(B).forEach(k=>Object.keys(B[k].d).forEach(d=>{if(!((A[k]||{d:{}}).d[d]||[]).length)cells++}));
+  if(!Object.keys(ch).length){toast('Nothing to fill: everyone is planned, or nobody has recent time card hours.');return}
+  if(!await confirmBox('Fill '+cells+' empty day'+(cells===1?'':'s')+' with the job each person worked most recently on the time cards? Days already planned stay the same.','Fill',false))return;
+  lookSave(P,'Filled from time cards.')}
+function bindLook(){$('#lkBack').onclick=closeLook;if(!$('#lkPrev'))return;
+  const nav=n=>{LK.start=n==null?lookMonday(tcToday()):isoAddD(LK.start,7*n);LK.sel=[];LK.sx=0;loadLook()};
+  $('#lkPrev').onclick=()=>nav(-1);$('#lkNext').onclick=()=>nav(1);$('#lkNow').onclick=()=>nav(null);
+  $$('[data-lkm]').forEach(b=>b.onclick=()=>{LK.mode=b.dataset.lkm;LK.multi=false;LK.sel=[];LK.sx=0;render()});
+  const mu=$('#lkMulti');if(mu)mu.onclick=()=>{LK.multi=!LK.multi;LK.sel=[];render()};
+  $('#lkCopy').onclick=lookCopyBox;$('#lkSame').onclick=lookSameBox;$('#lkSat').onclick=()=>{LK.sat=!LK.sat;render()};
+  const sc=$('#lkSelClr');if(sc)sc.onclick=()=>{LK.sel=[];render()};
+  const sg=$('#lkSelGo');if(sg)sg.onclick=()=>lookPick(LK.sel.map(s=>{const i=s.lastIndexOf('|');return {n:s.slice(0,i),d:s.slice(i+1)}}));
+  const wd=$('.lkwarn');if(wd)wd.ontoggle=()=>{LK.wOpen=wd.open};
+  const aj=$('#lkAddJob');if(aj)aj.onchange=()=>{if(aj.value&&!LK.addJobs.includes(aj.value))LK.addJobs.push(aj.value);render()};
+  const g=$('#lkGrid');if(!g)return;g.scrollLeft=LK.sx||0;g.onscroll=()=>{LK.sx=g.scrollLeft};
+  if(LK.mode==='jobs'){g.onclick=e=>{const td=e.target.closest('td[data-j]');if(td)lookJobDay(td.dataset.j,td.dataset.d)};return}
+  let drag=null,lastUp=0;const rc=td=>td.dataset.c.split(',').map(Number);
+  const rect=()=>{const [r1,c1]=rc(drag.a),[r2,c2]=rc(drag.b);return $$('td[data-c]',g).filter(td=>{const [r,c]=rc(td);return r>=Math.min(r1,r2)&&r<=Math.max(r1,r2)&&c>=Math.min(c1,c2)&&c<=Math.max(c1,c2)})};
+  const paint=()=>{$$('td.drag',g).forEach(td=>td.classList.remove('drag'));if(drag)rect().forEach(td=>td.classList.add('drag'))};
+  const cellAt=(x,y)=>{const el=document.elementFromPoint(x,y);return el&&el.closest?el.closest('#lkGrid td[data-c]'):null};
+  g.onpointerdown=e=>{const td=e.target.closest('td[data-c]');if(!td||(e.pointerType!=='mouse'&&!LK.multi)||e.button>0)return;e.preventDefault();drag={a:td,b:td};try{g.setPointerCapture(e.pointerId)}catch(_){}paint()};
+  g.onpointermove=e=>{if(!drag)return;const td=cellAt(e.clientX,e.clientY);if(td&&td!==drag.b){drag.b=td;paint()}};
+  g.onpointercancel=()=>{drag=null;paint()};
+  g.onpointerup=()=>{if(!drag)return;const cells=rect().map(td=>({n:td.dataset.n,d:td.dataset.d}));const one=drag.a===drag.b;drag=null;paint();lastUp=Date.now();
+    if(LK.multi){const ks=cells.map(x=>x.n+'|'+x.d);if(one&&LK.sel.includes(ks[0]))LK.sel=LK.sel.filter(s=>s!==ks[0]);else ks.forEach(s=>{if(!LK.sel.includes(s))LK.sel.push(s)});render()}else lookPick(cells)};
+  g.onclick=e=>{if(LK.multi||Date.now()-lastUp<500)return;const td=e.target.closest('td[data-c]');if(td)lookPick([{n:td.dataset.n,d:td.dataset.d}])}}
 function renderJobs(){
   let h='<div class="top"><h1><div class="ttl"><span class="brand"></span>Alpha Operations</div></h1><button id="acct" aria-label="Account">☰</button></div><main>';
   if(S.isAdmin)h+='<button class="btn primary block" id="newJob" style="margin-bottom:10px">+ New job</button>';
   if(dashOk())h+='<button class="btn block" id="dashOpen" style="margin-bottom:10px">\ud83d\udcca All jobs at a glance</button>';
   if(canSeeTc())h+='<button class="btn block" id="tcOpen" style="margin-bottom:14px">⏱ Time cards</button>';
+  if(lookCan())h+='<button class="btn block" id="lkOpen" style="margin:-4px 0 14px">🗓 Crew lookahead</button>';
   if(!S.jobsLoaded)h+='<div class="empty">Loading jobs…</div>';
   else if(!S.jobs.length)h+='<div class="empty"><b>No jobs yet</b>'+(S.asUser?esc(S.asUser.name)+' isn’t on any jobs right now.':S.isAdmin?'Add a job, upload its plan PDF, then invite your foreman from the job\'s ⋯ menu.':'Open the invite link the office texted you to get access to a job.')+'</div>';
   else{
@@ -1926,6 +2173,7 @@ function bindJobs(){
   $$('.job').forEach(el=>el.onclick=()=>openJob(el.dataset.id));
   if($('#tcOpen'))$('#tcOpen').onclick=openTimecards;
   if($('#dashOpen'))$('#dashOpen').onclick=openDash;
+  if($('#lkOpen'))$('#lkOpen').onclick=openLook;
   $$('[data-view]').forEach(b=>b.onclick=()=>{lsSet('crewplans.jobView',b.dataset.view);render()});
   const js=$('#jobSort');if(js)js.onchange=()=>{lsSet('crewplans.jobSort',js.value);if(js.value==='size'&&!S.jobSize)loadJobSizes();render()};
   if(S.isAdmin&&!S.jobSize&&(lsGet('crewplans.jobSort')||'')==='size'&&!S.jobSizeT){S.jobSizeT=1;loadJobSizes()}
@@ -1949,10 +2197,11 @@ function bindJobs(){
 }
 async function jobMenu(){
   const j=S.job;
-  const m=modal('<h2>'+esc(j.name)+'</h2><div style="display:grid;gap:10px"><button class="btn primary" data-a="people">People & invite links</button><button class="btn" data-a="scope">Scope items</button><button class="btn" data-a="dl">Download job (save to OneDrive)</button><button class="btn" data-a="edit">Edit job (name, PM, GC email)</button><button class="btn danger" data-a="del">Delete job</button><button class="btn" data-a="x">Close</button></div>');
+  const m=modal('<h2>'+esc(j.name)+'</h2><div style="display:grid;gap:10px"><button class="btn primary" data-a="people">People & invite links</button><button class="btn" data-a="scope">Scope items</button><button class="btn" data-a="tm">T&amp;M log (extra work tickets)</button><button class="btn" data-a="dl">Download job (save to OneDrive)</button><button class="btn" data-a="edit">Edit job (name, PM, GC email)</button><button class="btn danger" data-a="del">Delete job</button><button class="btn" data-a="x">Close</button></div>');
   $('[data-a=x]',m).onclick=()=>m.close();
   $('[data-a=people]',m).onclick=()=>{m.close();peoplePanel()};
   $('[data-a=scope]',m).onclick=()=>{m.close();scopeEditor()};
+  $('[data-a=tm]',m).onclick=()=>{m.close();S.tab='log';render();setTimeout(()=>{const b=$('#tmLog');if(b&&b.innerHTML)b.scrollIntoView({behavior:'smooth',block:'start'});else toast('No T&M tickets on this job yet. Foremen make them on the Daily Report.')},300)};
   $('[data-a=dl]',m).onclick=()=>{m.close();downloadJob()};
   $('[data-a=edit]',m).onclick=async()=>{m.close();const v=await formBox('Edit job',[{k:'name',label:'Job name',value:j.name,req:true},{k:'addr',label:'Address or GC',value:j.addr},{k:'pm',label:'PM',type:'select',value:j.pm||'',options:(S.office||[]).map(o=>[o.id,o.name]).concat([['','No PM']])},{k:'gc_name',label:'General contractor (company)',value:j.gc_name||''},{k:'gc_email',label:'GC email for daily reports (separate several with commas)',value:j.gc_email||'',ph:'super@gc.com, pm@gc.com'}]);if(v){const bad=String(v.gc_email||'').split(/[,;\s]+/).filter(x=>x&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x));if(bad.length){toast('Check this email: '+bad[0]);return}if(await run(sb.from('jobs').update({name:v.name.slice(0,120),addr:v.addr.slice(0,160),pm:v.pm||null,gc_name:v.gc_name.slice(0,120),gc_email:v.gc_email.slice(0,400)}).eq('id',j.id))){loadJobs();Object.assign(j,{gc_name:v.gc_name,gc_email:v.gc_email});if(S.tab==='log'){S.tab='log';const a=$('#app');a.dataset.tab='';render()}}}};
   $('[data-a=del]',m).onclick=async()=>{
@@ -2013,7 +2262,7 @@ async function downloadJob(){
     if(pdf)top.file(base+' - Marked-up plans.pdf',pdf.output('blob'));
     top.file(base+' - Pins.csv',toCsv(pinRows));
     const sc=PHASES;top.file(base+' - Progress.csv',toCsv([['Area'].concat(sc.map(p=>p.n+' %')).concat(['Last updated','Updated by'])].concat(areas.map(a=>[a.name].concat(sc.map(p=>areaPct(a,p.k))).concat([a.updated_at?fmtDate(a.updated_at):'',a.updated_by?who(a.updated_by):''])))));
-    top.file(base+' - Daily logs.csv',toCsv([['Date','Foreman','Crew on site','Man-hours','Work done','Material delivered','Delays / notes']].concat(logs.map(l=>[l.date,who(l.user_id),num(l.crew),num(l.hours),l.work,l.deliveries,l.notes]))));
+    top.file(base+' - Daily logs.csv',toCsv([['Date','Foreman','Crew on site','Man-hours','Work done','Material delivered','Delays / notes']].concat(logs.map(l=>[l.date,who(l.user_id),num(l.crew),num(l.hours),l.work,(l.materials||[]).length?l.materials.map(matRowText).join('; '):l.deliveries,l.notes]))));
     top.file('README.txt','Alpha Operations export for '+job.name+(job.addr?' ('+job.addr+')':'')+'\r\nExported '+new Date().toLocaleString()+'\r\n\r\nMarked-up plans.pdf - every sheet with crew markups; numbered pins match Pins.csv.\r\nScope colors: '+sc.map(p=>p.n).join(', ')+'\r\nPhotos - pin photos, named by sheet and pin number.\r\n');
     const blob=await zip.generateAsync({type:'blob'},m=>pb.set('Zipping… '+Math.round(m.percent)+'%'));
     const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=base+' - Alpha Operations '+today()+'.zip';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},60000);
@@ -2547,6 +2796,168 @@ async function areaMenu(id){
   $('[data-a=d]',m).onclick=async()=>{m.close();if(await confirmBox('Delete area "'+a.name+'"?')&&await run(sb.from('areas').delete().eq('id',id)))loadAreas()};
 }
 
+/* ===== Materials vs. the order =====
+   The office keeps each job's PO lines in job_budget.labor.materials ({lines:[{id,po,sup,item,unit,qty,exp,short_ok}]}); the labor sync and every labor write keep other keys.
+   Foremen log deliveries on the daily report (logs.materials rows {text,qty,unit,po,line,short,note}); delivered is summed from every report on the job. No $ is stored here. */
+const MAT_UNITS={sheet:'sheet',sheets:'sheet',sht:'sheet',shts:'sheet',sh:'sheet',ea:'ea',each:'ea',pc:'ea',pcs:'ea',piece:'ea',pieces:'ea',stick:'ea',sticks:'ea',length:'ea',lengths:'ea',lgth:'ea',lgths:'ea',box:'box',boxes:'box',bx:'box',bxs:'box',bundle:'bundle',bundles:'bundle',bdl:'bundle',bdls:'bundle',bucket:'bucket',buckets:'bucket',bkt:'bucket',bkts:'bucket',pail:'bucket',pails:'bucket',roll:'roll',rolls:'roll',rl:'roll',rls:'roll',bag:'bag',bags:'bag',carton:'carton',cartons:'carton',ctn:'carton',ctns:'carton',case:'carton',cases:'carton',cs:'carton',lf:'lf',sf:'sf',tube:'tube',tubes:'tube',gal:'gal',gals:'gal',pallet:'pallet',pallets:'pallet',plt:'pallet'};
+const MAT_SYN={stud:'stud',studs:'stud',trk:'track',trak:'track',scr:'screw',brd:'board',bd:'board',sheetrock:'board',gyp:'board',gypsum:'board',drywall:'board',gwb:'board',wallboard:'board',mud:'compound',jc:'compound',insul:'insulation',batts:'batt',sheet:'',sheets:'',sht:'',shts:'',pcs:'',pc:'',ea:'',lbs:'lb'};
+const MAT_STOP=['of','the','and','w','with','for','x','a','per','to','in','inch','inches','ga'];
+const matUnit=u=>{const k=String(u||'').toLowerCase().replace(/[.\s]/g,'');return MAT_UNITS[k]||k};
+const matQ=v=>String(Math.round(num(v)*100)/100);
+const matPO=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'').replace(/^po/,'');
+const MAT_MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const matDay=d=>{const [y,m,dd]=String(d||'').split('-').map(Number);return y&&m?MAT_MON[m-1]+' '+dd:String(d||'')};
+const matDays=(a,b)=>{const p=s=>{const [y,m,d]=String(s).split('-').map(Number);return Date.UTC(y,m-1,d)};return Math.round((p(b)-p(a))/864e5)};
+/* item text -> comparable tokens: 3 5/8" 20 ga studs -> [3-5/8, 20ga, stud] */
+function matTok(s){
+  s=String(s||'').toLowerCase().replace(/½/g,' 1/2').replace(/¼/g,' 1/4').replace(/¾/g,' 3/4').replace(/⅝/g,' 5/8').replace(/⅜/g,' 3/8').replace(/[“”″"]|''/g,' ').replace(/(\d)\s*(?:in|inch|inches)\b/g,'$1 ')
+    .replace(/(\d)\s*(?:'|’|′|ft\b|feet\b|foot\b)/g,'$1ft ').replace(/(\d+)\s*-\s*(\d+\/\d+)/g,'$1-$2').replace(/(\d+)\s+(\d+\/\d+)/g,'$1-$2')
+    .replace(/(\d+)\s*(?:ga|gauge|gage)\b/g,'$1ga ').replace(/\btype\s*-?\s*x\b/g,' typex ').replace(/\btype\s*-?\s*c\b/g,' typec ').replace(/#\s*(\d+)/g,' no$1 ');
+  const out=s.split(/[^a-z0-9\/\-.]+/).map(t=>t.replace(/^[-.\/]+|[-.\/]+$/g,'')).filter(Boolean)
+    .map(t=>MAT_SYN[t]!=null?MAT_SYN[t]:(t.length>3&&/[a-z]s$/.test(t)&&!/ss$/.test(t)?t.slice(0,-1):t)).filter(t=>t&&!MAT_STOP.includes(t));
+  return [...new Set(out)]}
+const matCat=t=>!/\d/.test(t)?'':/^\d+(\.\d+)?ga$/.test(t)?'ga':/ft$/.test(t)?'ft':/^no\d+$/.test(t)?'no':/^[\d\-\/.]+$/.test(t)?'size':'dim';
+/* 0..1: how well a delivery's tokens fit an order line's; sizes, gauges and lengths must agree when both name one */
+function matScore(d,l){if(!d.length||!l.length)return 0;const cats={};
+  const add=(t,w)=>{const c=matCat(t);if(c)(cats[c]=cats[c]||[[],[]])[w].push(t)};d.forEach(t=>add(t,0));l.forEach(t=>add(t,1));
+  for(const c in cats){const [a,b]=cats[c];if(a.length&&b.length&&!a.some(t=>b.includes(t)))return 0}
+  const L=new Set(l);const common=d.filter(t=>L.has(t)).length;return common?(common/d.length+common/l.length)/2:0}
+/* free text from an older report: "120 sheets 5/8 Type X" or "5/8 Type X - 120 sheets" */
+function matParseText(s){s=String(s||'').trim();let m=s.match(/^(\d[\d,]*(?:\.\d+)?)\s+(?:([a-z.]+)\s+)?(?:of\s+)?(.+)$/i);
+  if(m){const u=m[2]&&MAT_UNITS[m[2].toLowerCase().replace(/\./g,'')]?m[2]:'';return {item:(m[2]&&!u?m[2]+' ':'')+m[3],qty:num(m[1].replace(/,/g,'')),unit:u}}
+  m=s.match(/^(.+?)[\s\-–:(]+(\d[\d,]*(?:\.\d+)?)\s*([a-z.]+)\)?$/i);
+  if(m&&MAT_UNITS[m[3].toLowerCase().replace(/\./g,'')])return {item:m[1].trim(),qty:num(m[2].replace(/,/g,'')),unit:m[3]};
+  return {item:s,qty:0,unit:''}}
+/* rows copied from the Excel PO (tab-separated). Uses the header row when there is one (Qty / Unit / Item or Description / Length), else guesses per row. */
+function matParsePaste(text){
+  const rows=String(text||'').replace(/\r/g,'').split('\n').map(r=>r.split('\t').map(c=>c.trim())).filter(r=>r.some(Boolean));
+  const isNum=c=>/^\d[\d,]*(\.\d+)?$/.test(c);const isLen=c=>/^\d+\s*('|’|ft)(\s*-?\s*\d+\s*("|in)?)?$/i.test(c);
+  let H=null;const out=[];
+  rows.forEach(r=>{
+    const lc=r.map(c=>c.toLowerCase());const fi=re=>lc.findIndex(c=>re.test(c));
+    if(!H){const qi=fi(/^(qty|qty\.|quantity|qnty|order qty|qty ordered|ordered)$/),ii=fi(/^(item|items|description|desc|material|materials|product|item description)$/);
+      if(qi>=0&&ii>=0){H={q:qi,i:ii,u:fi(/^(unit|units|uom|u\/m|um)$/),l:fi(/^(length|len|size)$/)};return}}
+    let item='',qty=0,unit='';
+    if(H){item=r[H.i]||'';qty=num(String(r[H.q]||'').replace(/,/g,''));unit=H.u>=0?r[H.u]||'':'';if(H.l>=0&&r[H.l])item+=' '+r[H.l]}
+    else{const cs=r.map((c,i)=>({c,i})).filter(x=>x.c);
+      if(cs.length===1){const p=matParseText(cs[0].c);item=p.item;qty=p.qty;unit=p.unit}
+      else{const q=cs.find(x=>isNum(x.c));if(q)qty=num(q.c.replace(/,/g,''));let rest=cs.filter(x=>x!==q&&!/^\$/.test(x.c)&&!isNum(x.c));
+        const un=rest.find(x=>MAT_UNITS[x.c.toLowerCase().replace(/\./g,'')]&&(!q||x.i===q.i+1))||rest.find(x=>MAT_UNITS[x.c.toLowerCase().replace(/\./g,'')]);if(un){unit=un.c;rest=rest.filter(x=>x!==un)}
+        const ln=rest.find(x=>isLen(x.c));if(ln)rest=rest.filter(x=>x!==ln);
+        const it=rest.filter(x=>/[a-z]/i.test(x.c)).sort((a,b)=>b.c.length-a.c.length)[0];item=it?it.c+(ln?' '+ln.c:''):''}}
+    item=item.replace(/\s+/g,' ').trim().slice(0,120);
+    if(!item||!(qty>0)||/^(sub\s*)?total\b|^tax\b|^freight\b|^delivery\b/i.test(item))return;
+    out.push({item,qty,unit:String(unit).slice(0,20)})});
+  return out}
+/* ordered vs delivered for every PO line, plus deliveries that match no line and the flags */
+function matCalc(M,logs,day){
+  const lines=((M&&M.lines)||[]).filter(l=>l&&l.item).map(l=>Object.assign({},l,{tok:matTok(l.item),got:0,last:'',short:null,unitDiff:''}));
+  const rows=[];(logs||[]).forEach(lg=>{const ms=Array.isArray(lg.materials)&&lg.materials.length?lg.materials:(lg.deliveries?[{text:lg.deliveries}]:[]);
+    ms.forEach(x=>{if(!x||!(x.text||x.qty))return;const p=num(x.qty)>0?{item:String(x.text||''),qty:num(x.qty),unit:String(x.unit||'')}:matParseText(x.text);rows.push(Object.assign({},x,p,{date:String(lg.date||''),by:lg.name||''}))})});
+  rows.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
+  const extra=[];
+  rows.forEach(r=>{let ln=r.line?lines.find(l=>l.id===r.line):null;
+    if(!ln){const tk=matTok(r.item);let c=lines.map(l=>({l,s:matScore(tk,l.tok)})).filter(x=>x.s>=0.5);
+      const po=matPO(r.po);if(po){const c2=c.filter(x=>matPO(x.l.po)===po);if(c2.length)c=c2}
+      if(c.length){const best=Math.max(...c.map(x=>x.s));c=c.filter(x=>best-x.s<1e-6).sort((a,b)=>(num(b.l.qty)-b.l.got)-(num(a.l.qty)-a.l.got));ln=c[0].l}}
+    if(!ln){extra.push(r);return}
+    ln.got+=num(r.qty);if(num(r.qty)>0)ln.last=r.date;
+    if(r.unit&&ln.unit&&matUnit(r.unit)!==matUnit(ln.unit))ln.unitDiff=r.unit;
+    if(r.short&&(!ln.short_ok||r.date>ln.short_ok))ln.short={date:r.date,note:r.note||'',by:r.by}});
+  const flags=[];
+  lines.forEach(l=>{const q=num(l.qty),g=Math.round(l.got*100)/100;l.got=g;
+    l.st=!g?'none':!q?'got':g<q-1e-9?'partial':g>q+1e-9?'over':'complete';l.pct=q?Math.min(100,Math.round(g/q*100)):(g?100:0);
+    const done=l.st==='complete'||l.st==='over';if(done)l.short=null;
+    l.late=!!(l.exp&&day&&l.exp<day&&!g);l.early=!!(l.exp&&done&&l.last&&l.last<l.exp);const u=l.unit?' '+l.unit:'';
+    if(l.short)flags.push({lvl:'short',id:l.id,t:l.item+(q?' short '+matQ(q-g)+u:' short')+' ('+(l.short.note||'backordered')+')'});
+    if(l.late)flags.push({lvl:'late',id:l.id,t:l.item+': nothing delivered, expected '+matDay(l.exp)});
+    if(l.st==='over')flags.push({lvl:'over',id:l.id,t:l.item+': '+matQ(g)+' delivered, '+matQ(q)+' ordered'});
+    if(l.unitDiff)flags.push({lvl:'unit',id:l.id,t:l.item+': logged in '+l.unitDiff+', ordered in '+l.unit+'. Check the count.'});
+    if(l.early)flags.push({lvl:'early',id:l.id,t:l.item+': all here '+matDay(l.last)+', ahead of '+matDay(l.exp)})});
+  extra.forEach(r=>{if(r.short&&(!day||matDays(r.date,day)<=14))flags.unshift({lvl:'short',id:'',t:(r.item||'Material')+' short ('+(r.note||'backordered')+')'})});
+  const rank={short:0,late:1,unit:2,over:3,early:4};flags.sort((a,b)=>rank[a.lvl]-rank[b.lvl]);
+  return {lines,extra,flags}}
+const matRowText=x=>[num(x.qty)?matQ(x.qty)+(x.unit?' '+x.unit:''):'',x.text||''].filter(Boolean).join(' ')+(x.po?' (PO '+x.po+')':'')+(x.short?' – SHORT/BACKORDERED'+(x.note?': '+x.note:''):(x.note?' – '+x.note:''));
+const matClean=m=>({lines:Array.isArray(m&&m.lines)?m.lines.filter(l=>l&&l.item):[],updated_at:(m&&m.updated_at)||null,by:(m&&m.by)||null});
+const matHere=()=>!!(S.job&&S.mat&&S.mat.job===S.job.id);
+const matNow=()=>matCalc(S.mat.M,S.mat.logs,today());
+async function loadMat(){const id=jobId();if(!id||!canLog())return;
+  try{const [L,ls]=await Promise.all([laborBudgetRead(id),q(sb.from('logs').select('id,date,name,user_id,materials,deliveries').eq('job_id',id).order('date'))]);
+    if(jobId()!==id)return;S.mat={job:id,M:matClean((L||{}).materials),logs:ls||[]}}
+  catch(e){if(jobId()!==id)return;if(!matHere())S.mat={job:id,M:matClean(null),logs:[],err:errMsg(e)}}
+  if(S.tab==='mat')render();else matPaint();const dl=$('#matDL');if(dl)dl.innerHTML=matDLOpts()}
+function matBanner(){if(!matHere()||S.tab==='mat')return '';const f=matNow().flags.filter(x=>x.lvl==='short'||x.lvl==='late');if(!f.length)return '';
+  return '<div class="card" id="matAlert" role="button" style="background:#fdecea;border-color:#f3b0a8;margin-bottom:12px;padding:10px 12px;cursor:pointer;font-size:14px"><b>⚠ Materials:</b> '+esc(f[0].t)+(f.length>1?' <span class="muted small">+'+(f.length-1)+' more</span>':'')+'</div>'}
+function matPaint(){const tb=$('#tabBody');if(!tb||S.view!=='job')return;const o=$('#matAlert',tb);if(o)o.remove();const h=matBanner();if(!h)return;
+  const nb=$('#nudgeCard',tb);if(nb)nb.insertAdjacentHTML('afterend',h);else tb.insertAdjacentHTML('afterbegin',h);$('#matAlert',tb).onclick=()=>{S.tab='mat';window.scrollTo(0,0);render()}}
+const MAT_ST={none:['Not delivered','#e8ebef','#38414b','#98a2b3'],partial:['Partial','#fff1d0','#7a4f00','#f2a516'],complete:['Complete','#e3f4e4','#1b5e20','#2e7d32'],over:['Over','#e8eefc','#1d3f91','#3b63c4'],got:['Delivered','#e8ebef','#38414b','#2e7d32']};
+const MAT_FL={short:['⚠','#b42318'],late:['⏰','#b42318'],unit:['?','#7a4f00'],over:['+','#1d3f91'],early:['✓','#1b5e20']};
+function matLineHtml(l,ad){const s=MAT_ST[l.st]||MAT_ST.none;const tag=(t,bg,c)=>' <span class="badge" style="background:'+bg+';color:'+c+'">'+t+'</span>';
+  return '<div class="mline"'+(ad?' data-ml="'+esc(l.id)+'"':'')+'><div class="row" style="align-items:flex-start;gap:8px"><div class="grow"><b>'+esc(l.item)+'</b>'+(l.short?tag('Short','#fdecea','#b42318'):'')+(l.late?tag('Late','#fdecea','#b42318'):'')+(l.early?tag('Early','#e3f4e4','#1b5e20'):'')+'</div>'+
+    '<span class="badge" style="background:'+s[1]+';color:'+s[2]+';white-space:nowrap">'+s[0]+(l.st==='partial'?' ('+matQ(l.got)+' of '+matQ(l.qty)+')':'')+'</span></div>'+
+    '<div class="mbar"><i style="width:'+l.pct+'%;background:'+s[3]+'"></i></div>'+
+    '<div class="muted small">'+matQ(l.got)+' of '+matQ(l.qty)+(l.unit?' '+esc(l.unit):'')+' received'+(l.last?' · last '+matDay(l.last):'')+(l.exp?' · expected '+matDay(l.exp):'')+(l.unitDiff?' · check units ('+esc(l.unitDiff)+' logged)':'')+
+    (l.short?'<br><span style="color:#b42318">Marked short '+matDay(l.short.date)+(l.short.by?' by '+esc(l.short.by):'')+(l.short.note?': '+esc(l.short.note):'')+'</span>':'')+'</div></div>'}
+function renderMat(){if(!matHere())return '<div class="empty">Loading materials…</div>';
+  const ad=isAdminRole();const C=matNow();const M=S.mat.M;
+  let h='<div class="card"><b style="font-size:17px">Materials vs. the order</b><div class="muted small">Ordered from the PO'+(ad?'':' (entered by the office)')+'. Received = what foremen log under Materials delivered on the daily report.'+(M.updated_at?' Order updated '+esc(fmtWhen(M.updated_at))+'.':'')+'</div>'+
+    (S.mat.err?'<div class="small" style="color:#b42318;margin-top:6px">Couldn’t load the order: '+esc(S.mat.err)+'</div>':'')+
+    (ad?'<div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><button class="btn sm primary" id="matPaste">📋 Paste PO from Excel</button><button class="btn sm" id="matAdd">+ Add line</button></div>':'')+'</div>';
+  if(C.flags.length)h+='<div class="card" style="padding:10px 14px">'+C.flags.map(f=>{const x=MAT_FL[f.lvl];return '<div class="kv" style="color:'+x[1]+'"><b>'+x[0]+'</b> '+esc(f.t)+'</div>'}).join('')+'</div>';
+  if(!C.lines.length)h+='<div class="empty"><b>No order yet</b>'+(ad?'Tap <b>Paste PO from Excel</b> and paste the item, qty and unit columns from the PO, or add lines one at a time. Foremen then pick these items on the daily report.':'The office hasn’t entered the material order for this job yet. Keep logging deliveries on the daily report.')+'</div>';
+  else{const G={};C.lines.forEach(l=>{const k=(l.po||'')+'|'+(l.sup||'');(G[k]=G[k]||[]).push(l)});
+    h+=Object.keys(G).map(k=>{const ls=G[k];const [po,sup]=k.split('|');const dn=ls.filter(l=>l.st==='complete'||l.st==='over').length;
+      return '<div class="card" style="padding-bottom:4px"><div class="row" style="margin-bottom:4px"><b class="grow">'+(po?'PO '+esc(po):'No PO #')+(sup?' · '+esc(sup):'')+'</b><span class="muted small">'+dn+' of '+ls.length+' complete</span></div>'+ls.map(l=>matLineHtml(l,ad)).join('')+'</div>'}).join('');
+    if(ad)h+='<p class="muted small" style="margin:-4px 2px 12px">Tap a line to change it, set an expected date or clear a short flag.</p>'}
+  if(C.extra.length)h+='<details class="card"><summary><b>Delivered, not matched to the order</b> <span class="muted small">('+C.extra.length+')</span></summary><div class="muted small" style="margin:6px 0">These daily report lines didn’t match an order item. Picking items from the list on the daily report keeps them matched.</div>'+
+    C.extra.slice().reverse().map(r=>'<div class="kv">'+matDay(r.date)+' · '+esc(matRowText({text:r.item,qty:r.qty,unit:r.unit,po:r.po,short:r.short,note:r.note}))+(r.by?' <span class="muted small">('+esc(r.by)+')</span>':'')+'</div>').join('')+'</details>';
+  return h}
+function bindMat(){if(!isAdminRole())return;const p=$('#matPaste');if(p)p.onclick=matPasteBox;const a=$('#matAdd');if(a)a.onclick=()=>matLineBox(null);
+  $$('[data-ml]').forEach(el=>el.onclick=()=>{const l=((S.mat&&S.mat.M.lines)||[]).find(x=>x.id===el.dataset.ml);if(l)matLineBox(l)})}
+/* office save: re-read labor so nothing the sync or another tab wrote is lost, change only labor.materials */
+async function matSave(fn,msg){if(!isAdminRole()||!S.job)return false;const id=S.job.id;let L;
+  try{const d=await q(sb.from('job_budget').select('labor').eq('job_id',id).maybeSingle());L=(d&&d.labor)||{}}catch(e){toast(errMsg(e));return false}
+  const M=matClean(L.materials);fn(M);M.updated_at=new Date().toISOString();M.by=S.me&&S.me.id;const labor=Object.assign({},L,{materials:M});
+  if(!await run(sb.from('job_budget').upsert({job_id:id,labor},{onConflict:'job_id'}),msg))return false;
+  if(S.labor)S.labor.materials=M;if(S.mat&&S.mat.job===id)S.mat.M=M;render();return true}
+const matSupDL='<datalist id="matSupDL"><option value="FBM"><option value="LKL"></datalist>';
+function matLineBox(l){const isNew=!l;l=l||{};const C=matHere()?matNow():null;const cur=C&&!isNew?C.lines.find(x=>x.id===l.id):null;
+  const m=modal('<h2>'+(isNew?'Add order line':'Order line')+'</h2><form>'+
+    '<div class="two"><label class="field"><span>PO #</span><input name="po" maxlength="30" value="'+esc(isNew?S.matLastPo||'':l.po||'')+'"></label><label class="field"><span>Supplier</span><input name="sup" list="matSupDL" maxlength="30" placeholder="FBM or LKL" value="'+esc(isNew?S.matLastSup||'':l.sup||'')+'"></label></div>'+matSupDL+
+    '<label class="field"><span>Item</span><input name="item" required maxlength="120" placeholder="e.g. 5/8 Type X board 12’" value="'+esc(l.item||'')+'"></label>'+
+    '<div class="two"><label class="field"><span>Qty ordered</span><input name="qty" type="number" step="any" min="0" inputmode="decimal" value="'+esc(l.qty!=null?l.qty:'')+'"></label><label class="field"><span>Unit</span><input name="unit" maxlength="20" placeholder="sheets, pcs, boxes" value="'+esc(l.unit||'')+'"></label></div>'+
+    '<label class="field"><span>Expected delivery (optional)</span><input name="exp" type="date" value="'+esc(l.exp||'')+'"></label>'+
+    (cur&&cur.short?'<label class="mshort" style="margin:0 0 10px"><input type="checkbox" name="sok" style="width:20px;height:20px"> Short / backorder is taken care of (clear the flag)</label>':'')+
+    '<div class="mbtns">'+(isNew?'':'<button type="button" class="btn danger" data-del>Delete</button>')+'<button type="button" class="btn" data-x>Cancel</button><button class="btn primary" type="submit">Save</button></div></form>');
+  const f=$('form',m);$('[data-x]',m).onclick=()=>m.close();setTimeout(()=>f.item.focus(),50);
+  const d=$('[data-del]',m);if(d)d.onclick=async()=>{m.close();if(await confirmBox('Delete '+l.item+' from the order?'))matSave(M=>{M.lines=M.lines.filter(x=>x.id!==l.id)},'Line deleted.')};
+  f.onsubmit=async e=>{e.preventDefault();const v={po:f.po.value.trim(),sup:f.sup.value.trim(),item:f.item.value.trim(),qty:num(f.qty.value),unit:f.unit.value.trim(),exp:f.exp.value||''};if(!v.item)return;
+    S.matLastPo=v.po;S.matLastSup=v.sup;const sok=f.sok&&f.sok.checked;m.close();
+    matSave(M=>{const o=M.lines.find(x=>x.id===l.id);if(o){Object.assign(o,v);if(sok)o.short_ok=today()}else M.lines.push(Object.assign({id:uuid().slice(0,8)},v))},isNew?'Line added.':'Line saved.')}}
+function matPasteBox(){
+  const m=modal('<h2>Paste PO from Excel</h2><p class="small muted" style="margin:-4px 0 10px">In the PO, select the rows (item, qty and unit columns, headers OK) and copy. Paste them below.</p><form>'+
+    '<div class="two"><label class="field"><span>PO #</span><input name="po" maxlength="30" value="'+esc(S.matLastPo||'')+'"></label><label class="field"><span>Supplier</span><input name="sup" list="matSupDL" maxlength="30" placeholder="FBM or LKL" value="'+esc(S.matLastSup||'')+'"></label></div>'+matSupDL+
+    '<label class="field"><span>Expected delivery (optional)</span><input name="exp" type="date"></label>'+
+    '<label class="field"><span>Rows from Excel</span><textarea name="rows" rows="6" placeholder="Item | Qty | Unit columns copied from the PO"></textarea></label>'+
+    '<div class="small" data-prev style="max-height:180px;overflow:auto;margin:-4px 0 8px"></div>'+
+    '<label class="mshort" style="margin:0 0 10px"><input type="checkbox" name="rep" style="width:20px;height:20px"> Replace the lines already on this PO #</label>'+
+    '<div class="mbtns"><button type="button" class="btn" data-x>Cancel</button><button class="btn primary" type="submit" disabled>Add lines</button></div></form>');
+  const f=$('form',m);const ok=$('button[type=submit]',m);let got=[];$('[data-x]',m).onclick=()=>m.close();setTimeout(()=>f.rows.focus(),50);
+  const prev=()=>{got=matParsePaste(f.rows.value);ok.disabled=!got.length;ok.textContent=got.length?'Add '+got.length+' line'+(got.length>1?'s':''):'Add lines';
+    $('[data-prev]',m).innerHTML=f.rows.value.trim()?(got.length?got.map(x=>'<div>• <b>'+esc(matQ(x.qty))+(x.unit?' '+esc(x.unit):'')+'</b> '+esc(x.item)+'</div>').join(''):'<span style="color:#b42318">No rows with an item and a qty found.</span>'):''};
+  f.rows.oninput=prev;
+  f.onsubmit=e=>{e.preventDefault();if(!got.length)return;const po=f.po.value.trim(),sup=f.sup.value.trim(),exp=f.exp.value||'',rep=f.rep.checked;S.matLastPo=po;S.matLastSup=sup;m.close();
+    matSave(M=>{if(rep)M.lines=M.lines.filter(x=>matPO(x.po)!==matPO(po));got.forEach(x=>M.lines.push({id:uuid().slice(0,8),po,sup,item:x.item,unit:x.unit,qty:x.qty,exp}))},got.length+' line'+(got.length>1?'s':'')+' added to the order.')}}
+/* daily report: delivered rows pick from the order (datalist), free text still OK */
+function matDLOpts(){if(!matHere())return '';return S.mat.M.lines.map(l=>'<option value="'+esc(l.item)+'">'+esc((l.po?'PO '+l.po+' · ':'')+matQ(l.qty)+(l.unit?' '+l.unit:'')+' ordered')+'</option>').join('')}
+function matRowsEditor(){const r='<div class="lrow mrow" data-row><input data-c="text" list="matDL" autocomplete="off" placeholder="Item – pick from the order"><button type="button" class="ico" data-rm aria-label="Remove">✕</button>'+
+    '<input data-c="qty" type="number" inputmode="decimal" min="0" step="any" placeholder="Qty"><input data-c="unit" placeholder="Unit"><input data-c="po" placeholder="PO #"><input type="hidden" data-c="line">'+
+    '<label class="mshort"><input type="checkbox" data-c="short"> Short / backordered</label><input data-c="note" maxlength="200" placeholder="Note, e.g. 40 sheets coming Tue"></div>';
+  return '<datalist id="matDL">'+matDLOpts()+'</datalist><div data-rows="mat">'+r+'</div><button type="button" class="btn sm" data-add="mat">+ Add line</button><template data-tpl="mat">'+r+'</template>'}
+/* link a typed/picked item to its order line; fill unit and PO from the order when empty */
+function matLink(rw){if(!rw||!matHere())return;const g=c=>$('[data-c="'+c+'"]',rw);const t=g('text').value.trim().toLowerCase();const po=matPO(g('po').value);
+  const c=t?S.mat.M.lines.filter(l=>String(l.item).trim().toLowerCase()===t):[];const l=c.find(x=>po&&matPO(x.po)===po)||c[0];g('line').value=l?l.id:'';
+  if(l){if(!g('unit').value.trim())g('unit').value=l.unit||'';if(!g('po').value.trim())g('po').value=l.po||''}}
 /* daily log tab */
 const LOGO_PNG='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAggAAADaAQAAAADr7ofDAAAAAnRSTlMAAHaTzTgAAAfBSURBVHja7VtNiiS5Ff70MjwZhoGKnWdhyJgb1HI2psI38TFsGGg1DV576d3URQaijBe9rAsY1NCLXsqmwKomUs8LKf4lhSKqeyjDaJGVkZV6ev+/SsEILF0hYz19CwAU/N/fcwDgEXEIMgtCCwAQISr4tyYHQtHFcdizXi+ELmuv/Zo4WAB4EKJ0j89C9O+FEDU+CEEAeCcfnmXk4Hwq7tcs2Anh04ul2a22eUZwYHWCmQ3wxj97/WdmBcHMwIWZrdsbhGAEM1uc+ud2OMvghplbvGHmbgsC49w/KwDwuy7MrMEjhAQfZNm/qwZjJtQAIDI5OTqqU48H0AAoD8niO6jF4d4RhSFwf9rEneyyCxP8og4rSDYV4uUeRpqXQmhegZ+su3DACELQWSHH/PJUVK8h4tivgIOKQlA+sKeX3otD+X8Xu18BhDZTljqBg/qVk18EgszcbKIQ1tEltB5+eT6Yr8BJGYcgXkoF70I3+HGRScS8Qmm22KYjh1PPE/UiaXIbo/2L6oMqwhkFeYdi9TQ4JQzj7VBrTHGwOaGhXcvcJqjoUinuXObkJdVt1aic5GSXFbmrlCzMNpTA/+sRgplrchfK/D75DVETOJtUwnMV8YSEUoE9pEBvXAEFoHTcJY/Av5vNjEemtVo/Hk3NCQCuFZQ5akEEAB+f0HZbPrWIZJgEAMouKK+DZVJYQSiU+Acl/6cIc10bgJd6v7aCk4ykyTSILh0sz1GtLzxF6f2nblNGcupB9G4/mVSFOh5HywHC6symQj5CFEnfMpKQui/mAZWbQX71PEoH6eEsCMdI0N7WKBSwZbmfCgZM2F1XKa+nFjjo3em9w6HZKgc3IahBe9Tu8wGAeI/kQiUI7eyLrqXgU+hmir2YeNVt3pANm5PKSmn1l7GLSeohd5YXAzcYh3a2g6fthqD45lDnmhzfJQD8c6fPcLGYJqnHz7v8jvDWPP2ulGsr2x5D0LVYMof3StMCEJAA78vve4TJcE6zJYXDtIOm95Q4ky5r6/2MDeVMatPLk5pEcRPwuvVWokt+dz0qoN3XDiGPaBVRYLmZ61MLMSS19njUq1CuU+MWwDUPgkQ942MZN02e5U+Nh6CbxUhjQv77FXntVFAWQCHdx0L+NDu3A+SgFnrieNXSdAjArUCFpl5wfvItxXKArgE8Qo5oEYDym2eD22ZhAp+nMfZ+qHSeZs8ewtmYz7hZSv798O4Z+DBo6LXGB+DjUpqa8wJ+fJ6lfATfE3NLoOYBQovHuVE1NjuB6/sPT/tU2Y66RtMifLYubhLVACfmXruZ+R6/Y/68rv1ZLp1JPWhnMcO6QTlzY0Pd3WYk42mWqJ0bUXmxD3W3nvnbOt/XUsSlc3abjpAd3uJ8qKAAdKiOQSh6ZR4VQj1kdfY+iEGCF3YjVAPc8e7O1h3JgXXFYT7U7lxJx2scx4JWHIfQeaWU0dldEkKDxmzM/jZxkL0y3x6mQg9VsDwCoRbeMXQoDvGSKvKKZUHH5Glu7ODBznxEJ7+5tYOtH7PPvkcG3E1vGgxPsdXbFNN4NaIPGYJHqMmjue943x/yMW3vEQmTyL53HkXu5XOorCv26KQ5VrAGRzbyIIT7ZXmxVzN5GWvtabjvkVrusskN8wsrVjOv/fW+0sQXEdO62xxqMlEXTYFZCFwFQVQPN6IR9dvmPa5C4qHc6GjZYtSwGqPKDkcs0jUyqSb1J8xuNU32cqgV5u4OcXfu5QScGLhI7u7e8QNrfscsmNVdL3PGiZl0JGcwwLvOQkL/0ccBAQB/Baomu7PXnCTO1lwANKgHMst1rzhgGN5r3/l3MpGgkkp1HGqXcnWeRJnZn5xgWUlAQor1V20YQrvj/l4xqRa3k3iDGgoal1CVQMnJjyOopZgTaxLSlAuPvKfTu3L6hQIYkJEEg3K6ooV/rUL8pe1scxI7ZEDmGa6ENFChhbJBL0uxS1R2gkfpz5SRTCwzRraRwQJFuj8TwMIAkBVKlO2WLGREM6q1fptJJrYx8+DSddtkjkaJSH3c1QCKRdpcjblc2l89F9Uo/SJEI5Vb8bTGHQDUKpCWVItzi4kC1hMlsQ3QAlU4TaLCjT1ldFDabnT8iACcJf4c6TucO1fKMsUsgIQEvgPOGGZ/TaDd5JkWnT54Jsk4voX7q1da04JwizMA/N79WSmo8NQ1MVdF+BY/AMCp/SHFOTXT1b7VUAIocOoT6TblqCzg64+n38xP2XMLtGNzaKY27voXZXpaGfCnBPnfCH8oCqDNmhzkUCF7rWjCF1MpfUuwGemRuOEfF3Zb7JzCtHlRj8NyEANX9ULnaXPi1WuDjQiM8gYEMACqYOilzclBn9Q20rVW1QIdyrxvGrtjbBI4aIzN1YVEuim/01T8Y/a9umeNSVIxCW0tD/roWXoBrjB43PjdgewpvFKBH2Glcp+wgsJfCuBtM6pXt4YwYniVKK9X2aG5B4Dv//Px2vwBKP6WK80OwO2M73ZUs65/Z9cQtMPP9CMefD9kMjT6SjNh2rqvcGFm1r5eiSyNG/dDhkCB2zrT0ekyXDssDCBXOMD9aEKmuyDSodgClyWEzhFmAYdneFnfZgFwXkJQrv42Q+EWXMYdEP1lk97sqBiMN8No13WD3Fsc+tc7va8Gwj5p/g8qvC+4M+AuHwAAAABJRU5ErkJggg==';
 const WORKFORCE=['Super','Foreman','Framer','Drywall','Carpenter','Taper','Laborer','Truck Driver','Safety','Stockers'];
@@ -2558,10 +2969,10 @@ function rowsEditor(key,cols,vals){
   const r=(v)=>'<div class="lrow" data-row>'+cols.map(c=>'<input data-c="'+c.k+'" placeholder="'+esc(c.ph)+'" value="'+esc((v||{})[c.k]||'')+'"'+(c.num?' type="number" inputmode="decimal" min="0" style="max-width:76px"':'')+'>').join('')+'<button type="button" class="ico" data-rm aria-label="Remove">✕</button></div>';
   return '<div data-rows="'+key+'">'+((vals&&vals.length?vals:[{}]).map(r).join(''))+'</div><button type="button" class="btn sm" data-add="'+key+'">+ Add line</button><template data-tpl="'+key+'">'+r({})+'</template>';
 }
-function readRows(form,key){return $$('[data-rows="'+key+'"] [data-row]',form).map(rw=>{const o={};$$('[data-c]',rw).forEach(i=>{const v=i.value.trim();if(v)o[i.dataset.c]=i.type==='number'?num(v):v.slice(0,300)});return o}).filter(o=>Object.keys(o).length)}
+function readRows(form,key){return $$('[data-rows="'+key+'"] [data-row]',form).map(rw=>{const o={};$$('[data-c]',rw).forEach(i=>{if(i.type==='checkbox'){if(i.checked)o[i.dataset.c]=true;return}const v=i.value.trim();if(v)o[i.dataset.c]=i.type==='number'?num(v):v.slice(0,300)});return o}).filter(o=>Object.keys(o).length)}
 function bindRows(form){
   form.addEventListener('click',e=>{const a=e.target.closest('[data-add]');if(a){const k=a.dataset.add;const box=$('[data-rows="'+k+'"]',form);box.insertAdjacentHTML('beforeend',$('[data-tpl="'+k+'"]',form).innerHTML);const ins=$$('[data-row]',box);const l=ins[ins.length-1];const f=l&&$('input',l);if(f)f.focus();return}
-    const rm=e.target.closest('[data-rm]');if(rm){const rw=rm.closest('[data-row]');const box=rw.parentElement;if($$('[data-row]',box).length>1)rw.remove();else $$('input',rw).forEach(i=>i.value='')}});
+    const rm=e.target.closest('[data-rm]');if(rm){const rw=rm.closest('[data-row]');const box=rw.parentElement;if($$('[data-row]',box).length>1)rw.remove();else $$('input',rw).forEach(i=>{if(i.type==='checkbox')i.checked=false;else i.value=''})}});
 }
 function sigPad(cv){
   const x=cv.getContext('2d');let drawing=false,dirty=false,last=null;
@@ -2576,6 +2987,186 @@ function sigPad(cv){
     get dirty(){return dirty}};
   requestAnimationFrame(fitCv);return pad;
 }
+/* ===== T&M tickets =====
+   Each extra work row on a daily report (logs.extra_work) can be a T&M ticket: {tm:1,id,no,work,loc,awa,crew:[{name,hrs}],mats:[{item,qty,unit}],photos:[],by (GC rep),sig,signed_at,no_sig,status,co,amt,notes,upd_by,upd_at}.
+   Old plain rows {work,by,awa} still show as before. Ticket saves go through the logs table, so offline, practice and view-as work like the rest of the report. */
+const TM_ST={unsigned:'Unsigned',signed:'Signed',sent:'Sent to GC',approved:'Approved',rejected:'Rejected'};
+const TM_OFFICE=['sent','approved','rejected'];
+const TM_REASONS=['GC not on site','GC will sign later','GC refused to sign'];
+const tmIs=x=>!!(x&&x.tm);
+const tmNo=n=>'T&M-'+String(Math.max(0,Math.round(num(n)))).padStart(3,'0');
+const tmSt=t=>TM_OFFICE.includes(t&&t.status)?t.status:(t&&t.sig?'signed':'unsigned');
+const tmHrs=t=>r2(((t&&t.crew)||[]).reduce((a,c)=>a+num(c.hrs),0));
+const tmIs172=c=>/^\s*0*172\b|extra|t\s*&\s*m/i.test(String(c||''));
+const tmBody=t=>JSON.stringify([t.work||'',t.loc||'',(t.crew||[]).map(c=>[c.name||'',num(c.hrs)]),(t.mats||[]).map(m=>[m.item||'',num(m.qty),m.unit||''])]);
+const tmOld=(t,date,now)=>tmSt(t)==='unsigned'&&!!date&&date<isoAddD(now,-2);
+/** Next ticket number on the job: one more than the highest on any report (plus tickets not saved yet). */
+function tmNext(logs,more){let n=0;const see=x=>{if(tmIs(x))n=Math.max(n,num(x.no))};(logs||[]).forEach(l=>(l.extra_work||[]).forEach(see));(more||[]).forEach(see);return n+1}
+/** Every ticket on the job with its report, newest number first. Plain old rows are not tickets. */
+function tmAll(logs){const out=[];(logs||[]).forEach(l=>(l.extra_work||[]).forEach(t=>{if(tmIs(t))out.push({t,l})}));return out.sort((a,b)=>num(b.t.no)-num(a.t.no)||String(b.l.date).localeCompare(String(a.l.date)))}
+/** Crew for a ticket: each worker's hours on this job that day coded 172 (Extra) on the time card. */
+function tmCrew172(card,iso,no,nm){const out=[];if(!card||!card.period_start)return out;const d=tcDayIdx(card.period_start,iso);if(d<0)return out;
+  (card.workers||[]).forEach(w=>{const h=((w.days&&w.days[d])||[]).reduce((a,l)=>a+(tcIsJob(l,no,nm)&&tmIs172(l&&l.code)?tcHrs(l):0),0);if(h>0)out.push({name:String(w.name||'').trim()||'Worker',hrs:r2(h)})});return out}
+/** Time card 172 hours not already on the day’s other tickets (so two tickets the same day don’t both claim them). */
+function tmLeft(crew,others){const used={};(others||[]).forEach(t=>(t.crew||[]).forEach(c=>{const k=String(c.name||'').trim().toLowerCase();used[k]=(used[k]||0)+num(c.hrs)}));
+  return (crew||[]).map(c=>{const k=String(c.name||'').trim().toLowerCase();const h=r2(num(c.hrs)-(used[k]||0));used[k]=Math.max(0,(used[k]||0)-num(c.hrs));return {name:c.name,hrs:h}}).filter(c=>c.hrs>0)}
+/** GC signs on the phone: Unsigned -> Signed (an office status like Approved stays). */
+function tmSign(t,name,sig,when){if(!sig||!String(name||'').trim())throw new Error('Signature and GC name needed');const n=Object.assign({},t,{by:String(name).trim().slice(0,60),sig,signed_at:when,no_sig:null});if(!TM_OFFICE.includes(n.status))n.status='signed';return n}
+function tmUnsign(t){const n=Object.assign({},t,{sig:null,signed_at:null});if(!TM_OFFICE.includes(n.status))n.status='unsigned';return n}
+/** Office sets Sent / Approved / Rejected, or 'open' to go back to Signed/Unsigned (from the signature). Also GC CO #, approved $ and notes. */
+function tmSetStatus(t,s,o){o=o||{};if(s!=='open'&&!TM_OFFICE.includes(s))throw new Error('Unknown status: '+s);const n=Object.assign({},t);n.status=s==='open'?(t.sig?'signed':'unsigned'):s;
+  ['co','notes'].forEach(k=>{if(o[k]!=null)n[k]=String(o[k]).trim().slice(0,k==='co'?40:1000)});if(o.amt!=null)n.amt=String(o.amt).trim()===''?null:r2(num(String(o.amt).replace(/[$,\s]/g,'')));
+  if(o.by)n.upd_by=o.by;if(o.at)n.upd_at=o.at;return n}
+/** The foreman's copy of the rows wins, but the office's fields (status, CO #, $, notes) and a newer GC signature come from the saved copy. Office-handled tickets can't be dropped. */
+function tmMerge(mine,saved){const sv={};(saved||[]).forEach(x=>{if(tmIs(x)&&x.id)sv[x.id]=x});const seen=new Set();
+  const out=(mine||[]).map(x=>{const s=tmIs(x)&&x.id&&sv[x.id];if(!s)return x;seen.add(x.id);const n=Object.assign({},x);['co','amt','notes','upd_by','upd_at'].forEach(k=>{if(s[k]!==undefined)n[k]=s[k]});
+    if(s.sig&&!n.sig&&tmBody(s)===tmBody(n))Object.assign(n,{sig:s.sig,signed_at:s.signed_at,by:s.by,no_sig:null});if(TM_OFFICE.includes(s.status))n.status=s.status;else if(!TM_OFFICE.includes(n.status))n.status=n.sig?'signed':'unsigned';return n});
+  Object.keys(sv).forEach(id=>{if(!seen.has(id)&&TM_OFFICE.includes(sv[id].status))out.push(sv[id])});return out}
+/** One line of text for a row (ticket or plain old row): report list. */
+function tmText(x){if(!tmIs(x))return (x.work||'')+(x.by?' – auth. '+x.by:'')+(x.awa?' – AWA '+x.awa:'');
+  return tmNo(x.no)+' '+(x.work||'')+(x.loc?' @ '+x.loc:'')+(tmHrs(x)?' – '+tmHrs(x)+' hrs':'')+' – '+(x.sig?'GC signed'+(x.by?' ('+x.by+')':''):'not signed'+(x.no_sig?' ('+x.no_sig+')':''))}
+/** Daily report PDF "Additional Work" cells: [work, authorized by, AWA #]. */
+function tmCells(r){r=r||{};if(!tmIs(r))return [r.work||'',r.by||'',r.awa||''];return [tmNo(r.no)+' '+(r.work||''),(r.by||'')+(r.sig?' (signed)':' (NOT signed)'),r.awa||'']}
+const tmWhenTxt=v=>{const d=new Date(v);if(!v||isNaN(d))return '';const p=x=>String(x).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes())};
+/** Office T&M log as CSV rows (for the CO workbook). */
+function tmCsv(list,job){const H=['Job','Ticket #','Date','Foreman','Description','Location','Crew hours','Crew','Materials','GC rep','GC signed','Signed at','Not signed reason','Status','GC CO #','Approved $','Notes','GC ref / AWA #'];
+  return [H].concat((list||[]).slice().sort((a,b)=>num(a.t.no)-num(b.t.no)).map(({t,l})=>[(job&&job.name)||'',tmNo(t.no),l.date||'',l.name||'',t.work||'',t.loc||'',tmHrs(t),(t.crew||[]).map(c=>(c.name||'')+' '+num(c.hrs)).join('; '),
+    (t.mats||[]).map(m=>[m.qty,m.unit,m.item].filter(v=>v!=null&&v!=='').join(' ')).join('; '),t.by||'',t.sig?'Yes':'No',tmWhenTxt(t.signed_at),t.sig?'':(t.no_sig||''),TM_ST[tmSt(t)],t.co||'',t.amt==null||t.amt===''?'':num(t.amt),t.notes||'',t.awa||'']))}
+const tmChip=t=>'<span class="tmst '+tmSt(t)+'">'+esc(TM_ST[tmSt(t)])+'</span>';
+const tmMoney=n=>'$'+num(n).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+/** Change the extra work rows on one report (job, author, date), starting from the saved copy. Own report: upsert (makes the report row if there isn't one yet). Someone else's: update by id (office). */
+async function tmWrite(d,uid,fn,okMsg){const jid=S.job.id,mine=uid===S.me.id;let rows=null;
+  try{rows=await q(sb.from('logs').select('id,user_id,date,extra_work').eq('job_id',jid).eq('user_id',uid).eq('date',d))}catch(e){rows=null}
+  const row=(rows&&rows[0])||(S.logs||[]).find(l=>l.date===d&&l.user_id===uid)||null;const ew=fn(JSON.parse(JSON.stringify((row&&row.extra_work)||[])));if(!ew)return null;
+  const p=mine?sb.from('logs').upsert(Object.assign({job_id:jid,user_id:uid,date:d,extra_work:ew},row?{}:{name:(lsGet('crewplans.logName')||myName()||'').slice(0,60)}),{onConflict:'job_id,user_id,date'})
+    :row&&!String(row.id).startsWith('local-')?sb.from('logs').update({extra_work:ew}).eq('id',row.id):null;
+  if(!p){toast('That report hasn’t uploaded yet. Try again once it syncs.');return null}
+  if(!await run(p,isPractice()?'Practice: saved in this browser only.':okMsg))return null;
+  const L=(S.logs||[]).find(l=>l.date===d&&l.user_id===uid);if(L)L.extra_work=ew;const f=$('#logForm');if(f&&f._tm)f._tm(d,ew);loadLogs();return ew}
+function tmFind(lid,tid){const l=(S.logs||[]).find(x=>String(x.id)===String(lid));const t=l&&(l.extra_work||[]).find(x=>tmIs(x)&&x.id===tid);return t?{l,t}:null}
+function tmOpen(l,t){if(l.user_id===S.me.id&&canWrite()&&!TM_OFFICE.includes(t.status))tmEditor(t,{date:l.date});else tmView(l,t)}
+function tmDetail(t,l){const crew=t.crew||[],mats=t.mats||[];
+  return (t.work?'<div class="kv">'+esc(t.work)+'</div>':'')+(t.loc?'<div class="kv"><b>Location:</b> '+esc(t.loc)+'</div>':'')+(t.awa?'<div class="kv"><b>GC ref / AWA #:</b> '+esc(t.awa)+'</div>':'')+(l?'<div class="kv"><b>Foreman:</b> '+esc(logName(l))+' · '+fmtDay(l.date)+'</div>':'')+
+    (crew.length?'<table class="tmtab"><tr><th>Crew</th><th>Hrs</th></tr>'+crew.map(c=>'<tr><td>'+esc(c.name||'')+'</td><td>'+f1(num(c.hrs))+'</td></tr>').join('')+'<tr><td><b>Total</b></td><td><b>'+f1(tmHrs(t))+'</b></td></tr></table>':'<div class="kv muted">No crew hours.</div>')+
+    (mats.length?'<table class="tmtab"><tr><th>Material</th><th>Qty</th></tr>'+mats.map(m=>'<tr><td>'+esc(m.item||'')+'</td><td>'+esc([m.qty,m.unit].filter(v=>v!=null&&v!=='').join(' '))+'</td></tr>').join('')+'</table>':'')+
+    ((t.photos||[]).length?'<div class="photos">'+t.photos.map(p=>'<img class="ph" alt="" data-path="'+esc(p)+'">').join('')+'</div>':'')+
+    '<div class="field tmsig" style="margin-top:8px"><span>GC signature</span>'+(t.sig?'<img alt="GC signature" src="'+esc(t.sig)+'"><div class="muted small">'+esc(t.by||'')+' · '+esc(fmtWhen(t.signed_at))+'</div>':'<div style="color:#b42318;font-weight:700">Not signed'+(t.no_sig?' – '+esc(t.no_sig):'')+'</div>')+'</div>'}
+/** Ticket editor (author): description, location, crew & hours (from the time card's 172 lines), materials, photos, and the GC's signature on this phone. Saves right away. */
+function tmEditor(t0,o){o=o||{};const t=JSON.parse(JSON.stringify(t0)),d=o.date,jid=S.job.id;let photos=(t.photos||[]).filter(p=>typeof p==='string'),pad=null,resign=false;
+  const m=modal('<h2 style="display:flex;gap:8px;align-items:center"><span class="grow">'+esc(tmNo(t.no))+'</span>'+tmChip(t)+'</h2><div class="muted small" style="margin:-6px 0 10px">'+esc(S.job.name)+' · '+fmtDay(d)+'</div><form class="tmed">'+
+    '<label class="field"><span>Extra work done</span><textarea name="work" maxlength="2000" placeholder="e.g. Added 2 rated walls at elevator lobby per GC super">'+esc(t.work||'')+'</textarea></label>'+
+    '<div class="two"><label class="field"><span>Location / area</span><input name="loc" maxlength="120" value="'+esc(t.loc||'')+'" placeholder="e.g. Level 2, Rm 204"></label><label class="field"><span>GC ref / AWA # (optional)</span><input name="awa" maxlength="40" value="'+esc(t.awa||'')+'"></label></div>'+
+    '<fieldset class="codes"><legend>Crew & hours</legend><div data-tmtc class="muted small" style="margin-bottom:6px"></div>'+rowsEditor('tmcrew',[{k:'name',ph:'Worker'},{k:'hrs',ph:'Hrs',num:1}],t.crew)+'</fieldset>'+
+    '<fieldset class="codes"><legend>Materials used</legend>'+rowsEditor('tmmat',[{k:'item',ph:'e.g. 5/8 Type X'},{k:'qty',ph:'Qty',num:1},{k:'unit',ph:'Unit'}],t.mats)+'</fieldset>'+
+    '<div class="field"><span>Photos (optional)</span><div class="photos" data-ph></div></div>'+
+    '<fieldset class="codes" style="border:2px solid var(--head)"><legend>GC signature</legend><label class="field"><span>GC rep name (print)</span><input name="by" maxlength="60" value="'+esc(t.by||'')+'" placeholder="GC superintendent"></label><div data-sigbox></div>'+
+    '<label class="field"><span>Can’t get it signed now?</span><select name="no_sig"><option value="">—</option>'+TM_REASONS.map(r=>'<option'+(t.no_sig===r?' selected':'')+'>'+esc(r)+'</option>').join('')+'</select></label></fieldset>'+
+    '<div class="mbtns">'+(o.isNew?'':'<button type="button" class="btn danger" data-del>Delete</button>')+'<button type="button" class="btn" data-pdf>PDF</button><button type="button" class="btn" data-x>Cancel</button><button class="btn primary" type="submit">Save ticket</button></div></form>');
+  const form=$('form',m);bindRows(form);
+  const setR=(k,vals)=>{const b=$('[data-rows="'+k+'"]',form),tp=$('[data-tpl="'+k+'"]',form).innerHTML;b.innerHTML='';(vals&&vals.length?vals:[{}]).forEach(v=>{b.insertAdjacentHTML('beforeend',tp);$$('[data-c]',b.lastElementChild).forEach(i=>i.value=v[i.dataset.c]!=null?v[i.dataset.c]:'')})};
+  const sigDraw=()=>{const sb2=$('[data-sigbox]',form);
+    if(t.sig&&!resign){sb2.innerHTML='<div class="tmsig"><img alt="GC signature" src="'+esc(t.sig)+'"></div><div class="row" style="justify-content:space-between"><span class="muted small">Signed '+esc(fmtWhen(t.signed_at))+'</span><button type="button" class="btn sm" data-resign>Sign again</button></div>';pad=null;$('[data-resign]',sb2).onclick=()=>{resign=true;sigDraw()};return}
+    sb2.innerHTML='<div class="small"><b>Hand the phone to the GC’s super to sign.</b> <span class="muted">Signing agrees this extra work was done as described.</span></div><canvas class="sig" data-sig style="height:150px"></canvas><div class="row" style="justify-content:space-between"><span class="muted small">Sign with a finger</span><button type="button" class="btn sm" data-sigclr>Clear</button></div>';
+    pad=sigPad($('[data-sig]',sb2));$('[data-sigclr]',sb2).onclick=()=>pad.clear()};
+  sigDraw();if(o.focusSig)setTimeout(()=>{const s=$('[data-sigbox]',form);if(s)s.scrollIntoView({block:'center'})},200);
+  const drawPh=()=>{const b=$('[data-ph]',form);b.innerHTML=photos.map(p=>'<img class="ph" alt="" data-path="'+esc(p)+'">').join('')+'<label class="addph"><b>+</b>Photo<input type="file" accept="image/*,.heic,.heif" multiple hidden></label>';
+    fillImgs(b);$$('.ph',b).forEach(i=>i.onclick=()=>showPhoto(i.dataset.path));const inp=$('input[type=file]',b);inp.onchange=async()=>{const fs=[...inp.files].filter(isImgFile);inp.value='';const lab=$('.addph',b);if(lab)lab.innerHTML='<b>…</b>Uploading';
+      for(const f of fs){try{photos.push(await putFile(jid+'/photos/'+uuid()+'.jpg',await photoFromFile(f)))}catch(e){toast(errMsg(e))}}drawPh()}};
+  drawPh();
+  const tcLine=$('[data-tmtc]',form);
+  const tcFill=async force=>{const K=tcJobKey(S.job);const card=await tcCardFor(S.me.id,d);if(!document.body.contains(form))return;const all=tmCrew172(card,d,K[0],K[1]);
+    const ml=(S.logs||[]).find(l=>l.date===d&&l.user_id===S.me.id),f=$('#logForm'),oth=((f&&f._tks&&f._tks(d))||(ml&&ml.extra_work)||[]).filter(x=>tmIs(x)&&x.id!==t.id),cr=tmLeft(all,oth);
+    tcLine.innerHTML=cr.length?'From your time card (172 Extra'+(oth.length?', less other tickets that day':'')+'): '+cr.length+' worker'+(cr.length===1?'':'s')+', '+f1(cr.reduce((a,c)=>a+c.hrs,0))+' hrs. Change it if this ticket was only part of that. <button type="button" class="btn sm" data-tcre>↻ Refill</button>'
+      :all.length?'All the 172 (Extra) hours on your time card for this day are already on other tickets. Type the crew and hours.':card===undefined?'Couldn’t check your time card right now. Type the crew and hours.':'No 172 (Extra) hours on your time card for this day yet. Type the crew and hours, and put them on the time card as 172.';
+    const rb=$('[data-tcre]',tcLine);if(rb)rb.onclick=()=>tcFill(true);
+    const empty=readRows(form,'tmcrew').length===0;if(cr.length&&(force||empty))setR('tmcrew',cr)};
+  tcFill(false);
+  const collect=()=>{const n=Object.assign({},t,{tm:1,work:form.work.value.trim().slice(0,2000),loc:form.loc.value.trim().slice(0,120),awa:form.awa.value.trim().slice(0,40),by:form.by.value.trim().slice(0,60),
+    crew:readRows(form,'tmcrew').map(c=>({name:c.name||'',hrs:num(c.hrs)})),mats:readRows(form,'tmmat'),photos:photos.slice(),no_sig:form.no_sig.value||null});
+    const sg=pad&&pad.get();if(sg&&n.by)return tmSign(n,n.by,sg,new Date().toISOString());if(resign||!n.sig)return tmUnsign(n);return n};
+  $('[data-x]',form).onclick=()=>m.close();
+  $('[data-pdf]',form).onclick=()=>tmPdfMenu(collect(),{date:d,name:lsGet('crewplans.logName')||myName()});
+  const del=$('[data-del]',form);if(del)del.onclick=async()=>{if(!await confirmBox('Delete '+tmNo(t.no)+'?'))return;if(await tmWrite(d,S.me.id,a=>a.filter(x=>!(tmIs(x)&&x.id===t.id)),'Ticket deleted.'))m.close()};
+  form.onsubmit=async e=>{e.preventDefault();const n=collect();if(!n.work){toast('Describe the extra work.');form.work.focus();return}
+    if(pad&&pad.dirty&&!n.by){toast('Enter the GC rep’s name.');form.by.focus();return}
+    if(t0.sig&&!resign&&tmBody(n)!==tmBody(t0)){if(!await confirmBox('This ticket is signed. Changing it clears the GC signature and it has to be signed again. Save anyway?','Save and clear'))return;Object.assign(n,tmUnsign(n))}
+    if(!n.created_at)n.created_at=new Date().toISOString();const btn=$('button[type=submit]',form);btn.disabled=true;
+    const ok=await tmWrite(d,S.me.id,a=>{let i=a.findIndex(x=>tmIs(x)&&x.id===n.id);
+      if(i<0&&o.orig)i=a.findIndex(x=>!tmIs(x)&&(x.work||'')===(o.orig.work||'')&&(x.by||'')===(o.orig.by||'')&&(x.awa||'')===(o.orig.awa||''));
+      if(i<0&&tmAll(S.logs).concat(a.filter(tmIs).map(x=>({t:x}))).some(x=>x.t.id!==n.id&&num(x.t.no)===num(n.no)))n.no=tmNext(S.logs,a);
+      if(i>=0)a[i]=tmMerge([n],[a[i]])[0];else a.push(n);return a},n.sig?tmNo(n.no)+' signed and saved.':tmNo(n.no)+' saved. Still needs the GC’s signature.');
+    btn.disabled=false;if(ok)m.close()};
+}
+/** Read-only ticket (other people’s, or locked by the office). Office also sets status, GC CO #, approved $ and notes here. */
+function tmView(l,t){const off=isAdminRole(),st=tmSt(t);
+  const m=modal('<h2 style="display:flex;gap:8px;align-items:center"><span class="grow">'+esc(tmNo(t.no))+'</span>'+tmChip(t)+'</h2>'+tmDetail(t,l)+
+    (off?'<form style="margin-top:12px"><fieldset class="codes"><legend>Office</legend><label class="field"><span>Status</span><select name="st"><option value="open">'+(t.sig?'Signed':'Unsigned')+' (open)</option>'+TM_OFFICE.map(s=>'<option value="'+s+'"'+(st===s?' selected':'')+'>'+esc(TM_ST[s])+'</option>').join('')+'</select></label>'+
+      '<div class="two"><label class="field"><span>GC CO #</span><input name="co" maxlength="40" value="'+esc(t.co||'')+'"></label><label class="field"><span>Approved $</span><input name="amt" inputmode="decimal" value="'+esc(t.amt==null?'':t.amt)+'" placeholder="0.00"></label></div>'+
+      '<label class="field"><span>Notes</span><textarea name="notes" maxlength="1000">'+esc(t.notes||'')+'</textarea></label>'+(t.upd_at?'<div class="muted small">Last office change '+esc(fmtWhen(t.upd_at))+(t.upd_by?' by '+esc(t.upd_by):'')+'</div>':'')+'</fieldset>'+
+      '<div class="mbtns"><button type="button" class="btn" data-pdf>PDF</button><button type="button" class="btn" data-x>Cancel</button><button class="btn primary" type="submit">Save</button></div></form>'
+    :'<div class="mbtns"><button type="button" class="btn" data-pdf>PDF</button><button type="button" class="btn primary" data-x>Close</button></div>'));
+  fillImgs(m);$$('.ph',m).forEach(i=>i.onclick=()=>showPhoto(i.dataset.path));
+  $('[data-x]',m).onclick=()=>m.close();$('[data-pdf]',m).onclick=()=>tmPdfMenu(t,l);
+  const f=$('form',m);if(f)f.onsubmit=async e=>{e.preventDefault();const v={co:f.co.value,amt:f.amt.value,notes:f.notes.value,by:myName()||'Office',at:new Date().toISOString()};
+    if(String(v.amt).trim()&&!isFinite(Number(String(v.amt).replace(/[$,\s]/g,'')))){toast('Approved $ should be a number.');f.amt.focus();return}
+    if(await tmWrite(l.date,l.user_id,a=>{const i=a.findIndex(x=>tmIs(x)&&x.id===t.id);if(i<0){toast('That ticket was deleted.');return null}a[i]=tmSetStatus(a[i],f.st.value,v);return a},tmNo(t.no)+' updated.'))m.close()}}
+/** Office T&M log for the job (Daily Report tab): filters, totals, unsigned > 2 days highlighted, CSV export. */
+function renderTmLog(){const box=$('#tmLog');if(!box)return;if(!isAdminRole()||!S.loaded.logs){box.innerHTML='';return}
+  const all=tmAll(S.logs);if(!all.length){box.innerHTML='';return}
+  const F=S.tmF||'all',td=today(),cnt=s=>all.filter(x=>tmSt(x.t)===s).length;const list=F==='all'?all:all.filter(x=>tmSt(x.t)===F);
+  const hrs=r2(list.reduce((a,x)=>a+tmHrs(x.t),0)),appr=list.filter(x=>tmSt(x.t)==='approved').reduce((a,x)=>a+num(x.t.amt),0),uns=list.filter(x=>tmSt(x.t)==='unsigned').length,old=list.filter(x=>tmOld(x.t,x.l.date,td)).length;
+  box.innerHTML='<div class="card"><div class="row"><b class="grow" style="font-size:17px">T&M log</b><button class="btn sm" data-tmcsv>Export CSV</button></div>'+
+    '<div class="chips" style="margin:8px 0">'+[['all','All',all.length]].concat(Object.keys(TM_ST).map(s=>[s,TM_ST[s],cnt(s)])).filter(c=>c[2]||c[0]===F||['all','unsigned','signed','approved'].includes(c[0])).map(c=>'<button class="chip'+(c[0]===F?' on':'')+'" data-tmf="'+c[0]+'">'+esc(c[1])+' '+c[2]+'</button>').join('')+'</div>'+
+    '<div class="small" style="margin-bottom:8px"><b>'+list.length+'</b> ticket'+(list.length===1?'':'s')+' · <b>'+f1(hrs)+'</b> crew hrs · <b'+(uns?' style="color:#b42318"':'')+'>'+uns+'</b> unsigned'+(old?' (<b style="color:#b42318">'+old+' over 2 days</b>)':'')+' · Approved <b>'+tmMoney(appr)+'</b></div>'+
+    list.map(({t,l})=>{const ol=tmOld(t,l.date,td);const age=ol?Math.round((Date.parse(td)-Date.parse(l.date))/864e5):0;
+      return '<button class="tmt'+(ol?' old':'')+'" data-tmo="'+esc(l.id+'|'+t.id)+'"><div class="row"><b>'+esc(tmNo(t.no))+'</b><span class="muted small grow">'+fmtDay(l.date)+' · '+esc(logName(l))+'</span>'+tmChip(t)+'</div>'+
+        '<div class="small" style="margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(t.work||'(no description)')+(t.loc?' <span class="muted">@ '+esc(t.loc)+'</span>':'')+'</div>'+
+        '<div class="muted small">'+f1(tmHrs(t))+' hrs · '+(t.sig?'GC signed ✓':'<span style="color:#b42318">Not signed'+(t.no_sig?' – '+esc(t.no_sig):'')+'</span>')+(t.co?' · CO '+esc(t.co):'')+(t.amt!=null&&t.amt!==''?' · '+tmMoney(t.amt):'')+(ol?' · <b style="color:#b42318">⚠ '+age+' days unsigned</b>':'')+'</div></button>'}).join('')+'</div>';
+  $$('[data-tmf]',box).forEach(b=>b.onclick=()=>{S.tmF=b.dataset.tmf;renderTmLog()});
+  $$('[data-tmo]',box).forEach(b=>b.onclick=()=>{const [lid,tid]=b.dataset.tmo.split('|');const x=tmFind(lid,tid);if(x)tmView(x.l,x.t)});
+  $('[data-tmcsv]',box).onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([toCsv(tmCsv(list,S.job))],{type:'text/csv'}));a.download=fileSafe((S.job&&S.job.name)||'Job')+' T&M log '+today()+'.csv';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000)}}
+/** Reminder on the job until the GC signs: the user's own unsigned tickets. */
+function tmNagSync(){const tb=$('#tabBody');if(!tb)return;const old=$('#tmNag',tb);if(old)old.remove();if(!canWrite()||!S.job||!S.me)return;
+  const l=tmAll(S.logs).filter(x=>x.l.user_id===S.me.id&&tmSt(x.t)==='unsigned').reverse();if(!l.length)return;
+  const html='<div class="card" id="tmNag" style="background:#fdecea;border-color:#f1a8a8;margin-bottom:12px">'+l.slice(0,3).map(({t,l:lg})=>'<div class="row" style="margin-bottom:6px"><b class="grow">⚠ '+esc(tmNo(t.no))+' not signed by the GC</b><button class="btn sm primary" data-tmsig="'+esc(lg.id+'|'+t.id)+'">Get signature</button></div>').join('')+
+    (l.length>3?'<div class="small">+'+(l.length-3)+' more unsigned ticket'+(l.length>4?'s':'')+'.</div>':'')+'<div class="small">Extra work without the GC’s signature often doesn’t get paid. Hand the phone to the GC’s super to sign.</div></div>';
+  const nc=$('#nudgeCard',tb);if(nc)nc.insertAdjacentHTML('afterend',html);else tb.insertAdjacentHTML('afterbegin',html);
+  $$('[data-tmsig]',tb).forEach(b=>b.onclick=()=>{const [lid,tid]=b.dataset.tmsig.split('|');const x=tmFind(lid,tid);if(x)tmEditor(x.t,{date:x.l.date,focusSig:true})})}
+async function tmImg(path){const [u]=await urlsFor([path]);if(!u)return null;const i=await loadImg(u);const c=scaledCanvas(i,i.naturalWidth,i.naturalHeight,500);return {d:c.toDataURL('image/jpeg',.75),w:c.width,h:c.height}}
+/** One-page T&M ticket PDF (same look as the daily report). */
+async function tmPdf(t,l,job){
+  await loadPdfLib();const {jsPDF}=window.jspdf;const doc=new jsPDF({unit:'pt',format:'letter'});const W=612,L=36,R=576;let y;
+  doc.setFont('helvetica','normal');doc.addImage(LOGO_PNG,'PNG',W/2-95,24,190,80);
+  doc.setFont('helvetica','bold');doc.setFontSize(16);doc.text('T&M TICKET',L,124);doc.text(tmNo(t.no),R,124,{align:'right'});
+  const line=(lab,val,x,yy,w)=>{doc.setFontSize(9);doc.setFont('helvetica','normal');doc.text(lab,x,yy,{align:'right'});doc.setFont('helvetica','bold');doc.text(doc.splitTextToSize(String(val||''),w-6)[0]||'',x+4,yy);doc.setLineWidth(.5);doc.line(x+2,yy+2,x+w,yy+2)};
+  line('Contractor:',job.gc_name||'',90,148,230);line('Date:',fmtDay(l.date),390,148,186);
+  line('Job Name:',(job.name||'').replace(/^\s*\d{3,}\s*[-–]\s*/,''),90,166,230);line('Job No.',jobNo(job),390,166,186);
+  line('Location:',t.loc||'',90,184,230);line('Foreman:',l.name||'',390,184,186);
+  y=198;const box=(title,text,minL)=>{doc.setFontSize(9);const ls=doc.splitTextToSize(String(text||''),R-L-8).slice(0,14);const n=Math.max(minL,ls.length);const h=14+n*11+4;doc.setLineWidth(.6);doc.rect(L,y,R-L,h);doc.setFont('helvetica','bold');doc.text(title,L+3,y+10);doc.setFont('helvetica','normal');doc.text(ls,L+4,y+22);y+=h};
+  box('Extra Work Performed:',t.work,4);if(t.awa){y+=4;doc.setFontSize(9);doc.text('GC ref / AWA #: '+t.awa,L,y+8);y+=10}
+  y+=8;const top=y,cw=(R-L)*.46,mx=L+(R-L)*.5,mw=R-mx;
+  const cell=(x,w,txt,b,al)=>{doc.rect(x,y,w,14);doc.setFont('helvetica',b?'bold':'normal');doc.setFontSize(8.5);const s=doc.splitTextToSize(String(txt==null?'':txt),w-6)[0]||'';al==='r'?doc.text(s,x+w-3,y+10,{align:'right'}):doc.text(s,x+3,y+10)};
+  const crew=(t.crew||[]).slice(0,16);cell(L,cw*.7,'Crew',1);cell(L+cw*.7,cw*.3,'Hours',1,'r');y+=14;for(let i=0;i<Math.max(4,crew.length);i++){const c=crew[i]||{};cell(L,cw*.7,c.name||'');cell(L+cw*.7,cw*.3,crew[i]?f1(num(c.hrs)):'',0,'r');y+=14}
+  cell(L,cw*.7,'Total crew hours',1);cell(L+cw*.7,cw*.3,f1(tmHrs(t)),1,'r');y+=14;const yc=y;y=top;
+  const mats=(t.mats||[]).slice(0,16);cell(mx,mw*.6,'Materials Used',1);cell(mx+mw*.6,mw*.2,'Qty',1,'r');cell(mx+mw*.8,mw*.2,'Unit',1);y+=14;for(let i=0;i<Math.max(4,mats.length);i++){const a=mats[i]||{};cell(mx,mw*.6,a.item||'');cell(mx+mw*.6,mw*.2,a.qty,0,'r');cell(mx+mw*.8,mw*.2,a.unit||'');y+=14}
+  y=Math.max(y,yc)+12;
+  const ph=(t.photos||[]).slice(0,4);if(ph.length){const imgs=[];for(const p of ph){try{const im=await tmImg(p);if(im)imgs.push(im)}catch(e){}}
+    if(imgs.length){doc.setFont('helvetica','bold');doc.setFontSize(9);doc.text('Photos',L,y+8);y+=12;const bw=(R-L-30)/4,bh=bw*.75;let x=L;imgs.forEach(im=>{const k=Math.min(bw/im.w,bh/im.h);try{doc.addImage(im.d,'JPEG',x,y,im.w*k,im.h*k)}catch(e){}x+=bw+10});y+=bh+12}}
+  if(y>600){doc.addPage();y=60}
+  doc.setFont('helvetica','italic');doc.setFontSize(8.5);doc.text(doc.splitTextToSize('By signing, the general contractor’s representative agrees the extra work above was performed by Alpha Drywall on a time-and-material basis and is outside the contract scope.',R-L),L,y+8);y+=42;
+  doc.setFont('helvetica','bold');doc.setFontSize(10);doc.text(t.by||'',L+110,y,{align:'center'});doc.setLineWidth(.5);doc.line(L+20,y+3,L+200,y+3);doc.setFont('helvetica','italic');doc.setFontSize(8);doc.text('GC Representative (Print)',L+110,y+13,{align:'center'});
+  if(t.sig){try{doc.addImage(t.sig,'PNG',L+250,y-38,160,44)}catch(e){}}else{doc.setTextColor(180,35,24);doc.setFont('helvetica','bold');doc.setFontSize(12);doc.text('NOT SIGNED'+(t.no_sig?' – '+t.no_sig:''),L+252,y-4);doc.setTextColor(0)}
+  doc.line(L+246,y+3,R,y+3);doc.setFont('helvetica','italic');doc.setFontSize(8);doc.text('GC Signature'+(t.signed_at?'   ·   Signed '+tmWhenTxt(t.signed_at):''),L+246+(R-L-246)/2,y+13,{align:'center'});
+  pdfFoot(doc,W);return doc.output('blob')}
+/** Make the ticket PDF, then offer Open / Share / Download. */
+async function tmPdfMenu(t,l){const name=fileSafe(jobNo()+' '+tmNo(t.no)+' '+((l&&l.date)||''))+'.pdf';let blob;
+  try{blob=await tmPdf(t,l||{},S.job)}catch(e){toast("Couldn't make the PDF. "+(navigator.onLine===false?'Open the Daily Report once with signal first.':errMsg(e)));return}
+  const u=URL.createObjectURL(blob);const file=typeof File==='function'?new File([blob],name,{type:'application/pdf'}):null;const canShare=!!(file&&navigator.canShare&&navigator.canShare({files:[file]}));
+  const m=modal('<h2>'+esc(tmNo(t.no))+' PDF</h2><p class="muted small">'+esc(name)+'</p><div style="display:grid;gap:10px"><button class="btn primary" data-o>Open</button>'+(canShare?'<button class="btn" data-s>Share (text / email)</button>':'')+'<button class="btn" data-d>Download</button><button class="btn" data-x>Close</button></div>',()=>setTimeout(()=>URL.revokeObjectURL(u),60000));
+  $('[data-o]',m).onclick=()=>{const w=window.open(u,'_blank');if(!w)location.href=u};
+  $('[data-d]',m).onclick=()=>{const a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove()};
+  if(canShare)$('[data-s]',m).onclick=()=>navigator.share({files:[file],title:tmNo(t.no)}).catch(()=>{});
+  $('[data-x]',m).onclick=()=>m.close()}
 function renderLogForm(){
   const box=$('#logForm');if(!box)return;
   if(!canWrite()){box.innerHTML='';return}
@@ -2589,18 +3180,28 @@ function renderLogForm(){
     '<fieldset class="codes"><legend>Hours</legend><div data-tch class="small"></div></fieldset>'+
     ta('problems','Problems / delays','e.g. Waiting on electrician in 205')+ta('subs','Subcontractor progress','')+ta('damage','Trade damage','')+
     '<fieldset class="codes"><legend>Equipment</legend>'+rowsEditor('equip',[{k:'name',ph:'e.g. Scissor lift'},{k:'qty',ph:'Qty',num:1}])+'</fieldset>'+
-    '<fieldset class="codes"><legend>Materials delivered (PO)</legend>'+rowsEditor('mat',[{k:'text',ph:'e.g. 120 sheets 5/8 Type X'},{k:'po',ph:'PO #'}])+'</fieldset>'+
-    '<fieldset class="codes"><legend>Additional work</legend>'+rowsEditor('extra',[{k:'work',ph:'Work'},{k:'by',ph:'Authorized by'},{k:'awa',ph:'AWA #'}])+'</fieldset>'+
+    '<fieldset class="codes"><legend>Materials delivered (PO)</legend>'+matRowsEditor()+'</fieldset>'+
+    '<fieldset class="codes"><legend>Additional work (T&amp;M tickets)</legend><div data-tm></div><button type="button" class="btn sm" data-tmadd>+ T&amp;M ticket for extra work</button><div class="muted small" style="margin:6px 0 8px">Extra work the GC asked for? Make a ticket and have the GC’s super sign it on this phone.</div></fieldset>'+
     '<label class="field"><span>Supervisor (print name)</span><input name="who" required maxlength="60" autocomplete="name" placeholder="Your name"></label>'+
     '<div class="field"><span>Supervisor signature</span><canvas class="sig" data-sig></canvas><div class="row" style="justify-content:space-between"><span class="muted small">Sign with your finger</span><button type="button" class="btn sm" data-sigclr>Clear</button></div></div>'+
     '<div class="field gcq"><span>Send to general contractor?</span>'+(gce.length?'<div class="seg"><label><input type="radio" name="gc" value="yes"> Yes</label><label><input type="radio" name="gc" value="no" checked> No</label></div><div class="muted small">'+esc(gce.join(', '))+'</div>'
       :'<div class="muted small">No GC email on this job yet. '+(isAdminRole()?'Add it under ⋯ → Edit job.':'Ask the office to add it.')+'</div>')+'</div>'+
     '<button class="btn primary block" type="submit">Save daily report</button><div class="muted small" data-st style="text-align:center;margin-top:6px">A PDF is saved to the job\'s Daily Reports folder.</div></form></div>';
-  const form=$('form',box);let touched=false;bindRows(form);const pad=sigPad($('[data-sig]',form));
+  const form=$('form',box);let touched=false;bindRows(form);
+  form.addEventListener('input',e=>{const c=e.target.dataset&&e.target.dataset.c;if(c==='text'||c==='po')matLink(e.target.closest('[data-row]'))});const pad=sigPad($('[data-sig]',form));
+  let tks=[];const tmBox=$('[data-tm]',form);
+  const drawTk=()=>{tmBox.innerHTML=tks.map((x,i)=>tmIs(x)?'<div class="tmt"><div class="row"><b>'+esc(tmNo(x.no))+'</b><span class="grow"></span>'+tmChip(x)+'</div><div class="small" style="margin:3px 0">'+esc(x.work||'')+(x.loc?' <span class="muted">@ '+esc(x.loc)+'</span>':'')+'</div><div class="row"><span class="muted small grow">'+f1(tmHrs(x))+' crew hrs'+(x.sig?' · signed by '+esc(x.by||'GC'):x.no_sig?' · '+esc(x.no_sig):'')+'</span><button type="button" class="btn sm" data-tmi="'+i+'">'+(TM_OFFICE.includes(x.status)?'View':x.sig?'Open':'Open / sign')+'</button></div></div>'
+      :'<div class="tmt"><div class="small">'+esc(tmText(x))+'</div><div class="row" style="justify-content:flex-end;gap:6px;margin-top:4px"><button type="button" class="btn sm" data-tmi="'+i+'">Make T&amp;M ticket</button><button type="button" class="btn sm" data-tmrm="'+i+'" style="color:var(--danger)">Remove</button></div></div>').join('');
+    $$('[data-tmi]',tmBox).forEach(b=>b.onclick=()=>{const x=tks[+b.dataset.tmi];const d=form.date.value||today();const L=mine(d);
+      if(tmIs(x)){if(TM_OFFICE.includes(x.status)&&L)tmView(L,x);else tmEditor(x,{date:d})}else tmEditor(Object.assign({},x,{tm:1,id:uuid(),no:tmNext(S.logs,tks)}),{date:d,isNew:true,orig:x})});
+    $$('[data-tmrm]',tmBox).forEach(b=>b.onclick=()=>{tks.splice(+b.dataset.tmrm,1);touched=true;drawTk()})};
+  $('[data-tmadd]',form).onclick=()=>tmEditor({tm:1,id:uuid(),no:tmNext(S.logs,tks),work:'',crew:[],mats:[],photos:[]},{date:form.date.value||today(),isNew:true});
+  box._tks=d=>(form.date.value||today())===d?tks:null;
+  box._tm=(d,ew)=>{if((form.date.value||today())===d){tks=JSON.parse(JSON.stringify(ew||[]));drawTk()}};
   $('[data-sigclr]',form).onclick=()=>{pad.clear();touched=true};
   const wfTot=()=>{$('[data-wft]',form).textContent=$$('[data-wf]',form).reduce((a,i)=>a+num(i.value),0)};
   const mine=d=>S.logs.find(l=>l.date===d&&l.user_id===S.me.id);
-  const setRows=(k,vals)=>{const b=$('[data-rows="'+k+'"]',form);const t=$('[data-tpl="'+k+'"]',form).innerHTML;b.innerHTML='';(vals&&vals.length?vals:[{}]).forEach(v=>{b.insertAdjacentHTML('beforeend',t);const rw=b.lastElementChild;$$('[data-c]',rw).forEach(i=>i.value=v[i.dataset.c]!=null?v[i.dataset.c]:'')})};
+  const setRows=(k,vals)=>{const b=$('[data-rows="'+k+'"]',form);const t=$('[data-tpl="'+k+'"]',form).innerHTML;b.innerHTML='';(vals&&vals.length?vals:[{}]).forEach(v=>{b.insertAdjacentHTML('beforeend',t);const rw=b.lastElementChild;$$('[data-c]',rw).forEach(i=>{if(i.type==='checkbox')i.checked=!!v[i.dataset.c];else i.value=v[i.dataset.c]!=null?v[i.dataset.c]:''})})};
   let tcX=null;const tcBox=$('[data-tch]',form);
   const tcRef=async()=>{const d=form.date.value||today();tcX=null;tcBox.innerHTML='<span class="muted">Checking your time card\u2026</span>';const card=await tcCardFor(S.me.id,d);if((form.date.value||today())!==d||!S.job)return;
     const K=tcJobKey(S.job);tcX={d,card,r:card?tcJobDay([card],d,K[0],K[1]):null};tcBox.innerHTML=tcFeedHtml(tcX);
@@ -2608,7 +3209,7 @@ function renderLogForm(){
   const fill=()=>{tcRef();const e=mine(form.date.value);form.who.value=(e&&e.name)||lsGet('crewplans.logName')||myName();
     form.weather.value=(e&&e.weather)||'';form.work.value=(e&&e.work)||'';form.problems.value=(e&&(e.problems||e.notes))||'';form.subs.value=(e&&e.sub_progress)||'';form.damage.value=(e&&e.trade_damage)||'';
     const wf=(e&&e.workforce)||{};$$('[data-wf]',form).forEach(i=>i.value=wf[i.dataset.wf]||'');wfTot();
-    setRows('equip',e&&e.equipment);setRows('mat',(e&&e.materials)||(e&&e.deliveries?[{text:e.deliveries}]:null));setRows('extra',e&&e.extra_work);
+    setRows('equip',e&&e.equipment);setRows('mat',(e&&e.materials)||(e&&e.deliveries?[{text:e.deliveries}]:null));tks=JSON.parse(JSON.stringify((e&&e.extra_work)||[]));drawTk();
     pad.load(e&&e.signature);const g=$$('[name=gc]',form);g.forEach(r=>r.checked=r.value==='no')};
   form.date.onchange=fill;form.addEventListener('input',e=>{if(e.target!==form.date)touched=true;if(e.target.dataset&&e.target.dataset.wf!=null)wfTot()});
   $('[data-sig]',form).addEventListener('pointerdown',()=>touched=true);fill();
@@ -2617,9 +3218,11 @@ function renderLogForm(){
   form.onsubmit=async e=>{e.preventDefault();const d=form.date.value||today();const nm=form.who.value.trim().slice(0,60);if(!nm){toast('Enter the supervisor name.');form.who.focus();return}lsSet('crewplans.logName',nm);
     const wf={};$$('[data-wf]',form).forEach(i=>{const v=num(i.value);if(v>0)wf[i.dataset.wf]=v});const crew=Object.values(wf).reduce((a,b)=>a+b,0);
     const sig=pad.get();if(!sig&&!await confirmBox('No signature. Save the report anyway?','Save anyway',false))return;
+    {const un=tks.filter(x=>tmIs(x)&&tmSt(x)==='unsigned'&&!x.no_sig);if(un.length){const v=await formBox(un.map(x=>tmNo(x.no)).join(', ')+' not signed by the GC',[{k:'r',label:'Why isn’t it signed?',type:'select',value:TM_REASONS[0],options:TM_REASONS.map(r=>[r,r])}],'Save report','Extra work needs the GC’s signature to get paid. Get it signed (Open / sign above), or give a reason. You’ll keep getting a reminder until it’s signed.');if(!v)return;
+      const ids=new Set(un.map(x=>x.id));tks=tks.map(x=>ids.has(x.id)?Object.assign({},x,{no_sig:v.r}):x);drawTk()}}
     const gcR=$('[name=gc]:checked',form);const send=!!(gcR&&gcR.value==='yes'&&gce.length);
     const o={job_id:S.job.id,user_id:S.me.id,name:nm,date:d,crew,weather:form.weather.value.trim().slice(0,80),work:form.work.value.trim().slice(0,3000),problems:form.problems.value.trim().slice(0,3000),
-      sub_progress:form.subs.value.trim().slice(0,3000),trade_damage:form.damage.value.trim().slice(0,3000),workforce:wf,equipment:readRows(form,'equip'),materials:readRows(form,'mat'),extra_work:readRows(form,'extra'),
+      sub_progress:form.subs.value.trim().slice(0,3000),trade_damage:form.damage.value.trim().slice(0,3000),workforce:wf,equipment:readRows(form,'equip'),materials:readRows(form,'mat'),extra_work:tmMerge(tks,((mine(d)||{}).extra_work)),
       signature:sig,send_gc:send,filed_at:null,sent_at:null,file_error:null,updated_at:new Date().toISOString()};
     if(tcX&&tcX.d===d&&tcX.card){o.hours=tcX.r.hours;o.hours_by_code=tcX.r.by}
     const btn=$('button[type=submit]',form);btn.disabled=true;$('[data-st]',form).textContent='Making the PDF…';
@@ -2648,7 +3251,7 @@ async function reportPdf(o,job){
   rcell('Workforce','Quantity',true);WORKFORCE.forEach(w=>rcell(w,(o.workforce||{})[w]||''));rcell('Total:',o.crew||0,true);
   y+=6;rcell('Equipment','Quantity',true);const eq=(o.equipment||[]);for(let i=0;i<Math.max(4,eq.length);i++)rcell(eq[i]?(eq[i].name||''):'',eq[i]?(eq[i].qty||''):'');
   y+=6;doc.rect(rx,y,rw,14);doc.setFont('helvetica','bold');doc.text('Materials Delivered (PO)',rx+rw/2,y+10,{align:'center'});y+=14;doc.setFont('helvetica','normal');
-  const mats=(o.materials||[]);for(let i=0;i<Math.max(4,mats.length);i++){const m=mats[i];const t=m?((m.text||'')+(m.po?' (PO '+m.po+')':'')):'';const ls=doc.splitTextToSize(t,rw-6);const h=Math.max(14,ls.length*10+4);doc.rect(rx,y,rw,h);doc.text(ls,rx+3,y+10);y+=h}
+  const mats=(o.materials||[]);for(let i=0;i<Math.max(4,mats.length);i++){const m=mats[i];const t=m?matRowText(m):'';const ls=doc.splitTextToSize(t,rw-6);const h=Math.max(14,ls.length*10+4);doc.rect(rx,y,rw,h);doc.text(ls,rx+3,y+10);y+=h}
   const rightEnd=y;
   // left column
   y=top;const lw=MID-L;
@@ -2660,7 +3263,7 @@ async function reportPdf(o,job){
   // additional work table
   const ex=o.extra_work||[];const cw=[lw*.42,lw*.33,lw*.25];if(y+30>700){doc.addPage();y=40}
   doc.setFont('helvetica','bold');let cx=L;['Additional Work','Authorized By','AWA #'].forEach((h,i)=>{doc.rect(cx,y,cw[i],14);doc.text(h,cx+cw[i]/2,y+10,{align:'center'});cx+=cw[i]});y+=14;doc.setFont('helvetica','normal');
-  for(let i=0;i<Math.max(3,ex.length);i++){const r=ex[i]||{};const cells=[r.work||'',r.by||'',r.awa||''].map((t,k)=>doc.splitTextToSize(String(t),cw[k]-6));const h=Math.max(14,Math.max(...cells.map(c=>c.length))*10+4);if(y+h>720){doc.addPage();y=40}
+  for(let i=0;i<Math.max(3,ex.length);i++){const r=ex[i]||{};const cells=tmCells(r).map((t,k)=>doc.splitTextToSize(String(t),cw[k]-6));const h=Math.max(14,Math.max(...cells.map(c=>c.length))*10+4);if(y+h>720){doc.addPage();y=40}
     cx=L;cells.forEach((c,k)=>{doc.rect(cx,y,cw[k],h);doc.text(c,cx+3,y+10);cx+=cw[k]});y+=h}
   // signature
   y=Math.max(y,doc.getNumberOfPages()===1?rightEnd:y)+18;if(y>690){doc.addPage();y=60}
@@ -2669,9 +3272,10 @@ async function reportPdf(o,job){
   if(o.signature){try{doc.addImage(o.signature,'PNG',L+306,y-30,150,40)}catch(e){}}else{doc.setFont('helvetica','bold');doc.setFontSize(12);doc.text(o.name||'',L+310,y-2)}
   doc.line(L+304,y+3,R,y+3);
   // footer
-  const pages=doc.getNumberOfPages();for(let p=1;p<=pages;p++){doc.setPage(p);doc.setFontSize(8);doc.setFont('helvetica','bold');doc.text('Alpha Drywall, LLC',W/2,748,{align:'center'});doc.setFont('helvetica','italic');doc.text('Drywall -- Metal Stud Framing-- Suspended Ceilings',W/2,758,{align:'center'});doc.setFont('helvetica','bolditalic');doc.text('2724 S. 3600 W. Suite L, West Valley City, UT 84119',W/2,768,{align:'center'});doc.text('Office#(801) 682-4447/Fax#(801) 683-2847',W/2,778,{align:'center'})}
+  pdfFoot(doc,W);
   return doc.output('blob');
 }
+function pdfFoot(doc,W){const pages=doc.getNumberOfPages();for(let p=1;p<=pages;p++){doc.setPage(p);doc.setFontSize(8);doc.setFont('helvetica','bold');doc.text('Alpha Drywall, LLC',W/2,748,{align:'center'});doc.setFont('helvetica','italic');doc.text('Drywall -- Metal Stud Framing-- Suspended Ceilings',W/2,758,{align:'center'});doc.setFont('helvetica','bolditalic');doc.text('2724 S. 3600 W. Suite L, West Valley City, UT 84119',W/2,768,{align:'center'});doc.text('Office#(801) 682-4447/Fax#(801) 683-2847',W/2,778,{align:'center'})}}
 let nudgeT=0;function nudgeReports(){if(S.asUser||navigator.onLine===false||Date.now()-nudgeT<20000)return;nudgeT=Date.now();setTimeout(()=>{sb.functions.invoke('crew-sync',{body:{action:'reports'}}).then(r=>{if(r&&r.data&&r.data.reports&&r.data.reports.length)setTimeout(loadLogs,500)}).catch(()=>{})},1500)}
 function reportStatus(l){
   if(isPractice()&&String(l.id).startsWith('local-'))return '<span class="muted small">Practice report. Saved in this browser only; not filed or emailed.</span>';
@@ -2693,6 +3297,7 @@ async function loadLogTc(){const id=jobId(),logs=S.logs||[];if(!id||!S.me)return
     if(!S.asUser&&(r.hours!==num(l.hours)||!sameBy(r.by,l.hours_by_code))){try{await q(sb.from('logs').update({hours:r.hours,hours_by_code:r.by}).eq('id',l.id))}catch(e){}}}
   if(jobId()!==id)return;S.logTc=Object.assign(S.logTc||{},out);if(S.tab==='log')renderLogList()}
 function renderLogList(){
+  renderTmLog();tmNagSync();
   const box=$('#logList');if(!box)return;
   if(!S.loaded.logs){box.innerHTML='<div class="empty">Loading reports…</div>';return}
   if(S.logs.some(l=>l.pdf_path&&(!l.filed_at||(l.send_gc&&!l.sent_at))&&num(l.file_tries)<6))nudgeReports();
@@ -2705,13 +3310,15 @@ function renderLogList(){
       (l.work?'<div class="kv"><b>Work:</b> '+esc(l.work)+'</div>':'')+((l.problems||l.notes)?'<div class="kv"><b>Problems:</b> '+esc(l.problems||l.notes)+'</div>':'')+
       (l.sub_progress?'<div class="kv"><b>Subs:</b> '+esc(l.sub_progress)+'</div>':'')+(l.trade_damage?'<div class="kv"><b>Trade damage:</b> '+esc(l.trade_damage)+'</div>':'')+
       ((l.equipment||[]).length?'<div class="kv"><b>Equipment:</b> '+l.equipment.map(x=>esc((x.name||'')+(x.qty?' ('+x.qty+')':''))).join(', ')+'</div>':'')+
-      ((l.materials||[]).length?'<div class="kv"><b>Delivered:</b> '+l.materials.map(x=>esc((x.text||'')+(x.po?' PO '+x.po:''))).join('; ')+'</div>':(l.deliveries?'<div class="kv"><b>Delivered:</b> '+esc(l.deliveries)+'</div>':''))+
-      ((l.extra_work||[]).length?'<div class="kv"><b>Additional work:</b> '+l.extra_work.map(x=>esc((x.work||'')+(x.by?' – auth. '+x.by:'')+(x.awa?' – AWA '+x.awa:''))).join('; ')+'</div>':'')+
+      ((l.materials||[]).length?'<div class="kv"><b>Delivered:</b> '+l.materials.map(x=>esc(matRowText(x))).join('; ')+'</div>':(l.deliveries?'<div class="kv"><b>Delivered:</b> '+esc(l.deliveries)+'</div>':''))+
+      (l.extra_work||[]).filter(x=>!tmIs(x)).map(x=>'<div class="kv"><b>Additional work:</b> '+esc(tmText(x))+'</div>').join('')+
+      (l.extra_work||[]).filter(tmIs).map(x=>'<div class="row" style="margin-top:4px;gap:8px"><span class="kv grow" style="margin:0"><b>'+esc(tmNo(x.no))+':</b> '+esc((x.work||'')+(x.loc?' @ '+x.loc:''))+(tmHrs(x)?' · '+f1(tmHrs(x))+' hrs':'')+'</span>'+tmChip(x)+'<button class="btn sm" data-tmo="'+esc(l.id+'|'+x.id)+'">Open</button></div>').join('')+
       '<div class="row" style="margin-top:8px;gap:8px;align-items:center"><span class="grow">'+reportStatus(l)+'</span>'+(l.pdf_path?'<button class="btn sm" data-lpdf="'+esc(l.id)+'">PDF</button>':'')+
       ((l.user_id===S.me.id&&canWrite())?'<button class="btn sm" data-ledit="'+esc(l.id)+'">✎ Edit</button>':'')+
       ((l.user_id===S.me.id&&canWrite())||isAdminRole()?'<button class="btn sm" data-ldel="'+esc(l.id)+'" style="color:var(--danger)">Delete</button>':'')+'</div>'+
       (l.updated_at?'<div class="progress-note">Saved '+esc(fmtWhen(l.updated_at))+' by '+esc(logName(l))+'</div>':'')+'</div>'}).join('')}).join('');
   loadLogTc();
+  $$('[data-tmo]',box).forEach(b=>b.onclick=()=>{const [lid,tid]=b.dataset.tmo.split('|');const x=tmFind(lid,tid);if(x)tmOpen(x.l,x.t)});
   $$('[data-ledit]',box).forEach(b=>b.onclick=()=>{const l=S.logs.find(x=>x.id===b.dataset.ledit);const f=$('#logForm');if(l&&f&&f._edit)f._edit(l.date)});
   $$('[data-lpdf]',box).forEach(b=>b.onclick=async()=>{const l=S.logs.find(x=>x.id===b.dataset.lpdf);if(!l)return;const w=window.open('','_blank');const [u]=await urlsFor([l.pdf_path]);if(u){if(w)w.location=u;else location.href=u}else{if(w)w.close();toast("Couldn't open the PDF. Check your signal.")}});
   $$('[data-ldel]',box).forEach(b=>b.onclick=async()=>{const l=S.logs.find(x=>x.id===b.dataset.ldel);if(!l)return;

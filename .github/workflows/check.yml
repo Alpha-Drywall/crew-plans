@@ -19,3 +19,9 @@ jobs:
         run: node .github/scripts/viewas-test.js
       - name: Test the all-jobs-at-a-glance math
         run: node .github/scripts/dashboard-test.js
+      - name: Test materials vs. the order (paste, matching, status, flags)
+        run: node .github/scripts/materials-test.js
+      - name: Test T&M tickets (numbering, time card 172, status, CSV)
+        run: node .github/scripts/tm-test.js
+      - name: Test the crew lookahead board
+        run: node .github/scripts/lookahead-test.js
