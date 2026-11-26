@@ -2831,7 +2831,7 @@ async function areaMenu(id){
 }
 
 /* ===== Materials vs. the order =====
-   The office keeps each job's PO lines in job_budget.labor.materials ({lines:[{id,po,sup,item,unit,qty,exp,short_ok}]}); the labor sync and every labor write keep other keys.
+   The office keeps each job's PO lines in job_budget.labor.materials ({lines:[{id,po,sup,item,unit,qty,exp,short_ok,pre:{date}}]} (pre = delivered before the app: counts as all received, never late)); the labor sync and every labor write keep other keys.
    Foremen log deliveries on the daily report (logs.materials rows {text,qty,unit,po,line,short,note}); delivered is summed from every report on the job. No $ is stored here. */
 const MAT_UNITS={sheet:'sheet',sheets:'sheet',sht:'sheet',shts:'sheet',sh:'sheet',ea:'ea',each:'ea',pc:'ea',pcs:'ea',piece:'ea',pieces:'ea',stick:'ea',sticks:'ea',length:'ea',lengths:'ea',lgth:'ea',lgths:'ea',box:'box',boxes:'box',bx:'box',bxs:'box',bundle:'bundle',bundles:'bundle',bdl:'bundle',bdls:'bundle',bucket:'bucket',buckets:'bucket',bkt:'bucket',bkts:'bucket',pail:'bucket',pails:'bucket',roll:'roll',rolls:'roll',rl:'roll',rls:'roll',bag:'bag',bags:'bag',carton:'carton',cartons:'carton',ctn:'carton',ctns:'carton',case:'carton',cases:'carton',cs:'carton',lf:'lf',sf:'sf',tube:'tube',tubes:'tube',gal:'gal',gals:'gal',pallet:'pallet',pallets:'pallet',plt:'pallet'};
 const MAT_SYN={stud:'stud',studs:'stud',trk:'track',trak:'track',scr:'screw',brd:'board',bd:'board',sheetrock:'board',gyp:'board',gypsum:'board',drywall:'board',gwb:'board',wallboard:'board',mud:'compound',jc:'compound',insul:'insulation',batts:'batt',sheet:'',sheets:'',sht:'',shts:'',pcs:'',pc:'',ea:'',lbs:'lb'};
@@ -2948,10 +2948,11 @@ function matCalc(M,logs,day){
     if(r.unit&&ln.unit&&matUnit(r.unit)!==matUnit(ln.unit))ln.unitDiff=r.unit;
     if(r.short&&(!ln.short_ok||r.date>ln.short_ok))ln.short={date:r.date,note:r.note||'',by:r.by}});
   const flags=[];
+  lines.forEach(l=>{if(l.pre){const pq=num(l.qty);if(l.got<pq)l.got=pq;if(!l.last||(l.pre.date&&l.pre.date>l.last))l.last=String(l.pre.date||'');l.short=null}});
   lines.forEach(l=>{const q=num(l.qty),g=Math.round(l.got*100)/100;l.got=g;
     l.st=!g?'none':!q?'got':g<q-1e-9?'partial':g>q+1e-9?'over':'complete';l.pct=q?Math.min(100,Math.round(g/q*100)):(g?100:0);
     const done=l.st==='complete'||l.st==='over';if(done)l.short=null;
-    l.late=!!(l.exp&&day&&l.exp<day&&!g);l.early=!!(l.exp&&done&&l.last&&l.last<l.exp);const u=l.unit?' '+l.unit:'';
+    l.late=!!(l.exp&&day&&l.exp<day&&!g);l.early=!!(!l.pre&&l.exp&&done&&l.last&&l.last<l.exp);const u=l.unit?' '+l.unit:'';
     if(l.short)flags.push({lvl:'short',id:l.id,t:l.item+(q?' short '+matQ(q-g)+u:' short')+' ('+(l.short.note||'backordered')+')'});
     if(l.late)flags.push({lvl:'late',id:l.id,t:l.item+': nothing delivered, expected '+matDay(l.exp)});
     if(l.st==='over')flags.push({lvl:'over',id:l.id,t:l.item+': '+matQ(g)+' delivered, '+matQ(q)+' ordered'});
@@ -2979,7 +2980,7 @@ function matLineHtml(l,ad){const s=MAT_ST[l.st]||MAT_ST.none;const tag=(t,bg,c)=
   return '<div class="mline"'+(ad?' data-ml="'+esc(l.id)+'"':'')+'><div class="row" style="align-items:flex-start;gap:8px"><div class="grow"><b>'+esc(l.item)+'</b>'+(l.short?tag('Short','#fdecea','#b42318'):'')+(l.late?tag('Late','#fdecea','#b42318'):'')+(l.early?tag('Early','#e3f4e4','#1b5e20'):'')+'</div>'+
     '<span class="badge" style="background:'+s[1]+';color:'+s[2]+';white-space:nowrap">'+s[0]+(l.st==='partial'?' ('+matQ(l.got)+' of '+matQ(l.qty)+')':'')+'</span></div>'+
     '<div class="mbar"><i style="width:'+l.pct+'%;background:'+s[3]+'"></i></div>'+
-    '<div class="muted small">'+matQ(l.got)+' of '+matQ(l.qty)+(l.unit?' '+esc(l.unit):'')+' received'+(l.last?' · last '+matDay(l.last):'')+(l.exp?' · expected '+matDay(l.exp):'')+(l.unitDiff?' · check units ('+esc(l.unitDiff)+' logged)':'')+(ad&&(l.code||l.loc)?'<br>'+(l.code?'Code '+esc(l.code):'')+(l.code&&l.loc?' · ':'')+(l.loc?esc(l.loc):''):'')+
+    '<div class="muted small">'+matQ(l.got)+' of '+matQ(l.qty)+(l.unit?' '+esc(l.unit):'')+' received'+(l.pre?' · delivered before the app'+(l.pre.date?' ('+matDay(l.pre.date)+')':''):(l.last?' · last '+matDay(l.last):''))+(l.exp?' · expected '+matDay(l.exp):'')+(l.unitDiff?' · check units ('+esc(l.unitDiff)+' logged)':'')+(ad&&(l.code||l.loc)?'<br>'+(l.code?'Code '+esc(l.code):'')+(l.code&&l.loc?' · ':'')+(l.loc?esc(l.loc):''):'')+
     (l.short?'<br><span style="color:#b42318">Marked short '+matDay(l.short.date)+(l.short.by?' by '+esc(l.short.by):'')+(l.short.note?': '+esc(l.short.note):'')+'</span>':'')+'</div></div>'}
 function renderMat(){if(!matHere())return '<div class="empty">Loading materials…</div>';
   const ad=isAdminRole();const C=matNow();const M=S.mat.M;
@@ -2991,14 +2992,17 @@ function renderMat(){if(!matHere())return '<div class="empty">Loading materials�
   else{const G={};C.lines.forEach(l=>{const k=(l.po||'')+'|'+(l.sup||'');(G[k]=G[k]||[]).push(l)});
     h+=Object.keys(G).map(k=>{const ls=G[k];const [po,sup]=k.split('|');const dn=ls.filter(l=>l.st==='complete'||l.st==='over').length;
       const pk=ad&&matPdfFor(po);
-      return '<div class="card" style="padding-bottom:4px"><div class="row" style="margin-bottom:4px;gap:8px"><b class="grow">'+(po?'PO '+esc(po):'No PO #')+(sup?' · '+esc(sup):'')+'</b>'+(pk?'<button class="btn sm" data-popdf="'+esc(pk)+'" title="The PO PDF (office only)">📄 Open PDF</button>':'')+'<span class="muted small">'+dn+' of '+ls.length+' complete</span></div>'+ls.map(l=>matLineHtml(l,ad)).join('')+'</div>'}).join('');
+      return '<div class="card" style="padding-bottom:4px"><div class="row" style="margin-bottom:4px;gap:8px"><b class="grow">'+(po?'PO '+esc(po):'No PO #')+(sup?' · '+esc(sup):'')+'</b>'+(pk?'<button class="btn sm" data-popdf="'+esc(pk)+'" title="The PO PDF (office only)">📄 Open PDF</button>':'')+(ad&&dn<ls.length?'<button class="btn sm" data-popre="'+esc(po)+'" title="Mark every line on this PO as delivered before the app (no daily report needed)">✓ All delivered</button>':'')+'<span class="muted small">'+dn+' of '+ls.length+' complete</span></div>'+ls.map(l=>matLineHtml(l,ad)).join('')+'</div>'}).join('');
     if(ad)h+='<p class="muted small" style="margin:-4px 2px 12px">Tap a line to change it, set an expected date or clear a short flag.</p>'}
   if(C.extra.length)h+='<details class="card"><summary><b>Delivered, not matched to the order</b> <span class="muted small">('+C.extra.length+')</span></summary><div class="muted small" style="margin:6px 0">These daily report lines didn’t match an order item. Picking items from the list on the daily report keeps them matched.</div>'+
     C.extra.slice().reverse().map(r=>'<div class="kv">'+matDay(r.date)+' · '+esc(matRowText({text:r.item,qty:r.qty,unit:r.unit,po:r.po,short:r.short,note:r.note}))+(r.by?' <span class="muted small">('+esc(r.by)+')</span>':'')+'</div>').join('')+'</details>';
   return h}
 function bindMat(){if(!isAdminRole())return;const p=$('#matPaste');if(p)p.onclick=matPasteBox;
   const pf=$('#poPdfFile');if(pf)pf.onchange=()=>{const f=pf.files&&pf.files[0];pf.value='';if(f)matPoFromFile(f,{})};
-  $$('[data-popdf]').forEach(b=>b.onclick=e=>{e.stopPropagation();matPdfOpen(b.dataset.popdf)});const a=$('#matAdd');if(a)a.onclick=()=>matLineBox(null);
+  $$('[data-popdf]').forEach(b=>b.onclick=e=>{e.stopPropagation();matPdfOpen(b.dataset.popdf)});
+  $$('[data-popre]').forEach(b=>b.onclick=async e=>{e.stopPropagation();const po=b.dataset.popre;
+    if(!await confirmBox('Mark every line on '+(po?'PO '+po:'lines with no PO #')+' as already delivered? Use this for orders delivered before the crew logged deliveries in the app.'))return;
+    matSave(M=>{M.lines.forEach(l=>{if(matPO(l.po)===matPO(po)&&!l.pre)l.pre={date:l.exp&&l.exp<=today()?l.exp:today()}})},'Marked delivered.')});const a=$('#matAdd');if(a)a.onclick=()=>matLineBox(null);
   $$('[data-ml]').forEach(el=>el.onclick=()=>{const l=((S.mat&&S.mat.M.lines)||[]).find(x=>x.id===el.dataset.ml);if(l)matLineBox(l)})}
 /* office save: re-read labor so nothing the sync or another tab wrote is lost, change only labor.materials */
 async function matSave(fn,msg){if(!isAdminRole()||!S.job)return false;const id=S.job.id;let L;
@@ -3014,12 +3018,14 @@ function matLineBox(l){const isNew=!l;l=l||{};const C=matHere()?matNow():null;co
     '<div class="two"><label class="field"><span>Qty ordered</span><input name="qty" type="number" step="any" min="0" inputmode="decimal" value="'+esc(l.qty!=null?l.qty:'')+'"></label><label class="field"><span>Unit</span><input name="unit" maxlength="20" placeholder="sheets, pcs, boxes" value="'+esc(l.unit||'')+'"></label></div>'+
     '<label class="field"><span>Expected delivery (optional)</span><input name="exp" type="date" value="'+esc(l.exp||'')+'"></label>'+
     (cur&&cur.short?'<label class="mshort" style="margin:0 0 10px"><input type="checkbox" name="sok" style="width:20px;height:20px"> Short / backorder is taken care of (clear the flag)</label>':'')+
+    '<label class="mshort" style="margin:0 0 10px"><input type="checkbox" name="pre" style="width:20px;height:20px"'+(l.pre?' checked':'')+'> Already delivered (before the app) – counts as all received</label>'+
     '<div class="mbtns">'+(isNew?'':'<button type="button" class="btn danger" data-del>Delete</button>')+'<button type="button" class="btn" data-x>Cancel</button><button class="btn primary" type="submit">Save</button></div></form>');
   const f=$('form',m);$('[data-x]',m).onclick=()=>m.close();setTimeout(()=>f.item.focus(),50);
   const d=$('[data-del]',m);if(d)d.onclick=async()=>{m.close();if(await confirmBox('Delete '+l.item+' from the order?'))matSave(M=>{M.lines=M.lines.filter(x=>x.id!==l.id)},'Line deleted.')};
   f.onsubmit=async e=>{e.preventDefault();const v={po:f.po.value.trim(),sup:f.sup.value.trim(),item:f.item.value.trim(),qty:num(f.qty.value),unit:f.unit.value.trim(),exp:f.exp.value||''};if(!v.item)return;
-    S.matLastPo=v.po;S.matLastSup=v.sup;const sok=f.sok&&f.sok.checked;m.close();
-    matSave(M=>{const o=M.lines.find(x=>x.id===l.id);if(o){Object.assign(o,v);if(sok)o.short_ok=today()}else M.lines.push(Object.assign({id:uuid().slice(0,8)},v))},isNew?'Line added.':'Line saved.')}}
+    S.matLastPo=v.po;S.matLastSup=v.sup;const sok=f.sok&&f.sok.checked,pre=f.pre.checked;m.close();
+    const preV=o=>pre?(o&&o.pre)||{date:v.exp&&v.exp<=today()?v.exp:today()}:undefined;
+    matSave(M=>{const o=M.lines.find(x=>x.id===l.id);if(o){Object.assign(o,v);if(sok)o.short_ok=today();const pv=preV(o);if(pv)o.pre=pv;else delete o.pre}else{const n=Object.assign({id:uuid().slice(0,8)},v);const pv=preV(null);if(pv)n.pre=pv;M.lines.push(n)}},isNew?'Line added.':'Line saved.')}}
 function matPasteBox(){
   const m=modal('<h2>Paste PO from Excel</h2><p class="small muted" style="margin:-4px 0 10px">In the PO, select the rows (item, qty and unit columns, headers OK) and copy. Paste them below.</p><form>'+
     '<div class="two"><label class="field"><span>PO #</span><input name="po" maxlength="30" value="'+esc(S.matLastPo||'')+'"></label><label class="field"><span>Supplier</span><input name="sup" list="matSupDL" maxlength="30" placeholder="FBM or LKL" value="'+esc(S.matLastSup||'')+'"></label></div>'+matSupDL+
