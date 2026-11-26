@@ -36,14 +36,18 @@ const B = [
 const plain = x => JSON.parse(JSON.stringify(x));
 const ids = a => plain(a.map(j => j.id));
 
-t('Coming up: everyone\'s bids due today or later, no won / lost / no bid; Due today, This week (next 7 days), Later; by date then name', () => {
+t('Coming up: everyone\'s bids due today or later, no won / lost / no bid; Due today, This week (rest of Mon-Sun week), Next week, Later; by date then name', () => {
   const g = T.bidComingGroups(B, TD);
-  assert.deepStrictEqual(plain(g.map(x => [x[0], x[1], ids(x[2])])), [['today', 'Due today', ['m', 'a']], ['week', 'This week', ['c', 'b']], ['later', 'Later', ['d', 'e']]]);
+  assert.deepStrictEqual(plain(g.map(x => [x[0], x[1], ids(x[2])])), [['today', 'Due today', ['m', 'a']], ['next', 'Next week', ['c', 'b', 'd']], ['later', 'Later', ['e']]]);
 });
 
-t('day 7 is This week, day 8 is Later; empty groups are dropped', () => {
-  const g = T.bidComingGroups([{ id: 'x', bid_date: '2026-12-03' }, { id: 'y', bid_date: '2026-12-04' }], TD);
-  assert.deepStrictEqual(plain(g.map(x => [x[0], ids(x[2])])), [['week', ['x']], ['later', ['y']]]);
+t('calendar week Mon-Sun: Thu 11/26 -> This week thru Sun 11/29, Next week Mon 11/30 - Sun 12/6, then Later; empty groups dropped', () => {
+  const g = T.bidComingGroups([{ id: 'w', bid_date: '2026-11-29' }, { id: 'x', bid_date: '2026-11-30' }, { id: 'y', bid_date: '2026-12-06' }, { id: 'z', bid_date: '2026-12-07' }], TD);
+  assert.deepStrictEqual(plain(g.map(x => [x[0], ids(x[2])])), [['week', ['w']], ['next', ['x', 'y']], ['later', ['z']]]);
+  const s = T.bidComingGroups([{ id: 'u', bid_date: '2026-11-29' }, { id: 'v', bid_date: '2026-11-30' }], '2026-11-29');
+  assert.deepStrictEqual(plain(s.map(x => [x[0], ids(x[2])])), [['today', ['u']], ['next', ['v']]], 'on Sunday, Monday is Next week');
+  const mo = T.bidComingGroups([{ id: 'v', bid_date: '2026-12-06' }], '2026-11-30');
+  assert.deepStrictEqual(plain(mo.map(x => [x[0], ids(x[2])])), [['week', ['v']]], 'on Monday, Sunday is This week');
   assert.deepStrictEqual(plain(T.bidComingGroups([], TD)), []);
   assert.deepStrictEqual(plain(T.bidComingGroups([{ id: 'p', bid_date: '2026-11-25' }], TD)), []);
 });
@@ -62,7 +66,7 @@ t('My bids sections: same phases, not grouped by estimator; empty sections dropp
   const mine = B.filter(j => j.pm === 'o1');
   const s = T.bidSecs(mine, TD, nm, false);
   assert.deepStrictEqual(plain(s.map(x => [x.k, ids(x.items), !!x.groups])), [['up', ['b'], false], ['wait', ['h'], false], ['res', ['f'], false]]);
-  assert.deepStrictEqual(plain(s[0].subs.map(x => x[0])), ['week']);
+  assert.deepStrictEqual(plain(s[0].subs.map(x => x[0])), ['next']);
 });
 
 t('estimator chips: names with bids, A-Z, no blanks', () => {
