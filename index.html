@@ -2789,6 +2789,9 @@ async function billTcRead(L){const cost=laborCost(L);if(!cost||!S.job)return nul
 async function loadBilling(){const id=jobId();if(!id||!isAdminRole())return;try{const [d]=await Promise.all([q(sb.from('job_budget').select('labor').eq('job_id',id).maybeSingle()),S.loaded.labor||S.laborLoading?null:loadLabor()]);if(jobId()!==id)return;const L=(d&&d.labor)||{};S.billing=L.billing||null;
     const T=await billTcRead(L);if(jobId()!==id)return;S.billTc=T}catch(e){S.billing=null}S.loaded.billing=true;if(S.tab==='billing')render()}
 const billMonth=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')};
+/* the month shown on the Billing card: this month unless the office stepped back or ahead (‹ ›); limited to 24 months back and next month */
+const billAdd=(p,n)=>{const [y,m]=String(p).split('-').map(Number);const d=new Date(y,m-1+n,1);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')};
+const billSel=()=>{const c=billMonth();const p=S.billPer&&S.billPerJob===(S.job&&S.job.id)?S.billPer:c;return p>billAdd(c,1)?billAdd(c,1):p<billAdd(c,-24)?billAdd(c,-24):p};
 const billMonthText=p=>{const [y,m]=String(p).split('-').map(Number);return new Date(y,m-1,1).toLocaleDateString(undefined,{month:'short',year:'numeric'})};
 /* a history entry’s % for each current line: by line name when the entry carries its line names (pay app loads and confirms save them) or old line names are given, else by position (missing = 0) */
 const billKey=n=>String(n||'').toLowerCase().replace(/[^a-z0-9#]+/g,' ').trim();
@@ -2799,23 +2802,28 @@ function billPcts(h,lines,oldNames){const p=h&&Array.isArray(h.pcts)?h.pcts:[];c
 function billingCard(){const B=S.billing;
   if(!S.loaded.billing)return '<div class="card muted small" style="margin-bottom:12px">Loading billing…</div>';
   if(!B||!Array.isArray(B.lines)||!B.lines.length)return '<div class="card" id="billCard" style="margin-bottom:12px"><b>Billing</b><div class="muted small">No pay app lines for this job yet. Tap <b>Load pay app (.xlsx)</b> to read them from the GC pay app, or they come from the job’s BILLING pay app.</div></div>';
-  const hist=(B.history||[]).slice().sort((a,b)=>a.period<b.period?-1:1);const cur=billMonth();
+  const hist=(B.history||[]).slice().sort((a,b)=>a.period<b.period?-1:1);const cur=billSel();const now=cur===billMonth();
   const prev=hist.filter(h=>h.period<cur).pop();const mine=hist.find(h=>h.period===cur);const ed=canEditLaborRate();
   const pv=prev?billPcts(prev,B.lines):null,mv=mine?billPcts(mine,B.lines):null;
   const C=S.loaded.labor&&S.labor?laborCalc():null;const H=billHoursByCode(C,S.billTc);const noHrs=!Object.keys(H).length;
-  const rows=B.lines.map((l,i)=>{const last=pv?pv[i]:0;const crew=billHoursPct(l,H,B.lines);const code=PCT_SKIP.test(String(l.n||''))?null:lineCode(l.n);const sug=Math.min(100,Math.max(last,crew==null?last:crew));const val=mv?mv[i]:sug;return {l,i,last,crew,code,sug,val}});
+  const rows=B.lines.map((l,i)=>{const last=pv?pv[i]:0;const crew=now?billHoursPct(l,H,B.lines):null;const code=PCT_SKIP.test(String(l.n||''))?null:lineCode(l.n);const sug=Math.min(100,Math.max(last,crew==null?last:crew));const val=mv?mv[i]:sug;return {l,i,last,crew,code,sug,val}});
   const tot=B.lines.reduce((a,l)=>a+num(l.v),0);
-  return '<div class="card" id="billCard" style="margin-bottom:12px"><div class="row"><b class="grow" style="font-size:17px">Billing · '+esc(billMonthText(cur))+'</b>'+(mine?'<span class="badge">Confirmed</span>':'')+'</div>'+
+  const c0=billMonth();const canPrev=cur>billAdd(c0,-24),canNext=cur<billAdd(c0,1);
+  return '<div class="card" id="billCard" style="margin-bottom:12px"><div class="row" style="gap:6px;align-items:center"><button class="btn sm" data-bmon="-1" aria-label="Previous month"'+(canPrev?'':' disabled')+'>‹</button><b class="grow" style="font-size:17px;text-align:center">Billing · '+esc(billMonthText(cur))+'</b>'+(mine?'<span class="badge">Confirmed</span>':'')+'<button class="btn sm" data-bmon="1" aria-label="Next month"'+(canNext?'':' disabled')+'>›</button></div>'+
+    (!now?'<div class="small" style="margin:4px 0;padding:6px 8px;border-radius:8px;background:#eef3fb;color:#1d3f91">Looking at '+esc(billMonthText(cur))+(cur<c0?' (past month)':' (next month)')+'. % from hours is only shown for this month. <a href="#" data-bmon="0">Back to '+esc(billMonthText(c0))+'</a></div>':'')+
     (B.source?'<div class="muted small">Lines from '+esc(B.source)+(B.loaded_at?' · loaded '+esc(fmtWhen(B.loaded_at)):'')+'</div>':'')+
     '<div class="muted small" style="margin:2px 0 8px">% from hours = time card hours on each cost code vs. the job’s budgeted hours, for reference. Type this month’s % for each line, then '+(ed?'Confirm.':'the job’s PM confirms.')+' Never below last month.</div>'+
-    (!S.loaded.labor?'<div class="muted small" style="margin:-4px 0 8px">Loading hours…</div>':noHrs?'<div class="small" style="margin:-4px 0 8px;padding:6px 8px;border-radius:8px;background:#fff4e5;color:#9a3412">No budget hours on the Labor tab yet, so there’s no % from hours. Last month’s % is filled in.</div>':'')+
+    (!now?'':!S.loaded.labor?'<div class="muted small" style="margin:-4px 0 8px">Loading hours…</div>':noHrs?'<div class="small" style="margin:-4px 0 8px;padding:6px 8px;border-radius:8px;background:#fff4e5;color:#9a3412">No budget hours on the Labor tab yet, so there’s no % from hours. Last month’s % is filled in.</div>':'')+
     '<div style="overflow-x:auto"><table class="ltab" id="billTab"><thead><tr><th>Line</th><th>Scheduled</th><th>Last billed</th><th>% from hours</th><th>This month %</th><th>To date</th></tr></thead><tbody>'+
     rows.map(r=>'<tr><td>'+esc(r.l.n)+'</td><td>'+money(r.l.v)+'</td><td>'+r2(r.last)+'%</td><td>'+(r.crew==null?'–':r.crew+'%')+(r.code&&H[r.code]?'<div class="muted small" style="white-space:normal;min-width:88px">'+esc(billHrsNote(r.code,H[r.code]))+'</div>':'')+(r.crew!=null&&r.crew<r.last?' <span class="muted small">(below last)</span>':'')+'</td><td>'+(ed?'<input data-bp="'+r.i+'" type="number" inputmode="decimal" min="0" max="100" step="any" value="'+r2(r.val)+'" style="width:70px;border:1px solid var(--line);border-radius:8px;padding:6px;text-align:right">':r2(r.val)+'%')+'</td><td data-bd="'+r.i+'">'+money(num(r.l.v)*r.val/100)+'</td></tr>').join('')+
     '</tbody><tfoot><tr><th>Total</th><th>'+money(tot)+'</th><th></th><th></th><th></th><th data-btot></th></tr></tfoot></table></div>'+
     '<div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap"><span class="grow muted small" data-bthis></span>'+(ed?'<button class="btn sm primary" id="billOk">'+(mine?'Update':'Confirm')+' for '+esc(billMonthText(cur))+'</button>':'')+'</div>'+
-    (hist.length?'<div class="muted small" style="margin-top:6px">Confirmed: '+hist.map(h=>esc(billMonthText(h.period))+(h.from?' ('+esc(h.from)+')':h.by?' ('+esc(who(h.by))+')':'')).join(', ')+'</div>':'')+'</div>'}
+    (hist.length?'<div class="muted small" style="margin-top:6px">Confirmed: '+hist.map(h=>'<a href="#" data-bgo="'+esc(h.period)+'">'+esc(billMonthText(h.period))+'</a>'+(h.from?' ('+esc(h.from)+')':h.by?' ('+esc(who(h.by))+')':'')).join(', ')+'</div>':'')+'</div>'}
 function bindBilling(){const B=S.billing;if(!B||!B.lines||!$('#billTab'))return;
-  const hist=(B.history||[]).slice().sort((a,b)=>a.period<b.period?-1:1);const cur=billMonth();const prev=hist.filter(h=>h.period<cur).pop();const pv=prev?billPcts(prev,B.lines):null;
+  const go=p=>{S.billPer=p;S.billPerJob=S.job&&S.job.id;render()};
+  $$('[data-bmon]').forEach(b=>b.onclick=e=>{e.preventDefault();const n=+b.dataset.bmon;go(n?billAdd(billSel(),n):billMonth())});
+  $$('[data-bgo]').forEach(a=>a.onclick=e=>{e.preventDefault();go(a.dataset.bgo)});
+  const hist=(B.history||[]).slice().sort((a,b)=>a.period<b.period?-1:1);const cur=billSel();const prev=hist.filter(h=>h.period<cur).pop();const pv=prev?billPcts(prev,B.lines):null;
   const vals=()=>{const mine=hist.find(h=>h.period===cur);const mv=mine?billPcts(mine,B.lines):null;return B.lines.map((l,i)=>{const el=$('[data-bp="'+i+'"]');return el?Math.min(100,Math.max(0,r2(num(el.value)))):(mv?mv[i]:0)})};
   const upd=()=>{const v=vals();let td=0,th=0;B.lines.forEach((l,i)=>{const d=num(l.v)*v[i]/100;td+=d;th+=d-num(l.v)*(pv?pv[i]:0)/100;const c=$('[data-bd="'+i+'"]');if(c)c.textContent=money(d)});const t=$('[data-btot]');if(t)t.textContent=money(td);const x=$('[data-bthis]');if(x)x.textContent='Billed to date '+money(td)+' · this month '+money(th)};
   $$('[data-bp]').forEach(el=>el.oninput=upd);upd();
