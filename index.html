@@ -2793,14 +2793,14 @@ function bidCollSet(keys,v){const o=bidCollSt();keys.forEach(k=>o[k]=!!v);lsSet(
 const DOW3=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const wkDay=s=>{const [y,m,d]=String(s||'').split('-').map(Number);return y&&m?DOW3[new Date(Date.UTC(y,m-1,d)).getUTCDay()]+' '+MON3[m-1]+' '+d:''};
 const estBadge=n=>'<span class="best" style="--ec:'+(n==='No estimator'?'#9aa3ad':estColor(n))+'"><i></i>'+esc(n)+'</span>';
-/* "Next due" strip at the top of Bids: the soonest bid due today or later, everyone's */
-function bidNextHtml(){const td=today(),g=bidComingGroups(S.bids||[],td);if(!g.length)return '';const j=g[0][2][0],n=dayDiff(td,String(j.bid_date).slice(0,10)),same=g[0][2].filter(x=>x!==j&&x.bid_date===j.bid_date).length;
-  return '<button type="button" class="bnext'+(n===0?' tdy':'')+'" data-bnext="'+esc(j.id)+'" title="Open bid details"><span class="bnk">'+(n===0?'Due today':'Next due')+'</span><span class="bnn">'+esc(j.name||'Untitled bid')+'</span><span class="bnm"><span class="bnw">'+wkDay(j.bid_date)+(n>0?' · '+(n===1?'tomorrow':'in '+n+' days'):'')+'</span>'+estBadge(pmName(j.pm)||'No estimator')+(same?'<span class="bnw">+'+same+' more that day</span>':'')+'</span></button>'}
+/* "Next due" strip at the top of Bids: the soonest bid due today or later; yours on My bids, everyone's on All bids */
+function bidNextHtml(){const td=today(),mine=lsGet('crewplans.bidView')!=='all'&&!!S.myOfficeId,g=bidComingGroups((S.bids||[]).filter(j=>!mine||j.pm===S.myOfficeId),td);if(!g.length)return '';const j=g[0][2][0],n=dayDiff(td,String(j.bid_date).slice(0,10)),same=g[0][2].filter(x=>x!==j&&x.bid_date===j.bid_date).length;
+  return '<button type="button" class="bnext'+(n===0?' tdy':'')+'" data-bnext="'+esc(j.id)+'" title="Open bid details"><span class="bnk">'+(n===0?'Due today':(mine?'Your next due':'Next due'))+'</span><span class="bnn">'+esc(j.name||'Untitled bid')+'</span><span class="bnm"><span class="bnw">'+wkDay(j.bid_date)+(n>0?' · '+(n===1?'tomorrow':'in '+n+' days'):'')+'</span>'+estBadge(pmName(j.pm)||'No estimator')+(same?'<span class="bnw">+'+same+' more that day</span>':'')+'</span></button>'}
 function bidDateBlock(d,td,res,cls){if(!d)return '<div class="bdate none'+(cls||'')+'"><span>No</span><b>date</b></div>';const n=dayDiff(td,d),[y,m,dd]=d.split('-').map(Number);
   return '<div class="bdate'+(res?'':n>=0&&n<=7?' soon':n<0?' past':'')+(cls||'')+'" title="'+esc(fmtDay(d))+'"><span>'+MON3[m-1]+(y!==+td.slice(0,4)?' ’'+String(y).slice(2):'')+'</span><b>'+dd+'</b></div>'}
 const bidPill=s=>'<span class="bpill s-'+s+'">'+bidStLabel(s)+'</span>';
 function bidCard(j,td,sel,est){const s=bidStat(j,td),g=bidGcs(j),notes=Array.isArray(j.bid_notes)?j.bid_notes:[],last=notes[notes.length-1],d=j.bid_date,n=d?dayDiff(td,d):null,res=bidRes(s);
-  let l2=d?(n===0?'<b class="due">Due today</b>':n>0&&n<=14?'<b class="due">Due in '+n+' day'+(n===1?'':'s')+'</b>':'Bid '+shortDay(d)+(d.slice(0,4)!==td.slice(0,4)?', '+d.slice(0,4):'')):'No bid date';
+  let l2=d?(n===0?'<b class="due">Due today</b>':n===1?'<b class="due">Due tomorrow</b>':n>1&&n<=13?'<b class="due">Due '+wkDay(d)+'</b>':'Bid '+shortDay(d)+(d.slice(0,4)!==td.slice(0,4)?', '+d.slice(0,4):'')):'No bid date';
   if(est)l2=estBadge(est)+l2;
   if(g.length)l2+=' · '+esc(g[0].name)+(g.length>1?' +'+(g.length-1):'');
   let l3='';if(res&&j.bid_result)l3=esc(j.bid_result);else if(last)l3=esc(last.text)+(last.at?' · '+shortDay(last.at):'');else if(!res&&d&&n<-7)l3='<span class="bwarn">No follow-up yet · bid '+(-n)+' days ago</span>';
