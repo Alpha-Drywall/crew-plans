@@ -280,7 +280,7 @@ body:has(#fvPill) .mcard{padding-bottom:72px}#tmLog{scroll-margin-top:140px}
 .lkm{max-width:1240px}
 .lkgrid{overflow-x:auto;background:#fff;border:1px solid var(--line);border-radius:12px;-webkit-overflow-scrolling:touch}
 .lkt{border-collapse:separate;border-spacing:0;font-size:13px;min-width:100%}
-.lkt th,.lkt td{border-bottom:1px solid var(--line);border-right:1px solid #eef0f3;padding:2px 1px;text-align:center;height:36px;min-width:46px}
+.lkt th,.lkt td{border-bottom:1px solid var(--line);border-right:1px solid #eef0f3;padding:2px 1px;text-align:center;height:36px;min-width:62px}
 .lkt thead th{background:#f6f7f9;font-size:11.5px;color:#5d6670;font-weight:700;line-height:1.15;padding:4px 2px}
 .lkt thead th span{font-weight:500}
 .lkt thead th.td{background:#fff0cc;color:var(--ink)}
@@ -292,7 +292,7 @@ body:has(#fvPill) .mcard{padding-bottom:72px}#tmLog{scroll-margin-top:140px}
 .lkt .wk{border-left:2px solid #8a939d}
 .lkt tfoot td{font-size:11.5px;color:#5d6670;background:#f6f7f9;height:28px}
 .lkc{cursor:pointer;user-select:none;-webkit-user-select:none}
-.lkc b{display:inline-block;min-width:34px;padding:3px 4px;border-radius:6px;color:#fff;font-size:12px;font-weight:700;line-height:1.2}
+.lkc b{display:inline-block;min-width:34px;max-width:60px;padding:3px 3px;border-radius:6px;color:#fff;font-size:11px;font-weight:700;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:clip}
 .lkc.td{background:#fffcf2}
 .lkc.idle{background:#fff7ea}
 .lkc.past b{opacity:.6}
@@ -2019,7 +2019,17 @@ function lookGroups(cards,roster,fms,skip,extra){const fmOf={},nm={},isFm=new Se
 function lookDiff(a,b){const o={};a=a||{};b=b||{};new Set(Object.keys(a).concat(Object.keys(b))).forEach(j=>{const x=a[j]||{},y=b[j]||{};
     new Set(Object.keys(x).concat(Object.keys(y))).forEach(d=>{if(JSON.stringify(x[d]||[])!==JSON.stringify(y[d]||[]))(o[j]=o[j]||{})[d]=(y[d]&&y[d].length)?y[d]:null})});
   return o}
-const lookShort=j=>tcJobNo(j&&j.name)||String((j&&j.name)||'?').slice(0,4);
+/** Short job name for the board cells, made from the job name: first real word (skips U, of, the…), a 3-letter word gets the next word if it fits (IFA Elko), max 8 letters.
+    ‘330 - U OF U OR5 HYBRID ROOM UPGRADE’ → OR5 · ‘331 - NORDIC VALLEY WWTP’ → Nordic. Two jobs with the same short name get their job number added. */
+const LK_SKIP=new Set(['U','OF','THE','A','AN','AT','AND','&','-','–','FOR','NEW','PHASE','PH']);
+function lookAuto(name){const w=tcJobShort(name).split(/[\s\/,]+/).map(x=>x.replace(/[^A-Za-z0-9&\-–]/g,'')).filter(Boolean);const ok=w.filter(x=>!LK_SKIP.has(x.toUpperCase()));const ws=ok.length?ok:w;if(!ws.length)return '?';
+  const tc=x=>/\d/.test(x)||x.length<=3?x.toUpperCase():x.charAt(0).toUpperCase()+x.slice(1).toLowerCase();let t=tc(ws[0]);
+  if(ws[0].length<=3&&ws[1]&&(t+' '+tc(ws[1])).length<=8)t+=' '+tc(ws[1]);return t.length>8?t.slice(0,8):t}
+function lookNames(jobs){const o={},c={};(jobs||[]).forEach(j=>{const t=lookAuto(j.name);o[j.id]=t;c[t]=(c[t]||0)+1});
+  (jobs||[]).forEach(j=>{if(c[o[j.id]]>1){const n=tcJobNo(j.name);if(n)o[j.id]=o[j.id].slice(0,8-n.length-1)+' '+n}});return o}
+const lookShort=j=>{if(!j)return '?';const m=lookNames(S.jobs||[]);return m[j.id]||lookAuto(j.name)};
+/** Number + full name for pickers and row labels: 330 U OF U OR5 HYBRID ROOM UPGRADE */
+const lookFull=j=>j?((tcJobNo(j.name)?tcJobNo(j.name)+' ':'')+(tcJobShort(j.name)||j.name)):'?';
 const lkJob=id=>(S.jobs||[]).find(j=>j.id===id);
 function lookClean(la){const o={};if(!la||typeof la!=='object'||Array.isArray(la))return o;Object.keys(la).forEach(d=>{if(/^\d{4}-\d\d-\d\d$/.test(d)&&Array.isArray(la[d])){const a=la[d].filter(n=>typeof n==='string'&&n.trim());if(a.length)o[d]=a}});return o}
 function openLook(){if(!lookCan())return;S.view='look';LK.start=LK.start||lookMonday(tcToday());LK.sel=[];LK.multi=false;window.scrollTo(0,0);loadLook()}
@@ -2046,8 +2056,8 @@ function lookModel(){const td=tcToday(),jobs=S.jobs||[];const by=lookByPerson(LK
   const since=isoAddD(td,-14),active=new Set();jobs.forEach(j=>{const K=tcJobKey(j);const a=S.jobAct&&S.jobAct[j.id];if(tcJobLive(LK.cards,K[0],K[1],since).days.size||(a&&String(a).slice(0,10)>=since))active.add(j.id)});
   const W=lookWarn(LK.plans,people,days,td,active,act);const miss={};W.miss.forEach(x=>miss[tcKey(x.name)+'|'+x.date]=x);
   const num0=j=>+(tcJobNo(j.name)||1e9);const shown=jobs.filter(j=>active.has(j.id)||LK.addJobs.includes(j.id)||days.some(d=>((LK.plans[j.id]||{})[d]||[]).length)).sort((a,b)=>num0(a)-num0(b)||String(a.name).localeCompare(String(b.name)));
-  const col={},short={other:'oth'};jobs.forEach(j=>short[j.id]=lookShort(j));shown.forEach((j,i)=>col[j.id]=LK_COLORS[i%LK_COLORS.length]);jobs.forEach(j=>{if(!col[j.id])col[j.id]='#475569'});
-  return LK.M={td,days,by,groups,people,act,active,W,miss,shown,col,short}}
+  const col={},short=Object.assign({other:'oth'},lookNames(S.jobs||[]));jobs.forEach(j=>{if(!short[j.id])short[j.id]=lookAuto(j.name)});const full={};jobs.forEach(j=>full[j.id]=lookFull(j));shown.forEach((j,i)=>col[j.id]=LK_COLORS[i%LK_COLORS.length]);jobs.forEach(j=>{if(!col[j.id])col[j.id]='#475569'});
+  return LK.M={td,days,by,groups,people,act,active,W,miss,shown,col,short,full}}
 function renderLook(){let h='<div class="top"><button id="lkBack" aria-label="Back">‹</button><h1><div class="ttl"><span class="brand"></span>Alpha Operations</div></h1></div><main class="lkm'+(LK.multi?' multi':'')+'">';
   if(!lookCan())return h+'<div class="empty"><b>Office only</b>The crew lookahead is for the office login.</div></main>';
   if(!LK.loaded)return h+'<div class="empty">Loading crew lookahead…</div></main>';
@@ -2081,7 +2091,7 @@ function lookPeopleGrid(M){if(!M.people.length)return '<div class="empty"><b>No 
   const cnt=d=>M.people.filter(n=>((M.by[tcKey(n)]||{d:{}}).d[d]||[]).length).length;
   return h+'</tbody><tfoot><tr><td class="lkn">Planned</td>'+M.days.map((d,i)=>'<td class="lkf'+(i&&lookDow(d)===1?' wk':'')+'">'+cnt(d)+'/'+M.people.length+'</td>').join('')+'</tr></tfoot></table></div>'}
 function lookCell(M,n,k,js,d,r,c){const past=d<M.td,w=lookDow(d);let cls='lkc'+(c&&w===1?' wk':'')+(d===M.td?' td':'')+(past?' past':'')+(js.length>1?' dbl':'')+(LK.sel.includes(n+'|'+d)?' sel':'');
-  let x=js.map(j=>'<b style="background:'+M.col[j]+'">'+esc(M.short[j]||'?')+'</b>').join('');
+  let x=js.map(j=>'<b style="background:'+M.col[j]+'" title="'+esc(M.full[j]||'')+'">'+esc(M.short[j]||'?')+'</b>').join('');
   if(!js.length&&!past&&w>=1&&w<=5)cls+=' idle';
   const A=past&&M.act[d];if(A){const a=A[k]||[],mm=M.miss[k+'|'+d];
     if(js.length&&!mm)x+='<i class="ok" title="Time card matches">✓</i>';
@@ -2091,7 +2101,7 @@ function lookCell(M,n,k,js,d,r,c){const past=d<M.td,w=lookDow(d);let cls='lkc'+(
 function lookJobGrid(M){const opts=sortJobs((S.jobs||[]).filter(j=>!M.shown.includes(j)));
   let h='';if(!M.shown.length)h+='<div class="empty"><b>No jobs planned yet</b>Pick a job below, or plan people in By person.</div>';
   else{h+='<div class="lkgrid" id="lkGrid"><table class="lkt"><thead><tr><th class="lkn">Job</th>'+lookHead(M)+'</tr></thead><tbody>';
-    M.shown.forEach(j=>{const p=LK.plans[j.id]||{};h+='<tr><td class="lkn" title="'+esc(j.name)+'"><i class="lkdot" style="background:'+M.col[j.id]+'"></i>'+esc(lookShort(j))+' <span class="muted">'+esc(tcJobShort(j.name)||'')+'</span></td>'+
+    M.shown.forEach(j=>{const p=LK.plans[j.id]||{};h+='<tr><td class="lkn" title="'+esc(j.name)+'"><i class="lkdot" style="background:'+M.col[j.id]+'"></i>'+'<b>'+esc(lookShort(j))+'</b> <span class="muted">'+esc(tcJobNo(j.name)||'')+'</span></td>'+
       M.days.map((d,i)=>{const c=(p[d]||[]).length,zero=!c&&d>=M.td&&M.active.has(j.id)&&lookDow(d)<6;return '<td class="lkc lkj'+(i&&lookDow(d)===1?' wk':'')+(d===M.td?' td':'')+(d<M.td?' past':'')+(zero?' zero':'')+'" data-j="'+esc(j.id)+'" data-d="'+d+'">'+(c?'<b style="background:'+M.col[j.id]+'">'+c+'</b>':(zero?'0':''))+'</td>'}).join('')+'</tr>'});
     h+='</tbody></table></div>'}
   return h+(opts.length?'<select id="lkAddJob" class="lksel"><option value="">+ Plan another job…</option>'+opts.map(j=>'<option value="'+esc(j.id)+'">'+esc(j.name)+'</option>').join('')+'</select>':'')}
@@ -2100,7 +2110,7 @@ function lookPickJobs(M){const top=M.shown.slice();const rest=sortJobs((S.jobs||
 function lookPick(cells){if(!cells.length)return;const M=LK.M||lookModel();const ns=[...new Set(cells.map(x=>x.n))],ds=[...new Set(cells.map(x=>x.d))].sort();const [top,rest]=lookPickJobs(M);
   const cur=cells.length===1?((M.by[tcKey(cells[0].n)]||{d:{}}).d[cells[0].d]||[]):[];
   const m=modal('<h2>'+esc(ns.length===1?ns[0]:ns.length+' people')+'</h2><p class="muted small" style="margin:-4px 0 10px">'+esc(ds.length===1?fmtDay(ds[0]):ds.length+' days · '+tcFmt(ds[0])+' – '+tcFmt(ds[ds.length-1]))+(cur.length?' · now on '+cur.map(j=>M.short[j]).join(' + '):'')+'</p>'+
-    '<div class="chips lkjobs">'+top.map(j=>'<button type="button" class="chip'+(cur.includes(j.id)?' on':'')+'" data-j="'+esc(j.id)+'"><i style="background:'+M.col[j.id]+'"></i>'+esc(lookShort(j))+' <span>'+esc(tcJobShort(j.name)||'')+'</span></button>').join('')+'</div>'+
+    '<div class="chips lkjobs">'+top.map(j=>'<button type="button" class="chip'+(cur.includes(j.id)?' on':'')+'" data-j="'+esc(j.id)+'"><i style="background:'+M.col[j.id]+'"></i>'+esc(tcJobNo(j.name)||'')+' <span>'+esc(tcJobShort(j.name)||j.name)+'</span></button>').join('')+'</div>'+
     (rest.length?'<select class="lksel" data-other><option value="">'+(top.length?'Other job…':'Pick a job…')+'</option>'+rest.map(j=>'<option value="'+esc(j.id)+'">'+esc(j.name)+'</option>').join('')+'</select>':'')+
     '<label class="lkck"><input type="checkbox" data-rep> Repeat for the week (through Friday)</label><label class="lkck"><input type="checkbox" data-keep> Split day: keep their other job too</label>'+
     '<div class="mbtns"><button class="btn" data-clr>Nothing planned</button><button class="btn" data-x>Cancel</button></div>');
@@ -2110,7 +2120,7 @@ function lookPick(cells){if(!cells.length)return;const M=LK.M||lookModel();const
   $$('[data-j]',m).forEach(b=>b.onclick=()=>apply(b.dataset.j));const o=$('[data-other]',m);if(o)o.onchange=()=>{if(o.value)apply(o.value)};
   $('[data-clr]',m).onclick=()=>apply(null);$('[data-x]',m).onclick=()=>m.close()}
 function lookJobDay(j,d){const M=LK.M||lookModel(),job=lkJob(j);if(!job)return;const on=new Set(((LK.plans[j]||{})[d]||[]).map(tcKey));
-  const m=modal('<h2>'+esc(lookShort(job)+' '+(tcJobShort(job.name)||''))+'</h2><p class="muted small" style="margin:-4px 0 6px">'+esc(fmtDay(d))+' · tap who’s on this job</p>'+
+  const m=modal('<h2>'+esc(lookFull(job))+'</h2><p class="muted small" style="margin:-4px 0 6px">'+esc(fmtDay(d))+' · tap who’s on this job</p>'+
     M.groups.map(g=>'<div class="small muted" style="margin:8px 0 4px;font-weight:700">'+esc(g.fm?g.fm+'’s crew':'Others')+'</div><div class="chips" style="margin-bottom:4px">'+g.names.map(n=>{const o=((M.by[tcKey(n)]||{d:{}}).d[d]||[]).filter(x=>x!==j);
       return '<button type="button" class="chip'+(on.has(tcKey(n))?' on':'')+'" data-p="'+esc(n)+'">'+esc(n)+(o.length?' <small style="opacity:.7">'+esc(o.map(x=>M.short[x]).join('/'))+'</small>':'')+'</button>'}).join('')+'</div>').join('')+
     '<label class="lkck"><input type="checkbox" data-rep> Repeat for the week (through Friday)</label><label class="lkck"><input type="checkbox" data-keep> Split day: keep people on their other job too</label>'+
