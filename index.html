@@ -286,6 +286,10 @@ const phase=k=>PHASES.find(p=>p.k===k)||{k:String(k||'other'),n:String(k||'Other
 const areaPct=(a,k)=>clamp(num(a&&a.pct&&a.pct[k]!=null?a.pct[k]:a&&a[k]),0,100);
 const pinKind=k=>PIN_KINDS.find(p=>p.k===k)||PIN_KINDS[3];
 const uuid=()=>(crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;return (c==='x'?r:(r&3|8)).toString(16)}));
+/* Time card days: show days up to today (and any day that already has entries); later days are added on purpose with + Add <day>. */
+function tcShowUpTo(c,start){const td=today();let n=-1;for(let d=0;d<12;d++){if(isoAddD(start,TC_OFF[d])<=td)n=d;if((c.workers||[]).some(w=>((w.days&&w.days[d])||[]).length))n=Math.max(n,d)}return Math.max(n,TC.addUpTo!=null&&TC.addUpTo.start===start?TC.addUpTo.d:-1)}
+/* Same as: the closest earlier day that has entries (so an empty Saturday is skipped and Monday copies Friday). */
+function tcSameFrom(w,d){for(let p=d-1;p>=0;p--)if(((w.days&&w.days[p])||[]).length)return p;return d-1}
 function today(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 function fmtDay(s){const [y,m,d]=String(s).split('-').map(Number);if(!y)return esc(s);return new Date(y,m-1,d).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric',year:'numeric'})}
 function fmtWhen(v){if(!v)return '';const d=new Date(v);if(isNaN(d))return '';return d.toLocaleDateString(undefined,{month:'short',day:'numeric'})+' '+d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'})}
@@ -1462,14 +1466,16 @@ function tcBody(){
     h+='<div class="card tcw'+(open?' open':'')+'" data-w="'+i+'"><div class="tcwh" data-tog="'+i+'"><div class="grow"><b>'+esc(w.name||'New worker')+'</b><div class="muted small"><span data-wh="'+i+'">'+tcWHrs(w)+'</span> hrs'+(tcRate(w)?' · <span data-wd="'+i+'">'+tcMoney(tcWHrs(w)*tcRate(w))+'</span>':'')+'</div></div><button class="ico tcwx" data-rmw="'+i+'" aria-label="Remove worker">✕</button><span class="chev">'+(open?'▾':'›')+'</span></div>';
     if(open){
       h+='<div class="tcwb">'+(i===0&&mine&&S.isAdmin?tcBankBox(c,w):'')+'<div class="tcwf"><label class="field"><span>Name</span><input data-name="'+i+'" value="'+esc(w.name||'')+'"></label><label class="field" style="max-width:110px"><span>Rate $/hr</span><input data-rate="'+i+'" inputmode="decimal" value="'+esc(w.rate==null?'':String(w.rate))+'"></label></div>';
-      for(let d=0;d<12;d++){
+      const upTo=tcShowUpTo(c,TC.start);
+      for(let d=0;d<=upTo;d++){
         const iso=isoAddD(TC.start,TC_OFF[d]),lines=(w.days&&w.days[d])||[];
         h+='<div class="tcday'+(d%2?'':' alt')+'"><div class="tcdh"><b>'+esc(tcFmt(iso,{weekday:'short',month:'numeric',day:'numeric'}))+'</b><span class="muted small"><span data-dh="'+i+'-'+d+'">'+tcDayHrs(w,d)+'</span> hrs</span></div>';
         lines.forEach((l,k)=>{
           h+='<div class="tcl"><select data-job="'+i+'-'+d+'-'+k+'">'+tcJobOptions(l)+'</select>'+(l.kind==='off'?'<span class="muted small grow">Off</span>':'<select data-code="'+i+'-'+d+'-'+k+'"><option value="">Code</option>'+TC_CODES.map(o=>'<option value="'+o[0]+'"'+(String(l.code||'')===o[0]?' selected':'')+'>'+o[1]+'</option>').join('')+(l.code&&!TC_CODES.some(o=>o[0]===String(l.code))?'<option value="'+esc(l.code)+'" selected>'+esc(l.code)+'</option>':'')+'</select><input data-hrs="'+i+'-'+d+'-'+k+'" inputmode="decimal" placeholder="hrs" value="'+esc(l.hrs==null?'':String(l.hrs))+'"><span class="tchq">'+[8,10,12].map(n=>'<button type="button" data-qh="'+i+'-'+d+'-'+k+'-'+n+'"'+(String(l.hrs)===String(n)?' class="on"':'')+'>'+n+'</button>').join('')+'</span>')+'<button class="ico" data-rml="'+i+'-'+d+'-'+k+'" aria-label="Remove line">✕</button></div>';
         });
-        h+='<div class="tcdb">'+(lines.length<3?'<button class="btn sm" data-addl="'+i+'-'+d+'">+ Line</button>':'')+(d>0?'<button class="btn sm" data-same="'+i+'-'+d+'">Same as '+esc(tcFmt(isoAddD(TC.start,TC_OFF[d-1]),{weekday:'short'}))+'</button>':'')+'</div></div>';
+        h+='<div class="tcdb">'+(lines.length<3?'<button class="btn sm" data-addl="'+i+'-'+d+'">+ Line</button>':'')+(d>0?'<button class="btn sm" data-same="'+i+'-'+d+'">Same as '+esc(tcFmt(isoAddD(TC.start,TC_OFF[tcSameFrom(w,d)]),{weekday:'short'}))+'</button>':'')+'</div></div>';
       }
+      if(upTo<11)h+='<div class="tcdb"><button class="btn sm" data-addday="'+(upTo+1)+'">+ Add '+esc(tcFmt(isoAddD(TC.start,TC_OFF[upTo+1]),{weekday:'long',month:'numeric',day:'numeric'}))+'</button></div>';
       h+='<div class="tcdb" style="justify-content:space-between"><button class="btn sm" data-copyall="'+i+'">Copy these days to whole crew</button><button class="btn sm danger" data-rmw="'+i+'">Remove worker</button></div></div>';
     }
     h+='</div>';
@@ -1692,7 +1698,8 @@ function bindTc(){
     tcChanged(true);
   });
   $$('[data-addl]').forEach(el=>el.onclick=()=>{const [i,d]=el.dataset.addl.split('-').map(Number);const w=c.workers[i];w.days=w.days||{};const L=w.days[d]=w.days[d]||[];const prev=L[L.length-1]||((w.days[d-1]||[])[0]);L.push(prev&&prev.kind!=='off'?{kind:prev.kind||'job',job:prev.job,name:prev.name,code:prev.code,hrs:''}:{kind:'job',hrs:''});tcChanged(true)});
-  $$('[data-same]').forEach(el=>el.onclick=()=>{const [i,d]=el.dataset.same.split('-').map(Number);const w=c.workers[i];w.days=w.days||{};w.days[d]=JSON.parse(JSON.stringify(w.days[d-1]||[]));tcChanged(true)});
+  $$('[data-same]').forEach(el=>el.onclick=()=>{const [i,d]=el.dataset.same.split('-').map(Number);const w=c.workers[i];w.days=w.days||{};w.days[d]=JSON.parse(JSON.stringify(w.days[tcSameFrom(w,d)]||[]));tcChanged(true)});
+  $$('[data-addday]').forEach(el=>el.onclick=()=>{TC.addUpTo={start:TC.start,d:+el.dataset.addday};render()});
   $$('[data-rml]').forEach(el=>el.onclick=()=>{const x=tcLine(el.dataset.rml);x.lines.splice(x.k,1);tcChanged(true)});
   $$('[data-rmw]').forEach(el=>el.onclick=async e=>{e.stopPropagation();const i=+el.dataset.rmw;const w=c.workers[i];if(!await confirmBox('Are you sure? Delete '+(w.name||'this worker')+' from this time card'+(tcWHrs(w)?' and their '+tcWHrs(w)+' hours':'')+'?','Delete'))return;c.workers.splice(i,1);TC.open=-1;tcChanged(true)});
   $$('[data-copyall]').forEach(el=>el.onclick=async()=>{const i=+el.dataset.copyall;if(c.workers.length<2)return;if(!await confirmBox('Copy '+(c.workers[i].name||'this worker')+'\'s jobs, codes and hours to everyone else on this card? Their current days will be replaced. Rates stay the same.','Copy',false))return;const src=JSON.stringify(c.workers[i].days||{});c.workers.forEach((w,j)=>{if(j!==i)w.days=JSON.parse(src)});tcChanged(true);toast('Copied to the whole crew.')});
