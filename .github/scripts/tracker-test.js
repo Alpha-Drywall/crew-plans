@@ -13,7 +13,7 @@ function grab(name) {
   if (!lines[i].startsWith('const ')) while (j < lines.length && /^(\s|\})/.test(lines[j])) j++;
   return lines.slice(i, j).join('\n');
 }
-const names = ['num', 'BID_ST', 'bidStLabel', 'isoD', 'dayDiff', 'MON3', 'bidStat', 'bidFilt', 'bidGcs', 'pipeIn', 'bidYear',
+const names = ['num', 'BID_ST', 'bidStLabel', 'isoD', 'dayDiff', 'MON3', 'BID_NOWORD_DAYS', 'bidNoWord', 'bidLost', 'bidRes', 'bidStat', 'bidFilt', 'bidGcs', 'pipeIn', 'bidYear',
   'TRK_TABS', 'trkMon', 'trkText', 'trkDate', 'trkAmt', 'trkStatus', 'trkKey', 'gcKey', 'trkEst', 'TRK_FU', 'TRK_RES', 'TRK_CTX', 'trkSplit',
   'trkParseSheet', 'trkParseBook', 'trkRow', 'trkPatch', 'trkPlan', 'pipeCalc', 'niceMax', 'TRK_AW', 'trkGcText', 'trkExportTabs'];
 const T = vm.runInNewContext(names.map(grab).join('\n') + '\n;({' + names.join(',') + '})', { Math, Date, String, Number, Set, Object, Array, JSON, RegExp });
@@ -176,14 +176,15 @@ t('pipeline: counts, $ bid, win rate = won / (won + lost), $ won, by month and e
   const P = T.pipeCalc(all, 2026, TD, office);
   assert.strictEqual(P.n, 4);
   assert.strictEqual(P.total, 380000);
-  assert.strictEqual(P.won, 1); assert.strictEqual(P.lost, 1); assert.strictEqual(P.unk, 1); assert.strictEqual(P.open, 1);
-  assert.strictEqual(P.rate, 0.5);
+  // b (Mar 20, no result) is past 90 days with no answer -> Lost (no word); e (Nov 1) is still waiting
+  assert.strictEqual(P.won, 1); assert.strictEqual(P.lost, 2); assert.strictEqual(P.noword, 1); assert.strictEqual(P.unk, 0); assert.strictEqual(P.open, 1);
+  assert.strictEqual(P.rate, 1 / 3);
   assert.strictEqual(P.wonAmt, 200000);
   assert.strictEqual(P.avg, 95000);
   assert.deepStrictEqual(plain(P.months[2]), { n: 2, total: 150000, by: { Ken: 150000 } });
   assert.deepStrictEqual(plain(P.names), ['Josh', 'Ken', 'Rob']);
-  assert.deepStrictEqual(plain(P.estList.map(e => [e.name, e.n, e.won, e.lost, e.rate])), [['Josh', 1, 0, 0, null], ['Ken', 2, 0, 1, 0], ['Rob', 1, 1, 0, 1]]);
-  assert.deepStrictEqual(plain(P.gcList[0]), { name: 'Big D', n: 3, amt: 350000, won: 1, lost: 1, rate: 0.5 });
+  assert.deepStrictEqual(plain(P.estList.map(e => [e.name, e.n, e.won, e.lost, e.rate])), [['Josh', 1, 0, 0, null], ['Ken', 2, 0, 2, 0], ['Rob', 1, 1, 0, 1]]);
+  assert.deepStrictEqual(plain(P.gcList[0]), { name: 'Big D', n: 3, amt: 350000, won: 1, lost: 2, rate: 1 / 3 });
   assert.deepStrictEqual(plain(T.niceMax(8390000)), { max: 10000000, step: 2500000 });
 });
 
@@ -199,6 +200,59 @@ t('export: month tabs by bid date, one block per estimator (A-Z), tracker words 
     { est: 'Ken', rows: [['Big-O Tires', 'Ken', '2026-10-02', 20209, 'REVIEWED', 'Big D']] },
     { est: 'Rob', rows: [['Riverton Clinic', 'Rob', '2026-10-08', 75000, 'NO', 'Layton  10% high  Asked for results on 10/19']] }]);
   assert.deepStrictEqual(plain(tabs[12].blocks), [{ est: 'No estimator', rows: [['Mystery TI', 'No estimator', '', null, '', '']] }]);
+});
+
+t('no answer 90+ days after the bid date counts as Lost (no word); a real status overrides; nothing is saved', () => {
+  assert.strictEqual(T.BID_NOWORD_DAYS, 90);
+  // pure function: open / submitted -> noword only when the bid date is more than `days` days before td
+  assert.strictEqual(T.bidNoWord('submitted', '2026-08-28', TD, 90), 'submitted'); // exactly 90 days
+  assert.strictEqual(T.bidNoWord('submitted', '2026-08-27', TD, 90), 'noword');    // 91 days
+  assert.strictEqual(T.bidNoWord('open', '2025-12-01', TD, 90), 'noword');
+  assert.strictEqual(T.bidNoWord('open', '2026-12-10', TD, 90), 'open');
+  assert.strictEqual(T.bidNoWord('submitted', '2026-08-27', TD, 120), 'submitted');
+  assert.deepStrictEqual(['won', 'lost', 'nobid', 'rebid'].map(s => T.bidNoWord(s, '2025-01-01', TD, 90)), ['won', 'lost', 'nobid', 'rebid']);
+  assert.deepStrictEqual([null, '', 'Oct 2', undefined].map(d => T.bidNoWord('submitted', d, TD, 90)), Array(4).fill('submitted'));
+  assert.strictEqual(T.bidNoWord('submitted', '2026-01-05T10:00:00Z', TD, 90), 'noword');
+  // bidStat: blank / Open / Submitted saved statuses go to noword; real results and awarded jobs don't
+  const old = { stage: 'bid', bid_date: '2026-07-01' };
+  assert.strictEqual(T.bidStat(Object.assign({}, old), TD), 'noword');
+  assert.strictEqual(T.bidStat(Object.assign({ bid_status: 'open' }, old), TD), 'noword');
+  assert.strictEqual(T.bidStat(Object.assign({ bid_status: 'submitted' }, old), TD), 'noword');
+  assert.deepStrictEqual(['won', 'lost', 'nobid', 'rebid'].map(s => T.bidStat(Object.assign({ bid_status: s }, old), TD)), ['won', 'lost', 'nobid', 'rebid']);
+  assert.strictEqual(T.bidStat({ stage: 'job', bid_date: '2026-01-01' }, TD), 'won');
+  assert.strictEqual(T.bidStat({ stage: 'bid', bid_date: '2026-10-01' }, TD), 'submitted');
+  assert.strictEqual(T.bidStLabel('noword'), 'Lost (no word)');
+  assert.ok(!T.BID_ST.some(x => x[0] === 'noword'), 'noword is derived, never a status you can save');
+  assert.ok(T.bidLost('noword') && T.bidLost('lost') && !T.bidLost('submitted'));
+  // Results filter lists it, Open doesn't
+  assert.strictEqual(T.bidFilt(old, 'res', TD), true);
+  assert.strictEqual(T.bidFilt(old, 'open', TD), false);
+  assert.strictEqual(T.TRK_AW.noword, 'NO');
+  // Pipeline: counts as lost in win rate, estimator win rates and Top GCs
+  const all = [
+    { id: 'a', stage: 'bid', pm: 'o1', bid_date: '2026-03-02', bid_amount: 50000, bid_gcs: [{ name: 'Okland' }] },
+    { id: 'b', stage: 'bid', pm: 'o1', bid_date: '2026-04-02', bid_amount: 60000, bid_status: 'won', bid_gcs: [{ name: 'Okland' }] },
+    { id: 'c', stage: 'bid', pm: 'o1', bid_date: '2026-10-20', bid_amount: 70000, bid_status: 'submitted', bid_gcs: [{ name: 'Okland' }] }];
+  const P = T.pipeCalc(all, 2026, TD, office);
+  assert.deepStrictEqual([P.won, P.lost, P.noword, P.unk, P.rate], [1, 1, 1, 1, 0.5]);
+  const K = P.estList.find(e => e.name === 'Ken');
+  assert.deepStrictEqual([K.won, K.lost, K.unk, K.rate], [1, 1, 1, 0.5]);
+  assert.deepStrictEqual([P.gcList[0].won, P.gcList[0].lost, P.gcList[0].rate], [1, 1, 0.5]);
+});
+
+t('didn\'t bid (No bid): out of win rate, $ bid, averages, waiting counts, Top GC $ and the no-word rule', () => {
+  const all = [
+    { id: 'a', stage: 'bid', pm: 'o1', bid_date: '2026-03-02', bid_amount: 50000, bid_status: 'nobid', bid_gcs: [{ name: 'Okland' }] },
+    { id: 'b', stage: 'bid', pm: 'o1', bid_date: '2026-10-02', bid_amount: 80000, bid_status: 'nobid', bid_gcs: [{ name: 'Okland' }] },
+    { id: 'c', stage: 'bid', pm: 'o1', bid_date: '2026-04-02', bid_amount: 60000, bid_status: 'won', bid_gcs: [{ name: 'Okland' }] }];
+  assert.strictEqual(T.bidStat(all[0], TD), 'nobid');
+  const P = T.pipeCalc(all, 2026, TD, office);
+  assert.deepStrictEqual([P.n, P.nobid, P.won, P.lost, P.noword, P.unk, P.open, P.rate], [3, 2, 1, 0, 0, 0, 0, 1]);
+  assert.deepStrictEqual([P.total, P.priced, P.avg], [60000, 1, 60000]);
+  assert.deepStrictEqual([P.months[2].total, P.months[9].total], [0, 0]);
+  const K = P.estList.find(e => e.name === 'Ken');
+  assert.deepStrictEqual([K.amt, K.won, K.lost, K.unk, K.rate], [60000, 1, 0, 0, 1]);
+  assert.deepStrictEqual([P.gcList[0].n, P.gcList[0].amt, P.gcList[0].lost, P.gcList[0].rate], [3, 60000, 0, 1]);
 });
 
 console.log(n + ' tracker tests passed');

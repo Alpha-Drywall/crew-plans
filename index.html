@@ -224,6 +224,8 @@ input[type=range]{width:100%;height:32px}
 .bsum{font-size:13px;color:var(--muted);margin:2px 2px -6px;font-variant-numeric:tabular-nums}
 .bidc{display:flex;align-items:center;gap:12px;cursor:pointer;padding:12px 8px 12px 12px}
 .bidc:focus-visible,.uprow:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.bidc .bchk{width:20px;height:20px;flex:none;margin:0;pointer-events:none;accent-color:var(--accent)}.bidc.bsel{outline:2px solid var(--accent);outline-offset:-2px}
+.bselbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;position:sticky;top:0;z-index:3;background:var(--bg,#fff);padding:8px 0}.bpdel{margin-top:18px}
 .bidc .name{font-weight:700;font-size:16px;line-height:1.25;overflow-wrap:anywhere}
 .bidc .due{color:#9a3412;font-weight:700}
 .bl3{margin-top:3px;color:#38414b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -243,7 +245,7 @@ input[type=range]{width:100%;height:32px}
 .bdate.lg{width:58px}.bdate.lg b{font-size:24px}
 .bdate.sm{width:40px;padding:2px 0 3px}.bdate.sm b{font-size:16px}
 .bpill{display:inline-block;font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap;border:1px solid transparent;line-height:1.45}
-.s-open{background:#e7eef8;color:#1f4e8c}.s-submitted{background:#fff1d6;color:#7a4b00}.s-won{background:#dcf5e3;color:#14632e}.s-lost{background:#fde8e6;color:#b42318}.s-nobid{background:#eceef1;color:#5d6670}.s-rebid{background:#efe9fd;color:#5b3cc4}
+.s-open{background:#e7eef8;color:#1f4e8c}.s-submitted{background:#fff1d6;color:#7a4b00}.s-won{background:#dcf5e3;color:#14632e}.s-lost{background:#fde8e6;color:#b42318}.s-noword{background:#f8efee;color:#a0605a}.s-nobid{background:#eceef1;color:#5d6670}.s-rebid{background:#efe9fd;color:#5b3cc4}
 .mcard.wide{max-width:720px}
 .mcard.xwide{max-width:1180px}
 .bph{display:flex;gap:12px;align-items:flex-start;margin-bottom:12px}
@@ -2407,7 +2409,7 @@ async function jobMenu(){
   $('[data-a=edit]',m).onclick=async()=>{m.close();const v=await formBox('Edit job',[{k:'name',label:'Job name',value:j.name,req:true},{k:'addr',label:'Address or GC',value:j.addr},{k:'pm',label:'PM',type:'select',value:j.pm||'',options:(S.office||[]).map(o=>[o.id,o.name]).concat([['','No PM']])},{k:'gc_name',label:'General contractor (company)',value:j.gc_name||''},{k:'gc_email',label:'GC email for daily reports (separate several with commas)',value:j.gc_email||'',ph:'super@gc.com, pm@gc.com'}]);if(v){const bad=String(v.gc_email||'').split(/[,;\s]+/).filter(x=>x&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x));if(bad.length){toast('Check this email: '+bad[0]);return}if(await run(sb.from('jobs').update({name:v.name.slice(0,120),addr:v.addr.slice(0,160),pm:v.pm||null,gc_name:v.gc_name.slice(0,120),gc_email:v.gc_email.slice(0,400)}).eq('id',j.id))){loadJobs();Object.assign(j,{gc_name:v.gc_name,gc_email:v.gc_email});if(S.tab==='log'){S.tab='log';const a=$('#app');a.dataset.tab='';render()}}}};
   $('[data-a=del]',m).onclick=async()=>{
     m.close();if(!await confirmBox('Delete "'+(j.name||'this job')+'" with all its sheets, markups, progress and logs, for everyone?'))return;
-    try{const files=[];for(const f of ['sheets','photos','po']){const {data}=await sb.storage.from(BUCKET).list(j.id+'/'+f,{limit:1000});(data||[]).forEach(o=>files.push(j.id+'/'+f+'/'+o.name))}if(files.length)await sb.storage.from(BUCKET).remove(files)}catch(e){}
+    await jobFilesRemove(j.id);
     if(await run(sb.from('jobs').delete().eq('id',j.id))){toast('Job deleted.');S.jobs=S.jobs.filter(x=>x.id!==j.id);S.bids=(S.bids||[]).filter(x=>x.id!==j.id);closeJob()}
   };
 }
@@ -2447,16 +2449,28 @@ function renderJobsSec(){const mode=lsGet('crewplans.jobView')==='all'?'all':'mi
 
 /* ===== Bids: tracker fields on each bid (amount, status, result, GCs invited, follow-up log) and the Pipeline page. Office only. ===== */
 const BID_ST=[['open','Open'],['submitted','Submitted'],['won','Won'],['lost','Lost'],['nobid','No bid'],['rebid','Re-bid']];
-const bidStLabel=s=>(BID_ST.find(x=>x[0]===s)||['',''])[1];
+const bidStLabel=s=>s==='noword'?'Lost (no word)':(BID_ST.find(x=>x[0]===s)||['',''])[1];
 const isoD=(y,m,d)=>y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
 const dayDiff=(a,b)=>{const p=s=>{const [y,m,d]=String(s).split('-').map(Number);return Date.UTC(y,m-1,d)};return Math.round((p(b)-p(a))/864e5)};
 const MON3=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const shortDay=s=>{const [y,m,d]=String(s||'').split('-').map(Number);return y&&m?MON3[m-1]+' '+d:''};
 const moneyK=v=>{v=num(v);const a=Math.abs(v);return a>=1e6?'$'+(v/1e6).toFixed(a>=1e7?1:2).replace(/\.?0+$/,'')+'M':a>=1e4?'$'+Math.round(v/1e3)+'K':a>=1e3?'$'+(v/1e3).toFixed(1).replace(/\.0$/,'')+'K':'$'+Math.round(v)};
-/* status shown for a bid: the saved status, or Open / Submitted from the bid date (an awarded job counts as Won) */
-const bidStat=(j,td)=>j.bid_status&&BID_ST.some(s=>s[0]===j.bid_status)?j.bid_status:j.stage==='job'?'won':(j.bid_date&&j.bid_date<td?'submitted':'open');
-/* Open = due today or later, or still waiting (open / submitted / re-bid). Results = won, lost, no bid. */
-const bidFilt=(j,f,td)=>{const s=bidStat(j,td);return f==='res'?(s==='won'||s==='lost'||s==='nobid'):f==='all'?true:(!!(j.bid_date&&j.bid_date>=td)||s==='open'||s==='submitted'||s==='rebid')};
+/* a bid with no answer (Open / Submitted / not set) this many days after its bid date counts as lost */
+const BID_NOWORD_DAYS=90;
+/* derived status, never saved: s = the saved or date-based status; Open / Submitted with a bid date more than `days` days before td -> 'noword' (Lost, no word). Won / Lost / No bid / Re-bid stay. */
+function bidNoWord(s,bd,td,days){
+  if(s!=='open'&&s!=='submitted')return s;
+  if(!bd||!/^\d{4}-\d\d-\d\d/.test(String(bd))||!td)return s;
+  return dayDiff(String(bd).slice(0,10),td)>days?'noword':s;
+}
+/* lost for counting: a real Lost, or no word 90+ days after the bid date */
+const bidLost=s=>s==='lost'||s==='noword';
+/* has a result (Results filter): won, lost, lost (no word), no bid */
+const bidRes=s=>s==='won'||s==='lost'||s==='noword'||s==='nobid';
+/* status shown for a bid: the saved status, or Open / Submitted from the bid date (an awarded job counts as Won); no answer 90+ days after the bid date shows as Lost (no word) */
+const bidStat=(j,td)=>bidNoWord(j.bid_status&&BID_ST.some(s=>s[0]===j.bid_status)?j.bid_status:j.stage==='job'?'won':(j.bid_date&&j.bid_date<td?'submitted':'open'),j.bid_date,td,BID_NOWORD_DAYS);
+/* Open = due today or later, or still waiting (open / submitted / re-bid). Results = won, lost, lost (no word), no bid. */
+const bidFilt=(j,f,td)=>{const s=bidStat(j,td);return f==='res'?bidRes(s):f==='all'?true:(!!(j.bid_date&&j.bid_date>=td)||s==='open'||s==='submitted'||s==='rebid')};
 /* GCs invited: bid_gcs, or (older bids) the GC name typed on the bid, split at commas */
 const bidGcs=j=>Array.isArray(j.bid_gcs)&&j.bid_gcs.length?j.bid_gcs:String(j.gc_name||'').split(/\s*[,;]\s*/).filter(Boolean).map((n,i,a)=>({name:n,email:a.length===1?String(j.gc_email||''):''}));
 const bidMatch=(j,q)=>{q=String(q||'').trim().toLowerCase();if(!q)return true;return [j.name,j.gc_name,pmName(j.pm)].concat(bidGcs(j).map(g=>g.name)).some(x=>String(x||'').toLowerCase().includes(q))};
@@ -2468,39 +2482,83 @@ function estColor(name){const ns=[...new Set((S.office||[]).map(o=>o.name))].sor
 function bidDateBlock(d,td,res,cls){if(!d)return '<div class="bdate none'+(cls||'')+'"><span>No</span><b>date</b></div>';const n=dayDiff(td,d),[y,m,dd]=d.split('-').map(Number);
   return '<div class="bdate'+(res?'':n>=0&&n<=7?' soon':n<0?' past':'')+(cls||'')+'" title="'+esc(fmtDay(d))+'"><span>'+MON3[m-1]+(y!==+td.slice(0,4)?' ’'+String(y).slice(2):'')+'</span><b>'+dd+'</b></div>'}
 const bidPill=s=>'<span class="bpill s-'+s+'">'+bidStLabel(s)+'</span>';
-function bidCard(j,td){const s=bidStat(j,td),g=bidGcs(j),notes=Array.isArray(j.bid_notes)?j.bid_notes:[],last=notes[notes.length-1],d=j.bid_date,n=d?dayDiff(td,d):null,res=s==='won'||s==='lost'||s==='nobid';
+function bidCard(j,td,sel){const s=bidStat(j,td),g=bidGcs(j),notes=Array.isArray(j.bid_notes)?j.bid_notes:[],last=notes[notes.length-1],d=j.bid_date,n=d?dayDiff(td,d):null,res=bidRes(s);
   let l2=d?(n===0?'<b class="due">Due today</b>':n>0&&n<=14?'<b class="due">Due in '+n+' day'+(n===1?'':'s')+'</b>':'Bid '+shortDay(d)+(d.slice(0,4)!==td.slice(0,4)?', '+d.slice(0,4):'')):'No bid date';
   if(g.length)l2+=' · '+esc(g[0].name)+(g.length>1?' +'+(g.length-1):'');
   let l3='';if(res&&j.bid_result)l3=esc(j.bid_result);else if(last)l3=esc(last.text)+(last.at?' · '+shortDay(last.at):'');else if(!res&&d&&n<-7)l3='<span class="bwarn">No follow-up yet · bid '+(-n)+' days ago</span>';
-  return '<div class="card bidc" data-bid="'+esc(j.id)+'" tabindex="0" role="button" aria-label="'+esc(j.name||'Bid')+' details">'+bidDateBlock(d,td,res)+'<div class="grow"><div class="name">'+esc(j.name||'Untitled bid')+'</div><div class="muted small">'+l2+'</div>'+(l3?'<div class="small bl3">'+l3+'</div>':'')+'</div>'+
-    '<div class="bidr"><div class="amt">'+(j.bid_amount!=null&&j.bid_amount!==''?money(j.bid_amount):'<span class="muted">No $ yet</span>')+'</div>'+bidPill(s)+'</div><button class="bgo" data-go="'+esc(j.id)+'" title="Open plans & takeoff" aria-label="Open plans and takeoff for '+esc(j.name||'bid')+'">›</button></div>'}
+  const on=sel&&sel.has(j.id);
+  return '<div class="card bidc'+(on?' bsel':'')+'" data-bid="'+esc(j.id)+'" tabindex="0" role="'+(sel?'checkbox':'button')+'"'+(sel?' aria-checked="'+!!on+'"':'')+' aria-label="'+esc(j.name||'Bid')+(sel?'':' details')+'">'+(sel?'<input type="checkbox" class="bchk" tabindex="-1" aria-hidden="true"'+(on?' checked':'')+'>':'')+bidDateBlock(d,td,res)+'<div class="grow"><div class="name">'+esc(j.name||'Untitled bid')+'</div><div class="muted small">'+l2+'</div>'+(l3?'<div class="small bl3">'+l3+'</div>':'')+'</div>'+
+    '<div class="bidr"><div class="amt">'+(j.bid_amount!=null&&j.bid_amount!==''?money(j.bid_amount):'<span class="muted">No $ yet</span>')+'</div>'+bidPill(s)+'</div>'+(sel?'':'<button class="bgo bmore" data-bm="'+esc(j.id)+'" title="More: didn’t bid, delete" aria-label="More for '+esc(j.name||'bid')+'">⋯</button><button class="bgo" data-go="'+esc(j.id)+'" title="Open plans & takeoff" aria-label="Open plans and takeoff for '+esc(j.name||'bid')+'">›</button>')+'</div>'}
 function renderBidsSec(){const pane=lsGet('crewplans.bidPane')==='pipe'?'pipe':'list';
   let h='<div class="hbar"><div class="hseg" role="tablist"><button role="tab" data-bpane="list"'+(pane==='list'?' class="on" aria-selected="true"':'')+'>Bid list</button><button role="tab" data-bpane="pipe"'+(pane==='pipe'?' class="on" aria-selected="true"':'')+'>Pipeline</button></div><button class="btn sm" id="trkDl" title="Download the bid tracker as an Excel file, one tab per month, Josh / Ken / Rob blocks">⤓ Tracker .xlsx</button></div>';
   if(!S.jobsLoaded)return h+'<div class="empty">Loading bids…</div>';
   return h+(pane==='pipe'?renderPipe():renderBidList())}
 function renderBidList(){const bv=lsGet('crewplans.bidView')==='all'?'all':'mine',f=lsGet('crewplans.bidFilt')||'open';
-  let h='<div class="hbar"><div class="chips"><button class="chip'+(bv==='mine'?' on':'')+'" data-bview="mine">My bids</button><button class="chip'+(bv==='all'?' on':'')+'" data-bview="all">All bids</button></div><button class="btn primary sm" id="newBid">+ New bid</button></div>';
+  let h='<div class="hbar"><div class="chips"><button class="chip'+(bv==='mine'?' on':'')+'" data-bview="mine">My bids</button><button class="chip'+(bv==='all'?' on':'')+'" data-bview="all">All bids</button></div><div class="row" style="gap:8px"><button class="btn sm'+(S.bidSel?' on':'')+'" id="bidSelBtn" aria-pressed="'+!!S.bidSel+'" title="Pick several bids to mark didn’t bid or delete">'+(S.bidSel?'Done':'Select')+'</button><button class="btn primary sm" id="newBid">+ New bid</button></div></div>';
   h+='<div class="bfil"><div class="hseg sm">'+[['open','Open'],['res','Results'],['all','All']].map(x=>'<button data-bfilt="'+x[0]+'"'+(f===x[0]?' class="on"':'')+'>'+x[1]+'</button>').join('')+'</div><input type="search" id="bidQ" placeholder="Search bids" aria-label="Search bids" value="'+esc(S.bidQ||'')+'" autocomplete="off"></div>';
   return h+'<div id="bidList">'+bidListHtml()+'</div>'}
 function bidListHtml(){const td=today(),bv=lsGet('crewplans.bidView')==='all'?'all':'mine',f=lsGet('crewplans.bidFilt')||'open';
   if(!(S.bids||[]).length)return '<div class="empty"><b>No bids yet</b>Add a bid, upload its plans, then do the takeoff on its Takeoff tab. To bring in this year’s Excel tracker, use ☰ → Import bid tracker.</div>';
   let list=(S.bids||[]).filter(j=>bidFilt(j,f,td)&&bidMatch(j,S.bidQ));if(bv==='mine')list=list.filter(j=>j.pm&&j.pm===S.myOfficeId);
   if(!list.length)return '<div class="empty"><b>'+(S.bidQ?'Nothing matches “'+esc(S.bidQ)+'”':bv==='mine'?'No '+(f==='res'?'results':f==='open'?'open bids':'bids')+' with you as estimator':'No '+(f==='res'?'results yet':'open bids'))+'</b>'+(bv==='mine'?'Tap All bids to see everyone’s.':'Try All.')+'</div>';
-  const ph=j=>{const s=bidStat(j,td);return s==='won'||s==='lost'||s==='nobid'?3:!j.bid_date?2:j.bid_date>=td?0:1};
+  const ph=j=>{const s=bidStat(j,td);return bidRes(s)?3:!j.bid_date?2:j.bid_date>=td?0:1};
   list.sort((a,b)=>{const pa=ph(a),pb=ph(b);if(pa!==pb)return pa-pb;if(pa===0)return String(a.bid_date).localeCompare(String(b.bid_date));return String(b.result_date||b.bid_date||b.created_at||'').localeCompare(String(a.result_date||a.bid_date||a.created_at||''))});
-  const tot=list.reduce((a,j)=>a+num(j.bid_amount),0);
-  let h='<div class="bsum">'+list.length+' bid'+(list.length===1?'':'s')+(tot?' · '+moneyK(tot)+' bid':'')+'</div>';
-  const grp=(k,arr,unit)=>'<div class="logday"><span>'+esc(k)+'</span><span class="muted">'+arr.length+' '+unit+(arr.length===1?'':'s')+(arr.some(j=>num(j.bid_amount))?' · '+moneyK(arr.reduce((a,j)=>a+num(j.bid_amount),0)):'')+'</span></div>'+arr.map(j=>bidCard(j,td)).join('');
+  const amt=j=>bidStat(j,td)==='nobid'?0:num(j.bid_amount),tot=list.reduce((a,j)=>a+amt(j),0),sel=S.bidSel;
+  let h=sel?'<div class="bselbar" role="toolbar" aria-label="Selected bids"><b>'+sel.size+' selected</b><button class="btn sm" data-bsall>'+(list.every(j=>sel.has(j.id))?'Select none':'Select all '+list.length)+'</button><span class="grow"></span><button class="btn sm" data-bsnb'+(sel.size?'':' disabled')+'>Mark didn’t bid</button><button class="btn sm danger" data-bsdel'+(sel.size?'':' disabled')+'>Delete</button></div>':'';
+  S.bidVis=list.map(j=>j.id);
+  h+='<div class="bsum">'+list.length+' bid'+(list.length===1?'':'s')+(tot?' · '+moneyK(tot)+' bid':'')+'</div>';
+  const grp=(k,arr,unit)=>'<div class="logday"><span>'+esc(k)+'</span><span class="muted">'+arr.length+' '+unit+(arr.length===1?'':'s')+(arr.some(j=>amt(j))?' · '+moneyK(arr.reduce((a,j)=>a+amt(j),0)):'')+'</span></div>'+arr.map(j=>bidCard(j,td,sel)).join('');
   if(bv==='all'){const g={};list.forEach(j=>{const k=pmName(j.pm)||'No estimator';(g[k]=g[k]||[]).push(j)});Object.keys(g).sort((a,b)=>a==='No estimator'?1:b==='No estimator'?-1:a.localeCompare(b)).forEach(k=>h+=grp(k,g[k],'bid'));return h}
   const L=['Coming up','Waiting on results','No bid date','Results'],g=[[],[],[],[]];list.forEach(j=>g[ph(j)].push(j));g.forEach((arr,i)=>{if(arr.length)h+=grp(L[i],arr,'bid')});return h}
-function bindBidList(){const t=$('#bidList');if(!t)return;
-  $$('.bidc',t).forEach(el=>{const open=()=>{const j=(S.bids||[]).find(x=>x.id===el.dataset.bid);if(j)bidPanel(j)};el.onclick=e=>{if(e.target.closest('[data-go]'))return;open()};el.onkeydown=e=>{if((e.key==='Enter'||e.key===' ')&&e.target===el){e.preventDefault();open()}}});
-  $$('[data-go]',t).forEach(b=>b.onclick=e=>{e.stopPropagation();openJob(b.dataset.go)})}
+function bidListRepaint(){const t=$('#bidList');if(!t)return;t.innerHTML=bidListHtml();bindBidList()}
+function bindBidList(){const t=$('#bidList');if(!t)return;const sel=S.bidSel,find=id=>(S.bids||[]).find(x=>x.id===id);
+  $$('.bidc',t).forEach(el=>{const open=()=>{const j=find(el.dataset.bid);if(!j)return;if(sel){if(sel.has(j.id))sel.delete(j.id);else sel.add(j.id);bidListRepaint();const n=$('.bidc[data-bid="'+CSS.escape(j.id)+'"]');if(n)n.focus();return}bidPanel(j)};
+    el.onclick=e=>{if(e.target.closest('[data-go],[data-bm]'))return;if(el._lp){el._lp=false;return}open()};el.onkeydown=e=>{if((e.key==='Enter'||e.key===' ')&&e.target===el){e.preventDefault();open()}};
+    if(sel)return;
+    el.oncontextmenu=e=>{e.preventDefault();const j=find(el.dataset.bid);if(j)bidMenu(j)};
+    el.onpointerdown=e=>{if(e.pointerType==='mouse')return;clearTimeout(el._lt);el._lt=setTimeout(()=>{el._lp=true;const j=find(el.dataset.bid);if(j)bidMenu(j)},550)};
+    el.onpointerup=el.onpointercancel=el.onpointerleave=()=>clearTimeout(el._lt)});
+  $$('[data-go]',t).forEach(b=>b.onclick=e=>{e.stopPropagation();openJob(b.dataset.go)});
+  $$('[data-bm]',t).forEach(b=>b.onclick=e=>{e.stopPropagation();const j=find(b.dataset.bm);if(j)bidMenu(j)});
+  if(!sel)return;
+  const pick=()=>(S.bids||[]).filter(j=>sel.has(j.id));
+  const all=$('[data-bsall]',t);if(all)all.onclick=()=>{const vis=S.bidVis||[];if(vis.every(id=>sel.has(id)))vis.forEach(id=>sel.delete(id));else vis.forEach(id=>sel.add(id));bidListRepaint()};
+  const nb=$('[data-bsnb]',t);if(nb)nb.onclick=async()=>{const l=pick();if(!l.length)return;if(l.length>1&&!await confirmBox('Mark '+l.length+' bids as didn’t bid? They drop out of the win rate, $ bid and waiting counts.','Mark didn’t bid',false))return;if(await bidNoBidMany(l)){S.bidSel=new Set();render()}};
+  const dl=$('[data-bsdel]',t);if(dl)dl.onclick=async()=>{const l=pick();if(!l.length)return;if(await bidDeleteMany(l)){S.bidSel=new Set();render()}}}
+/* ⋯ / right-click / long-press on a bid card */
+function bidMenu(j){const td=today(),s=bidStat(j,td);
+  const m=modal('<h2>'+esc(j.name||'Bid')+'</h2><div style="display:grid;gap:10px">'+(s!=='nobid'?'<button class="btn primary" data-a="nb">Didn’t bid</button>':'')+'<button class="btn" data-a="det">Bid details</button><button class="btn" data-a="go">Open plans & takeoff</button>'+(j.stage==='bid'?'<button class="btn danger" data-a="del">Delete bid</button>':'')+'<button class="btn" data-a="x">Cancel</button></div>');
+  $('[data-a=x]',m).onclick=()=>m.close();
+  const nb=$('[data-a=nb]',m);if(nb)nb.onclick=async()=>{m.close();if(await bidNoBidMany([j]))render()};
+  $('[data-a=det]',m).onclick=()=>{m.close();bidPanel(j)};
+  $('[data-a=go]',m).onclick=()=>{m.close();openJob(j.id)};
+  const dl=$('[data-a=del]',m);if(dl)dl.onclick=async()=>{m.close();if(await bidDeleteMany([j]))render()}}
+/* Didn't bid: status No bid (out of win rate, $ bid, waiting counts and the no-word rule). Office only. */
+async function bidNoBidMany(list){if(!S.isAdmin)return false;list=(list||[]).filter(Boolean);if(!list.length)return false;const td=today();
+  const a=list.filter(j=>!j.result_date),b=list.filter(j=>j.result_date);
+  if(a.length&&!await run(sb.from('jobs').update({bid_status:'nobid',result_date:td}).in('id',a.map(j=>j.id))))return false;
+  if(b.length&&!await run(sb.from('jobs').update({bid_status:'nobid'}).in('id',b.map(j=>j.id))))return false;
+  a.forEach(j=>Object.assign(j,{bid_status:'nobid',result_date:td}));b.forEach(j=>j.bid_status='nobid');
+  toast(list.length===1?'Marked didn’t bid: '+(list[0].name||'bid')+'.':list.length+' bids marked didn’t bid.');return true}
+/* remove a job's files in storage (plan sheets, photos, POs) before its row is deleted */
+async function jobFilesRemove(id){try{const files=[];for(const f of ['sheets','photos','po']){const {data}=await sb.storage.from(BUCKET).list(id+'/'+f,{limit:1000});(data||[]).forEach(o=>files.push(id+'/'+f+'/'+o.name))}if(files.length)await sb.storage.from(BUCKET).remove(files)}catch(e){}}
+/* Delete bid(s): only rows still at stage 'bid'; plan sheets and the takeoff go with them. Office only. */
+async function bidDeleteMany(list){if(!S.isAdmin)return false;list=(list||[]).filter(j=>j&&j.stage==='bid');if(!list.length){toast('Only bids can be deleted here. Delete an awarded job from its ⋯ menu.');return false}
+  const ids=list.map(j=>j.id);let ns=0,tk=0;
+  try{ns=((await q(sb.from('sheets').select('id').in('job_id',ids)))||[]).length}catch(e){}
+  try{tk=((await q(sb.from('takeoffs').select('job_id').in('job_id',ids)))||[]).length}catch(e){}
+  const one=list.length===1,also=ns||tk?' This also deletes '+(one?'its':'their')+' '+[ns?ns+' plan sheet'+(ns===1?'':'s'):'',tk?(one?'takeoff':tk+' takeoff'+(tk===1?'':'s')):''].filter(Boolean).join(' and ')+'.':'';
+  if(!await confirmBox((one?'Delete the bid “'+(list[0].name||'Untitled bid')+'” for everyone?':'Delete these '+list.length+' bids for everyone?')+also,one?'Delete bid':'Delete '+list.length+' bids'))return false;
+  for(const id of ids)await jobFilesRemove(id);
+  if(!await run(sb.from('jobs').delete().in('id',ids).eq('stage','bid')))return false;
+  const gone=new Set(ids);S.bids=(S.bids||[]).filter(x=>!gone.has(x.id));S.jobs=(S.jobs||[]).filter(x=>!gone.has(x.id));
+  toast(one?'Bid deleted.':list.length+' bids deleted.');return true}
 function bindBidsSec(){
   $$('[data-bpane]').forEach(b=>b.onclick=()=>{lsSet('crewplans.bidPane',b.dataset.bpane);window.scrollTo(0,0);render()});
   $$('[data-bfilt]').forEach(b=>b.onclick=()=>{lsSet('crewplans.bidFilt',b.dataset.bfilt);render()});
   const qq=$('#bidQ');if(qq)qq.oninput=()=>{S.bidQ=qq.value;$('#bidList').innerHTML=bidListHtml();bindBidList()};
   if($('#trkDl'))$('#trkDl').onclick=trkDownload;
+  const sb2=$('#bidSelBtn');if(sb2)sb2.onclick=()=>{S.bidSel=S.bidSel?null:new Set();render()};
   bindBidList();if($('#pipe'))bindPipe()}
 async function bidSave(j,o){if(!await run(sb.from('jobs').update(o).eq('id',j.id)))return false;Object.assign(j,o);return true}
 const meOffice=()=>pmName(S.myOfficeId)||myName()||'Office';
@@ -2510,16 +2568,17 @@ function bidPanel(j){const m=modal('<div class="bp"></div>',()=>{if(S.view!=='jo
 function bidPanelHtml(j){const td=today(),s=bidStat(j,td),g=bidGcs(j),notes=(Array.isArray(j.bid_notes)?j.bid_notes:[]).map((n,i)=>Object.assign({i},n)).reverse();
   const rev=j.revision_of&&(S.bids||[]).concat(S.jobs||[]).find(x=>x.id===j.revision_of);const emails=g.map(x=>x.email).filter(Boolean);
   let h='<div class="bph">'+bidDateBlock(j.bid_date,td,false,' lg')+'<div class="grow"><h2>'+esc(j.name||'Bid')+'</h2><div class="muted small">'+(j.bid_date?esc(fmtDay(j.bid_date)):'No bid date')+' · '+(pmName(j.pm)?'Estimator '+esc(pmName(j.pm)):'No estimator')+(rev?' · Re-bid of '+esc(rev.name)+(rev.bid_date?' ('+shortDay(rev.bid_date)+')':''):'')+(j.bid_source?' · from the Excel tracker':'')+'</div></div><button class="ico" data-x aria-label="Close">✕</button></div>';
-  h+='<div class="bpacts">'+(j.stage==='bid'?'<button class="btn primary sm" data-open>Open plans & takeoff</button><button class="btn sm" data-edit>Edit bid</button><button class="btn sm" data-award>Mark awarded</button>':'<button class="btn primary sm" data-open>Open job</button>')+'</div>';
+  h+='<div class="bpacts">'+(j.stage==='bid'?'<button class="btn primary sm" data-open>Open plans & takeoff</button><button class="btn sm" data-edit>Edit bid</button><button class="btn sm" data-award>Mark awarded</button>'+(s!=='nobid'?'<button class="btn sm" data-nobid title="We never sent a number: out of the win rate, $ bid and waiting counts">Didn’t bid</button>':''):'<button class="btn primary sm" data-open>Open job</button>')+'</div>';
   h+='<div class="bpnum"><label class="field"><span>Bid amount</span><div class="bmoney"><b>$</b><input data-f="amt" inputmode="decimal" placeholder="0" value="'+(j.bid_amount!=null&&j.bid_amount!==''?esc(Math.round(num(j.bid_amount)).toLocaleString()):'')+'"></div></label>'+
     '<label class="field"><span>Result date</span><input type="date" data-f="rdate" value="'+esc(j.result_date||'')+'"></label></div>';
-  h+='<div class="field"><span>Status</span><div class="bstat" role="radiogroup" aria-label="Bid status">'+BID_ST.map(x=>'<button type="button" role="radio" aria-checked="'+(x[0]===s)+'" data-st="'+x[0]+'" class="bpill s-'+x[0]+(x[0]===s?' on':'')+'">'+x[1]+'</button>').join('')+'</div>'+(!j.bid_status?'<div class="muted small" style="margin-top:4px">Not set yet: '+(s==='submitted'?'the bid date has passed, so it shows as Submitted.':'shows as Open until the bid date.')+'</div>':'')+'</div>';
+  h+='<div class="field"><span>Status</span><div class="bstat" role="radiogroup" aria-label="Bid status">'+BID_ST.map(x=>'<button type="button" role="radio" aria-checked="'+(x[0]===s)+'" data-st="'+x[0]+'" class="bpill s-'+x[0]+(x[0]===s?' on':'')+'">'+x[1]+'</button>').join('')+'</div>'+(s==='noword'?'<div class="muted small" style="margin-top:4px">No answer '+BID_NOWORD_DAYS+'+ days after the bid date, so it counts as Lost (no word). Pick a status to set the real result.</div>':!j.bid_status?'<div class="muted small" style="margin-top:4px">Not set yet: '+(s==='submitted'?'the bid date has passed, so it shows as Submitted.':'shows as Open until the bid date.')+'</div>':'')+'</div>';
   h+='<label class="field"><span>Result: where we landed</span><input data-f="res" maxlength="200" placeholder="e.g. 3rd of 5, 10% high" value="'+esc(j.bid_result||'')+'"></label>';
   h+='<div class="bpsec"><h3>GCs invited <span class="muted">'+g.length+'</span></h3><button class="btn sm" data-addgc>+ Add GC</button></div>';
   h+=g.length?'<div class="bgcs">'+g.map((x,i)=>'<div class="bgc"><div class="grow"><div><b>'+esc(x.name||'GC')+'</b>'+(x.result?' <span class="bgres">'+esc(x.result)+'</span>':'')+'</div><div class="muted small">'+[x.contact,x.email?'<a href="mailto:'+esc(x.email)+'">'+esc(x.email)+'</a>':'',x.phone?'<a href="tel:'+esc(String(x.phone).replace(/[^\d+]/g,''))+'">'+esc(x.phone)+'</a>':'',x.invited_at?'Invited '+shortDay(x.invited_at):''].filter(Boolean).map(v=>v.startsWith('<a')?v:esc(v)).join(' · ')+'</div>'+(x.note?'<div class="small">'+esc(x.note)+'</div>':'')+'</div><button class="ico" data-egc="'+i+'" aria-label="Edit '+esc(x.name||'GC')+'">✎</button><button class="ico" data-rgc="'+i+'" aria-label="Remove '+esc(x.name||'GC')+'">✕</button></div>').join('')+'</div>':'<div class="muted small bnone">No GCs yet. Add each GC that invited you; their emails are where the proposal goes.</div>';
   h+=emails.length?'<div class="muted small" style="margin-top:6px">Proposal goes to: '+esc(emails.join(', '))+'</div>':'';
   h+='<div class="bpsec"><h3>Follow-ups & notes</h3><div class="row" style="gap:8px"><button class="btn sm primary" data-fu>Log follow-up</button><button class="btn sm" data-note>Add note</button></div></div>';
   h+=notes.length?'<ol class="blog">'+notes.map(n=>'<li><span class="bld">'+(n.at?shortDay(n.at):'–')+'</span><div class="grow">'+esc(n.text)+(n.by?'<div class="muted small">'+esc(n.by)+'</div>':'')+'</div><button class="ico" data-dn="'+n.i+'" aria-label="Delete note">✕</button></li>').join('')+'</ol>':'<div class="muted small bnone">Nothing logged yet. After the bid goes in, tap Log follow-up each time you ask a GC for results.</div>';
+  if(j.stage==='bid'&&S.isAdmin)h+='<div class="bpsec bpdel"><span class="muted small">Never bid this, or added by mistake?</span><button class="btn sm danger" data-delbid>Delete bid</button></div>';
   return h}
 async function bidGcSave(j,list){const em=[];list.forEach(g=>String(g.email||'').split(/[,;\s]+/).filter(Boolean).forEach(e=>{if(!em.includes(e))em.push(e)}));
   return bidSave(j,{bid_gcs:list,gc_name:list.map(g=>g.name).filter(Boolean).join(', ').slice(0,120),gc_email:em.join(', ').slice(0,400)})}
@@ -2529,6 +2588,8 @@ function bidPanelBind(m,j,paint){const b=$('.bp',m);
   const op=$('[data-open]',b);if(op)op.onclick=()=>{m.close();if(!(S.view==='job'&&S.job&&S.job.id===j.id))openJob(j.id)};
   const ed=$('[data-edit]',b);if(ed)ed.onclick=async()=>{if(await bidEdit(j))paint()};
   const aw=$('[data-award]',b);if(aw)aw.onclick=()=>{m.close();awardBid(j)};
+  const nbb=$('[data-nobid]',b);if(nbb)nbb.onclick=async()=>{if(await bidNoBidMany([j]))paint()};
+  const dlb=$('[data-delbid]',b);if(dlb)dlb.onclick=async()=>{if(await bidDeleteMany([j])){m.close();render()}};
   const amt=$('[data-f=amt]',b);amt.onchange=async()=>{const t=amt.value.replace(/[$,\s]/g,'');const v=t===''?null:Number(t);if(t!==''&&!Number.isFinite(v)){toast('Type the bid amount as a number, e.g. 124500');return}if(await bidSave(j,{bid_amount:v})){toast(v==null?'Amount cleared.':'Saved: '+money(v)+'.');paint()}};
   const rd=$('[data-f=rdate]',b);rd.onchange=async()=>{if(await bidSave(j,{result_date:rd.value||null}))toast('Saved.')};
   const rs=$('[data-f=res]',b);rs.onchange=async()=>{if(await bidSave(j,{bid_result:rs.value.trim().slice(0,200)||null}))toast('Saved.')};
@@ -2552,16 +2613,16 @@ async function awardBid(j){const v=await formBox('Mark awarded',[{k:'name',label
   const o={stage:'job',name:v.name.slice(0,120),pm:v.pm||null,bid_status:'won',result_date:j.result_date||today()};
   if(await run(sb.from('jobs').update(o).eq('id',j.id))){Object.assign(j,o);await loadJobs();toast('It\'s a job now.');const a=$('#app');a.dataset.tab='';render()}}
 
-/* ----- Pipeline (office only): KPIs for a year, $ bid by month by estimator, win rate by estimator, top GCs, next 14 days ----- */
+/* ----- Pipeline (office only): KPIs for a year, $ bid by month by estimator, win rate by estimator, top GCs, next 14 days. No bid (didn't bid) counts as a bid invite only: no $, not in win rate, not waiting. ----- */
 function pipeCalc(all,year,td,office){const sup=new Set(all.filter(j=>j.revision_of).map(j=>j.revision_of));const rows=all.filter(j=>pipeIn(j)&&!sup.has(j.id)&&bidYear(j)===year);
   const nm=j=>{const o=(office||[]).find(x=>x.id===j.pm);return o?o.name:'No estimator'};const names=[...new Set((office||[]).map(o=>o.name))].sort((a,b)=>a.localeCompare(b));
-  const T={year,n:rows.length,total:0,priced:0,won:0,lost:0,nobid:0,open:0,unk:0,wonAmt:0,months:[],est:{},gcs:{}};for(let i=0;i<12;i++)T.months.push({n:0,total:0,by:{}});
-  rows.forEach(j=>{const s=bidStat(j,td),a=num(j.bid_amount),e=nm(j),mi=+String(j.bid_date||j.created_at).slice(5,7)-1,past=!!(j.bid_date&&j.bid_date<td);
+  const T={year,n:rows.length,total:0,priced:0,won:0,lost:0,noword:0,nobid:0,open:0,unk:0,wonAmt:0,months:[],est:{},gcs:{}};for(let i=0;i<12;i++)T.months.push({n:0,total:0,by:{}});
+  rows.forEach(j=>{const s=bidStat(j,td),a=s==='nobid'?0:num(j.bid_amount),e=nm(j),mi=+String(j.bid_date||j.created_at).slice(5,7)-1,past=!!(j.bid_date&&j.bid_date<td);
     if(a>0){T.total+=a;T.priced++}
-    if(s==='won'){T.won++;T.wonAmt+=a}else if(s==='lost')T.lost++;else if(s==='nobid')T.nobid++;else if(past)T.unk++;else T.open++;
+    if(s==='won'){T.won++;T.wonAmt+=a}else if(bidLost(s)){T.lost++;if(s==='noword')T.noword++}else if(s==='nobid')T.nobid++;else if(past)T.unk++;else T.open++;
     const M=T.months[mi];if(M){M.n++;M.total+=a;if(a)M.by[e]=(M.by[e]||0)+a}
-    const E=T.est[e]=T.est[e]||{name:e,n:0,amt:0,won:0,lost:0,unk:0};E.n++;E.amt+=a;if(s==='won')E.won++;else if(s==='lost')E.lost++;else if(s!=='nobid'&&past)E.unk++;
-    bidGcs(j).forEach(g=>{const k=gcKey(g.name);if(!k)return;const G=T.gcs[k]=T.gcs[k]||{name:g.name,n:0,amt:0,won:0,lost:0,sp:{}};G.sp[g.name]=(G.sp[g.name]||0)+1;G.n++;G.amt+=a;if(s==='won')G.won++;else if(s==='lost')G.lost++})});
+    const E=T.est[e]=T.est[e]||{name:e,n:0,amt:0,won:0,lost:0,unk:0};E.n++;E.amt+=a;if(s==='won')E.won++;else if(bidLost(s))E.lost++;else if(s!=='nobid'&&past)E.unk++;
+    bidGcs(j).forEach(g=>{const k=gcKey(g.name);if(!k)return;const G=T.gcs[k]=T.gcs[k]||{name:g.name,n:0,amt:0,won:0,lost:0,sp:{}};G.sp[g.name]=(G.sp[g.name]||0)+1;G.n++;G.amt+=a;if(s==='won')G.won++;else if(bidLost(s))G.lost++})});
   T.avg=T.priced?T.total/T.priced:0;T.rate=T.won+T.lost?T.won/(T.won+T.lost):null;
   T.names=names.filter(n=>T.est[n]).concat(Object.keys(T.est).filter(n=>!names.includes(n)).sort());
   T.estList=T.names.map(n=>{const E=T.est[n];E.rate=E.won+E.lost?E.won/(E.won+E.lost):null;return E});
@@ -2574,12 +2635,12 @@ function pipeYear(){const y=+lsGet('crewplans.pipeYear');return pipeYears().incl
 async function pipeLoadGoal(){if(S.goalLoading)return;S.goalLoading=true;try{const r=await q(sb.from('office_settings').select('value').eq('key','sales_goal').maybeSingle());S.salesGoal=(r&&r.value)||{}}catch(e){S.salesGoal={}}S.goalLoading=false;if(S.view!=='job'&&$('#pipe'))render()}
 function renderPipe(){const td=today(),y=pipeYear(),T=pipeCalc(pipeAll(),y,td,S.office||[]);S.pipeT=T;if(!S.salesGoal)pipeLoadGoal();
   const goal=num((S.salesGoal||{})[String(y)]),gp=goal?T.wonAmt/goal:0,pct=v=>v==null?'–':Math.round(v*100)+'%';
-  let h='<div id="pipe"><div class="pyr"><label>Year <select id="pipeYear">'+pipeYears().map(v=>'<option'+(v===y?' selected':'')+'>'+v+'</option>').join('')+'</select></label><span class="muted small">Each bid counts once; a re-bid replaces the bid it revises.</span></div>';
+  let h='<div id="pipe"><div class="pyr"><label>Year <select id="pipeYear">'+pipeYears().map(v=>'<option'+(v===y?' selected':'')+'>'+v+'</option>').join('')+'</select></label><span class="muted small">Each bid counts once; a re-bid replaces the bid it revises. Bids with no answer '+BID_NOWORD_DAYS+'+ days after the bid date count as lost.</span></div>';
   h+='<div class="kpis"><div class="kpi goal"><div class="row" style="align-items:flex-start"><div class="grow"><div class="kl">Won in '+y+'</div><div class="kb">'+moneyK(T.wonAmt)+'</div></div><button class="btn sm" id="goalEd" title="Change the sales goal for '+y+'">'+(goal?'Goal '+moneyK(goal):'Set sales goal')+' ✎</button></div>'+
     (goal?'<div class="gbar" role="progressbar" aria-valuenow="'+Math.round(gp*100)+'" aria-valuemin="0" aria-valuemax="100" aria-label="Won vs sales goal"><i style="width:'+Math.min(100,gp*100).toFixed(1)+'%"></i></div><div class="gl"><b>'+pct(gp)+'</b> of the '+moneyK(goal)+' sales goal · '+T.won+' job'+(T.won===1?'':'s')+' won'+(goal>T.wonAmt?' · '+moneyK(goal-T.wonAmt)+' to go':'')+'</div>':'<div class="gl">'+T.won+' job'+(T.won===1?'':'s')+' won. Set a sales goal to track progress.</div>')+'</div>'+
     '<div class="kpi"><div class="kb">'+T.n+'</div><div class="kl">Bids</div><div class="ks">'+T.open+' still to bid</div></div>'+
     '<div class="kpi"><div class="kb">'+moneyK(T.total)+'</div><div class="kl">Total bid</div><div class="ks">'+T.priced+' with an amount</div></div>'+
-    '<div class="kpi"><div class="kb">'+pct(T.rate)+'</div><div class="kl">Win rate</div><div class="ks">'+T.won+' won · '+T.lost+' lost · '+T.unk+' no result yet</div></div>'+
+    '<div class="kpi"><div class="kb">'+pct(T.rate)+'</div><div class="kl">Win rate</div><div class="ks">'+T.won+' won · '+T.lost+' lost'+(T.noword?' ('+T.noword+' no word)':'')+' · '+T.unk+' no result yet</div></div>'+
     '<div class="kpi"><div class="kb">'+moneyK(T.avg)+'</div><div class="kl">Average bid</div><div class="ks">Bids with an amount</div></div></div>';
   if(!T.n)return h+'<div class="empty"><b>No bids in '+y+'</b>Add bids on the Bid list, or bring in the Excel tracker from ☰ → Import bid tracker.</div></div>';
   const leg=T.names.filter(n=>T.months.some(m=>m.by[n]));
@@ -2684,7 +2745,7 @@ function trkPlan(recs,existing,office,year){const ex=(existing||[]).map(e=>({e,k
     if(m){const p=trkPatch(m.e,r,pm);used.add(m.e.id);if(!Object.keys(p).length)return {r,pm,action:'skip',why:'Already up to date',match:{id:m.e.id,name:m.e.name,stage:m.e.stage},flags};return {r,pm,action:'merge',match:{id:m.e.id,name:m.e.name,stage:m.e.stage},patch:p,flags}}
     if(like.length)flags.push('Same name as '+like[0].e.name+(like[0].e.bid_date?' (bid '+like[0].e.bid_date+')':'')+' in the app (re-bid?)');
     return {r,pm,action:'new',match:null,flags}})}
-const TRK_AW={won:'YES',lost:'NO',nobid:'NO BID',submitted:'REVIEWED',open:'',rebid:'RE-BID'};
+const TRK_AW={won:'YES',lost:'NO',noword:'NO',nobid:'NO BID',submitted:'REVIEWED',open:'',rebid:'RE-BID'};
 const trkGcText=j=>[bidGcs(j).map(g=>g.name).join(', '),j.bid_result||'',(Array.isArray(j.bid_notes)?j.bid_notes:[]).map(n=>n.text+(n.at?' on '+(+n.at.slice(5,7))+'/'+(+n.at.slice(8,10)):'')).join('  ')].filter(Boolean).join('  ');
 /* export: month tabs (by bid date) with one block per estimator, same columns as the Excel tracker */
 function trkExportTabs(all,year,td,office){const nm=j=>{const o=(office||[]).find(x=>x.id===j.pm);return o?o.name:'No estimator'};const tabs=TRK_TABS.map(t=>({name:t,b:{}})),extra={name:'NO DATE',b:{}};
@@ -4462,7 +4523,7 @@ function tkvTools(){
   h.textContent=!sc&&TKV.mode!=='scale'?'No scale on this sheet yet: tap 📐 Scale':
     TKV.mode==='draw'&&TKV.cont?'Continuing the run: click each next corner · Enter or right-click ■ Stop to finish · Esc cancels (the mark stays as it was)':
     TKV.mode==='draw'?(it?(it.unit==='LF'?(TKV.lm==='seg'?'Segments: click both ends of each wall piece · right-click for more · drag to move':'Click each corner along the wall · double-click or ✓ Finish to end the run · right-click for more · drag to move'):it.unit==='SF'?(TKV.dNext?'Deduct: click the corners of the cut-out (or drag a rectangle) · ✓ Finish':'Area: click the corners (click the first one or ✓ Finish to close) or drag a rectangle · Alt+drag/click = deduct · space+drag to move'):'Click each item to count it · drag to move'):'Pick a takeoff item on the right'):
-    TKV.mode==='pan'?'Drag to move · wheel or pinch to zoom':TKV.mode==='select'?'Click a mark to select it, then drag its corners · double-click an edge to add a corner · shift-click or drag a box to pick several · right-click for more':TKV.mode==='scale'?'Click both ends of a dimension you know, then ✓ Finish':'Click points to measure (not saved) · ✓ Finish';
+    TKV.mode==='pan'?'Drag to move · wheel or pinch to zoom':TKV.mode==='select'?'Click a mark to select it · drag to move the sheet · drag a selected mark\'s corners to reshape · shift-click to pick several, shift+drag a box to pick an area · right-click (long-press) for more':TKV.mode==='scale'?'Click both ends of a dimension you know, then ✓ Finish':'Click points to measure (not saved) · ✓ Finish';
   h.style.display='block';
 }
 function tkvSide(){
@@ -4546,11 +4607,11 @@ function tkvBind(){
     if(!TKV||!TKV.W)return;try{st.setPointerCapture(e.pointerId)}catch(_){}
     TKV.pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
     if(TKV.pts.size===2){const [a,b]=[...TKV.pts.values()];TKV.g={type:'pinch',d0:Math.max(1,dist(a,b)),c0:mid(a,b),t0:Object.assign({},TKV.t)};if(TKV.box||TKV.drag){TKV.box=null;TKV.drag=null;tkvPaint(true)}}
-    else if(TKV.pts.size===1){const it=tkItem(TKV.item),btn=TKV.space?1:e.ctrlKey?2:e.button,sm=TKV.mode==='select'&&btn===0;
+    else if(TKV.pts.size===1){const it=tkItem(TKV.item),btn=TKV.space?1:e.ctrlKey?2:e.button,sm=TKV.mode==='select'&&!TKV.space&&e.button===0;
       const cs=sm&&TKV.sel&&!e.shiftKey?tkvShape(TKV.sel):null,ci=cs&&cs.k!=='count'?tkvNearCorner(cs,tkvImg(e.clientX,e.clientY),12):-1;
       TKV.g={type:'pan',sx:e.clientX,sy:e.clientY,t0:Object.assign({},TKV.t),moved:false,time:Date.now(),btn,alt:e.altKey,shift:e.shiftKey,
       rect:!TKV.space&&e.button===0&&!e.ctrlKey&&TKV.mode==='draw'&&!!it&&it.unit==='SF'&&!TKV.draft.length&&!!tkScaleOf(TKV.id),
-      corner:ci>=0?{id:cs.id,i:ci,p0:(cs.p||[]).slice()}:null,box:sm&&ci<0}}
+      corner:ci>=0?{id:cs.id,i:ci,p0:(cs.p||[]).slice()}:null,box:sm&&ci<0&&(e.shiftKey||e.metaKey||e.ctrlKey||!!TKV.boxNext)};TKV.boxNext=false}
     clearTimeout(TKV.lp);
     if(e.pointerType!=='mouse'&&TKV.pts.size===1){const g0=TKV.g,x=e.clientX,y=e.clientY;TKV.lp=setTimeout(()=>{if(TKV&&TKV.g===g0&&!g0.moved&&TKV.pts.size===1){g0.long=true;tkCtx(x,y)}},500)}
     const h=$('#tkHint');if(h)h.style.display='none';
@@ -4562,7 +4623,7 @@ function tkvBind(){
     if(g.type==='pinch'&&TKV.pts.size>=2){const [a,b]=[...TKV.pts.values()];const c=mid(a,b);const r=st.getBoundingClientRect();const s=clamp(g.t0.s*dist(a,b)/g.d0,TKV.minS,6);const ix=(g.c0.x-r.left-g.t0.x)/g.t0.s,iy=(g.c0.y-r.top-g.t0.y)/g.t0.s;TKV.t={s,x:c.x-r.left-ix*s,y:c.y-r.top-iy*s};tkvT()}
     else if(g.corner&&(g.type==='corner'||far(4))){clearTimeout(TKV.lp);g.type='corner';g.moved=true;const q=tkvSnapPt(tkvImg(e.clientX,e.clientY),g.corner);
       TKV.drag={id:g.corner.id,p:tkMoveCorner(g.corner.p0,g.corner.i,clamp(q.x,0,TKV.W)/TKV.W,clamp(q.y,0,TKV.H)/TKV.H)};tkvPaint(true)}
-    else if(g.box&&(g.type==='box'||far(6))){clearTimeout(TKV.lp);g.type='box';g.moved=true;TKV.box={a:tkvImg(g.sx,g.sy),b:tkvImg(e.clientX,e.clientY)};tkvLive()}
+    else if(g.box&&(g.type==='box'||far(6))){clearTimeout(TKV.lp);if(g.type!=='box')tkCtxClose();g.type='box';g.moved=true;TKV.box={a:tkvImg(g.sx,g.sy),b:tkvImg(e.clientX,e.clientY)};tkvLive()}
     else if(g.type==='rect'||(g.type==='pan'&&g.rect&&far(10))){
       clearTimeout(TKV.lp);if(g.type!=='rect'){g.type='rect';g.a=tkvSnapPt(tkvImg(g.sx,g.sy));TKV.dDraft=!!(g.alt||e.altKey||TKV.dNext)}
       const a=g.a,b=tkvImg(e.clientX,e.clientY);b.x=clamp(b.x,0,TKV.W);b.y=clamp(b.y,0,TKV.H);TKV.draft=[a,{x:b.x,y:a.y},b,{x:a.x,y:b.y}];TKV.cur=null;tkvLive()}
@@ -4741,6 +4802,7 @@ function tkCtx(cx,cy,sub){
       add('mdel','Delete this mark',true,'Del');
       sep()}
     if(many){add('scopy','⧉ Copy '+ids.length+' marks',true,C+'C');add('sdel','Delete '+ids.length+' marks',true,'Del');add('sclear','Clear selection',true,'Esc');sep()}
+    add('boxsel','⬚ Select area…',sel&&!dr);
     add('paste','Paste '+(TK_CLIP?TK_CLIP.length:0)+' mark'+(TK_CLIP&&TK_CLIP.length===1?'':'s')+' here',!!(TK_CLIP&&TK_CLIP.length),C+'V');
     add('umark','Undo last mark',!!last);
     sep();
@@ -4786,6 +4848,7 @@ function tkCtx(cx,cy,sub){
     else if(c==='scopy')tkvCopyMarks(ids);
     else if(c==='sdel')tkvDelMarks(ids);
     else if(c==='sclear'){TKV.sel=null;TKV.msel=[];tkvPaint()}
+    else if(c==='boxsel'){TKV.boxNext=true;toast('Drag a box around the marks to select them.')}
     else if(c==='paste')tkvPaste(p0);
     else if(c==='umark'){TKV.mine=TKV.mine.filter(id=>id!==last);tkDo({t:'del_shape',id:last});if(TKV.sel===last)TKV.sel=null;tkvPaint()}
     else if(c==='snap'){TKV.snap=!TKV.snap;lsSet('acv.tkSnap',TKV.snap?null:'off');tkvTools()}
