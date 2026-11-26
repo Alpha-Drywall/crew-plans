@@ -269,6 +269,14 @@ body.noscroll .netpill{bottom:auto;top:calc(56px + env(safe-area-inset-top))}
 .offok b{color:var(--ok)}
 .progress-note{font-size:13px;color:var(--muted);margin-top:4px}
 .welcome{max-width:420px;margin:30px auto}
+.tmt{display:block;width:100%;text-align:left;font:inherit;color:inherit;border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:8px;background:#fff}
+.tmt.old{border-color:#e8a0a0;background:#fff5f5}
+.tmst{display:inline-block;font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px;background:#e7ebef;color:#475569;white-space:nowrap}
+.tmst.unsigned{background:#fdecea;color:#b42318}.tmst.signed{background:#e6f4ea;color:#1e7b34}.tmst.sent{background:#e3f0fb;color:#1565c0}.tmst.approved{background:#1e7b34;color:#fff}.tmst.rejected{background:#475569;color:#fff}
+.tmsig img{display:block;max-width:100%;height:90px;border:1px solid var(--line);border-radius:8px;background:#fff}
+.tmed [data-row].lrow{padding:0;border:0;margin-bottom:6px}.tmed [data-row].lrow input{height:auto;min-height:40px;width:0;flex:1 1 0;min-width:0;border:1px solid var(--line);border-radius:8px;padding:8px 10px}.tmed fieldset{min-width:0}
+body:has(#fvPill) .mcard{padding-bottom:72px}#tmLog{scroll-margin-top:140px}
+.tmtab{width:100%;border-collapse:collapse;font-size:14px;margin:4px 0}.tmtab td,.tmtab th{border-bottom:1px solid var(--line);padding:4px 2px;text-align:left}.tmtab td+td,.tmtab th+th{text-align:right}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js"></script>
 </head>
@@ -1117,7 +1125,7 @@ function jobId(){return S.job&&S.job.id}
 async function loadSheets(){const id=jobId();if(!id)return;try{const d=await q(sb.from('sheets').select('*').eq('job_id',id).order('sort'));if(jobId()!==id)return;S.sheets=d;S.loaded.sheets=true;if(S.tab==='plans')render()}catch(e){toast(errMsg(e))}}
 async function loadBudget(){const id=jobId();if(!id||!isAdminRole()){S.budget=null;return}try{const d=await q(sb.from('job_budget').select('amounts').eq('job_id',id).maybeSingle());if(jobId()===id)S.budget=d?d.amounts||{}:null}catch(e){S.budget=null}}
 async function loadAreas(){const id=jobId();if(!id)return;await loadBudget();try{const d=await q(sb.from('areas').select('*').eq('job_id',id).order('created_at'));if(jobId()!==id)return;S.areas=d;S.loaded.areas=true;if(S.tab==='progress')render()}catch(e){toast(errMsg(e))}}
-async function loadLogs(){const id=jobId();if(!id)return;if(S.tab!=='labor')S.loaded.labor=false;try{const d=await q(sb.from('logs').select('*').eq('job_id',id).order('date',{ascending:false}).limit(300));if(jobId()!==id)return;S.logs=d;S.loaded.logs=true;loadMat();if(S.tab==='log'){renderLogList();const b=$('#logForm');if(b&&b._fillIfEmpty)b._fillIfEmpty()}}catch(e){toast(errMsg(e))}}
+async function loadLogs(){const id=jobId();if(!id)return;if(S.tab!=='labor')S.loaded.labor=false;try{const d=await q(sb.from('logs').select('*').eq('job_id',id).order('date',{ascending:false}).limit(300));if(jobId()!==id)return;S.logs=d;S.loaded.logs=true;loadMat();if(S.tab!=='log')tmNagSync();if(S.tab==='log'){renderLogList();const b=$('#logForm');if(b&&b._fillIfEmpty)b._fillIfEmpty()}}catch(e){toast(errMsg(e))}}
 async function loadMembers(){const id=jobId();if(!id)return;try{const d=await q(sb.from('members').select('*').eq('job_id',id).order('joined_at'));if(jobId()!==id)return;S.members=d;d.forEach(m=>S.people[m.user_id]=m.name);render();if(V)buildPins()}catch(e){}}
 async function loadInvites(){const id=jobId();if(!id||!isAdminRole())return [];try{S.invites=await q(sb.from('invites').select('*').eq('job_id',id).order('created_at',{ascending:false}))}catch(e){toast(errMsg(e))}return S.invites}
 function closeJob(){
@@ -1143,7 +1151,7 @@ function render(){
     $('#back').onclick=closeJob;
     $$('.tabs button').forEach(b=>b.onclick=()=>{S.tab=b.dataset.tab;window.scrollTo(0,0);render()});
     if($('#jmenu'))$('#jmenu').onclick=jobMenu;
-    if(S.tab==='log'){$('#tabBody').innerHTML='<div id="logForm"></div><div id="logList"></div>';renderLogForm()}
+    if(S.tab==='log'){$('#tabBody').innerHTML='<div id="tmLog"></div><div id="logForm"></div><div id="logList"></div>';renderLogForm()}
   }
   $('#jt').innerHTML=esc(j.name||'Job')+'<div class="sub">'+(j.addr?esc(j.addr)+' · ':'')+(pmName(j.pm)?'PM '+esc(pmName(j.pm))+' · ':'')+(S.role==='viewer'?'View only':S.role==='editor'?'Editor':'Office')+'</div>';$('#jt2').innerHTML=$('#jt').innerHTML;
   $$('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===S.tab));
@@ -1154,6 +1162,7 @@ function render(){
   else renderLogList();
   {const nb=nudgeBanner();const tb=$('#tabBody');if(nb&&tb&&!$('#nudgeCard',tb)){tb.insertAdjacentHTML('afterbegin',nb);const g=$('#nudgeGo');if(g)g.onclick=()=>{S.tab='progress';window.scrollTo(0,0);render()}}}
   matPaint();
+  tmNagSync();
   clearTimeout(S.tipT);S.tipT=setTimeout(()=>{if(S.view==='job'&&!V)tipsFor(S.tab==='plans'?'job':S.tab)},1200);
 }
 
@@ -1959,10 +1968,11 @@ function bindJobs(){
 }
 async function jobMenu(){
   const j=S.job;
-  const m=modal('<h2>'+esc(j.name)+'</h2><div style="display:grid;gap:10px"><button class="btn primary" data-a="people">People & invite links</button><button class="btn" data-a="scope">Scope items</button><button class="btn" data-a="dl">Download job (save to OneDrive)</button><button class="btn" data-a="edit">Edit job (name, PM, GC email)</button><button class="btn danger" data-a="del">Delete job</button><button class="btn" data-a="x">Close</button></div>');
+  const m=modal('<h2>'+esc(j.name)+'</h2><div style="display:grid;gap:10px"><button class="btn primary" data-a="people">People & invite links</button><button class="btn" data-a="scope">Scope items</button><button class="btn" data-a="tm">T&amp;M log (extra work tickets)</button><button class="btn" data-a="dl">Download job (save to OneDrive)</button><button class="btn" data-a="edit">Edit job (name, PM, GC email)</button><button class="btn danger" data-a="del">Delete job</button><button class="btn" data-a="x">Close</button></div>');
   $('[data-a=x]',m).onclick=()=>m.close();
   $('[data-a=people]',m).onclick=()=>{m.close();peoplePanel()};
   $('[data-a=scope]',m).onclick=()=>{m.close();scopeEditor()};
+  $('[data-a=tm]',m).onclick=()=>{m.close();S.tab='log';render();setTimeout(()=>{const b=$('#tmLog');if(b&&b.innerHTML)b.scrollIntoView({behavior:'smooth',block:'start'});else toast('No T&M tickets on this job yet. Foremen make them on the Daily Report.')},300)};
   $('[data-a=dl]',m).onclick=()=>{m.close();downloadJob()};
   $('[data-a=edit]',m).onclick=async()=>{m.close();const v=await formBox('Edit job',[{k:'name',label:'Job name',value:j.name,req:true},{k:'addr',label:'Address or GC',value:j.addr},{k:'pm',label:'PM',type:'select',value:j.pm||'',options:(S.office||[]).map(o=>[o.id,o.name]).concat([['','No PM']])},{k:'gc_name',label:'General contractor (company)',value:j.gc_name||''},{k:'gc_email',label:'GC email for daily reports (separate several with commas)',value:j.gc_email||'',ph:'super@gc.com, pm@gc.com'}]);if(v){const bad=String(v.gc_email||'').split(/[,;\s]+/).filter(x=>x&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x));if(bad.length){toast('Check this email: '+bad[0]);return}if(await run(sb.from('jobs').update({name:v.name.slice(0,120),addr:v.addr.slice(0,160),pm:v.pm||null,gc_name:v.gc_name.slice(0,120),gc_email:v.gc_email.slice(0,400)}).eq('id',j.id))){loadJobs();Object.assign(j,{gc_name:v.gc_name,gc_email:v.gc_email});if(S.tab==='log'){S.tab='log';const a=$('#app');a.dataset.tab='';render()}}}};
   $('[data-a=del]',m).onclick=async()=>{
@@ -2748,6 +2758,186 @@ function sigPad(cv){
     get dirty(){return dirty}};
   requestAnimationFrame(fitCv);return pad;
 }
+/* ===== T&M tickets =====
+   Each extra work row on a daily report (logs.extra_work) can be a T&M ticket: {tm:1,id,no,work,loc,awa,crew:[{name,hrs}],mats:[{item,qty,unit}],photos:[],by (GC rep),sig,signed_at,no_sig,status,co,amt,notes,upd_by,upd_at}.
+   Old plain rows {work,by,awa} still show as before. Ticket saves go through the logs table, so offline, practice and view-as work like the rest of the report. */
+const TM_ST={unsigned:'Unsigned',signed:'Signed',sent:'Sent to GC',approved:'Approved',rejected:'Rejected'};
+const TM_OFFICE=['sent','approved','rejected'];
+const TM_REASONS=['GC not on site','GC will sign later','GC refused to sign'];
+const tmIs=x=>!!(x&&x.tm);
+const tmNo=n=>'T&M-'+String(Math.max(0,Math.round(num(n)))).padStart(3,'0');
+const tmSt=t=>TM_OFFICE.includes(t&&t.status)?t.status:(t&&t.sig?'signed':'unsigned');
+const tmHrs=t=>r2(((t&&t.crew)||[]).reduce((a,c)=>a+num(c.hrs),0));
+const tmIs172=c=>/^\s*0*172\b|extra|t\s*&\s*m/i.test(String(c||''));
+const tmBody=t=>JSON.stringify([t.work||'',t.loc||'',(t.crew||[]).map(c=>[c.name||'',num(c.hrs)]),(t.mats||[]).map(m=>[m.item||'',num(m.qty),m.unit||''])]);
+const tmOld=(t,date,now)=>tmSt(t)==='unsigned'&&!!date&&date<isoAddD(now,-2);
+/** Next ticket number on the job: one more than the highest on any report (plus tickets not saved yet). */
+function tmNext(logs,more){let n=0;const see=x=>{if(tmIs(x))n=Math.max(n,num(x.no))};(logs||[]).forEach(l=>(l.extra_work||[]).forEach(see));(more||[]).forEach(see);return n+1}
+/** Every ticket on the job with its report, newest number first. Plain old rows are not tickets. */
+function tmAll(logs){const out=[];(logs||[]).forEach(l=>(l.extra_work||[]).forEach(t=>{if(tmIs(t))out.push({t,l})}));return out.sort((a,b)=>num(b.t.no)-num(a.t.no)||String(b.l.date).localeCompare(String(a.l.date)))}
+/** Crew for a ticket: each worker's hours on this job that day coded 172 (Extra) on the time card. */
+function tmCrew172(card,iso,no,nm){const out=[];if(!card||!card.period_start)return out;const d=tcDayIdx(card.period_start,iso);if(d<0)return out;
+  (card.workers||[]).forEach(w=>{const h=((w.days&&w.days[d])||[]).reduce((a,l)=>a+(tcIsJob(l,no,nm)&&tmIs172(l&&l.code)?tcHrs(l):0),0);if(h>0)out.push({name:String(w.name||'').trim()||'Worker',hrs:r2(h)})});return out}
+/** Time card 172 hours not already on the day’s other tickets (so two tickets the same day don’t both claim them). */
+function tmLeft(crew,others){const used={};(others||[]).forEach(t=>(t.crew||[]).forEach(c=>{const k=String(c.name||'').trim().toLowerCase();used[k]=(used[k]||0)+num(c.hrs)}));
+  return (crew||[]).map(c=>{const k=String(c.name||'').trim().toLowerCase();const h=r2(num(c.hrs)-(used[k]||0));used[k]=Math.max(0,(used[k]||0)-num(c.hrs));return {name:c.name,hrs:h}}).filter(c=>c.hrs>0)}
+/** GC signs on the phone: Unsigned -> Signed (an office status like Approved stays). */
+function tmSign(t,name,sig,when){if(!sig||!String(name||'').trim())throw new Error('Signature and GC name needed');const n=Object.assign({},t,{by:String(name).trim().slice(0,60),sig,signed_at:when,no_sig:null});if(!TM_OFFICE.includes(n.status))n.status='signed';return n}
+function tmUnsign(t){const n=Object.assign({},t,{sig:null,signed_at:null});if(!TM_OFFICE.includes(n.status))n.status='unsigned';return n}
+/** Office sets Sent / Approved / Rejected, or 'open' to go back to Signed/Unsigned (from the signature). Also GC CO #, approved $ and notes. */
+function tmSetStatus(t,s,o){o=o||{};if(s!=='open'&&!TM_OFFICE.includes(s))throw new Error('Unknown status: '+s);const n=Object.assign({},t);n.status=s==='open'?(t.sig?'signed':'unsigned'):s;
+  ['co','notes'].forEach(k=>{if(o[k]!=null)n[k]=String(o[k]).trim().slice(0,k==='co'?40:1000)});if(o.amt!=null)n.amt=String(o.amt).trim()===''?null:r2(num(String(o.amt).replace(/[$,\s]/g,'')));
+  if(o.by)n.upd_by=o.by;if(o.at)n.upd_at=o.at;return n}
+/** The foreman's copy of the rows wins, but the office's fields (status, CO #, $, notes) and a newer GC signature come from the saved copy. Office-handled tickets can't be dropped. */
+function tmMerge(mine,saved){const sv={};(saved||[]).forEach(x=>{if(tmIs(x)&&x.id)sv[x.id]=x});const seen=new Set();
+  const out=(mine||[]).map(x=>{const s=tmIs(x)&&x.id&&sv[x.id];if(!s)return x;seen.add(x.id);const n=Object.assign({},x);['co','amt','notes','upd_by','upd_at'].forEach(k=>{if(s[k]!==undefined)n[k]=s[k]});
+    if(s.sig&&!n.sig&&tmBody(s)===tmBody(n))Object.assign(n,{sig:s.sig,signed_at:s.signed_at,by:s.by,no_sig:null});if(TM_OFFICE.includes(s.status))n.status=s.status;else if(!TM_OFFICE.includes(n.status))n.status=n.sig?'signed':'unsigned';return n});
+  Object.keys(sv).forEach(id=>{if(!seen.has(id)&&TM_OFFICE.includes(sv[id].status))out.push(sv[id])});return out}
+/** One line of text for a row (ticket or plain old row): report list. */
+function tmText(x){if(!tmIs(x))return (x.work||'')+(x.by?' – auth. '+x.by:'')+(x.awa?' – AWA '+x.awa:'');
+  return tmNo(x.no)+' '+(x.work||'')+(x.loc?' @ '+x.loc:'')+(tmHrs(x)?' – '+tmHrs(x)+' hrs':'')+' – '+(x.sig?'GC signed'+(x.by?' ('+x.by+')':''):'not signed'+(x.no_sig?' ('+x.no_sig+')':''))}
+/** Daily report PDF "Additional Work" cells: [work, authorized by, AWA #]. */
+function tmCells(r){r=r||{};if(!tmIs(r))return [r.work||'',r.by||'',r.awa||''];return [tmNo(r.no)+' '+(r.work||''),(r.by||'')+(r.sig?' (signed)':' (NOT signed)'),r.awa||'']}
+const tmWhenTxt=v=>{const d=new Date(v);if(!v||isNaN(d))return '';const p=x=>String(x).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes())};
+/** Office T&M log as CSV rows (for the CO workbook). */
+function tmCsv(list,job){const H=['Job','Ticket #','Date','Foreman','Description','Location','Crew hours','Crew','Materials','GC rep','GC signed','Signed at','Not signed reason','Status','GC CO #','Approved $','Notes','GC ref / AWA #'];
+  return [H].concat((list||[]).slice().sort((a,b)=>num(a.t.no)-num(b.t.no)).map(({t,l})=>[(job&&job.name)||'',tmNo(t.no),l.date||'',l.name||'',t.work||'',t.loc||'',tmHrs(t),(t.crew||[]).map(c=>(c.name||'')+' '+num(c.hrs)).join('; '),
+    (t.mats||[]).map(m=>[m.qty,m.unit,m.item].filter(v=>v!=null&&v!=='').join(' ')).join('; '),t.by||'',t.sig?'Yes':'No',tmWhenTxt(t.signed_at),t.sig?'':(t.no_sig||''),TM_ST[tmSt(t)],t.co||'',t.amt==null||t.amt===''?'':num(t.amt),t.notes||'',t.awa||'']))}
+const tmChip=t=>'<span class="tmst '+tmSt(t)+'">'+esc(TM_ST[tmSt(t)])+'</span>';
+const tmMoney=n=>'$'+num(n).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+/** Change the extra work rows on one report (job, author, date), starting from the saved copy. Own report: upsert (makes the report row if there isn't one yet). Someone else's: update by id (office). */
+async function tmWrite(d,uid,fn,okMsg){const jid=S.job.id,mine=uid===S.me.id;let rows=null;
+  try{rows=await q(sb.from('logs').select('id,user_id,date,extra_work').eq('job_id',jid).eq('user_id',uid).eq('date',d))}catch(e){rows=null}
+  const row=(rows&&rows[0])||(S.logs||[]).find(l=>l.date===d&&l.user_id===uid)||null;const ew=fn(JSON.parse(JSON.stringify((row&&row.extra_work)||[])));if(!ew)return null;
+  const p=mine?sb.from('logs').upsert(Object.assign({job_id:jid,user_id:uid,date:d,extra_work:ew},row?{}:{name:(lsGet('crewplans.logName')||myName()||'').slice(0,60)}),{onConflict:'job_id,user_id,date'})
+    :row&&!String(row.id).startsWith('local-')?sb.from('logs').update({extra_work:ew}).eq('id',row.id):null;
+  if(!p){toast('That report hasn’t uploaded yet. Try again once it syncs.');return null}
+  if(!await run(p,isPractice()?'Practice: saved in this browser only.':okMsg))return null;
+  const L=(S.logs||[]).find(l=>l.date===d&&l.user_id===uid);if(L)L.extra_work=ew;const f=$('#logForm');if(f&&f._tm)f._tm(d,ew);loadLogs();return ew}
+function tmFind(lid,tid){const l=(S.logs||[]).find(x=>String(x.id)===String(lid));const t=l&&(l.extra_work||[]).find(x=>tmIs(x)&&x.id===tid);return t?{l,t}:null}
+function tmOpen(l,t){if(l.user_id===S.me.id&&canWrite()&&!TM_OFFICE.includes(t.status))tmEditor(t,{date:l.date});else tmView(l,t)}
+function tmDetail(t,l){const crew=t.crew||[],mats=t.mats||[];
+  return (t.work?'<div class="kv">'+esc(t.work)+'</div>':'')+(t.loc?'<div class="kv"><b>Location:</b> '+esc(t.loc)+'</div>':'')+(t.awa?'<div class="kv"><b>GC ref / AWA #:</b> '+esc(t.awa)+'</div>':'')+(l?'<div class="kv"><b>Foreman:</b> '+esc(logName(l))+' · '+fmtDay(l.date)+'</div>':'')+
+    (crew.length?'<table class="tmtab"><tr><th>Crew</th><th>Hrs</th></tr>'+crew.map(c=>'<tr><td>'+esc(c.name||'')+'</td><td>'+f1(num(c.hrs))+'</td></tr>').join('')+'<tr><td><b>Total</b></td><td><b>'+f1(tmHrs(t))+'</b></td></tr></table>':'<div class="kv muted">No crew hours.</div>')+
+    (mats.length?'<table class="tmtab"><tr><th>Material</th><th>Qty</th></tr>'+mats.map(m=>'<tr><td>'+esc(m.item||'')+'</td><td>'+esc([m.qty,m.unit].filter(v=>v!=null&&v!=='').join(' '))+'</td></tr>').join('')+'</table>':'')+
+    ((t.photos||[]).length?'<div class="photos">'+t.photos.map(p=>'<img class="ph" alt="" data-path="'+esc(p)+'">').join('')+'</div>':'')+
+    '<div class="field tmsig" style="margin-top:8px"><span>GC signature</span>'+(t.sig?'<img alt="GC signature" src="'+esc(t.sig)+'"><div class="muted small">'+esc(t.by||'')+' · '+esc(fmtWhen(t.signed_at))+'</div>':'<div style="color:#b42318;font-weight:700">Not signed'+(t.no_sig?' – '+esc(t.no_sig):'')+'</div>')+'</div>'}
+/** Ticket editor (author): description, location, crew & hours (from the time card's 172 lines), materials, photos, and the GC's signature on this phone. Saves right away. */
+function tmEditor(t0,o){o=o||{};const t=JSON.parse(JSON.stringify(t0)),d=o.date,jid=S.job.id;let photos=(t.photos||[]).filter(p=>typeof p==='string'),pad=null,resign=false;
+  const m=modal('<h2 style="display:flex;gap:8px;align-items:center"><span class="grow">'+esc(tmNo(t.no))+'</span>'+tmChip(t)+'</h2><div class="muted small" style="margin:-6px 0 10px">'+esc(S.job.name)+' · '+fmtDay(d)+'</div><form class="tmed">'+
+    '<label class="field"><span>Extra work done</span><textarea name="work" maxlength="2000" placeholder="e.g. Added 2 rated walls at elevator lobby per GC super">'+esc(t.work||'')+'</textarea></label>'+
+    '<div class="two"><label class="field"><span>Location / area</span><input name="loc" maxlength="120" value="'+esc(t.loc||'')+'" placeholder="e.g. Level 2, Rm 204"></label><label class="field"><span>GC ref / AWA # (optional)</span><input name="awa" maxlength="40" value="'+esc(t.awa||'')+'"></label></div>'+
+    '<fieldset class="codes"><legend>Crew & hours</legend><div data-tmtc class="muted small" style="margin-bottom:6px"></div>'+rowsEditor('tmcrew',[{k:'name',ph:'Worker'},{k:'hrs',ph:'Hrs',num:1}],t.crew)+'</fieldset>'+
+    '<fieldset class="codes"><legend>Materials used</legend>'+rowsEditor('tmmat',[{k:'item',ph:'e.g. 5/8 Type X'},{k:'qty',ph:'Qty',num:1},{k:'unit',ph:'Unit'}],t.mats)+'</fieldset>'+
+    '<div class="field"><span>Photos (optional)</span><div class="photos" data-ph></div></div>'+
+    '<fieldset class="codes" style="border:2px solid var(--head)"><legend>GC signature</legend><label class="field"><span>GC rep name (print)</span><input name="by" maxlength="60" value="'+esc(t.by||'')+'" placeholder="GC superintendent"></label><div data-sigbox></div>'+
+    '<label class="field"><span>Can’t get it signed now?</span><select name="no_sig"><option value="">—</option>'+TM_REASONS.map(r=>'<option'+(t.no_sig===r?' selected':'')+'>'+esc(r)+'</option>').join('')+'</select></label></fieldset>'+
+    '<div class="mbtns">'+(o.isNew?'':'<button type="button" class="btn danger" data-del>Delete</button>')+'<button type="button" class="btn" data-pdf>PDF</button><button type="button" class="btn" data-x>Cancel</button><button class="btn primary" type="submit">Save ticket</button></div></form>');
+  const form=$('form',m);bindRows(form);
+  const setR=(k,vals)=>{const b=$('[data-rows="'+k+'"]',form),tp=$('[data-tpl="'+k+'"]',form).innerHTML;b.innerHTML='';(vals&&vals.length?vals:[{}]).forEach(v=>{b.insertAdjacentHTML('beforeend',tp);$$('[data-c]',b.lastElementChild).forEach(i=>i.value=v[i.dataset.c]!=null?v[i.dataset.c]:'')})};
+  const sigDraw=()=>{const sb2=$('[data-sigbox]',form);
+    if(t.sig&&!resign){sb2.innerHTML='<div class="tmsig"><img alt="GC signature" src="'+esc(t.sig)+'"></div><div class="row" style="justify-content:space-between"><span class="muted small">Signed '+esc(fmtWhen(t.signed_at))+'</span><button type="button" class="btn sm" data-resign>Sign again</button></div>';pad=null;$('[data-resign]',sb2).onclick=()=>{resign=true;sigDraw()};return}
+    sb2.innerHTML='<div class="small"><b>Hand the phone to the GC’s super to sign.</b> <span class="muted">Signing agrees this extra work was done as described.</span></div><canvas class="sig" data-sig style="height:150px"></canvas><div class="row" style="justify-content:space-between"><span class="muted small">Sign with a finger</span><button type="button" class="btn sm" data-sigclr>Clear</button></div>';
+    pad=sigPad($('[data-sig]',sb2));$('[data-sigclr]',sb2).onclick=()=>pad.clear()};
+  sigDraw();if(o.focusSig)setTimeout(()=>{const s=$('[data-sigbox]',form);if(s)s.scrollIntoView({block:'center'})},200);
+  const drawPh=()=>{const b=$('[data-ph]',form);b.innerHTML=photos.map(p=>'<img class="ph" alt="" data-path="'+esc(p)+'">').join('')+'<label class="addph"><b>+</b>Photo<input type="file" accept="image/*,.heic,.heif" multiple hidden></label>';
+    fillImgs(b);$$('.ph',b).forEach(i=>i.onclick=()=>showPhoto(i.dataset.path));const inp=$('input[type=file]',b);inp.onchange=async()=>{const fs=[...inp.files].filter(isImgFile);inp.value='';const lab=$('.addph',b);if(lab)lab.innerHTML='<b>…</b>Uploading';
+      for(const f of fs){try{photos.push(await putFile(jid+'/photos/'+uuid()+'.jpg',await photoFromFile(f)))}catch(e){toast(errMsg(e))}}drawPh()}};
+  drawPh();
+  const tcLine=$('[data-tmtc]',form);
+  const tcFill=async force=>{const K=tcJobKey(S.job);const card=await tcCardFor(S.me.id,d);if(!document.body.contains(form))return;const all=tmCrew172(card,d,K[0],K[1]);
+    const ml=(S.logs||[]).find(l=>l.date===d&&l.user_id===S.me.id),f=$('#logForm'),oth=((f&&f._tks&&f._tks(d))||(ml&&ml.extra_work)||[]).filter(x=>tmIs(x)&&x.id!==t.id),cr=tmLeft(all,oth);
+    tcLine.innerHTML=cr.length?'From your time card (172 Extra'+(oth.length?', less other tickets that day':'')+'): '+cr.length+' worker'+(cr.length===1?'':'s')+', '+f1(cr.reduce((a,c)=>a+c.hrs,0))+' hrs. Change it if this ticket was only part of that. <button type="button" class="btn sm" data-tcre>↻ Refill</button>'
+      :all.length?'All the 172 (Extra) hours on your time card for this day are already on other tickets. Type the crew and hours.':card===undefined?'Couldn’t check your time card right now. Type the crew and hours.':'No 172 (Extra) hours on your time card for this day yet. Type the crew and hours, and put them on the time card as 172.';
+    const rb=$('[data-tcre]',tcLine);if(rb)rb.onclick=()=>tcFill(true);
+    const empty=readRows(form,'tmcrew').length===0;if(cr.length&&(force||empty))setR('tmcrew',cr)};
+  tcFill(false);
+  const collect=()=>{const n=Object.assign({},t,{tm:1,work:form.work.value.trim().slice(0,2000),loc:form.loc.value.trim().slice(0,120),awa:form.awa.value.trim().slice(0,40),by:form.by.value.trim().slice(0,60),
+    crew:readRows(form,'tmcrew').map(c=>({name:c.name||'',hrs:num(c.hrs)})),mats:readRows(form,'tmmat'),photos:photos.slice(),no_sig:form.no_sig.value||null});
+    const sg=pad&&pad.get();if(sg&&n.by)return tmSign(n,n.by,sg,new Date().toISOString());if(resign||!n.sig)return tmUnsign(n);return n};
+  $('[data-x]',form).onclick=()=>m.close();
+  $('[data-pdf]',form).onclick=()=>tmPdfMenu(collect(),{date:d,name:lsGet('crewplans.logName')||myName()});
+  const del=$('[data-del]',form);if(del)del.onclick=async()=>{if(!await confirmBox('Delete '+tmNo(t.no)+'?'))return;if(await tmWrite(d,S.me.id,a=>a.filter(x=>!(tmIs(x)&&x.id===t.id)),'Ticket deleted.'))m.close()};
+  form.onsubmit=async e=>{e.preventDefault();const n=collect();if(!n.work){toast('Describe the extra work.');form.work.focus();return}
+    if(pad&&pad.dirty&&!n.by){toast('Enter the GC rep’s name.');form.by.focus();return}
+    if(t0.sig&&!resign&&tmBody(n)!==tmBody(t0)){if(!await confirmBox('This ticket is signed. Changing it clears the GC signature and it has to be signed again. Save anyway?','Save and clear'))return;Object.assign(n,tmUnsign(n))}
+    if(!n.created_at)n.created_at=new Date().toISOString();const btn=$('button[type=submit]',form);btn.disabled=true;
+    const ok=await tmWrite(d,S.me.id,a=>{let i=a.findIndex(x=>tmIs(x)&&x.id===n.id);
+      if(i<0&&o.orig)i=a.findIndex(x=>!tmIs(x)&&(x.work||'')===(o.orig.work||'')&&(x.by||'')===(o.orig.by||'')&&(x.awa||'')===(o.orig.awa||''));
+      if(i<0&&tmAll(S.logs).concat(a.filter(tmIs).map(x=>({t:x}))).some(x=>x.t.id!==n.id&&num(x.t.no)===num(n.no)))n.no=tmNext(S.logs,a);
+      if(i>=0)a[i]=tmMerge([n],[a[i]])[0];else a.push(n);return a},n.sig?tmNo(n.no)+' signed and saved.':tmNo(n.no)+' saved. Still needs the GC’s signature.');
+    btn.disabled=false;if(ok)m.close()};
+}
+/** Read-only ticket (other people’s, or locked by the office). Office also sets status, GC CO #, approved $ and notes here. */
+function tmView(l,t){const off=isAdminRole(),st=tmSt(t);
+  const m=modal('<h2 style="display:flex;gap:8px;align-items:center"><span class="grow">'+esc(tmNo(t.no))+'</span>'+tmChip(t)+'</h2>'+tmDetail(t,l)+
+    (off?'<form style="margin-top:12px"><fieldset class="codes"><legend>Office</legend><label class="field"><span>Status</span><select name="st"><option value="open">'+(t.sig?'Signed':'Unsigned')+' (open)</option>'+TM_OFFICE.map(s=>'<option value="'+s+'"'+(st===s?' selected':'')+'>'+esc(TM_ST[s])+'</option>').join('')+'</select></label>'+
+      '<div class="two"><label class="field"><span>GC CO #</span><input name="co" maxlength="40" value="'+esc(t.co||'')+'"></label><label class="field"><span>Approved $</span><input name="amt" inputmode="decimal" value="'+esc(t.amt==null?'':t.amt)+'" placeholder="0.00"></label></div>'+
+      '<label class="field"><span>Notes</span><textarea name="notes" maxlength="1000">'+esc(t.notes||'')+'</textarea></label>'+(t.upd_at?'<div class="muted small">Last office change '+esc(fmtWhen(t.upd_at))+(t.upd_by?' by '+esc(t.upd_by):'')+'</div>':'')+'</fieldset>'+
+      '<div class="mbtns"><button type="button" class="btn" data-pdf>PDF</button><button type="button" class="btn" data-x>Cancel</button><button class="btn primary" type="submit">Save</button></div></form>'
+    :'<div class="mbtns"><button type="button" class="btn" data-pdf>PDF</button><button type="button" class="btn primary" data-x>Close</button></div>'));
+  fillImgs(m);$$('.ph',m).forEach(i=>i.onclick=()=>showPhoto(i.dataset.path));
+  $('[data-x]',m).onclick=()=>m.close();$('[data-pdf]',m).onclick=()=>tmPdfMenu(t,l);
+  const f=$('form',m);if(f)f.onsubmit=async e=>{e.preventDefault();const v={co:f.co.value,amt:f.amt.value,notes:f.notes.value,by:myName()||'Office',at:new Date().toISOString()};
+    if(String(v.amt).trim()&&!isFinite(Number(String(v.amt).replace(/[$,\s]/g,'')))){toast('Approved $ should be a number.');f.amt.focus();return}
+    if(await tmWrite(l.date,l.user_id,a=>{const i=a.findIndex(x=>tmIs(x)&&x.id===t.id);if(i<0){toast('That ticket was deleted.');return null}a[i]=tmSetStatus(a[i],f.st.value,v);return a},tmNo(t.no)+' updated.'))m.close()}}
+/** Office T&M log for the job (Daily Report tab): filters, totals, unsigned > 2 days highlighted, CSV export. */
+function renderTmLog(){const box=$('#tmLog');if(!box)return;if(!isAdminRole()||!S.loaded.logs){box.innerHTML='';return}
+  const all=tmAll(S.logs);if(!all.length){box.innerHTML='';return}
+  const F=S.tmF||'all',td=today(),cnt=s=>all.filter(x=>tmSt(x.t)===s).length;const list=F==='all'?all:all.filter(x=>tmSt(x.t)===F);
+  const hrs=r2(list.reduce((a,x)=>a+tmHrs(x.t),0)),appr=list.filter(x=>tmSt(x.t)==='approved').reduce((a,x)=>a+num(x.t.amt),0),uns=list.filter(x=>tmSt(x.t)==='unsigned').length,old=list.filter(x=>tmOld(x.t,x.l.date,td)).length;
+  box.innerHTML='<div class="card"><div class="row"><b class="grow" style="font-size:17px">T&M log</b><button class="btn sm" data-tmcsv>Export CSV</button></div>'+
+    '<div class="chips" style="margin:8px 0">'+[['all','All',all.length]].concat(Object.keys(TM_ST).map(s=>[s,TM_ST[s],cnt(s)])).filter(c=>c[2]||c[0]===F||['all','unsigned','signed','approved'].includes(c[0])).map(c=>'<button class="chip'+(c[0]===F?' on':'')+'" data-tmf="'+c[0]+'">'+esc(c[1])+' '+c[2]+'</button>').join('')+'</div>'+
+    '<div class="small" style="margin-bottom:8px"><b>'+list.length+'</b> ticket'+(list.length===1?'':'s')+' · <b>'+f1(hrs)+'</b> crew hrs · <b'+(uns?' style="color:#b42318"':'')+'>'+uns+'</b> unsigned'+(old?' (<b style="color:#b42318">'+old+' over 2 days</b>)':'')+' · Approved <b>'+tmMoney(appr)+'</b></div>'+
+    list.map(({t,l})=>{const ol=tmOld(t,l.date,td);const age=ol?Math.round((Date.parse(td)-Date.parse(l.date))/864e5):0;
+      return '<button class="tmt'+(ol?' old':'')+'" data-tmo="'+esc(l.id+'|'+t.id)+'"><div class="row"><b>'+esc(tmNo(t.no))+'</b><span class="muted small grow">'+fmtDay(l.date)+' · '+esc(logName(l))+'</span>'+tmChip(t)+'</div>'+
+        '<div class="small" style="margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(t.work||'(no description)')+(t.loc?' <span class="muted">@ '+esc(t.loc)+'</span>':'')+'</div>'+
+        '<div class="muted small">'+f1(tmHrs(t))+' hrs · '+(t.sig?'GC signed ✓':'<span style="color:#b42318">Not signed'+(t.no_sig?' – '+esc(t.no_sig):'')+'</span>')+(t.co?' · CO '+esc(t.co):'')+(t.amt!=null&&t.amt!==''?' · '+tmMoney(t.amt):'')+(ol?' · <b style="color:#b42318">⚠ '+age+' days unsigned</b>':'')+'</div></button>'}).join('')+'</div>';
+  $$('[data-tmf]',box).forEach(b=>b.onclick=()=>{S.tmF=b.dataset.tmf;renderTmLog()});
+  $$('[data-tmo]',box).forEach(b=>b.onclick=()=>{const [lid,tid]=b.dataset.tmo.split('|');const x=tmFind(lid,tid);if(x)tmView(x.l,x.t)});
+  $('[data-tmcsv]',box).onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([toCsv(tmCsv(list,S.job))],{type:'text/csv'}));a.download=fileSafe((S.job&&S.job.name)||'Job')+' T&M log '+today()+'.csv';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000)}}
+/** Reminder on the job until the GC signs: the user's own unsigned tickets. */
+function tmNagSync(){const tb=$('#tabBody');if(!tb)return;const old=$('#tmNag',tb);if(old)old.remove();if(!canWrite()||!S.job||!S.me)return;
+  const l=tmAll(S.logs).filter(x=>x.l.user_id===S.me.id&&tmSt(x.t)==='unsigned').reverse();if(!l.length)return;
+  const html='<div class="card" id="tmNag" style="background:#fdecea;border-color:#f1a8a8;margin-bottom:12px">'+l.slice(0,3).map(({t,l:lg})=>'<div class="row" style="margin-bottom:6px"><b class="grow">⚠ '+esc(tmNo(t.no))+' not signed by the GC</b><button class="btn sm primary" data-tmsig="'+esc(lg.id+'|'+t.id)+'">Get signature</button></div>').join('')+
+    (l.length>3?'<div class="small">+'+(l.length-3)+' more unsigned ticket'+(l.length>4?'s':'')+'.</div>':'')+'<div class="small">Extra work without the GC’s signature often doesn’t get paid. Hand the phone to the GC’s super to sign.</div></div>';
+  const nc=$('#nudgeCard',tb);if(nc)nc.insertAdjacentHTML('afterend',html);else tb.insertAdjacentHTML('afterbegin',html);
+  $$('[data-tmsig]',tb).forEach(b=>b.onclick=()=>{const [lid,tid]=b.dataset.tmsig.split('|');const x=tmFind(lid,tid);if(x)tmEditor(x.t,{date:x.l.date,focusSig:true})})}
+async function tmImg(path){const [u]=await urlsFor([path]);if(!u)return null;const i=await loadImg(u);const c=scaledCanvas(i,i.naturalWidth,i.naturalHeight,500);return {d:c.toDataURL('image/jpeg',.75),w:c.width,h:c.height}}
+/** One-page T&M ticket PDF (same look as the daily report). */
+async function tmPdf(t,l,job){
+  await loadPdfLib();const {jsPDF}=window.jspdf;const doc=new jsPDF({unit:'pt',format:'letter'});const W=612,L=36,R=576;let y;
+  doc.setFont('helvetica','normal');doc.addImage(LOGO_PNG,'PNG',W/2-95,24,190,80);
+  doc.setFont('helvetica','bold');doc.setFontSize(16);doc.text('T&M TICKET',L,124);doc.text(tmNo(t.no),R,124,{align:'right'});
+  const line=(lab,val,x,yy,w)=>{doc.setFontSize(9);doc.setFont('helvetica','normal');doc.text(lab,x,yy,{align:'right'});doc.setFont('helvetica','bold');doc.text(doc.splitTextToSize(String(val||''),w-6)[0]||'',x+4,yy);doc.setLineWidth(.5);doc.line(x+2,yy+2,x+w,yy+2)};
+  line('Contractor:',job.gc_name||'',90,148,230);line('Date:',fmtDay(l.date),390,148,186);
+  line('Job Name:',(job.name||'').replace(/^\s*\d{3,}\s*[-–]\s*/,''),90,166,230);line('Job No.',jobNo(job),390,166,186);
+  line('Location:',t.loc||'',90,184,230);line('Foreman:',l.name||'',390,184,186);
+  y=198;const box=(title,text,minL)=>{doc.setFontSize(9);const ls=doc.splitTextToSize(String(text||''),R-L-8).slice(0,14);const n=Math.max(minL,ls.length);const h=14+n*11+4;doc.setLineWidth(.6);doc.rect(L,y,R-L,h);doc.setFont('helvetica','bold');doc.text(title,L+3,y+10);doc.setFont('helvetica','normal');doc.text(ls,L+4,y+22);y+=h};
+  box('Extra Work Performed:',t.work,4);if(t.awa){y+=4;doc.setFontSize(9);doc.text('GC ref / AWA #: '+t.awa,L,y+8);y+=10}
+  y+=8;const top=y,cw=(R-L)*.46,mx=L+(R-L)*.5,mw=R-mx;
+  const cell=(x,w,txt,b,al)=>{doc.rect(x,y,w,14);doc.setFont('helvetica',b?'bold':'normal');doc.setFontSize(8.5);const s=doc.splitTextToSize(String(txt==null?'':txt),w-6)[0]||'';al==='r'?doc.text(s,x+w-3,y+10,{align:'right'}):doc.text(s,x+3,y+10)};
+  const crew=(t.crew||[]).slice(0,16);cell(L,cw*.7,'Crew',1);cell(L+cw*.7,cw*.3,'Hours',1,'r');y+=14;for(let i=0;i<Math.max(4,crew.length);i++){const c=crew[i]||{};cell(L,cw*.7,c.name||'');cell(L+cw*.7,cw*.3,crew[i]?f1(num(c.hrs)):'',0,'r');y+=14}
+  cell(L,cw*.7,'Total crew hours',1);cell(L+cw*.7,cw*.3,f1(tmHrs(t)),1,'r');y+=14;const yc=y;y=top;
+  const mats=(t.mats||[]).slice(0,16);cell(mx,mw*.6,'Materials Used',1);cell(mx+mw*.6,mw*.2,'Qty',1,'r');cell(mx+mw*.8,mw*.2,'Unit',1);y+=14;for(let i=0;i<Math.max(4,mats.length);i++){const a=mats[i]||{};cell(mx,mw*.6,a.item||'');cell(mx+mw*.6,mw*.2,a.qty,0,'r');cell(mx+mw*.8,mw*.2,a.unit||'');y+=14}
+  y=Math.max(y,yc)+12;
+  const ph=(t.photos||[]).slice(0,4);if(ph.length){const imgs=[];for(const p of ph){try{const im=await tmImg(p);if(im)imgs.push(im)}catch(e){}}
+    if(imgs.length){doc.setFont('helvetica','bold');doc.setFontSize(9);doc.text('Photos',L,y+8);y+=12;const bw=(R-L-30)/4,bh=bw*.75;let x=L;imgs.forEach(im=>{const k=Math.min(bw/im.w,bh/im.h);try{doc.addImage(im.d,'JPEG',x,y,im.w*k,im.h*k)}catch(e){}x+=bw+10});y+=bh+12}}
+  if(y>600){doc.addPage();y=60}
+  doc.setFont('helvetica','italic');doc.setFontSize(8.5);doc.text(doc.splitTextToSize('By signing, the general contractor’s representative agrees the extra work above was performed by Alpha Drywall on a time-and-material basis and is outside the contract scope.',R-L),L,y+8);y+=42;
+  doc.setFont('helvetica','bold');doc.setFontSize(10);doc.text(t.by||'',L+110,y,{align:'center'});doc.setLineWidth(.5);doc.line(L+20,y+3,L+200,y+3);doc.setFont('helvetica','italic');doc.setFontSize(8);doc.text('GC Representative (Print)',L+110,y+13,{align:'center'});
+  if(t.sig){try{doc.addImage(t.sig,'PNG',L+250,y-38,160,44)}catch(e){}}else{doc.setTextColor(180,35,24);doc.setFont('helvetica','bold');doc.setFontSize(12);doc.text('NOT SIGNED'+(t.no_sig?' – '+t.no_sig:''),L+252,y-4);doc.setTextColor(0)}
+  doc.line(L+246,y+3,R,y+3);doc.setFont('helvetica','italic');doc.setFontSize(8);doc.text('GC Signature'+(t.signed_at?'   ·   Signed '+tmWhenTxt(t.signed_at):''),L+246+(R-L-246)/2,y+13,{align:'center'});
+  pdfFoot(doc,W);return doc.output('blob')}
+/** Make the ticket PDF, then offer Open / Share / Download. */
+async function tmPdfMenu(t,l){const name=fileSafe(jobNo()+' '+tmNo(t.no)+' '+((l&&l.date)||''))+'.pdf';let blob;
+  try{blob=await tmPdf(t,l||{},S.job)}catch(e){toast("Couldn't make the PDF. "+(navigator.onLine===false?'Open the Daily Report once with signal first.':errMsg(e)));return}
+  const u=URL.createObjectURL(blob);const file=typeof File==='function'?new File([blob],name,{type:'application/pdf'}):null;const canShare=!!(file&&navigator.canShare&&navigator.canShare({files:[file]}));
+  const m=modal('<h2>'+esc(tmNo(t.no))+' PDF</h2><p class="muted small">'+esc(name)+'</p><div style="display:grid;gap:10px"><button class="btn primary" data-o>Open</button>'+(canShare?'<button class="btn" data-s>Share (text / email)</button>':'')+'<button class="btn" data-d>Download</button><button class="btn" data-x>Close</button></div>',()=>setTimeout(()=>URL.revokeObjectURL(u),60000));
+  $('[data-o]',m).onclick=()=>{const w=window.open(u,'_blank');if(!w)location.href=u};
+  $('[data-d]',m).onclick=()=>{const a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove()};
+  if(canShare)$('[data-s]',m).onclick=()=>navigator.share({files:[file],title:tmNo(t.no)}).catch(()=>{});
+  $('[data-x]',m).onclick=()=>m.close()}
 function renderLogForm(){
   const box=$('#logForm');if(!box)return;
   if(!canWrite()){box.innerHTML='';return}
@@ -2762,7 +2952,7 @@ function renderLogForm(){
     ta('problems','Problems / delays','e.g. Waiting on electrician in 205')+ta('subs','Subcontractor progress','')+ta('damage','Trade damage','')+
     '<fieldset class="codes"><legend>Equipment</legend>'+rowsEditor('equip',[{k:'name',ph:'e.g. Scissor lift'},{k:'qty',ph:'Qty',num:1}])+'</fieldset>'+
     '<fieldset class="codes"><legend>Materials delivered (PO)</legend>'+matRowsEditor()+'</fieldset>'+
-    '<fieldset class="codes"><legend>Additional work</legend>'+rowsEditor('extra',[{k:'work',ph:'Work'},{k:'by',ph:'Authorized by'},{k:'awa',ph:'AWA #'}])+'</fieldset>'+
+    '<fieldset class="codes"><legend>Additional work (T&amp;M tickets)</legend><div data-tm></div><button type="button" class="btn sm" data-tmadd>+ T&amp;M ticket for extra work</button><div class="muted small" style="margin:6px 0 8px">Extra work the GC asked for? Make a ticket and have the GC’s super sign it on this phone.</div></fieldset>'+
     '<label class="field"><span>Supervisor (print name)</span><input name="who" required maxlength="60" autocomplete="name" placeholder="Your name"></label>'+
     '<div class="field"><span>Supervisor signature</span><canvas class="sig" data-sig></canvas><div class="row" style="justify-content:space-between"><span class="muted small">Sign with your finger</span><button type="button" class="btn sm" data-sigclr>Clear</button></div></div>'+
     '<div class="field gcq"><span>Send to general contractor?</span>'+(gce.length?'<div class="seg"><label><input type="radio" name="gc" value="yes"> Yes</label><label><input type="radio" name="gc" value="no" checked> No</label></div><div class="muted small">'+esc(gce.join(', '))+'</div>'
@@ -2770,6 +2960,15 @@ function renderLogForm(){
     '<button class="btn primary block" type="submit">Save daily report</button><div class="muted small" data-st style="text-align:center;margin-top:6px">A PDF is saved to the job\'s Daily Reports folder.</div></form></div>';
   const form=$('form',box);let touched=false;bindRows(form);
   form.addEventListener('input',e=>{const c=e.target.dataset&&e.target.dataset.c;if(c==='text'||c==='po')matLink(e.target.closest('[data-row]'))});const pad=sigPad($('[data-sig]',form));
+  let tks=[];const tmBox=$('[data-tm]',form);
+  const drawTk=()=>{tmBox.innerHTML=tks.map((x,i)=>tmIs(x)?'<div class="tmt"><div class="row"><b>'+esc(tmNo(x.no))+'</b><span class="grow"></span>'+tmChip(x)+'</div><div class="small" style="margin:3px 0">'+esc(x.work||'')+(x.loc?' <span class="muted">@ '+esc(x.loc)+'</span>':'')+'</div><div class="row"><span class="muted small grow">'+f1(tmHrs(x))+' crew hrs'+(x.sig?' · signed by '+esc(x.by||'GC'):x.no_sig?' · '+esc(x.no_sig):'')+'</span><button type="button" class="btn sm" data-tmi="'+i+'">'+(TM_OFFICE.includes(x.status)?'View':x.sig?'Open':'Open / sign')+'</button></div></div>'
+      :'<div class="tmt"><div class="small">'+esc(tmText(x))+'</div><div class="row" style="justify-content:flex-end;gap:6px;margin-top:4px"><button type="button" class="btn sm" data-tmi="'+i+'">Make T&amp;M ticket</button><button type="button" class="btn sm" data-tmrm="'+i+'" style="color:var(--danger)">Remove</button></div></div>').join('');
+    $$('[data-tmi]',tmBox).forEach(b=>b.onclick=()=>{const x=tks[+b.dataset.tmi];const d=form.date.value||today();const L=mine(d);
+      if(tmIs(x)){if(TM_OFFICE.includes(x.status)&&L)tmView(L,x);else tmEditor(x,{date:d})}else tmEditor(Object.assign({},x,{tm:1,id:uuid(),no:tmNext(S.logs,tks)}),{date:d,isNew:true,orig:x})});
+    $$('[data-tmrm]',tmBox).forEach(b=>b.onclick=()=>{tks.splice(+b.dataset.tmrm,1);touched=true;drawTk()})};
+  $('[data-tmadd]',form).onclick=()=>tmEditor({tm:1,id:uuid(),no:tmNext(S.logs,tks),work:'',crew:[],mats:[],photos:[]},{date:form.date.value||today(),isNew:true});
+  box._tks=d=>(form.date.value||today())===d?tks:null;
+  box._tm=(d,ew)=>{if((form.date.value||today())===d){tks=JSON.parse(JSON.stringify(ew||[]));drawTk()}};
   $('[data-sigclr]',form).onclick=()=>{pad.clear();touched=true};
   const wfTot=()=>{$('[data-wft]',form).textContent=$$('[data-wf]',form).reduce((a,i)=>a+num(i.value),0)};
   const mine=d=>S.logs.find(l=>l.date===d&&l.user_id===S.me.id);
@@ -2781,7 +2980,7 @@ function renderLogForm(){
   const fill=()=>{tcRef();const e=mine(form.date.value);form.who.value=(e&&e.name)||lsGet('crewplans.logName')||myName();
     form.weather.value=(e&&e.weather)||'';form.work.value=(e&&e.work)||'';form.problems.value=(e&&(e.problems||e.notes))||'';form.subs.value=(e&&e.sub_progress)||'';form.damage.value=(e&&e.trade_damage)||'';
     const wf=(e&&e.workforce)||{};$$('[data-wf]',form).forEach(i=>i.value=wf[i.dataset.wf]||'');wfTot();
-    setRows('equip',e&&e.equipment);setRows('mat',(e&&e.materials)||(e&&e.deliveries?[{text:e.deliveries}]:null));setRows('extra',e&&e.extra_work);
+    setRows('equip',e&&e.equipment);setRows('mat',(e&&e.materials)||(e&&e.deliveries?[{text:e.deliveries}]:null));tks=JSON.parse(JSON.stringify((e&&e.extra_work)||[]));drawTk();
     pad.load(e&&e.signature);const g=$$('[name=gc]',form);g.forEach(r=>r.checked=r.value==='no')};
   form.date.onchange=fill;form.addEventListener('input',e=>{if(e.target!==form.date)touched=true;if(e.target.dataset&&e.target.dataset.wf!=null)wfTot()});
   $('[data-sig]',form).addEventListener('pointerdown',()=>touched=true);fill();
@@ -2790,9 +2989,11 @@ function renderLogForm(){
   form.onsubmit=async e=>{e.preventDefault();const d=form.date.value||today();const nm=form.who.value.trim().slice(0,60);if(!nm){toast('Enter the supervisor name.');form.who.focus();return}lsSet('crewplans.logName',nm);
     const wf={};$$('[data-wf]',form).forEach(i=>{const v=num(i.value);if(v>0)wf[i.dataset.wf]=v});const crew=Object.values(wf).reduce((a,b)=>a+b,0);
     const sig=pad.get();if(!sig&&!await confirmBox('No signature. Save the report anyway?','Save anyway',false))return;
+    {const un=tks.filter(x=>tmIs(x)&&tmSt(x)==='unsigned'&&!x.no_sig);if(un.length){const v=await formBox(un.map(x=>tmNo(x.no)).join(', ')+' not signed by the GC',[{k:'r',label:'Why isn’t it signed?',type:'select',value:TM_REASONS[0],options:TM_REASONS.map(r=>[r,r])}],'Save report','Extra work needs the GC’s signature to get paid. Get it signed (Open / sign above), or give a reason. You’ll keep getting a reminder until it’s signed.');if(!v)return;
+      const ids=new Set(un.map(x=>x.id));tks=tks.map(x=>ids.has(x.id)?Object.assign({},x,{no_sig:v.r}):x);drawTk()}}
     const gcR=$('[name=gc]:checked',form);const send=!!(gcR&&gcR.value==='yes'&&gce.length);
     const o={job_id:S.job.id,user_id:S.me.id,name:nm,date:d,crew,weather:form.weather.value.trim().slice(0,80),work:form.work.value.trim().slice(0,3000),problems:form.problems.value.trim().slice(0,3000),
-      sub_progress:form.subs.value.trim().slice(0,3000),trade_damage:form.damage.value.trim().slice(0,3000),workforce:wf,equipment:readRows(form,'equip'),materials:readRows(form,'mat'),extra_work:readRows(form,'extra'),
+      sub_progress:form.subs.value.trim().slice(0,3000),trade_damage:form.damage.value.trim().slice(0,3000),workforce:wf,equipment:readRows(form,'equip'),materials:readRows(form,'mat'),extra_work:tmMerge(tks,((mine(d)||{}).extra_work)),
       signature:sig,send_gc:send,filed_at:null,sent_at:null,file_error:null,updated_at:new Date().toISOString()};
     if(tcX&&tcX.d===d&&tcX.card){o.hours=tcX.r.hours;o.hours_by_code=tcX.r.by}
     const btn=$('button[type=submit]',form);btn.disabled=true;$('[data-st]',form).textContent='Making the PDF…';
@@ -2833,7 +3034,7 @@ async function reportPdf(o,job){
   // additional work table
   const ex=o.extra_work||[];const cw=[lw*.42,lw*.33,lw*.25];if(y+30>700){doc.addPage();y=40}
   doc.setFont('helvetica','bold');let cx=L;['Additional Work','Authorized By','AWA #'].forEach((h,i)=>{doc.rect(cx,y,cw[i],14);doc.text(h,cx+cw[i]/2,y+10,{align:'center'});cx+=cw[i]});y+=14;doc.setFont('helvetica','normal');
-  for(let i=0;i<Math.max(3,ex.length);i++){const r=ex[i]||{};const cells=[r.work||'',r.by||'',r.awa||''].map((t,k)=>doc.splitTextToSize(String(t),cw[k]-6));const h=Math.max(14,Math.max(...cells.map(c=>c.length))*10+4);if(y+h>720){doc.addPage();y=40}
+  for(let i=0;i<Math.max(3,ex.length);i++){const r=ex[i]||{};const cells=tmCells(r).map((t,k)=>doc.splitTextToSize(String(t),cw[k]-6));const h=Math.max(14,Math.max(...cells.map(c=>c.length))*10+4);if(y+h>720){doc.addPage();y=40}
     cx=L;cells.forEach((c,k)=>{doc.rect(cx,y,cw[k],h);doc.text(c,cx+3,y+10);cx+=cw[k]});y+=h}
   // signature
   y=Math.max(y,doc.getNumberOfPages()===1?rightEnd:y)+18;if(y>690){doc.addPage();y=60}
@@ -2842,9 +3043,10 @@ async function reportPdf(o,job){
   if(o.signature){try{doc.addImage(o.signature,'PNG',L+306,y-30,150,40)}catch(e){}}else{doc.setFont('helvetica','bold');doc.setFontSize(12);doc.text(o.name||'',L+310,y-2)}
   doc.line(L+304,y+3,R,y+3);
   // footer
-  const pages=doc.getNumberOfPages();for(let p=1;p<=pages;p++){doc.setPage(p);doc.setFontSize(8);doc.setFont('helvetica','bold');doc.text('Alpha Drywall, LLC',W/2,748,{align:'center'});doc.setFont('helvetica','italic');doc.text('Drywall -- Metal Stud Framing-- Suspended Ceilings',W/2,758,{align:'center'});doc.setFont('helvetica','bolditalic');doc.text('2724 S. 3600 W. Suite L, West Valley City, UT 84119',W/2,768,{align:'center'});doc.text('Office#(801) 682-4447/Fax#(801) 683-2847',W/2,778,{align:'center'})}
+  pdfFoot(doc,W);
   return doc.output('blob');
 }
+function pdfFoot(doc,W){const pages=doc.getNumberOfPages();for(let p=1;p<=pages;p++){doc.setPage(p);doc.setFontSize(8);doc.setFont('helvetica','bold');doc.text('Alpha Drywall, LLC',W/2,748,{align:'center'});doc.setFont('helvetica','italic');doc.text('Drywall -- Metal Stud Framing-- Suspended Ceilings',W/2,758,{align:'center'});doc.setFont('helvetica','bolditalic');doc.text('2724 S. 3600 W. Suite L, West Valley City, UT 84119',W/2,768,{align:'center'});doc.text('Office#(801) 682-4447/Fax#(801) 683-2847',W/2,778,{align:'center'})}}
 let nudgeT=0;function nudgeReports(){if(S.asUser||navigator.onLine===false||Date.now()-nudgeT<20000)return;nudgeT=Date.now();setTimeout(()=>{sb.functions.invoke('crew-sync',{body:{action:'reports'}}).then(r=>{if(r&&r.data&&r.data.reports&&r.data.reports.length)setTimeout(loadLogs,500)}).catch(()=>{})},1500)}
 function reportStatus(l){
   if(isPractice()&&String(l.id).startsWith('local-'))return '<span class="muted small">Practice report. Saved in this browser only; not filed or emailed.</span>';
@@ -2866,6 +3068,7 @@ async function loadLogTc(){const id=jobId(),logs=S.logs||[];if(!id||!S.me)return
     if(!S.asUser&&(r.hours!==num(l.hours)||!sameBy(r.by,l.hours_by_code))){try{await q(sb.from('logs').update({hours:r.hours,hours_by_code:r.by}).eq('id',l.id))}catch(e){}}}
   if(jobId()!==id)return;S.logTc=Object.assign(S.logTc||{},out);if(S.tab==='log')renderLogList()}
 function renderLogList(){
+  renderTmLog();tmNagSync();
   const box=$('#logList');if(!box)return;
   if(!S.loaded.logs){box.innerHTML='<div class="empty">Loading reports…</div>';return}
   if(S.logs.some(l=>l.pdf_path&&(!l.filed_at||(l.send_gc&&!l.sent_at))&&num(l.file_tries)<6))nudgeReports();
@@ -2879,12 +3082,14 @@ function renderLogList(){
       (l.sub_progress?'<div class="kv"><b>Subs:</b> '+esc(l.sub_progress)+'</div>':'')+(l.trade_damage?'<div class="kv"><b>Trade damage:</b> '+esc(l.trade_damage)+'</div>':'')+
       ((l.equipment||[]).length?'<div class="kv"><b>Equipment:</b> '+l.equipment.map(x=>esc((x.name||'')+(x.qty?' ('+x.qty+')':''))).join(', ')+'</div>':'')+
       ((l.materials||[]).length?'<div class="kv"><b>Delivered:</b> '+l.materials.map(x=>esc(matRowText(x))).join('; ')+'</div>':(l.deliveries?'<div class="kv"><b>Delivered:</b> '+esc(l.deliveries)+'</div>':''))+
-      ((l.extra_work||[]).length?'<div class="kv"><b>Additional work:</b> '+l.extra_work.map(x=>esc((x.work||'')+(x.by?' – auth. '+x.by:'')+(x.awa?' – AWA '+x.awa:''))).join('; ')+'</div>':'')+
+      (l.extra_work||[]).filter(x=>!tmIs(x)).map(x=>'<div class="kv"><b>Additional work:</b> '+esc(tmText(x))+'</div>').join('')+
+      (l.extra_work||[]).filter(tmIs).map(x=>'<div class="row" style="margin-top:4px;gap:8px"><span class="kv grow" style="margin:0"><b>'+esc(tmNo(x.no))+':</b> '+esc((x.work||'')+(x.loc?' @ '+x.loc:''))+(tmHrs(x)?' · '+f1(tmHrs(x))+' hrs':'')+'</span>'+tmChip(x)+'<button class="btn sm" data-tmo="'+esc(l.id+'|'+x.id)+'">Open</button></div>').join('')+
       '<div class="row" style="margin-top:8px;gap:8px;align-items:center"><span class="grow">'+reportStatus(l)+'</span>'+(l.pdf_path?'<button class="btn sm" data-lpdf="'+esc(l.id)+'">PDF</button>':'')+
       ((l.user_id===S.me.id&&canWrite())?'<button class="btn sm" data-ledit="'+esc(l.id)+'">✎ Edit</button>':'')+
       ((l.user_id===S.me.id&&canWrite())||isAdminRole()?'<button class="btn sm" data-ldel="'+esc(l.id)+'" style="color:var(--danger)">Delete</button>':'')+'</div>'+
       (l.updated_at?'<div class="progress-note">Saved '+esc(fmtWhen(l.updated_at))+' by '+esc(logName(l))+'</div>':'')+'</div>'}).join('')}).join('');
   loadLogTc();
+  $$('[data-tmo]',box).forEach(b=>b.onclick=()=>{const [lid,tid]=b.dataset.tmo.split('|');const x=tmFind(lid,tid);if(x)tmOpen(x.l,x.t)});
   $$('[data-ledit]',box).forEach(b=>b.onclick=()=>{const l=S.logs.find(x=>x.id===b.dataset.ledit);const f=$('#logForm');if(l&&f&&f._edit)f._edit(l.date)});
   $$('[data-lpdf]',box).forEach(b=>b.onclick=async()=>{const l=S.logs.find(x=>x.id===b.dataset.lpdf);if(!l)return;const w=window.open('','_blank');const [u]=await urlsFor([l.pdf_path]);if(u){if(w)w.location=u;else location.href=u}else{if(w)w.close();toast("Couldn't open the PDF. Check your signal.")}});
   $$('[data-ldel]',box).forEach(b=>b.onclick=async()=>{const l=S.logs.find(x=>x.id===b.dataset.ldel);if(!l)return;

@@ -21,3 +21,5 @@ jobs:
         run: node .github/scripts/dashboard-test.js
       - name: Test materials vs. the order (paste, matching, status, flags)
         run: node .github/scripts/materials-test.js
+      - name: Test T&M tickets (numbering, time card 172, status, CSV)
+        run: node .github/scripts/tm-test.js
