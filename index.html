@@ -249,6 +249,7 @@ input[type=range]{width:100%;height:32px}
 .lrow.mrow input{width:auto;height:auto;min-width:0;min-height:40px;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:#fff;font-size:15px}
 .mrow [data-c=text]{grid-column:1/4}.mrow [data-rm]{grid-column:4;grid-row:1}.mrow .mshort,.mrow [data-c=note]{grid-column:1/-1}
 .mshort{display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px}.lrow.mrow .mshort input{width:20px;height:20px;min-height:0;flex:none}
+details.mpo>summary{list-style:none;cursor:pointer;align-items:center;flex-wrap:wrap}details.mpo>summary::-webkit-details-marker{display:none}.mchev{display:inline-block;transition:transform .15s;color:var(--muted,#667085);font-size:13px}details.mpo[open] .mchev{transform:rotate(90deg)}details.mpo:not([open]){padding-bottom:14px}
 .mline{padding:10px 0;border-top:1px solid var(--line)}.mline[data-ml]{cursor:pointer}
 .mbar{height:8px;background:#e8ebef;border-radius:99px;overflow:hidden;margin:6px 0 4px}.mbar i{display:block;height:100%;border-radius:99px}
 canvas.sig{display:block;width:100%;height:120px;border:1px dashed #9aa4af;border-radius:10px;background:#fff;touch-action:none;margin:4px 0}
@@ -3082,6 +3083,7 @@ function matCalc(M,logs,day){
   return {lines,extra,flags}}
 const matRowText=x=>[num(x.qty)?matQ(x.qty)+(x.unit?' '+x.unit:''):'',x.text||''].filter(Boolean).join(' ')+(x.po?' (PO '+x.po+')':'')+(x.short?' – SHORT/BACKORDERED'+(x.note?': '+x.note:''):(x.note?' – '+x.note:''));
 const matClean=m=>Object.assign({lines:Array.isArray(m&&m.lines)?m.lines.filter(l=>l&&l.item):[],updated_at:(m&&m.updated_at)||null,by:(m&&m.by)||null},m&&m.pos&&typeof m.pos==='object'&&!Array.isArray(m.pos)?{pos:m.pos}:{});
+const matPoOpenKey=k=>(S.job&&S.job.id)+'|'+k;
 const matHere=()=>!!(S.job&&S.mat&&S.mat.job===S.job.id);
 const matNow=()=>matCalc(S.mat.M,S.mat.logs,today());
 async function loadMat(){const id=jobId();if(!id||!canLog())return;
@@ -3108,18 +3110,22 @@ function renderMat(){if(!matHere())return '<div class="empty">Loading materials�
     (ad?'<div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><button class="btn sm primary" id="matPaste">📋 Paste PO from Excel</button><label class="btn sm primary" id="matPdf" title="Load the PO PDF you sent the supplier. The PDF is kept for the office only.">📄 Upload PO PDF<input type="file" id="poPdfFile" accept="application/pdf,.pdf" hidden></label><button class="btn sm" id="matAdd">+ Add line</button></div>':'')+'</div>';
   if(C.flags.length)h+='<div class="card" style="padding:10px 14px">'+C.flags.map(f=>{const x=MAT_FL[f.lvl];return '<div class="kv" style="color:'+x[1]+'"><b>'+x[0]+'</b> '+esc(f.t)+'</div>'}).join('')+'</div>';
   if(!C.lines.length)h+='<div class="empty"><b>No order yet</b>'+(ad?'Tap <b>Upload PO PDF</b> to load the PO you sent the supplier, or <b>Paste PO from Excel</b> and paste the item, qty and unit columns from the PO, or add lines one at a time. Foremen then pick these items on the daily report.':'The office hasn’t entered the material order for this job yet. Keep logging deliveries on the daily report.')+'</div>';
-  else{const G={};C.lines.forEach(l=>{const k=(l.po||'')+'|'+(l.sup||'');(G[k]=G[k]||[]).push(l)});
+  else{const G={};C.lines.forEach(l=>{const k=(l.po||'')+'|'+(l.sup||'');(G[k]=G[k]||[]).push(l)});S.matOpen=S.matOpen||{};
+    if(Object.keys(G).length>1)h+='<div class="row" style="justify-content:flex-end;gap:6px;margin:-4px 2px 8px"><button class="btn sm" data-mpoall="1">Open all</button><button class="btn sm" data-mpoall="0">Close all</button></div>';
     h+=Object.keys(G).map(k=>{const ls=G[k];const [po,sup]=k.split('|');const dn=ls.filter(l=>l.st==='complete'||l.st==='over').length;
       const pk=ad&&matPdfFor(po);
-      return '<div class="card" style="padding-bottom:4px"><div class="row" style="margin-bottom:4px;gap:8px"><b class="grow">'+(po?'PO '+esc(po):'No PO #')+(sup?' · '+esc(sup):'')+'</b>'+(pk?'<button class="btn sm" data-popdf="'+esc(pk)+'" title="The PO PDF (office only)">📄 Open PDF</button>':'')+(ad&&dn<ls.length?'<button class="btn sm" data-popre="'+esc(po)+'" title="Mark every line on this PO as delivered before the app (no daily report needed)">✓ All delivered</button>':'')+'<span class="muted small">'+dn+' of '+ls.length+' complete</span></div>'+ls.map(l=>matLineHtml(l,ad)).join('')+'</div>'}).join('');
+      const fl=ls.some(l=>l.short||l.late);const ok=matPoOpenKey(k);const op=ok in S.matOpen?S.matOpen[ok]:fl;
+      return '<details class="card mpo" style="padding-bottom:4px" data-pok="'+esc(k)+'"'+(op?' open':'')+'><summary class="row" style="margin-bottom:4px;gap:8px"><span class="mchev" aria-hidden="true">▸</span><b class="grow">'+(po?'PO '+esc(po):'No PO #')+(sup?' · '+esc(sup):'')+(fl?' <span class="badge" style="background:#fdecea;color:#b42318">⚠</span>':'')+'</b>'+(pk?'<button class="btn sm" data-popdf="'+esc(pk)+'" title="The PO PDF (office only)">📄 Open PDF</button>':'')+(ad&&dn<ls.length?'<button class="btn sm" data-popre="'+esc(po)+'" title="Mark every line on this PO as delivered before the app (no daily report needed)">✓ All delivered</button>':'')+'<span class="muted small" style="white-space:nowrap">'+dn+' of '+ls.length+' complete</span></summary>'+ls.map(l=>matLineHtml(l,ad)).join('')+'</details>'}).join('');
     if(ad)h+='<p class="muted small" style="margin:-4px 2px 12px">Tap a line to change it, set an expected date or clear a short flag.</p>'}
   if(C.extra.length)h+='<details class="card"><summary><b>Delivered, not matched to the order</b> <span class="muted small">('+C.extra.length+')</span></summary><div class="muted small" style="margin:6px 0">These daily report lines didn’t match an order item. Picking items from the list on the daily report keeps them matched.</div>'+
     C.extra.slice().reverse().map(r=>'<div class="kv">'+matDay(r.date)+' · '+esc(matRowText({text:r.item,qty:r.qty,unit:r.unit,po:r.po,short:r.short,note:r.note}))+(r.by?' <span class="muted small">('+esc(r.by)+')</span>':'')+'</div>').join('')+'</details>';
   return h}
-function bindMat(){if(!isAdminRole())return;const p=$('#matPaste');if(p)p.onclick=matPasteBox;
+function bindMat(){$$('details.mpo').forEach(d=>d.ontoggle=()=>{S.matOpen=S.matOpen||{};S.matOpen[matPoOpenKey(d.dataset.pok)]=d.open});
+  $$('[data-mpoall]').forEach(b=>b.onclick=()=>{const o=b.dataset.mpoall==='1';$$('details.mpo').forEach(d=>{d.open=o})});
+  if(!isAdminRole())return;const p=$('#matPaste');if(p)p.onclick=matPasteBox;
   const pf=$('#poPdfFile');if(pf)pf.onchange=()=>{const f=pf.files&&pf.files[0];pf.value='';if(f)matPoFromFile(f,{})};
-  $$('[data-popdf]').forEach(b=>b.onclick=e=>{e.stopPropagation();matPdfOpen(b.dataset.popdf)});
-  $$('[data-popre]').forEach(b=>b.onclick=async e=>{e.stopPropagation();const po=b.dataset.popre;
+  $$('[data-popdf]').forEach(b=>b.onclick=e=>{e.preventDefault();e.stopPropagation();matPdfOpen(b.dataset.popdf)});
+  $$('[data-popre]').forEach(b=>b.onclick=async e=>{e.preventDefault();e.stopPropagation();const po=b.dataset.popre;
     if(!await confirmBox('Mark every line on '+(po?'PO '+po:'lines with no PO #')+' as already delivered? Use this for orders delivered before the crew logged deliveries in the app.'))return;
     matSave(M=>{M.lines.forEach(l=>{if(matPO(l.po)===matPO(po)&&!l.pre)l.pre={date:l.exp&&l.exp<=today()?l.exp:today()}})},'Marked delivered.')});const a=$('#matAdd');if(a)a.onclick=()=>matLineBox(null);
   $$('[data-ml]').forEach(el=>el.onclick=()=>{const l=((S.mat&&S.mat.M.lines)||[]).find(x=>x.id===el.dataset.ml);if(l)matLineBox(l)})}
