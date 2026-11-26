@@ -245,6 +245,12 @@ input[type=range]{width:100%;height:32px}
 .wf{display:grid;grid-template-columns:repeat(2,1fr);gap:0 10px}
 .wf .field{margin-bottom:6px}
 .lrow{display:flex;gap:6px;margin-bottom:6px;align-items:center}.lrow input{flex:1;min-width:0}
+.lrow.mrow{display:grid;grid-template-columns:1fr 1fr 1fr 36px;gap:6px;padding:8px 0;margin:0;border-bottom:1px solid var(--line);align-items:center}
+.lrow.mrow input{width:auto;height:auto;min-width:0;min-height:40px;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:#fff;font-size:15px}
+.mrow [data-c=text]{grid-column:1/4}.mrow [data-rm]{grid-column:4;grid-row:1}.mrow .mshort,.mrow [data-c=note]{grid-column:1/-1}
+.mshort{display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px}.lrow.mrow .mshort input{width:20px;height:20px;min-height:0;flex:none}
+.mline{padding:10px 0;border-top:1px solid var(--line)}.mline[data-ml]{cursor:pointer}
+.mbar{height:8px;background:#e8ebef;border-radius:99px;overflow:hidden;margin:6px 0 4px}.mbar i{display:block;height:100%;border-radius:99px}
 canvas.sig{display:block;width:100%;height:120px;border:1px dashed #9aa4af;border-radius:10px;background:#fff;touch-action:none;margin:4px 0}
 .seg{display:flex;gap:16px;margin:4px 0}.seg label{display:flex;align-items:center;gap:6px;font-weight:600}.seg input{width:20px;height:20px}
 .snav{position:absolute;top:50%;transform:translateY(-50%);z-index:6;width:44px;height:64px;border:0;border-radius:12px;background:#1d232bcc;color:#fff;font-size:30px;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px #0004}
@@ -1111,7 +1117,7 @@ function jobId(){return S.job&&S.job.id}
 async function loadSheets(){const id=jobId();if(!id)return;try{const d=await q(sb.from('sheets').select('*').eq('job_id',id).order('sort'));if(jobId()!==id)return;S.sheets=d;S.loaded.sheets=true;if(S.tab==='plans')render()}catch(e){toast(errMsg(e))}}
 async function loadBudget(){const id=jobId();if(!id||!isAdminRole()){S.budget=null;return}try{const d=await q(sb.from('job_budget').select('amounts').eq('job_id',id).maybeSingle());if(jobId()===id)S.budget=d?d.amounts||{}:null}catch(e){S.budget=null}}
 async function loadAreas(){const id=jobId();if(!id)return;await loadBudget();try{const d=await q(sb.from('areas').select('*').eq('job_id',id).order('created_at'));if(jobId()!==id)return;S.areas=d;S.loaded.areas=true;if(S.tab==='progress')render()}catch(e){toast(errMsg(e))}}
-async function loadLogs(){const id=jobId();if(!id)return;if(S.tab!=='labor')S.loaded.labor=false;try{const d=await q(sb.from('logs').select('*').eq('job_id',id).order('date',{ascending:false}).limit(300));if(jobId()!==id)return;S.logs=d;S.loaded.logs=true;if(S.tab==='log'){renderLogList();const b=$('#logForm');if(b&&b._fillIfEmpty)b._fillIfEmpty()}}catch(e){toast(errMsg(e))}}
+async function loadLogs(){const id=jobId();if(!id)return;if(S.tab!=='labor')S.loaded.labor=false;try{const d=await q(sb.from('logs').select('*').eq('job_id',id).order('date',{ascending:false}).limit(300));if(jobId()!==id)return;S.logs=d;S.loaded.logs=true;loadMat();if(S.tab==='log'){renderLogList();const b=$('#logForm');if(b&&b._fillIfEmpty)b._fillIfEmpty()}}catch(e){toast(errMsg(e))}}
 async function loadMembers(){const id=jobId();if(!id)return;try{const d=await q(sb.from('members').select('*').eq('job_id',id).order('joined_at'));if(jobId()!==id)return;S.members=d;d.forEach(m=>S.people[m.user_id]=m.name);render();if(V)buildPins()}catch(e){}}
 async function loadInvites(){const id=jobId();if(!id||!isAdminRole())return [];try{S.invites=await q(sb.from('invites').select('*').eq('job_id',id).order('created_at',{ascending:false}))}catch(e){toast(errMsg(e))}return S.invites}
 function closeJob(){
@@ -1129,11 +1135,11 @@ function render(){
   if(S.view==='dash'){app.dataset.job='';app.innerHTML=renderDash();bindDash();return}
   if(S.view!=='job'||!S.job){app.dataset.job='';app.innerHTML=renderJobs();bindJobs();return}
   const j=S.job;
-  if(S.tab==='tc'||((S.tab==='log'||S.tab==='labor')&&!canLog()))S.tab='plans';
+  if(S.tab==='tc'||((S.tab==='log'||S.tab==='labor'||S.tab==='mat')&&!canLog()))S.tab='plans';
   if(!app.querySelector('[data-jobshell]')||app.dataset.job!==j.id||app.dataset.tab!==S.tab||app.dataset.role!==S.role){
     app.dataset.job=j.id;app.dataset.tab=S.tab;app.dataset.role=S.role;
     app.innerHTML='<div data-jobshell><div class="jhead"><div class="top"><button id="back" aria-label="Back">‹</button><div class="jl" id="jt2"></div><h1><div class="ttl"><span class="brand"></span>Alpha Operations</div><div class="jn" id="jt"></div></h1>'+(isAdminRole()?'<button id="jmenu" aria-label="Job menu">⋯</button>':'')+'</div>'+
-      '<div class="tabs"><button data-tab="plans">Plans</button><button data-tab="progress">Progress</button>'+(canLog()?'<button data-tab="log">Daily Report</button><button data-tab="labor">Labor</button>':'')+'</div></div><main id="tabBody"></main></div>';
+      '<div class="tabs"><button data-tab="plans">Plans</button><button data-tab="progress">Progress</button>'+(canLog()?'<button data-tab="log">Daily Report</button><button data-tab="labor">Labor</button><button data-tab="mat">Materials</button>':'')+'</div></div><main id="tabBody"></main></div>';
     $('#back').onclick=closeJob;
     $$('.tabs button').forEach(b=>b.onclick=()=>{S.tab=b.dataset.tab;window.scrollTo(0,0);render()});
     if($('#jmenu'))$('#jmenu').onclick=jobMenu;
@@ -1144,8 +1150,10 @@ function render(){
   if(S.tab==='plans'){$('#tabBody').innerHTML=renderPlans();bindPlans();fillImgs($('#tabBody'))}
   else if(S.tab==='progress'){$('#tabBody').innerHTML=renderProgress();bindProgress();fillImgs($('#tabBody'))}
   else if(S.tab==='labor'){$('#tabBody').innerHTML=renderLabor();bindLabor();if(!S.loaded.labor&&!S.laborLoading)loadLabor()}
+  else if(S.tab==='mat'){$('#tabBody').innerHTML=renderMat();bindMat();if(!matHere())loadMat()}
   else renderLogList();
   {const nb=nudgeBanner();const tb=$('#tabBody');if(nb&&tb&&!$('#nudgeCard',tb)){tb.insertAdjacentHTML('afterbegin',nb);const g=$('#nudgeGo');if(g)g.onclick=()=>{S.tab='progress';window.scrollTo(0,0);render()}}}
+  matPaint();
   clearTimeout(S.tipT);S.tipT=setTimeout(()=>{if(S.view==='job'&&!V)tipsFor(S.tab==='plans'?'job':S.tab)},1200);
 }
 
@@ -1737,6 +1745,7 @@ const TIPS={
     ['.tabs button[data-tab="plans"]',"Plans: every sheet for the job, always the newest version. Use it to look things up, drop pins and quick highlights.","Planos: todas las hojas del trabajo, siempre la versión más nueva. Úsalo para consultar, poner pines y marcas rápidas."],
     ['.tabs button[data-tab="progress"]',"Progress: color in the work that's finished. This is what the office looks at to see how the job is going.","Avance: colorea el trabajo que ya está terminado. Esto es lo que la oficina revisa para ver cómo va el trabajo."],
     ['.tabs button[data-tab="log"]',"Daily Report: fill it out every day you're on the job. It's saved as a PDF and can go to the GC.","Reporte diario: llénalo cada día que estés en el trabajo. Se guarda como PDF y se puede mandar al contratista."],
+    ['.tabs button[data-tab="mat"]',"Materials: what was ordered on the PO and what has shown up so far. Log deliveries on the daily report.","Material: lo que se pidió en la orden y lo que ya llegó. Anota las entregas en el reporte diario."],
     ['.tabs button[data-tab="labor"]',"Labor: hours used against the budget, by cost code, from the job cost sheet.","Mano de obra: horas usadas contra el presupuesto, por código, de la hoja de costos."],
     ['#revFilt',"Pick which sheets to see: current sheets, revised sheets or RFI/ASI pages.","Escoge qué hojas ver: hojas actuales, hojas revisadas o páginas de RFI/ASI."],
     ['#tabBody .sheet',"Tap a sheet to open it. Pinch to zoom.","Toca una hoja para abrirla. Pellizca para hacer zoom."]],
@@ -1747,6 +1756,7 @@ const TIPS={
     ['#logForm [name="date"]',"One report per day. Pick the day; you can go back and fix an old one.","Un reporte por día. Escoge el día; puedes regresar y corregir uno viejo."],
     ['#logForm [name="work"]',"What your crew did today, in a few words: areas and rooms.","Lo que hizo tu cuadrilla hoy, en pocas palabras: áreas y cuartos."],
     ['#logForm [data-wf]',"How many of each trade were on site today.","Cuántos de cada oficio estuvieron hoy en la obra."],
+    ['#logForm [data-rows="mat"]',"Materials that came today: pick the item from the order list, enter the qty, and check Short if something didn't come.","Material que llegó hoy: escoge el artículo de la lista de la orden, pon la cantidad y marca Short si algo no llegó."],
     ['#logForm [name="problems"]',"Delays, missing materials, other trades in the way. This protects us later.","Retrasos, material que falta, otros oficios estorbando. Esto nos protege después."],
     ['#logForm [data-sig]',"Type your name and sign with your finger.","Escribe tu nombre y firma con el dedo."],
     ['#logForm .gcq',"Yes sends the report to the general contractor too.","Sí manda el reporte también al contratista general."],
@@ -2013,7 +2023,7 @@ async function downloadJob(){
     if(pdf)top.file(base+' - Marked-up plans.pdf',pdf.output('blob'));
     top.file(base+' - Pins.csv',toCsv(pinRows));
     const sc=PHASES;top.file(base+' - Progress.csv',toCsv([['Area'].concat(sc.map(p=>p.n+' %')).concat(['Last updated','Updated by'])].concat(areas.map(a=>[a.name].concat(sc.map(p=>areaPct(a,p.k))).concat([a.updated_at?fmtDate(a.updated_at):'',a.updated_by?who(a.updated_by):''])))));
-    top.file(base+' - Daily logs.csv',toCsv([['Date','Foreman','Crew on site','Man-hours','Work done','Material delivered','Delays / notes']].concat(logs.map(l=>[l.date,who(l.user_id),num(l.crew),num(l.hours),l.work,l.deliveries,l.notes]))));
+    top.file(base+' - Daily logs.csv',toCsv([['Date','Foreman','Crew on site','Man-hours','Work done','Material delivered','Delays / notes']].concat(logs.map(l=>[l.date,who(l.user_id),num(l.crew),num(l.hours),l.work,(l.materials||[]).length?l.materials.map(matRowText).join('; '):l.deliveries,l.notes]))));
     top.file('README.txt','Alpha Operations export for '+job.name+(job.addr?' ('+job.addr+')':'')+'\r\nExported '+new Date().toLocaleString()+'\r\n\r\nMarked-up plans.pdf - every sheet with crew markups; numbered pins match Pins.csv.\r\nScope colors: '+sc.map(p=>p.n).join(', ')+'\r\nPhotos - pin photos, named by sheet and pin number.\r\n');
     const blob=await zip.generateAsync({type:'blob'},m=>pb.set('Zipping… '+Math.round(m.percent)+'%'));
     const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=base+' - Alpha Operations '+today()+'.zip';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},60000);
@@ -2547,6 +2557,168 @@ async function areaMenu(id){
   $('[data-a=d]',m).onclick=async()=>{m.close();if(await confirmBox('Delete area "'+a.name+'"?')&&await run(sb.from('areas').delete().eq('id',id)))loadAreas()};
 }
 
+/* ===== Materials vs. the order =====
+   The office keeps each job's PO lines in job_budget.labor.materials ({lines:[{id,po,sup,item,unit,qty,exp,short_ok}]}); the labor sync and every labor write keep other keys.
+   Foremen log deliveries on the daily report (logs.materials rows {text,qty,unit,po,line,short,note}); delivered is summed from every report on the job. No $ is stored here. */
+const MAT_UNITS={sheet:'sheet',sheets:'sheet',sht:'sheet',shts:'sheet',sh:'sheet',ea:'ea',each:'ea',pc:'ea',pcs:'ea',piece:'ea',pieces:'ea',stick:'ea',sticks:'ea',length:'ea',lengths:'ea',lgth:'ea',lgths:'ea',box:'box',boxes:'box',bx:'box',bxs:'box',bundle:'bundle',bundles:'bundle',bdl:'bundle',bdls:'bundle',bucket:'bucket',buckets:'bucket',bkt:'bucket',bkts:'bucket',pail:'bucket',pails:'bucket',roll:'roll',rolls:'roll',rl:'roll',rls:'roll',bag:'bag',bags:'bag',carton:'carton',cartons:'carton',ctn:'carton',ctns:'carton',case:'carton',cases:'carton',cs:'carton',lf:'lf',sf:'sf',tube:'tube',tubes:'tube',gal:'gal',gals:'gal',pallet:'pallet',pallets:'pallet',plt:'pallet'};
+const MAT_SYN={stud:'stud',studs:'stud',trk:'track',trak:'track',scr:'screw',brd:'board',bd:'board',sheetrock:'board',gyp:'board',gypsum:'board',drywall:'board',gwb:'board',wallboard:'board',mud:'compound',jc:'compound',insul:'insulation',batts:'batt',sheet:'',sheets:'',sht:'',shts:'',pcs:'',pc:'',ea:'',lbs:'lb'};
+const MAT_STOP=['of','the','and','w','with','for','x','a','per','to','in','inch','inches','ga'];
+const matUnit=u=>{const k=String(u||'').toLowerCase().replace(/[.\s]/g,'');return MAT_UNITS[k]||k};
+const matQ=v=>String(Math.round(num(v)*100)/100);
+const matPO=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'').replace(/^po/,'');
+const MAT_MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const matDay=d=>{const [y,m,dd]=String(d||'').split('-').map(Number);return y&&m?MAT_MON[m-1]+' '+dd:String(d||'')};
+const matDays=(a,b)=>{const p=s=>{const [y,m,d]=String(s).split('-').map(Number);return Date.UTC(y,m-1,d)};return Math.round((p(b)-p(a))/864e5)};
+/* item text -> comparable tokens: 3 5/8" 20 ga studs -> [3-5/8, 20ga, stud] */
+function matTok(s){
+  s=String(s||'').toLowerCase().replace(/½/g,' 1/2').replace(/¼/g,' 1/4').replace(/¾/g,' 3/4').replace(/⅝/g,' 5/8').replace(/⅜/g,' 3/8').replace(/[“”″"]|''/g,' ').replace(/(\d)\s*(?:in|inch|inches)\b/g,'$1 ')
+    .replace(/(\d)\s*(?:'|’|′|ft\b|feet\b|foot\b)/g,'$1ft ').replace(/(\d+)\s*-\s*(\d+\/\d+)/g,'$1-$2').replace(/(\d+)\s+(\d+\/\d+)/g,'$1-$2')
+    .replace(/(\d+)\s*(?:ga|gauge|gage)\b/g,'$1ga ').replace(/\btype\s*-?\s*x\b/g,' typex ').replace(/\btype\s*-?\s*c\b/g,' typec ').replace(/#\s*(\d+)/g,' no$1 ');
+  const out=s.split(/[^a-z0-9\/\-.]+/).map(t=>t.replace(/^[-.\/]+|[-.\/]+$/g,'')).filter(Boolean)
+    .map(t=>MAT_SYN[t]!=null?MAT_SYN[t]:(t.length>3&&/[a-z]s$/.test(t)&&!/ss$/.test(t)?t.slice(0,-1):t)).filter(t=>t&&!MAT_STOP.includes(t));
+  return [...new Set(out)]}
+const matCat=t=>!/\d/.test(t)?'':/^\d+(\.\d+)?ga$/.test(t)?'ga':/ft$/.test(t)?'ft':/^no\d+$/.test(t)?'no':/^[\d\-\/.]+$/.test(t)?'size':'dim';
+/* 0..1: how well a delivery's tokens fit an order line's; sizes, gauges and lengths must agree when both name one */
+function matScore(d,l){if(!d.length||!l.length)return 0;const cats={};
+  const add=(t,w)=>{const c=matCat(t);if(c)(cats[c]=cats[c]||[[],[]])[w].push(t)};d.forEach(t=>add(t,0));l.forEach(t=>add(t,1));
+  for(const c in cats){const [a,b]=cats[c];if(a.length&&b.length&&!a.some(t=>b.includes(t)))return 0}
+  const L=new Set(l);const common=d.filter(t=>L.has(t)).length;return common?(common/d.length+common/l.length)/2:0}
+/* free text from an older report: "120 sheets 5/8 Type X" or "5/8 Type X - 120 sheets" */
+function matParseText(s){s=String(s||'').trim();let m=s.match(/^(\d[\d,]*(?:\.\d+)?)\s+(?:([a-z.]+)\s+)?(?:of\s+)?(.+)$/i);
+  if(m){const u=m[2]&&MAT_UNITS[m[2].toLowerCase().replace(/\./g,'')]?m[2]:'';return {item:(m[2]&&!u?m[2]+' ':'')+m[3],qty:num(m[1].replace(/,/g,'')),unit:u}}
+  m=s.match(/^(.+?)[\s\-–:(]+(\d[\d,]*(?:\.\d+)?)\s*([a-z.]+)\)?$/i);
+  if(m&&MAT_UNITS[m[3].toLowerCase().replace(/\./g,'')])return {item:m[1].trim(),qty:num(m[2].replace(/,/g,'')),unit:m[3]};
+  return {item:s,qty:0,unit:''}}
+/* rows copied from the Excel PO (tab-separated). Uses the header row when there is one (Qty / Unit / Item or Description / Length), else guesses per row. */
+function matParsePaste(text){
+  const rows=String(text||'').replace(/\r/g,'').split('\n').map(r=>r.split('\t').map(c=>c.trim())).filter(r=>r.some(Boolean));
+  const isNum=c=>/^\d[\d,]*(\.\d+)?$/.test(c);const isLen=c=>/^\d+\s*('|’|ft)(\s*-?\s*\d+\s*("|in)?)?$/i.test(c);
+  let H=null;const out=[];
+  rows.forEach(r=>{
+    const lc=r.map(c=>c.toLowerCase());const fi=re=>lc.findIndex(c=>re.test(c));
+    if(!H){const qi=fi(/^(qty|qty\.|quantity|qnty|order qty|qty ordered|ordered)$/),ii=fi(/^(item|items|description|desc|material|materials|product|item description)$/);
+      if(qi>=0&&ii>=0){H={q:qi,i:ii,u:fi(/^(unit|units|uom|u\/m|um)$/),l:fi(/^(length|len|size)$/)};return}}
+    let item='',qty=0,unit='';
+    if(H){item=r[H.i]||'';qty=num(String(r[H.q]||'').replace(/,/g,''));unit=H.u>=0?r[H.u]||'':'';if(H.l>=0&&r[H.l])item+=' '+r[H.l]}
+    else{const cs=r.map((c,i)=>({c,i})).filter(x=>x.c);
+      if(cs.length===1){const p=matParseText(cs[0].c);item=p.item;qty=p.qty;unit=p.unit}
+      else{const q=cs.find(x=>isNum(x.c));if(q)qty=num(q.c.replace(/,/g,''));let rest=cs.filter(x=>x!==q&&!/^\$/.test(x.c)&&!isNum(x.c));
+        const un=rest.find(x=>MAT_UNITS[x.c.toLowerCase().replace(/\./g,'')]&&(!q||x.i===q.i+1))||rest.find(x=>MAT_UNITS[x.c.toLowerCase().replace(/\./g,'')]);if(un){unit=un.c;rest=rest.filter(x=>x!==un)}
+        const ln=rest.find(x=>isLen(x.c));if(ln)rest=rest.filter(x=>x!==ln);
+        const it=rest.filter(x=>/[a-z]/i.test(x.c)).sort((a,b)=>b.c.length-a.c.length)[0];item=it?it.c+(ln?' '+ln.c:''):''}}
+    item=item.replace(/\s+/g,' ').trim().slice(0,120);
+    if(!item||!(qty>0)||/^(sub\s*)?total\b|^tax\b|^freight\b|^delivery\b/i.test(item))return;
+    out.push({item,qty,unit:String(unit).slice(0,20)})});
+  return out}
+/* ordered vs delivered for every PO line, plus deliveries that match no line and the flags */
+function matCalc(M,logs,day){
+  const lines=((M&&M.lines)||[]).filter(l=>l&&l.item).map(l=>Object.assign({},l,{tok:matTok(l.item),got:0,last:'',short:null,unitDiff:''}));
+  const rows=[];(logs||[]).forEach(lg=>{const ms=Array.isArray(lg.materials)&&lg.materials.length?lg.materials:(lg.deliveries?[{text:lg.deliveries}]:[]);
+    ms.forEach(x=>{if(!x||!(x.text||x.qty))return;const p=num(x.qty)>0?{item:String(x.text||''),qty:num(x.qty),unit:String(x.unit||'')}:matParseText(x.text);rows.push(Object.assign({},x,p,{date:String(lg.date||''),by:lg.name||''}))})});
+  rows.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
+  const extra=[];
+  rows.forEach(r=>{let ln=r.line?lines.find(l=>l.id===r.line):null;
+    if(!ln){const tk=matTok(r.item);let c=lines.map(l=>({l,s:matScore(tk,l.tok)})).filter(x=>x.s>=0.5);
+      const po=matPO(r.po);if(po){const c2=c.filter(x=>matPO(x.l.po)===po);if(c2.length)c=c2}
+      if(c.length){const best=Math.max(...c.map(x=>x.s));c=c.filter(x=>best-x.s<1e-6).sort((a,b)=>(num(b.l.qty)-b.l.got)-(num(a.l.qty)-a.l.got));ln=c[0].l}}
+    if(!ln){extra.push(r);return}
+    ln.got+=num(r.qty);if(num(r.qty)>0)ln.last=r.date;
+    if(r.unit&&ln.unit&&matUnit(r.unit)!==matUnit(ln.unit))ln.unitDiff=r.unit;
+    if(r.short&&(!ln.short_ok||r.date>ln.short_ok))ln.short={date:r.date,note:r.note||'',by:r.by}});
+  const flags=[];
+  lines.forEach(l=>{const q=num(l.qty),g=Math.round(l.got*100)/100;l.got=g;
+    l.st=!g?'none':!q?'got':g<q-1e-9?'partial':g>q+1e-9?'over':'complete';l.pct=q?Math.min(100,Math.round(g/q*100)):(g?100:0);
+    const done=l.st==='complete'||l.st==='over';if(done)l.short=null;
+    l.late=!!(l.exp&&day&&l.exp<day&&!g);l.early=!!(l.exp&&done&&l.last&&l.last<l.exp);const u=l.unit?' '+l.unit:'';
+    if(l.short)flags.push({lvl:'short',id:l.id,t:l.item+(q?' short '+matQ(q-g)+u:' short')+' ('+(l.short.note||'backordered')+')'});
+    if(l.late)flags.push({lvl:'late',id:l.id,t:l.item+': nothing delivered, expected '+matDay(l.exp)});
+    if(l.st==='over')flags.push({lvl:'over',id:l.id,t:l.item+': '+matQ(g)+' delivered, '+matQ(q)+' ordered'});
+    if(l.unitDiff)flags.push({lvl:'unit',id:l.id,t:l.item+': logged in '+l.unitDiff+', ordered in '+l.unit+'. Check the count.'});
+    if(l.early)flags.push({lvl:'early',id:l.id,t:l.item+': all here '+matDay(l.last)+', ahead of '+matDay(l.exp)})});
+  extra.forEach(r=>{if(r.short&&(!day||matDays(r.date,day)<=14))flags.unshift({lvl:'short',id:'',t:(r.item||'Material')+' short ('+(r.note||'backordered')+')'})});
+  const rank={short:0,late:1,unit:2,over:3,early:4};flags.sort((a,b)=>rank[a.lvl]-rank[b.lvl]);
+  return {lines,extra,flags}}
+const matRowText=x=>[num(x.qty)?matQ(x.qty)+(x.unit?' '+x.unit:''):'',x.text||''].filter(Boolean).join(' ')+(x.po?' (PO '+x.po+')':'')+(x.short?' – SHORT/BACKORDERED'+(x.note?': '+x.note:''):(x.note?' – '+x.note:''));
+const matClean=m=>({lines:Array.isArray(m&&m.lines)?m.lines.filter(l=>l&&l.item):[],updated_at:(m&&m.updated_at)||null,by:(m&&m.by)||null});
+const matHere=()=>!!(S.job&&S.mat&&S.mat.job===S.job.id);
+const matNow=()=>matCalc(S.mat.M,S.mat.logs,today());
+async function loadMat(){const id=jobId();if(!id||!canLog())return;
+  try{const [L,ls]=await Promise.all([laborBudgetRead(id),q(sb.from('logs').select('id,date,name,user_id,materials,deliveries').eq('job_id',id).order('date'))]);
+    if(jobId()!==id)return;S.mat={job:id,M:matClean((L||{}).materials),logs:ls||[]}}
+  catch(e){if(jobId()!==id)return;if(!matHere())S.mat={job:id,M:matClean(null),logs:[],err:errMsg(e)}}
+  if(S.tab==='mat')render();else matPaint();const dl=$('#matDL');if(dl)dl.innerHTML=matDLOpts()}
+function matBanner(){if(!matHere()||S.tab==='mat')return '';const f=matNow().flags.filter(x=>x.lvl==='short'||x.lvl==='late');if(!f.length)return '';
+  return '<div class="card" id="matAlert" role="button" style="background:#fdecea;border-color:#f3b0a8;margin-bottom:12px;padding:10px 12px;cursor:pointer;font-size:14px"><b>⚠ Materials:</b> '+esc(f[0].t)+(f.length>1?' <span class="muted small">+'+(f.length-1)+' more</span>':'')+'</div>'}
+function matPaint(){const tb=$('#tabBody');if(!tb||S.view!=='job')return;const o=$('#matAlert',tb);if(o)o.remove();const h=matBanner();if(!h)return;
+  const nb=$('#nudgeCard',tb);if(nb)nb.insertAdjacentHTML('afterend',h);else tb.insertAdjacentHTML('afterbegin',h);$('#matAlert',tb).onclick=()=>{S.tab='mat';window.scrollTo(0,0);render()}}
+const MAT_ST={none:['Not delivered','#e8ebef','#38414b','#98a2b3'],partial:['Partial','#fff1d0','#7a4f00','#f2a516'],complete:['Complete','#e3f4e4','#1b5e20','#2e7d32'],over:['Over','#e8eefc','#1d3f91','#3b63c4'],got:['Delivered','#e8ebef','#38414b','#2e7d32']};
+const MAT_FL={short:['⚠','#b42318'],late:['⏰','#b42318'],unit:['?','#7a4f00'],over:['+','#1d3f91'],early:['✓','#1b5e20']};
+function matLineHtml(l,ad){const s=MAT_ST[l.st]||MAT_ST.none;const tag=(t,bg,c)=>' <span class="badge" style="background:'+bg+';color:'+c+'">'+t+'</span>';
+  return '<div class="mline"'+(ad?' data-ml="'+esc(l.id)+'"':'')+'><div class="row" style="align-items:flex-start;gap:8px"><div class="grow"><b>'+esc(l.item)+'</b>'+(l.short?tag('Short','#fdecea','#b42318'):'')+(l.late?tag('Late','#fdecea','#b42318'):'')+(l.early?tag('Early','#e3f4e4','#1b5e20'):'')+'</div>'+
+    '<span class="badge" style="background:'+s[1]+';color:'+s[2]+';white-space:nowrap">'+s[0]+(l.st==='partial'?' ('+matQ(l.got)+' of '+matQ(l.qty)+')':'')+'</span></div>'+
+    '<div class="mbar"><i style="width:'+l.pct+'%;background:'+s[3]+'"></i></div>'+
+    '<div class="muted small">'+matQ(l.got)+' of '+matQ(l.qty)+(l.unit?' '+esc(l.unit):'')+' received'+(l.last?' · last '+matDay(l.last):'')+(l.exp?' · expected '+matDay(l.exp):'')+(l.unitDiff?' · check units ('+esc(l.unitDiff)+' logged)':'')+
+    (l.short?'<br><span style="color:#b42318">Marked short '+matDay(l.short.date)+(l.short.by?' by '+esc(l.short.by):'')+(l.short.note?': '+esc(l.short.note):'')+'</span>':'')+'</div></div>'}
+function renderMat(){if(!matHere())return '<div class="empty">Loading materials…</div>';
+  const ad=isAdminRole();const C=matNow();const M=S.mat.M;
+  let h='<div class="card"><b style="font-size:17px">Materials vs. the order</b><div class="muted small">Ordered from the PO'+(ad?'':' (entered by the office)')+'. Received = what foremen log under Materials delivered on the daily report.'+(M.updated_at?' Order updated '+esc(fmtWhen(M.updated_at))+'.':'')+'</div>'+
+    (S.mat.err?'<div class="small" style="color:#b42318;margin-top:6px">Couldn’t load the order: '+esc(S.mat.err)+'</div>':'')+
+    (ad?'<div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><button class="btn sm primary" id="matPaste">📋 Paste PO from Excel</button><button class="btn sm" id="matAdd">+ Add line</button></div>':'')+'</div>';
+  if(C.flags.length)h+='<div class="card" style="padding:10px 14px">'+C.flags.map(f=>{const x=MAT_FL[f.lvl];return '<div class="kv" style="color:'+x[1]+'"><b>'+x[0]+'</b> '+esc(f.t)+'</div>'}).join('')+'</div>';
+  if(!C.lines.length)h+='<div class="empty"><b>No order yet</b>'+(ad?'Tap <b>Paste PO from Excel</b> and paste the item, qty and unit columns from the PO, or add lines one at a time. Foremen then pick these items on the daily report.':'The office hasn’t entered the material order for this job yet. Keep logging deliveries on the daily report.')+'</div>';
+  else{const G={};C.lines.forEach(l=>{const k=(l.po||'')+'|'+(l.sup||'');(G[k]=G[k]||[]).push(l)});
+    h+=Object.keys(G).map(k=>{const ls=G[k];const [po,sup]=k.split('|');const dn=ls.filter(l=>l.st==='complete'||l.st==='over').length;
+      return '<div class="card" style="padding-bottom:4px"><div class="row" style="margin-bottom:4px"><b class="grow">'+(po?'PO '+esc(po):'No PO #')+(sup?' · '+esc(sup):'')+'</b><span class="muted small">'+dn+' of '+ls.length+' complete</span></div>'+ls.map(l=>matLineHtml(l,ad)).join('')+'</div>'}).join('');
+    if(ad)h+='<p class="muted small" style="margin:-4px 2px 12px">Tap a line to change it, set an expected date or clear a short flag.</p>'}
+  if(C.extra.length)h+='<details class="card"><summary><b>Delivered, not matched to the order</b> <span class="muted small">('+C.extra.length+')</span></summary><div class="muted small" style="margin:6px 0">These daily report lines didn’t match an order item. Picking items from the list on the daily report keeps them matched.</div>'+
+    C.extra.slice().reverse().map(r=>'<div class="kv">'+matDay(r.date)+' · '+esc(matRowText({text:r.item,qty:r.qty,unit:r.unit,po:r.po,short:r.short,note:r.note}))+(r.by?' <span class="muted small">('+esc(r.by)+')</span>':'')+'</div>').join('')+'</details>';
+  return h}
+function bindMat(){if(!isAdminRole())return;const p=$('#matPaste');if(p)p.onclick=matPasteBox;const a=$('#matAdd');if(a)a.onclick=()=>matLineBox(null);
+  $$('[data-ml]').forEach(el=>el.onclick=()=>{const l=((S.mat&&S.mat.M.lines)||[]).find(x=>x.id===el.dataset.ml);if(l)matLineBox(l)})}
+/* office save: re-read labor so nothing the sync or another tab wrote is lost, change only labor.materials */
+async function matSave(fn,msg){if(!isAdminRole()||!S.job)return false;const id=S.job.id;let L;
+  try{const d=await q(sb.from('job_budget').select('labor').eq('job_id',id).maybeSingle());L=(d&&d.labor)||{}}catch(e){toast(errMsg(e));return false}
+  const M=matClean(L.materials);fn(M);M.updated_at=new Date().toISOString();M.by=S.me&&S.me.id;const labor=Object.assign({},L,{materials:M});
+  if(!await run(sb.from('job_budget').upsert({job_id:id,labor},{onConflict:'job_id'}),msg))return false;
+  if(S.labor)S.labor.materials=M;if(S.mat&&S.mat.job===id)S.mat.M=M;render();return true}
+const matSupDL='<datalist id="matSupDL"><option value="FBM"><option value="LKL"></datalist>';
+function matLineBox(l){const isNew=!l;l=l||{};const C=matHere()?matNow():null;const cur=C&&!isNew?C.lines.find(x=>x.id===l.id):null;
+  const m=modal('<h2>'+(isNew?'Add order line':'Order line')+'</h2><form>'+
+    '<div class="two"><label class="field"><span>PO #</span><input name="po" maxlength="30" value="'+esc(isNew?S.matLastPo||'':l.po||'')+'"></label><label class="field"><span>Supplier</span><input name="sup" list="matSupDL" maxlength="30" placeholder="FBM or LKL" value="'+esc(isNew?S.matLastSup||'':l.sup||'')+'"></label></div>'+matSupDL+
+    '<label class="field"><span>Item</span><input name="item" required maxlength="120" placeholder="e.g. 5/8 Type X board 12’" value="'+esc(l.item||'')+'"></label>'+
+    '<div class="two"><label class="field"><span>Qty ordered</span><input name="qty" type="number" step="any" min="0" inputmode="decimal" value="'+esc(l.qty!=null?l.qty:'')+'"></label><label class="field"><span>Unit</span><input name="unit" maxlength="20" placeholder="sheets, pcs, boxes" value="'+esc(l.unit||'')+'"></label></div>'+
+    '<label class="field"><span>Expected delivery (optional)</span><input name="exp" type="date" value="'+esc(l.exp||'')+'"></label>'+
+    (cur&&cur.short?'<label class="mshort" style="margin:0 0 10px"><input type="checkbox" name="sok" style="width:20px;height:20px"> Short / backorder is taken care of (clear the flag)</label>':'')+
+    '<div class="mbtns">'+(isNew?'':'<button type="button" class="btn danger" data-del>Delete</button>')+'<button type="button" class="btn" data-x>Cancel</button><button class="btn primary" type="submit">Save</button></div></form>');
+  const f=$('form',m);$('[data-x]',m).onclick=()=>m.close();setTimeout(()=>f.item.focus(),50);
+  const d=$('[data-del]',m);if(d)d.onclick=async()=>{m.close();if(await confirmBox('Delete '+l.item+' from the order?'))matSave(M=>{M.lines=M.lines.filter(x=>x.id!==l.id)},'Line deleted.')};
+  f.onsubmit=async e=>{e.preventDefault();const v={po:f.po.value.trim(),sup:f.sup.value.trim(),item:f.item.value.trim(),qty:num(f.qty.value),unit:f.unit.value.trim(),exp:f.exp.value||''};if(!v.item)return;
+    S.matLastPo=v.po;S.matLastSup=v.sup;const sok=f.sok&&f.sok.checked;m.close();
+    matSave(M=>{const o=M.lines.find(x=>x.id===l.id);if(o){Object.assign(o,v);if(sok)o.short_ok=today()}else M.lines.push(Object.assign({id:uuid().slice(0,8)},v))},isNew?'Line added.':'Line saved.')}}
+function matPasteBox(){
+  const m=modal('<h2>Paste PO from Excel</h2><p class="small muted" style="margin:-4px 0 10px">In the PO, select the rows (item, qty and unit columns, headers OK) and copy. Paste them below.</p><form>'+
+    '<div class="two"><label class="field"><span>PO #</span><input name="po" maxlength="30" value="'+esc(S.matLastPo||'')+'"></label><label class="field"><span>Supplier</span><input name="sup" list="matSupDL" maxlength="30" placeholder="FBM or LKL" value="'+esc(S.matLastSup||'')+'"></label></div>'+matSupDL+
+    '<label class="field"><span>Expected delivery (optional)</span><input name="exp" type="date"></label>'+
+    '<label class="field"><span>Rows from Excel</span><textarea name="rows" rows="6" placeholder="Item | Qty | Unit columns copied from the PO"></textarea></label>'+
+    '<div class="small" data-prev style="max-height:180px;overflow:auto;margin:-4px 0 8px"></div>'+
+    '<label class="mshort" style="margin:0 0 10px"><input type="checkbox" name="rep" style="width:20px;height:20px"> Replace the lines already on this PO #</label>'+
+    '<div class="mbtns"><button type="button" class="btn" data-x>Cancel</button><button class="btn primary" type="submit" disabled>Add lines</button></div></form>');
+  const f=$('form',m);const ok=$('button[type=submit]',m);let got=[];$('[data-x]',m).onclick=()=>m.close();setTimeout(()=>f.rows.focus(),50);
+  const prev=()=>{got=matParsePaste(f.rows.value);ok.disabled=!got.length;ok.textContent=got.length?'Add '+got.length+' line'+(got.length>1?'s':''):'Add lines';
+    $('[data-prev]',m).innerHTML=f.rows.value.trim()?(got.length?got.map(x=>'<div>• <b>'+esc(matQ(x.qty))+(x.unit?' '+esc(x.unit):'')+'</b> '+esc(x.item)+'</div>').join(''):'<span style="color:#b42318">No rows with an item and a qty found.</span>'):''};
+  f.rows.oninput=prev;
+  f.onsubmit=e=>{e.preventDefault();if(!got.length)return;const po=f.po.value.trim(),sup=f.sup.value.trim(),exp=f.exp.value||'',rep=f.rep.checked;S.matLastPo=po;S.matLastSup=sup;m.close();
+    matSave(M=>{if(rep)M.lines=M.lines.filter(x=>matPO(x.po)!==matPO(po));got.forEach(x=>M.lines.push({id:uuid().slice(0,8),po,sup,item:x.item,unit:x.unit,qty:x.qty,exp}))},got.length+' line'+(got.length>1?'s':'')+' added to the order.')}}
+/* daily report: delivered rows pick from the order (datalist), free text still OK */
+function matDLOpts(){if(!matHere())return '';return S.mat.M.lines.map(l=>'<option value="'+esc(l.item)+'">'+esc((l.po?'PO '+l.po+' · ':'')+matQ(l.qty)+(l.unit?' '+l.unit:'')+' ordered')+'</option>').join('')}
+function matRowsEditor(){const r='<div class="lrow mrow" data-row><input data-c="text" list="matDL" autocomplete="off" placeholder="Item – pick from the order"><button type="button" class="ico" data-rm aria-label="Remove">✕</button>'+
+    '<input data-c="qty" type="number" inputmode="decimal" min="0" step="any" placeholder="Qty"><input data-c="unit" placeholder="Unit"><input data-c="po" placeholder="PO #"><input type="hidden" data-c="line">'+
+    '<label class="mshort"><input type="checkbox" data-c="short"> Short / backordered</label><input data-c="note" maxlength="200" placeholder="Note, e.g. 40 sheets coming Tue"></div>';
+  return '<datalist id="matDL">'+matDLOpts()+'</datalist><div data-rows="mat">'+r+'</div><button type="button" class="btn sm" data-add="mat">+ Add line</button><template data-tpl="mat">'+r+'</template>'}
+/* link a typed/picked item to its order line; fill unit and PO from the order when empty */
+function matLink(rw){if(!rw||!matHere())return;const g=c=>$('[data-c="'+c+'"]',rw);const t=g('text').value.trim().toLowerCase();const po=matPO(g('po').value);
+  const c=t?S.mat.M.lines.filter(l=>String(l.item).trim().toLowerCase()===t):[];const l=c.find(x=>po&&matPO(x.po)===po)||c[0];g('line').value=l?l.id:'';
+  if(l){if(!g('unit').value.trim())g('unit').value=l.unit||'';if(!g('po').value.trim())g('po').value=l.po||''}}
 /* daily log tab */
 const LOGO_PNG='data:image/png;base64,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';
 const WORKFORCE=['Super','Foreman','Framer','Drywall','Carpenter','Taper','Laborer','Truck Driver','Safety','Stockers'];
@@ -2558,10 +2730,10 @@ function rowsEditor(key,cols,vals){
   const r=(v)=>'<div class="lrow" data-row>'+cols.map(c=>'<input data-c="'+c.k+'" placeholder="'+esc(c.ph)+'" value="'+esc((v||{})[c.k]||'')+'"'+(c.num?' type="number" inputmode="decimal" min="0" style="max-width:76px"':'')+'>').join('')+'<button type="button" class="ico" data-rm aria-label="Remove">✕</button></div>';
   return '<div data-rows="'+key+'">'+((vals&&vals.length?vals:[{}]).map(r).join(''))+'</div><button type="button" class="btn sm" data-add="'+key+'">+ Add line</button><template data-tpl="'+key+'">'+r({})+'</template>';
 }
-function readRows(form,key){return $$('[data-rows="'+key+'"] [data-row]',form).map(rw=>{const o={};$$('[data-c]',rw).forEach(i=>{const v=i.value.trim();if(v)o[i.dataset.c]=i.type==='number'?num(v):v.slice(0,300)});return o}).filter(o=>Object.keys(o).length)}
+function readRows(form,key){return $$('[data-rows="'+key+'"] [data-row]',form).map(rw=>{const o={};$$('[data-c]',rw).forEach(i=>{if(i.type==='checkbox'){if(i.checked)o[i.dataset.c]=true;return}const v=i.value.trim();if(v)o[i.dataset.c]=i.type==='number'?num(v):v.slice(0,300)});return o}).filter(o=>Object.keys(o).length)}
 function bindRows(form){
   form.addEventListener('click',e=>{const a=e.target.closest('[data-add]');if(a){const k=a.dataset.add;const box=$('[data-rows="'+k+'"]',form);box.insertAdjacentHTML('beforeend',$('[data-tpl="'+k+'"]',form).innerHTML);const ins=$$('[data-row]',box);const l=ins[ins.length-1];const f=l&&$('input',l);if(f)f.focus();return}
-    const rm=e.target.closest('[data-rm]');if(rm){const rw=rm.closest('[data-row]');const box=rw.parentElement;if($$('[data-row]',box).length>1)rw.remove();else $$('input',rw).forEach(i=>i.value='')}});
+    const rm=e.target.closest('[data-rm]');if(rm){const rw=rm.closest('[data-row]');const box=rw.parentElement;if($$('[data-row]',box).length>1)rw.remove();else $$('input',rw).forEach(i=>{if(i.type==='checkbox')i.checked=false;else i.value=''})}});
 }
 function sigPad(cv){
   const x=cv.getContext('2d');let drawing=false,dirty=false,last=null;
@@ -2589,18 +2761,19 @@ function renderLogForm(){
     '<fieldset class="codes"><legend>Hours</legend><div data-tch class="small"></div></fieldset>'+
     ta('problems','Problems / delays','e.g. Waiting on electrician in 205')+ta('subs','Subcontractor progress','')+ta('damage','Trade damage','')+
     '<fieldset class="codes"><legend>Equipment</legend>'+rowsEditor('equip',[{k:'name',ph:'e.g. Scissor lift'},{k:'qty',ph:'Qty',num:1}])+'</fieldset>'+
-    '<fieldset class="codes"><legend>Materials delivered (PO)</legend>'+rowsEditor('mat',[{k:'text',ph:'e.g. 120 sheets 5/8 Type X'},{k:'po',ph:'PO #'}])+'</fieldset>'+
+    '<fieldset class="codes"><legend>Materials delivered (PO)</legend>'+matRowsEditor()+'</fieldset>'+
     '<fieldset class="codes"><legend>Additional work</legend>'+rowsEditor('extra',[{k:'work',ph:'Work'},{k:'by',ph:'Authorized by'},{k:'awa',ph:'AWA #'}])+'</fieldset>'+
     '<label class="field"><span>Supervisor (print name)</span><input name="who" required maxlength="60" autocomplete="name" placeholder="Your name"></label>'+
     '<div class="field"><span>Supervisor signature</span><canvas class="sig" data-sig></canvas><div class="row" style="justify-content:space-between"><span class="muted small">Sign with your finger</span><button type="button" class="btn sm" data-sigclr>Clear</button></div></div>'+
     '<div class="field gcq"><span>Send to general contractor?</span>'+(gce.length?'<div class="seg"><label><input type="radio" name="gc" value="yes"> Yes</label><label><input type="radio" name="gc" value="no" checked> No</label></div><div class="muted small">'+esc(gce.join(', '))+'</div>'
       :'<div class="muted small">No GC email on this job yet. '+(isAdminRole()?'Add it under ⋯ → Edit job.':'Ask the office to add it.')+'</div>')+'</div>'+
     '<button class="btn primary block" type="submit">Save daily report</button><div class="muted small" data-st style="text-align:center;margin-top:6px">A PDF is saved to the job\'s Daily Reports folder.</div></form></div>';
-  const form=$('form',box);let touched=false;bindRows(form);const pad=sigPad($('[data-sig]',form));
+  const form=$('form',box);let touched=false;bindRows(form);
+  form.addEventListener('input',e=>{const c=e.target.dataset&&e.target.dataset.c;if(c==='text'||c==='po')matLink(e.target.closest('[data-row]'))});const pad=sigPad($('[data-sig]',form));
   $('[data-sigclr]',form).onclick=()=>{pad.clear();touched=true};
   const wfTot=()=>{$('[data-wft]',form).textContent=$$('[data-wf]',form).reduce((a,i)=>a+num(i.value),0)};
   const mine=d=>S.logs.find(l=>l.date===d&&l.user_id===S.me.id);
-  const setRows=(k,vals)=>{const b=$('[data-rows="'+k+'"]',form);const t=$('[data-tpl="'+k+'"]',form).innerHTML;b.innerHTML='';(vals&&vals.length?vals:[{}]).forEach(v=>{b.insertAdjacentHTML('beforeend',t);const rw=b.lastElementChild;$$('[data-c]',rw).forEach(i=>i.value=v[i.dataset.c]!=null?v[i.dataset.c]:'')})};
+  const setRows=(k,vals)=>{const b=$('[data-rows="'+k+'"]',form);const t=$('[data-tpl="'+k+'"]',form).innerHTML;b.innerHTML='';(vals&&vals.length?vals:[{}]).forEach(v=>{b.insertAdjacentHTML('beforeend',t);const rw=b.lastElementChild;$$('[data-c]',rw).forEach(i=>{if(i.type==='checkbox')i.checked=!!v[i.dataset.c];else i.value=v[i.dataset.c]!=null?v[i.dataset.c]:''})})};
   let tcX=null;const tcBox=$('[data-tch]',form);
   const tcRef=async()=>{const d=form.date.value||today();tcX=null;tcBox.innerHTML='<span class="muted">Checking your time card\u2026</span>';const card=await tcCardFor(S.me.id,d);if((form.date.value||today())!==d||!S.job)return;
     const K=tcJobKey(S.job);tcX={d,card,r:card?tcJobDay([card],d,K[0],K[1]):null};tcBox.innerHTML=tcFeedHtml(tcX);
@@ -2648,7 +2821,7 @@ async function reportPdf(o,job){
   rcell('Workforce','Quantity',true);WORKFORCE.forEach(w=>rcell(w,(o.workforce||{})[w]||''));rcell('Total:',o.crew||0,true);
   y+=6;rcell('Equipment','Quantity',true);const eq=(o.equipment||[]);for(let i=0;i<Math.max(4,eq.length);i++)rcell(eq[i]?(eq[i].name||''):'',eq[i]?(eq[i].qty||''):'');
   y+=6;doc.rect(rx,y,rw,14);doc.setFont('helvetica','bold');doc.text('Materials Delivered (PO)',rx+rw/2,y+10,{align:'center'});y+=14;doc.setFont('helvetica','normal');
-  const mats=(o.materials||[]);for(let i=0;i<Math.max(4,mats.length);i++){const m=mats[i];const t=m?((m.text||'')+(m.po?' (PO '+m.po+')':'')):'';const ls=doc.splitTextToSize(t,rw-6);const h=Math.max(14,ls.length*10+4);doc.rect(rx,y,rw,h);doc.text(ls,rx+3,y+10);y+=h}
+  const mats=(o.materials||[]);for(let i=0;i<Math.max(4,mats.length);i++){const m=mats[i];const t=m?matRowText(m):'';const ls=doc.splitTextToSize(t,rw-6);const h=Math.max(14,ls.length*10+4);doc.rect(rx,y,rw,h);doc.text(ls,rx+3,y+10);y+=h}
   const rightEnd=y;
   // left column
   y=top;const lw=MID-L;
@@ -2705,7 +2878,7 @@ function renderLogList(){
       (l.work?'<div class="kv"><b>Work:</b> '+esc(l.work)+'</div>':'')+((l.problems||l.notes)?'<div class="kv"><b>Problems:</b> '+esc(l.problems||l.notes)+'</div>':'')+
       (l.sub_progress?'<div class="kv"><b>Subs:</b> '+esc(l.sub_progress)+'</div>':'')+(l.trade_damage?'<div class="kv"><b>Trade damage:</b> '+esc(l.trade_damage)+'</div>':'')+
       ((l.equipment||[]).length?'<div class="kv"><b>Equipment:</b> '+l.equipment.map(x=>esc((x.name||'')+(x.qty?' ('+x.qty+')':''))).join(', ')+'</div>':'')+
-      ((l.materials||[]).length?'<div class="kv"><b>Delivered:</b> '+l.materials.map(x=>esc((x.text||'')+(x.po?' PO '+x.po:''))).join('; ')+'</div>':(l.deliveries?'<div class="kv"><b>Delivered:</b> '+esc(l.deliveries)+'</div>':''))+
+      ((l.materials||[]).length?'<div class="kv"><b>Delivered:</b> '+l.materials.map(x=>esc(matRowText(x))).join('; ')+'</div>':(l.deliveries?'<div class="kv"><b>Delivered:</b> '+esc(l.deliveries)+'</div>':''))+
       ((l.extra_work||[]).length?'<div class="kv"><b>Additional work:</b> '+l.extra_work.map(x=>esc((x.work||'')+(x.by?' – auth. '+x.by:'')+(x.awa?' – AWA '+x.awa:''))).join('; ')+'</div>':'')+
       '<div class="row" style="margin-top:8px;gap:8px;align-items:center"><span class="grow">'+reportStatus(l)+'</span>'+(l.pdf_path?'<button class="btn sm" data-lpdf="'+esc(l.id)+'">PDF</button>':'')+
       ((l.user_id===S.me.id&&canWrite())?'<button class="btn sm" data-ledit="'+esc(l.id)+'">✎ Edit</button>':'')+
