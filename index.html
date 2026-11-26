@@ -2990,14 +2990,32 @@ function trkPatch(e,r,pm){const p={};if(e.bid_amount==null&&r.amount!=null)p.bid
   const have=new Set((e.bid_notes||[]).map(n=>(n.at||'')+'|'+n.text));const add=r.notes.filter(n=>!have.has((n.at||'')+'|'+n.text));if(add.length)p.bid_notes=(e.bid_notes||[]).concat(add);
   if(!e.pm&&pm&&e.stage==='bid')p.pm=pm;
   return p}
-/* what the import will do per row: new bid, update a matching app bid / job (by name), or skip (already imported: same name + bid date + estimator) */
-function trkPlan(recs,existing,office,year){const ex=(existing||[]).map(e=>({e,k:trkKey(e.name)})),used=new Set();
+/* bid names for matching: lowercase, no job number, punctuation / dashes -> spaces, towne->town, centre->center, filler words dropped (the, inc, llc, by marriott ...) */
+function trkNameNorm(n){
+  let t=String(n||'').toLowerCase().replace(/^\s*\d{2,4}\s*[-–—]\s*/,'').replace(/&/g,' and ').replace(/['’.]/g,'').replace(/[^a-z0-9]+/g,' ');
+  t=t.replace(/\btowne/g,'town').replace(/centre\b/g,'center').replace(/theatre\b/g,'theater');
+  t=t.replace(/\bby (marriott|hilton|hyatt|ihg|wyndham|choice hotels)\b/g,' ').replace(/\b(the|inc|llc|co|corp|and)\b/g,' ');
+  return t.replace(/\s+/g,' ').trim();
+}
+/* same bid by name? equal after trkNameNorm, one contains the other (6+ letters), or word overlap (Jaccard) >= 0.6 */
+function trkNameMatch(a,b){
+  const x=trkNameNorm(a),y=trkNameNorm(b);if(!x||!y)return false;if(x===y)return true;
+  const cx=x.replace(/ /g,''),cy=y.replace(/ /g,'');if(cx===cy)return true;
+  if(cx.length>=6&&cy.length>=6&&(cx.includes(cy)||cy.includes(cx)))return true;
+  const A=new Set(x.split(' ')),B=new Set(y.split(' '));let n=0;A.forEach(w=>{if(B.has(w))n++});
+  return n/(A.size+B.size-n)>=0.6;
+}
+/* what the import will do per row: new bid, update a matching app bid / job (fuzzy name, bid date within 7 days; fills blanks and sets bid_source so it isn't inserted twice), or skip (already imported: same name + bid date + estimator) */
+function trkPlan(recs,existing,office,year){const ex=(existing||[]).map(e=>({e,k:trkKey(e.name)})),used=new Set(),src='tracker-'+year;
   return (recs||[]).map(r=>{const pm=trkEst(r.est,office),k=trkKey(r.name),flags=r.flags.slice();if(r.est&&!pm)flags.push('Estimator "'+r.est+'" isn’t an office user');
-    const done=ex.find(x=>x.e.bid_source&&String(x.e.bid_source).startsWith('tracker')&&x.k===k&&(x.e.bid_date||null)===(r.bidDate||null)&&(x.e.pm||null)===(pm||null));
+    const dn=ex.filter(x=>x.e.bid_source&&String(x.e.bid_source).startsWith('tracker')&&(x.k===k||trkNameMatch(x.e.name,r.name))&&(x.e.bid_date||null)===(r.bidDate||null)),done=dn.find(x=>(x.e.pm||null)===(pm||null))||dn[0];
     if(done)return {r,pm,action:'skip',why:'Already imported',match:{id:done.e.id,name:done.e.name},flags};
     if(r.dup)return {r,pm,action:'skip',why:'Duplicate row',match:null,flags};
-    const near=x=>!x.e.bid_date||!r.bidDate||Math.abs(dayDiff(x.e.bid_date,r.bidDate))<=21;const like=ex.filter(x=>!x.e.bid_source&&!used.has(x.e.id)&&x.k&&(x.k===k||(k.length>=6&&x.k.length>=6&&(x.k.includes(k)||k.includes(x.k)))));const m=like.find(near);
-    if(m){const p=trkPatch(m.e,r,pm);used.add(m.e.id);if(!Object.keys(p).length)return {r,pm,action:'skip',why:'Already up to date',match:{id:m.e.id,name:m.e.name,stage:m.e.stage},flags};return {r,pm,action:'merge',match:{id:m.e.id,name:m.e.name,stage:m.e.stage},patch:p,flags}}
+    /* fuzzy name match, bid dates within 7 days when both have one; same estimator first, then the closest date */
+    const dd=x=>x.e.bid_date&&r.bidDate?Math.abs(dayDiff(x.e.bid_date,r.bidDate)):0,near=x=>dd(x)<=7;
+    const like=ex.filter(x=>!x.e.bid_source&&!used.has(x.e.id)&&x.k&&(x.k===k||trkNameMatch(x.e.name,r.name)));
+    const m=like.filter(near).sort((a,b)=>((b.e.pm||null)===(pm||null))-((a.e.pm||null)===(pm||null))||dd(a)-dd(b))[0];
+    if(m){const p=trkPatch(m.e,r,pm);used.add(m.e.id);p.bid_source=src;return {r,pm,action:'merge',match:{id:m.e.id,name:m.e.name,stage:m.e.stage},patch:p,flags}}
     if(like.length)flags.push('Same name as '+like[0].e.name+(like[0].e.bid_date?' (bid '+like[0].e.bid_date+')':'')+' in the app (re-bid?)');
     return {r,pm,action:'new',match:null,flags}})}
 const TRK_AW={won:'YES',lost:'NO',noword:'NO',nobid:'NO BID',submitted:'REVIEWED',open:'',rebid:'RE-BID'};

@@ -15,7 +15,7 @@ function grab(name) {
 }
 const names = ['num', 'BID_ST', 'bidStLabel', 'isoD', 'dayDiff', 'MON3', 'BID_NOWORD_DAYS', 'bidNoWord', 'bidLost', 'bidRes', 'bidStat', 'bidFilt', 'bidGcs', 'pipeIn', 'bidYear',
   'TRK_TABS', 'trkMon', 'trkText', 'trkDate', 'trkAmt', 'trkStatus', 'trkKey', 'gcKey', 'trkEst', 'TRK_FU', 'TRK_RES', 'TRK_CTX', 'trkSplit',
-  'trkParseSheet', 'trkParseBook', 'trkRow', 'trkPatch', 'trkPlan', 'pipeCalc', 'niceMax', 'TRK_AW', 'trkGcText', 'trkExportTabs'];
+  'trkParseSheet', 'trkParseBook', 'trkRow', 'trkPatch', 'trkNameNorm', 'trkNameMatch', 'trkPlan', 'pipeCalc', 'niceMax', 'TRK_AW', 'trkGcText', 'trkExportTabs'];
 const T = vm.runInNewContext(names.map(grab).join('\n') + '\n;({' + names.join(',') + '})', { Math, Date, String, Number, Set, Object, Array, JSON, RegExp });
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok - ' + name); };
 const plain = x => JSON.parse(JSON.stringify(x));
@@ -136,7 +136,7 @@ t('import plan: estimator by first name, update matching app bid / job by name, 
   assert.strictEqual(by('Big-O Tires')[2].why, 'Duplicate row');
   const post = by('POSTINOS')[0];
   assert.strictEqual(post.action, 'merge');
-  assert.deepStrictEqual(plain(post.patch), { bid_amount: 150000, bid_status: 'open', bid_gcs: [{ name: 'Okland' }] });
+  assert.deepStrictEqual(plain(post.patch), { bid_amount: 150000, bid_status: 'open', bid_gcs: [{ name: 'Okland' }], bid_source: 'tracker-2026' });
   const dal = by('Dalling Hangar Elko')[0];
   assert.strictEqual(dal.action, 'merge');
   assert.strictEqual(dal.patch.bid_status, 'won');
@@ -145,7 +145,7 @@ t('import plan: estimator by first name, update matching app bid / job by name, 
   assert.deepStrictEqual(plain(row), { name: 'WEC Veterans Home', stage: 'bid', pm: 'o1', bid_date: '2026-10-20', bid_amount: null, bid_status: 'submitted', bid_result: 'came in 2nd of 4', result_date: null, bid_gcs: [{ name: 'Jacobsen' }], bid_notes: [], bid_source: 'tracker-2026', gc_name: 'Jacobsen', bid_folder: 'WEC Veterans Home' });
   const again = T.trkPlan([by('POSTINOS')[0].r], [Object.assign({}, existing[0], post.patch)], office, 2026);
   assert.strictEqual(again[0].action, 'skip');
-  assert.strictEqual(again[0].why, 'Already up to date');
+  assert.strictEqual(again[0].why, 'Already imported');
   const far = T.trkPlan([by('POSTINOS')[0].r], [Object.assign({}, existing[0], { bid_date: '2026-04-01' })], office, 2026)[0];
   assert.strictEqual(far.action, 'new');
   assert.ok(far.flags.some(f => /Same name as POSTINOS \(bid 2026-04-01\) in the app/.test(f)));
@@ -253,6 +253,39 @@ t('didn\'t bid (No bid): out of win rate, $ bid, averages, waiting counts, Top G
   const K = P.estList.find(e => e.name === 'Ken');
   assert.deepStrictEqual([K.amt, K.won, K.lost, K.unk, K.rate], [60000, 1, 0, 0, 1]);
   assert.deepStrictEqual([P.gcList[0].n, P.gcList[0].amt, P.gcList[0].lost, P.gcList[0].rate], [3, 60000, 0, 1]);
+});
+
+t('import match is fuzzy: TownePlace / TownPlace by Marriott is the same bid (dates within 7 days), Hounds Town is not University Town Center', () => {
+  assert.strictEqual(T.trkNameNorm('TOWNEPLACE SUITES - IDAHO FALLS'), 'townplace suites idaho falls');
+  assert.strictEqual(T.trkNameNorm('TownPlace Suites by Marriott - Idaho Falls'), 'townplace suites idaho falls');
+  assert.strictEqual(T.trkNameNorm('331 - The Centre, Inc.'), 'center');
+  assert.ok(T.trkNameMatch('TOWNEPLACE SUITES - IDAHO FALLS', 'TownPlace Suites by Marriott - Idaho Falls'));
+  assert.ok(!T.trkNameMatch('Hounds Town-Centerville', 'University Town Center Building B'));
+  assert.ok(T.trkNameMatch('Logan Public Works', 'Logan Public Works Ph 2'));
+  const rec = (name, bidDate, est) => ({ name, bidDate, est, amount: 412000, status: 'submitted', result: '', gcs: ['Okland'], notes: [], flags: [], tab: 'DEC', row: 3 });
+  const existing = [
+    { id: 'tps', name: 'TOWNEPLACE SUITES - IDAHO FALLS', stage: 'bid', pm: 'o1', bid_date: '2026-12-01' },
+    { id: 'ht', name: 'Hounds Town-Centerville', stage: 'bid', pm: 'o1', bid_date: '2026-12-02' }];
+  const [a, b, c] = T.trkPlan([rec('TownPlace Suites by Marriott - Idaho Falls', '2026-12-03', 'Ken'), rec('University Town Center Building B', '2026-12-02', 'Ken'), rec('TownPlace Suites by Marriott - Idaho Falls', '2026-12-12', 'Ken')], existing, office, 2026);
+  assert.strictEqual(a.action, 'merge');
+  assert.strictEqual(a.match.id, 'tps');
+  assert.deepStrictEqual(plain(a.patch), { bid_amount: 412000, bid_status: 'submitted', bid_gcs: [{ name: 'Okland' }], gc_name: 'Okland', bid_source: 'tracker-2026' });
+  assert.strictEqual(b.action, 'new');
+  assert.strictEqual(c.action, 'new', 'same name 11 days later is a re-bid, not the same row');
+  // after the update the row carries bid_source, so importing the tracker again skips it
+  const again = T.trkPlan([rec('TownPlace Suites by Marriott - Idaho Falls', '2026-12-01', 'Ken')], [Object.assign({}, existing[0], a.patch)], office, 2026)[0];
+  assert.strictEqual(again.action, 'skip');
+  assert.strictEqual(again.why, 'Already imported');
+  // a merged row with another estimator is still "already imported" on the next import (estimator is only a tiebreak)
+  const other = T.trkPlan([rec('TownPlace Suites by Marriott - Idaho Falls', '2026-12-01', 'Rob')], [Object.assign({}, existing[0], a.patch)], office, 2026)[0];
+  assert.strictEqual(other.why, 'Already imported');
+  // more than 7 days apart: no match, flagged as a possible re-bid
+  const far = T.trkPlan([rec('TownPlace Suites by Marriott - Idaho Falls', '2026-12-09', 'Ken')], existing, office, 2026)[0];
+  assert.strictEqual(far.action, 'new');
+  assert.ok(far.flags.some(f => /Same name as TOWNEPLACE SUITES/.test(f)));
+  // estimator breaks a tie between two close matches
+  const two = [Object.assign({}, existing[0], { id: 'x2', pm: 'o2' }), existing[0]];
+  assert.strictEqual(T.trkPlan([rec('TownPlace Suites by Marriott - Idaho Falls', '2026-12-01', 'Ken')], two, office, 2026)[0].match.id, 'tps');
 });
 
 console.log(n + ' tracker tests passed');
