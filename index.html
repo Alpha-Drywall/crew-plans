@@ -1200,9 +1200,11 @@ function render(){
 }
 
 /* labor (office edits budget; everyone on the job can view) */
+/* PO PDF paths (labor.materials.pos) are office only: never kept in a foreman, viewer, view-as or practice session */
+const laborNoPos=L=>{if(L&&L.materials&&L.materials.pos){L=Object.assign({},L,{materials:Object.assign({},L.materials)});delete L.materials.pos}return L};
 async function laborBudgetRead(id){if(isAdminRole()){const b=await q(sb.from('job_budget').select('labor').eq('job_id',id).maybeSingle());return (b&&b.labor)||{}}
-  try{const r=(await q(sb.rpc('labor_budget',{j:id},{get:true})))||{};if(!S.asUser||Object.keys(r).length)return r}catch(e){if(!S.asUser)throw e}
-  const b=await q(sb.from('job_budget').select('labor').eq('job_id',id).maybeSingle());const L=Object.assign({},(b&&b.labor)||{});['cost_dollars','rate','rate_note','billing'].forEach(k=>delete L[k]);return L}
+  try{const r=(await q(sb.rpc('labor_budget',{j:id},{get:true})))||{};if(!S.asUser||Object.keys(r).length)return laborNoPos(r)}catch(e){if(!S.asUser)throw e}
+  const b=await q(sb.from('job_budget').select('labor').eq('job_id',id).maybeSingle());const L=Object.assign({},(b&&b.labor)||{});['cost_dollars','rate','rate_note','billing'].forEach(k=>delete L[k]);return laborNoPos(L)}
 async function loadLabor(){const id=jobId();if(!id)return;S.laborLoading=true;
   try{const [lb,ls]=await Promise.all([laborBudgetRead(id),q(sb.from('logs').select('date,hours,hours_by_code,user_id').eq('job_id',id).order('date'))]);
     if(jobId()!==id)return;const tc=await laborTcRead(lb||{},ls||[]);if(jobId()!==id)return;S.labor=lb||{};S.laborLogs=ls||[];S.laborTc=tc;S.loaded.labor=true}catch(e){toast(errMsg(e))}finally{S.laborLoading=false}
@@ -2224,7 +2226,7 @@ async function jobMenu(){
   $('[data-a=edit]',m).onclick=async()=>{m.close();const v=await formBox('Edit job',[{k:'name',label:'Job name',value:j.name,req:true},{k:'addr',label:'Address or GC',value:j.addr},{k:'pm',label:'PM',type:'select',value:j.pm||'',options:(S.office||[]).map(o=>[o.id,o.name]).concat([['','No PM']])},{k:'gc_name',label:'General contractor (company)',value:j.gc_name||''},{k:'gc_email',label:'GC email for daily reports (separate several with commas)',value:j.gc_email||'',ph:'super@gc.com, pm@gc.com'}]);if(v){const bad=String(v.gc_email||'').split(/[,;\s]+/).filter(x=>x&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x));if(bad.length){toast('Check this email: '+bad[0]);return}if(await run(sb.from('jobs').update({name:v.name.slice(0,120),addr:v.addr.slice(0,160),pm:v.pm||null,gc_name:v.gc_name.slice(0,120),gc_email:v.gc_email.slice(0,400)}).eq('id',j.id))){loadJobs();Object.assign(j,{gc_name:v.gc_name,gc_email:v.gc_email});if(S.tab==='log'){S.tab='log';const a=$('#app');a.dataset.tab='';render()}}}};
   $('[data-a=del]',m).onclick=async()=>{
     m.close();if(!await confirmBox('Delete "'+(j.name||'this job')+'" with all its sheets, markups, progress and logs, for everyone?'))return;
-    try{const files=[];for(const f of ['sheets','photos']){const {data}=await sb.storage.from(BUCKET).list(j.id+'/'+f,{limit:1000});(data||[]).forEach(o=>files.push(j.id+'/'+f+'/'+o.name))}if(files.length)await sb.storage.from(BUCKET).remove(files)}catch(e){}
+    try{const files=[];for(const f of ['sheets','photos','po']){const {data}=await sb.storage.from(BUCKET).list(j.id+'/'+f,{limit:1000});(data||[]).forEach(o=>files.push(j.id+'/'+f+'/'+o.name))}if(files.length)await sb.storage.from(BUCKET).remove(files)}catch(e){}
     if(await run(sb.from('jobs').delete().eq('id',j.id))){toast('Job deleted.');S.jobs=S.jobs.filter(x=>x.id!==j.id);closeJob()}
   };
 }
@@ -2837,6 +2839,8 @@ const MAT_STOP=['of','the','and','w','with','for','x','a','per','to','in','inch'
 const matUnit=u=>{const k=String(u||'').toLowerCase().replace(/[.\s]/g,'');return MAT_UNITS[k]||k};
 const matQ=v=>String(Math.round(num(v)*100)/100);
 const matPO=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'').replace(/^po/,'');
+/* "001" on a delivery ticket matches PO 328-001 from the PDF */
+const matPOEq=(a,b)=>!!a&&!!b&&(a===b||(Math.min(a.length,b.length)>=3&&(a.endsWith(b)||b.endsWith(a))));
 const MAT_MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const matDay=d=>{const [y,m,dd]=String(d||'').split('-').map(Number);return y&&m?MAT_MON[m-1]+' '+dd:String(d||'')};
 const matDays=(a,b)=>{const p=s=>{const [y,m,d]=String(s).split('-').map(Number);return Date.UTC(y,m-1,d)};return Math.round((p(b)-p(a))/864e5)};
@@ -2881,6 +2885,53 @@ function matParsePaste(text){
     if(!item||!(qty>0)||/^(sub\s*)?total\b|^tax\b|^freight\b|^delivery\b/i.test(item))return;
     out.push({item,qty,unit:String(unit).slice(0,20)})});
   return out}
+/* PO PDF (Ken’s Excel PO template printed to PDF, text-based). Input: pages [{w, items:[{s,x,y,w}]}] from pdf.js getTextContent (x,y = transform[4],[5], y goes up).
+   Rows are rebuilt from item y, columns from the QUANTITY | DESCRIPTION | Length | COST CODE | PRICE | LOCATION header (nearest header center).
+   Header: job # and PO # at the top right ("328 001"), Vendor, Job Name, Job #, PM:, DATE OF ORDER, DATE WANTED ON SITE. The table stops at Notes:. Prices are read past and never kept. */
+function poRows(items){
+  const its=(items||[]).filter(i=>i&&String(i.s||'').trim()).map(i=>({s:String(i.s).replace(/\s+/g,' ').trim(),x:num(i.x),y:num(i.y),w:num(i.w)})).sort((a,b)=>b.y-a.y||a.x-b.x);
+  const rows=[];its.forEach(i=>{const r=rows.find(r=>Math.abs(r.y-i.y)<=3);if(r)r.c.push(i);else rows.push({y:i.y,c:[i]})});
+  rows.forEach(r=>r.c.sort((a,b)=>a.x-b.x));return rows.sort((a,b)=>b.y-a.y)}
+const poDate=s=>{const m=String(s||'').trim().match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2}|\d{4})$/);if(!m)return '';const y=m[3].length===2?2000+num(m[3]):num(m[3]),mo=num(m[1]),d=num(m[2]);return mo>=1&&mo<=12&&d>=1&&d<=31?y+'-'+String(mo).padStart(2,'0')+'-'+String(d).padStart(2,'0'):''};
+const poColKey=s=>{s=String(s||'').toLowerCase().replace(/[.:]/g,'').trim();return /^(qty|quantity|qnty|qty ordered)$/.test(s)?'q':/^(description|desc|item|material|item description)$/.test(s)?'d':/^(length|len)$/.test(s)?'l':/^(cost ?code|code)$/.test(s)?'c':/price|cost|amount|total/.test(s)?'p':/^location/.test(s)?'loc':/^(unit|units|uom|um)$/.test(s)?'u':'x'};
+function poParse(pages){
+  const R={job:'',num:'',po:'',sup:'',jobName:'',pm:'',ordered:'',orderedRaw:'',exp:'',expRaw:'',lines:[],skipped:[]};let cols=null,stop=false,top='';
+  const LAB=/^(vendor|job name|job ?#|job no|pm|ship to|date of order|date wanted on site|quantity|description|requested by)\b/i;
+  const below=(rows,ri,c)=>{const nx=rows[ri+1];if(!nx||c.y-nx.y>24)return '';const cx=c.x+c.w/2;let b=null;nx.c.forEach(d=>{const dd=Math.abs(d.x+d.w/2-cx);if(dd<60&&(!b||dd<b.d))b={d:dd,s:d.s}});return b?b.s:''};
+  (pages||[]).forEach(pg=>{if(stop)return;const rows=poRows(pg.items);if(!rows.length)return;
+    const W=num(pg.w)||Math.max(...rows.map(r=>Math.max(...r.c.map(c=>c.x+c.w))));let inT=!!cols;
+    rows.forEach((r,ri)=>{if(stop)return;const c0=r.c[0].s;
+      if(/^(notes?\b|personal protective|printed name)/i.test(c0)){if(inT)stop=true;inT=false;return}
+      if(r.c.some(c=>poColKey(c.s)==='q')&&r.c.some(c=>poColKey(c.s)==='d')){cols=r.c.map(c=>({k:poColKey(c.s),x:c.x,w:c.w,cx:c.x+c.w/2}));inT=true;return}
+      if(!inT){
+        if(!R.sup&&!cols&&!top){const rt=r.c.filter(c=>c.x>=W*0.6).map(c=>c.s).join(' ');const m=rt.match(/^(\d{1,6})\s*[-–#\/ ]\s*(\d{1,5})$/);if(m){top=m[1];R.num=m[2]}}
+        r.c.forEach((c,k)=>{const nx=r.c[k+1];const nv=nx&&!LAB.test(nx.s)?nx.s:'';let m;
+          if((m=c.s.match(/^vendor(?!\s*contact)\s*:?\s*(.*)$/i))){const v=m[1]||(nx&&nx.x<W*0.55?nv:'');if(v&&!R.sup)R.sup=v.slice(0,30)}
+          else if((m=c.s.match(/^job\s*name\s*:?\s*(.*)$/i))){if(!R.jobName)R.jobName=(m[1]||nv).slice(0,80)}
+          else if((m=c.s.match(/^job\s*(?:#|no\.?)\s*:?\s*(.*)$/i))){if(!R.job)R.job=(m[1]||nv).slice(0,20)}
+          else if((m=c.s.match(/^pm\s*:\s*(.*)$/i))){if(!R.pm)R.pm=(m[1]||nv).slice(0,30)}
+          else if((m=c.s.match(/^p\.?\s*o\.?\s*(?:#|no\.?|number)\s*:?\s*(.*)$/i))){if(!R.num&&(m[1]||nv))R.num=(m[1]||nv).slice(0,20)}
+          else if(/^date wanted/i.test(c.s)){R.expRaw=below(rows,ri,c)}
+          else if(/^date of order/i.test(c.s)){R.orderedRaw=below(rows,ri,c)}});
+        return}
+      const P={q:[],d:[],l:[],c:[],loc:[],u:[]};
+      /* a cell goes to the header it overlaps most, else the nearest header center; anything in the PRICE column is dropped, text near it goes to the next column over */
+      r.c.forEach(c=>{if(/^\$/.test(c.s))return;const cx=c.x+c.w/2;const near=cs=>{let b=null;cs.forEach(h=>{const dd=Math.abs(h.cx-cx);if(!b||dd<b.d)b={d:dd,k:h.k}});return b?b.k:'x'};
+        let k='x',ov=0;cols.forEach(h=>{const o=Math.min(c.x+c.w,h.x+h.w)-Math.max(c.x,h.x);if(o>ov){ov=o;k=h.k}});if(!ov)k=near(cols);
+        if(k==='p'){if(/^[\d,.\s$-]+$/.test(c.s))return;k=near(cols.filter(h=>h.k!=='p'))}
+        if(k==='q')k='d';if(P[k])P[k].push(c.s)});
+      const qd=P.d.join(' ').trim();if(!qd)return;
+      const m=qd.match(/^(\d[\d,]*(?:\.\d+)?)(?:\s+(.*))?$/);const qty=m?num(m[1].replace(/,/g,'')):0;
+      if(!m||!m[2]||!(qty>0)){R.skipped.push(qd.slice(0,120));return}
+      let rest=m[2].trim(),unit=P.u.join(' ').trim();
+      if(!unit){const w=rest.match(/^([A-Za-z.]+)\s+(\S.*)$/);if(w&&MAT_UNITS[w[1].toLowerCase().replace(/\./g,'')]){unit=w[1];rest=w[2]}}
+      let len=P.l.join(' ').trim();if(/^\d+(\.\d+)?$/.test(len))len+="'";if(len)rest=rest.replace(/([A-Za-z])['’]$/,'$1');
+      const ln={item:(rest+(len?' '+len:'')).replace(/\s+/g,' ').trim().slice(0,120),qty,unit:unit.slice(0,20)};
+      const cc=P.c.join(' ').trim(),lo=P.loc.join(' ').trim();if(cc)ln.code=cc.slice(0,20);if(lo)ln.loc=lo.slice(0,80);
+      R.lines.push(ln)})});
+  if(!R.job&&top)R.job=top;
+  R.po=R.num?((top||R.job)&&!String(R.num).includes('-')?(top||R.job)+'-'+R.num:R.num):'';
+  R.exp=poDate(R.expRaw);R.ordered=poDate(R.orderedRaw);return R}
 /* ordered vs delivered for every PO line, plus deliveries that match no line and the flags */
 function matCalc(M,logs,day){
   const lines=((M&&M.lines)||[]).filter(l=>l&&l.item).map(l=>Object.assign({},l,{tok:matTok(l.item),got:0,last:'',short:null,unitDiff:''}));
@@ -2890,7 +2941,7 @@ function matCalc(M,logs,day){
   const extra=[];
   rows.forEach(r=>{let ln=r.line?lines.find(l=>l.id===r.line):null;
     if(!ln){const tk=matTok(r.item);let c=lines.map(l=>({l,s:matScore(tk,l.tok)})).filter(x=>x.s>=0.5);
-      const po=matPO(r.po);if(po){const c2=c.filter(x=>matPO(x.l.po)===po);if(c2.length)c=c2}
+      const po=matPO(r.po);if(po){const c2=c.filter(x=>matPOEq(matPO(x.l.po),po));if(c2.length)c=c2}
       if(c.length){const best=Math.max(...c.map(x=>x.s));c=c.filter(x=>best-x.s<1e-6).sort((a,b)=>(num(b.l.qty)-b.l.got)-(num(a.l.qty)-a.l.got));ln=c[0].l}}
     if(!ln){extra.push(r);return}
     ln.got+=num(r.qty);if(num(r.qty)>0)ln.last=r.date;
@@ -2910,12 +2961,12 @@ function matCalc(M,logs,day){
   const rank={short:0,late:1,unit:2,over:3,early:4};flags.sort((a,b)=>rank[a.lvl]-rank[b.lvl]);
   return {lines,extra,flags}}
 const matRowText=x=>[num(x.qty)?matQ(x.qty)+(x.unit?' '+x.unit:''):'',x.text||''].filter(Boolean).join(' ')+(x.po?' (PO '+x.po+')':'')+(x.short?' – SHORT/BACKORDERED'+(x.note?': '+x.note:''):(x.note?' – '+x.note:''));
-const matClean=m=>({lines:Array.isArray(m&&m.lines)?m.lines.filter(l=>l&&l.item):[],updated_at:(m&&m.updated_at)||null,by:(m&&m.by)||null});
+const matClean=m=>Object.assign({lines:Array.isArray(m&&m.lines)?m.lines.filter(l=>l&&l.item):[],updated_at:(m&&m.updated_at)||null,by:(m&&m.by)||null},m&&m.pos&&typeof m.pos==='object'&&!Array.isArray(m.pos)?{pos:m.pos}:{});
 const matHere=()=>!!(S.job&&S.mat&&S.mat.job===S.job.id);
 const matNow=()=>matCalc(S.mat.M,S.mat.logs,today());
 async function loadMat(){const id=jobId();if(!id||!canLog())return;
   try{const [L,ls]=await Promise.all([laborBudgetRead(id),q(sb.from('logs').select('id,date,name,user_id,materials,deliveries').eq('job_id',id).order('date'))]);
-    if(jobId()!==id)return;S.mat={job:id,M:matClean((L||{}).materials),logs:ls||[]}}
+    if(jobId()!==id)return;const M=matClean((L||{}).materials);if(!isAdminRole())delete M.pos;S.mat={job:id,M,logs:ls||[]}}
   catch(e){if(jobId()!==id)return;if(!matHere())S.mat={job:id,M:matClean(null),logs:[],err:errMsg(e)}}
   if(S.tab==='mat')render();else matPaint();const dl=$('#matDL');if(dl)dl.innerHTML=matDLOpts()}
 function matBanner(){if(!matHere()||S.tab==='mat')return '';const f=matNow().flags.filter(x=>x.lvl==='short'||x.lvl==='late');if(!f.length)return '';
@@ -2928,23 +2979,26 @@ function matLineHtml(l,ad){const s=MAT_ST[l.st]||MAT_ST.none;const tag=(t,bg,c)=
   return '<div class="mline"'+(ad?' data-ml="'+esc(l.id)+'"':'')+'><div class="row" style="align-items:flex-start;gap:8px"><div class="grow"><b>'+esc(l.item)+'</b>'+(l.short?tag('Short','#fdecea','#b42318'):'')+(l.late?tag('Late','#fdecea','#b42318'):'')+(l.early?tag('Early','#e3f4e4','#1b5e20'):'')+'</div>'+
     '<span class="badge" style="background:'+s[1]+';color:'+s[2]+';white-space:nowrap">'+s[0]+(l.st==='partial'?' ('+matQ(l.got)+' of '+matQ(l.qty)+')':'')+'</span></div>'+
     '<div class="mbar"><i style="width:'+l.pct+'%;background:'+s[3]+'"></i></div>'+
-    '<div class="muted small">'+matQ(l.got)+' of '+matQ(l.qty)+(l.unit?' '+esc(l.unit):'')+' received'+(l.last?' · last '+matDay(l.last):'')+(l.exp?' · expected '+matDay(l.exp):'')+(l.unitDiff?' · check units ('+esc(l.unitDiff)+' logged)':'')+
+    '<div class="muted small">'+matQ(l.got)+' of '+matQ(l.qty)+(l.unit?' '+esc(l.unit):'')+' received'+(l.last?' · last '+matDay(l.last):'')+(l.exp?' · expected '+matDay(l.exp):'')+(l.unitDiff?' · check units ('+esc(l.unitDiff)+' logged)':'')+(ad&&(l.code||l.loc)?'<br>'+(l.code?'Code '+esc(l.code):'')+(l.code&&l.loc?' · ':'')+(l.loc?esc(l.loc):''):'')+
     (l.short?'<br><span style="color:#b42318">Marked short '+matDay(l.short.date)+(l.short.by?' by '+esc(l.short.by):'')+(l.short.note?': '+esc(l.short.note):'')+'</span>':'')+'</div></div>'}
 function renderMat(){if(!matHere())return '<div class="empty">Loading materials…</div>';
   const ad=isAdminRole();const C=matNow();const M=S.mat.M;
   let h='<div class="card"><b style="font-size:17px">Materials vs. the order</b><div class="muted small">Ordered from the PO'+(ad?'':' (entered by the office)')+'. Received = what foremen log under Materials delivered on the daily report.'+(M.updated_at?' Order updated '+esc(fmtWhen(M.updated_at))+'.':'')+'</div>'+
     (S.mat.err?'<div class="small" style="color:#b42318;margin-top:6px">Couldn’t load the order: '+esc(S.mat.err)+'</div>':'')+
-    (ad?'<div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><button class="btn sm primary" id="matPaste">📋 Paste PO from Excel</button><button class="btn sm" id="matAdd">+ Add line</button></div>':'')+'</div>';
+    (ad?'<div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><button class="btn sm primary" id="matPaste">📋 Paste PO from Excel</button><label class="btn sm primary" id="matPdf" title="Load the PO PDF you sent the supplier. The PDF is kept for the office only.">📄 Upload PO PDF<input type="file" id="poPdfFile" accept="application/pdf,.pdf" hidden></label><button class="btn sm" id="matAdd">+ Add line</button></div>':'')+'</div>';
   if(C.flags.length)h+='<div class="card" style="padding:10px 14px">'+C.flags.map(f=>{const x=MAT_FL[f.lvl];return '<div class="kv" style="color:'+x[1]+'"><b>'+x[0]+'</b> '+esc(f.t)+'</div>'}).join('')+'</div>';
-  if(!C.lines.length)h+='<div class="empty"><b>No order yet</b>'+(ad?'Tap <b>Paste PO from Excel</b> and paste the item, qty and unit columns from the PO, or add lines one at a time. Foremen then pick these items on the daily report.':'The office hasn’t entered the material order for this job yet. Keep logging deliveries on the daily report.')+'</div>';
+  if(!C.lines.length)h+='<div class="empty"><b>No order yet</b>'+(ad?'Tap <b>Upload PO PDF</b> to load the PO you sent the supplier, or <b>Paste PO from Excel</b> and paste the item, qty and unit columns from the PO, or add lines one at a time. Foremen then pick these items on the daily report.':'The office hasn’t entered the material order for this job yet. Keep logging deliveries on the daily report.')+'</div>';
   else{const G={};C.lines.forEach(l=>{const k=(l.po||'')+'|'+(l.sup||'');(G[k]=G[k]||[]).push(l)});
     h+=Object.keys(G).map(k=>{const ls=G[k];const [po,sup]=k.split('|');const dn=ls.filter(l=>l.st==='complete'||l.st==='over').length;
-      return '<div class="card" style="padding-bottom:4px"><div class="row" style="margin-bottom:4px"><b class="grow">'+(po?'PO '+esc(po):'No PO #')+(sup?' · '+esc(sup):'')+'</b><span class="muted small">'+dn+' of '+ls.length+' complete</span></div>'+ls.map(l=>matLineHtml(l,ad)).join('')+'</div>'}).join('');
+      const pk=ad&&matPdfFor(po);
+      return '<div class="card" style="padding-bottom:4px"><div class="row" style="margin-bottom:4px;gap:8px"><b class="grow">'+(po?'PO '+esc(po):'No PO #')+(sup?' · '+esc(sup):'')+'</b>'+(pk?'<button class="btn sm" data-popdf="'+esc(pk)+'" title="The PO PDF (office only)">📄 Open PDF</button>':'')+'<span class="muted small">'+dn+' of '+ls.length+' complete</span></div>'+ls.map(l=>matLineHtml(l,ad)).join('')+'</div>'}).join('');
     if(ad)h+='<p class="muted small" style="margin:-4px 2px 12px">Tap a line to change it, set an expected date or clear a short flag.</p>'}
   if(C.extra.length)h+='<details class="card"><summary><b>Delivered, not matched to the order</b> <span class="muted small">('+C.extra.length+')</span></summary><div class="muted small" style="margin:6px 0">These daily report lines didn’t match an order item. Picking items from the list on the daily report keeps them matched.</div>'+
     C.extra.slice().reverse().map(r=>'<div class="kv">'+matDay(r.date)+' · '+esc(matRowText({text:r.item,qty:r.qty,unit:r.unit,po:r.po,short:r.short,note:r.note}))+(r.by?' <span class="muted small">('+esc(r.by)+')</span>':'')+'</div>').join('')+'</details>';
   return h}
-function bindMat(){if(!isAdminRole())return;const p=$('#matPaste');if(p)p.onclick=matPasteBox;const a=$('#matAdd');if(a)a.onclick=()=>matLineBox(null);
+function bindMat(){if(!isAdminRole())return;const p=$('#matPaste');if(p)p.onclick=matPasteBox;
+  const pf=$('#poPdfFile');if(pf)pf.onchange=()=>{const f=pf.files&&pf.files[0];pf.value='';if(f)matPoFromFile(f,{})};
+  $$('[data-popdf]').forEach(b=>b.onclick=e=>{e.stopPropagation();matPdfOpen(b.dataset.popdf)});const a=$('#matAdd');if(a)a.onclick=()=>matLineBox(null);
   $$('[data-ml]').forEach(el=>el.onclick=()=>{const l=((S.mat&&S.mat.M.lines)||[]).find(x=>x.id===el.dataset.ml);if(l)matLineBox(l)})}
 /* office save: re-read labor so nothing the sync or another tab wrote is lost, change only labor.materials */
 async function matSave(fn,msg){if(!isAdminRole()||!S.job)return false;const id=S.job.id;let L;
@@ -2980,6 +3034,60 @@ function matPasteBox(){
   f.rows.oninput=prev;
   f.onsubmit=e=>{e.preventDefault();if(!got.length)return;const po=f.po.value.trim(),sup=f.sup.value.trim(),exp=f.exp.value||'',rep=f.rep.checked;S.matLastPo=po;S.matLastSup=sup;m.close();
     matSave(M=>{if(rep)M.lines=M.lines.filter(x=>matPO(x.po)!==matPO(po));got.forEach(x=>M.lines.push({id:uuid().slice(0,8),po,sup,item:x.item,unit:x.unit,qty:x.qty,exp}))},got.length+' line'+(got.length>1?'s':'')+' added to the order.')}}
+/* Upload PO PDF (office): the PDF is read in the browser (pdf.js text, no OCR), previewed, and the lines saved with matSave like the paste box.
+   The PDF itself shows prices, so it is office only: kept in storage at <job>/po/<random>-<name>.pdf and recorded in labor.materials.pos[matPO(po)] = {path,name,sup,at,by}.
+   Foremen, viewers, view-as and practice never get pos (laborBudgetRead / loadMat strip it) and never see the link.
+   Automation: the hidden input #poPdfFile on the Materials tab runs the same flow; window.matPoFromFile(file,{replace,autoSave}) parses and previews, or saves with autoSave:true. */
+const matPdfOk=()=>isAdminRole()&&!S.asUser&&!S.viewAs&&!isPractice()&&!!S.job;
+const matPoKey=po=>matPO(po)||'nopo';
+function matPdfFor(po){if(!matPdfOk()||!matHere())return '';const P=S.mat.M.pos;const k=matPoKey(po);return P&&P[k]&&P[k].path?k:''}
+async function matPdfOpen(k){if(!matPdfOk()||!matHere())return;const e=(S.mat.M.pos||{})[k];if(!e||!e.path)return;const w=window.open('','_blank');
+  try{const {data,error}=await sb.storage.from(BUCKET).createSignedUrl(e.path,600);if(error||!data||!data.signedUrl)throw error||new Error('no url');if(w)w.location=data.signedUrl;else location.href=data.signedUrl}
+  catch(err){if(w)w.close();toast('Couldn’t open the PO PDF. Check your signal.')}}
+async function poReadPdf(file){const lib=await loadPdfJs();const pdf=await lib.getDocument({data:new Uint8Array(await file.arrayBuffer()),isEvalSupported:false}).promise;const pages=[];
+  try{for(let p=1;p<=Math.min(pdf.numPages,10);p++){const pg=await pdf.getPage(p);const v=pg.view||[0,0,612,792];const tc=await pg.getTextContent();
+    pages.push({w:v[2]-v[0],items:tc.items.filter(i=>i&&typeof i.str==='string'&&i.transform).map(i=>({s:i.str,x:i.transform[4]-v[0],y:i.transform[5]-v[1],w:num(i.width)}))})}}
+  finally{try{pdf.destroy()}catch(e){}}
+  return pages}
+async function matPoFromFile(file,opt){opt=opt||{};
+  if(!matPdfOk()){toast(roMsg()||'Only the office can load a PO.');return null}
+  if(!file||!(/pdf/i.test(file.type||'')||/\.pdf$/i.test(file.name||''))){toast('Pick the PO as a PDF file.');return null}
+  const pb=opt.autoSave?null:progressBox('Reading the PO…');let P;
+  try{P=poParse(await poReadPdf(file))}catch(e){if(pb)pb.close();toast('Couldn’t read that PDF. Use Paste PO from Excel instead.');return null}
+  if(pb)pb.close();
+  if(!P.lines.length){if(opt.autoSave){toast('No order lines found in that PDF. Use Paste PO from Excel instead.');return {po:P.po,sup:P.sup,lines:0}}
+    const m=modal('<h2>No lines found</h2><p>Couldn’t find any order lines (a qty and a description) in <b>'+esc(file.name||'that PDF')+'</b>. Scanned or photographed POs can’t be read.</p><p class="small muted">Open the PO in Excel, copy the rows and use <b>Paste PO from Excel</b> instead.</p><div class="mbtns"><button class="btn" data-x>Close</button><button class="btn primary" data-p>Paste PO from Excel</button></div>');
+    $('[data-x]',m).onclick=()=>m.close();$('[data-p]',m).onclick=()=>{m.close();matPasteBox()};return {po:P.po,sup:P.sup,lines:0}}
+  const has=po=>!!po&&matHere()&&S.mat.M.lines.some(x=>matPO(x.po)===matPO(po));
+  if(opt.autoSave){const po=P.po,ok=await matPoSave(file,{po,sup:P.sup,exp:P.exp,rep:opt.replace!==false&&has(po),lines:P.lines});return ok?{po,sup:P.sup,lines:P.lines.length}:null}
+  matPoBox(file,P,opt,has);return {po:P.po,sup:P.sup,lines:P.lines.length,preview:true}}
+window.matPoFromFile=matPoFromFile;
+function matPoBox(file,P,opt,has){
+  const info=[P.job?'Job '+P.job:'',P.jobName,P.orderedRaw?'ordered '+P.orderedRaw:'',P.expRaw?'wanted on site: '+P.expRaw:'',P.pm?'PM '+P.pm:''].filter(Boolean).join(' · ');
+  const m=modal('<h2>PO from PDF</h2><p class="small muted" style="margin:-4px 0 10px">'+esc(file.name||'PO.pdf')+(info?'<br>'+esc(info):'')+'</p><form>'+
+    '<div class="two"><label class="field"><span>PO #</span><input name="po" maxlength="30" value="'+esc(P.po)+'"></label><label class="field"><span>Supplier</span><input name="sup" list="matSupDL" maxlength="30" placeholder="FBM or LKL" value="'+esc(P.sup)+'"></label></div>'+matSupDL+
+    '<label class="field"><span>Expected delivery (optional)</span><input name="exp" type="date" value="'+esc(P.exp)+'"></label>'+
+    '<div class="small" style="max-height:260px;overflow:auto;margin:-4px 0 8px"><b>'+P.lines.length+' line'+(P.lines.length>1?'s':'')+' found</b>'+
+    P.lines.map(x=>'<div style="padding:3px 0;border-bottom:1px solid #eef0f3">• <b>'+esc(matQ(x.qty))+(x.unit?' '+esc(x.unit):'')+'</b> '+esc(x.item)+(x.code||x.loc?'<div class="muted">'+(x.code?'Code '+esc(x.code):'')+(x.code&&x.loc?' · ':'')+esc(x.loc||'')+'</div>':'')+'</div>').join('')+
+    (P.skipped.length?'<div class="muted" style="margin-top:6px">Skipped (no qty): '+P.skipped.map(esc).join(' · ')+'</div>':'')+'</div>'+
+    '<label class="mshort" style="margin:0 0 10px"><input type="checkbox" name="rep" style="width:20px;height:20px"> Replace the lines already on this PO #</label>'+
+    '<p class="small muted" style="margin:0 0 10px">Prices are not saved. The PDF is kept with this PO for the office only.</p>'+
+    '<div class="mbtns"><button type="button" class="btn" data-x>Cancel</button><button class="btn primary" type="submit">Add '+P.lines.length+' line'+(P.lines.length>1?'s':'')+'</button></div></form>');
+  const f=$('form',m);$('[data-x]',m).onclick=()=>m.close();let touched=false;
+  const def=()=>{if(!touched)f.rep.checked=opt.replace!==false&&has(f.po.value.trim())};def();f.po.oninput=def;f.rep.onchange=()=>{touched=true};
+  f.onsubmit=e=>{e.preventDefault();const v={po:f.po.value.trim(),sup:f.sup.value.trim(),exp:f.exp.value||'',rep:f.rep.checked,lines:P.lines};S.matLastPo=v.po;S.matLastSup=v.sup;m.close();matPoSave(file,v)}}
+/* keep the PDF (office only), then save the lines; if the upload fails the lines still save */
+async function matPoSave(file,v){if(!matPdfOk())return false;const id=S.job.id;let path='';
+  if(file&&navigator.onLine!==false){const nm=String(file.name||'PO.pdf').replace(/\.pdf$/i,'').replace(/[^A-Za-z0-9._-]+/g,'_').replace(/^[_.]+|_+$/g,'').slice(0,60)||'PO';
+    try{path=await putFile(id+'/po/'+uuid().slice(0,8)+'-'+nm+'.pdf',file,'application/pdf')}catch(e){path=''}}
+  const k=matPoKey(v.po),n=v.lines.length;let old='';
+  const ok=await matSave(M=>{if(v.rep)M.lines=M.lines.filter(x=>matPO(x.po)!==matPO(v.po));
+    v.lines.forEach(x=>{const l={id:uuid().slice(0,8),po:v.po,sup:v.sup,item:x.item,unit:x.unit||'',qty:x.qty,exp:v.exp};if(x.code)l.code=x.code;if(x.loc)l.loc=x.loc;M.lines.push(l)});
+    if(path){M.pos=Object.assign({},M.pos);old=M.pos[k]&&M.pos[k].path||'';M.pos[k]={path,name:String(file.name||'PO.pdf').slice(0,120),sup:v.sup,at:new Date().toISOString(),by:(S.me&&S.me.id)||null}}},
+    n+' line'+(n>1?'s':'')+' added to the order.'+(file&&!path?' The PDF wasn’t kept (upload failed), so there is no Open PDF link.':''));
+  if(!ok){if(path)try{await sb.storage.from(BUCKET).remove([path])}catch(e){}return false}
+  if(old&&old!==path)try{await sb.storage.from(BUCKET).remove([old])}catch(e){}
+  return true}
 /* daily report: delivered rows pick from the order (datalist), free text still OK */
 function matDLOpts(){if(!matHere())return '';return S.mat.M.lines.map(l=>'<option value="'+esc(l.item)+'">'+esc((l.po?'PO '+l.po+' · ':'')+matQ(l.qty)+(l.unit?' '+l.unit:'')+' ordered')+'</option>').join('')}
 function matRowsEditor(){const r='<div class="lrow mrow" data-row><input data-c="text" list="matDL" autocomplete="off" placeholder="Item – pick from the order"><button type="button" class="ico" data-rm aria-label="Remove">✕</button>'+
