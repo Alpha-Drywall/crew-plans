@@ -88,6 +88,15 @@ t('received vs ordered: totals across reports, explicit line, fuzzy text and old
   assert.strictEqual(C.extra.length, 1); assert.strictEqual(C.extra[0].item, 'corner bead');
 });
 
+t('delivered before the app: counts as all received, no late or short flag, no early flag', () => {
+  const O = JSON.parse(JSON.stringify(ORDER)); O.lines.forEach(l => { if (l.id === 'mu' || l.id === 'bx') l.pre = { date: '2026-07-30' }; });
+  const C = T.matCalc(O, LOGS, '2026-11-25');
+  const L = id => C.lines.find(l => l.id === id);
+  assert.strictEqual(L('mu').st, 'complete'); assert.strictEqual(L('mu').got, Number(L('mu').qty));
+  assert.strictEqual(L('bx').st, 'complete'); assert.strictEqual(L('bx').short, null);
+  assert.ok(!C.flags.some(f => f.id === 'mu' || f.id === 'bx'));
+});
+
 t('flags: short with qty left, late with nothing delivered, early, over; short clears when complete or resolved', () => {
   const C = T.matCalc(ORDER, LOGS, '2026-11-25');
   const short = C.flags.filter(f => f.lvl === 'short');
