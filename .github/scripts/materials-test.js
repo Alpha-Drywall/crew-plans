@@ -13,7 +13,7 @@ function grab(name) {
   return lines.slice(i, j).join('\n');
 }
 const names = ['num', 'MAT_UNITS', 'MAT_SYN', 'MAT_STOP', 'matUnit', 'matQ', 'matPO', 'matPOEq', 'MAT_MON', 'matDay', 'matDays', 'matTok', 'matCat', 'matScore',
-  'matParseText', 'matParsePaste', 'poRows', 'poDate', 'poColKey', 'poParse', 'matCalc', 'matRowText', 'matClean', 'laborNoPos'];
+  'matParseText', 'matParsePaste', 'poRows', 'poDate', 'poColKey', 'poParse', 'matCalc', 'matPoSort', 'matRowText', 'matClean', 'laborNoPos'];
 const T = vm.runInNewContext(names.map(grab).join('\n') + '\n;({' + names.join(',') + '})', { Math, Date, String, Number, Set, Object, Array, JSON });
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok - ' + name); };
 const plain = x => JSON.parse(JSON.stringify(x));
@@ -86,6 +86,12 @@ t('received vs ordered: totals across reports, explicit line, fuzzy text and old
   assert.strictEqual(L('mu').st, 'none'); assert.strictEqual(L('ta').st, 'none');
   assert.strictEqual(L('tr').last, '2026-11-20');
   assert.strictEqual(C.extra.length, 1); assert.strictEqual(C.extra[0].item, 'corner bead');
+});
+
+t('PO order: by PO number, newest first or oldest first (not the order they were loaded)', () => {
+  const keys = ['321-002|FBM', '321-013|FBM', '321-004|Western States Equipment', '321-001|FBM', '|'];
+  assert.deepStrictEqual(Array.from(T.matPoSort(keys, true)), ['321-013|FBM', '321-004|Western States Equipment', '321-002|FBM', '321-001|FBM', '|']);
+  assert.deepStrictEqual(Array.from(T.matPoSort(keys, false)), ['|', '321-001|FBM', '321-002|FBM', '321-004|Western States Equipment', '321-013|FBM']);
 });
 
 t('delivered before the app: counts as all received, no late or short flag, no early flag', () => {
