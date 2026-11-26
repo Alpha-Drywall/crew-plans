@@ -198,6 +198,129 @@ input[type=range]{width:100%;height:32px}
 .dcon{display:none}@media (min-width:600px){.dtab .dcon{display:table-cell}.dcon2{display:none}}
 .logday{font-weight:700;margin:18px 2px 8px;display:flex;justify-content:space-between}
 .logday .muted{font-weight:400}
+/* home sections bar + bids tracker + pipeline */
+.hhead .top{box-shadow:none}
+.hsec{display:flex;justify-content:center;gap:2px;background:var(--head);padding:0 4px;overflow-x:auto;scrollbar-width:none;border-top:1px solid #ffffff14;box-shadow:0 2px 6px #0000001f}
+.hsec::-webkit-scrollbar{display:none}
+.hsec button{flex:1 0 auto;min-width:68px;max-width:150px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;background:none;border:0;border-bottom:3px solid transparent;color:#aeb6c0;padding:7px 6px 5px;font-weight:600;font-size:12px;white-space:nowrap;min-height:54px;border-radius:0}
+.hsec button span{display:flex;align-items:center;gap:4px}
+.hsec svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.hsec button.on{color:#fff;border-bottom-color:var(--accent)}
+.hsec button.on svg{stroke:var(--accent)}
+.hsec button:focus-visible{outline:2px solid var(--accent);outline-offset:-4px}
+.hsec i{font-style:normal;background:var(--accent);color:var(--accent-ink);border-radius:999px;padding:0 6px;font-size:11px;font-weight:800;line-height:17px}
+@media(min-width:700px){.hsec{gap:6px}.hsec button{flex:0 1 auto;max-width:none;flex-direction:row;gap:8px;font-size:15px;padding:9px 16px 8px;min-height:50px}}
+.hm{max-width:900px}
+.hbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 12px}
+.hbar .chips{margin:0;flex:1;min-width:0}
+.hbar .btn.sm{flex:none}
+.hseg{display:inline-flex;background:#e3e6ea;border-radius:11px;padding:3px;gap:2px;flex:none}
+.hseg button{border:0;background:none;border-radius:8px;padding:7px 14px;font-weight:700;font-size:14px;color:#38414b;min-height:36px}
+.hseg button.on{background:#fff;color:var(--ink);box-shadow:0 1px 2px #0000002e}
+.hseg.sm button{padding:5px 11px;font-size:13px;min-height:32px}
+.hbar>.hseg{margin-right:auto}
+.bfil{display:flex;gap:8px;align-items:center;margin:0 0 10px;flex-wrap:wrap}
+.bfil input{flex:1;min-width:170px;min-height:40px;border:1px solid var(--line);border-radius:10px;padding:6px 12px;background:#fff;font-size:15px}
+.bsum{font-size:13px;color:var(--muted);margin:2px 2px -6px;font-variant-numeric:tabular-nums}
+.bidc{display:flex;align-items:center;gap:12px;cursor:pointer;padding:12px 8px 12px 12px}
+.bidc:focus-visible,.uprow:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.bidc .name{font-weight:700;font-size:16px;line-height:1.25;overflow-wrap:anywhere}
+.bidc .due{color:#9a3412;font-weight:700}
+.bl3{margin-top:3px;color:#38414b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bwarn{color:#9a3412}
+.bidr{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex:none;text-align:right}
+.bidr .amt{font-weight:800;font-size:16px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.bidr .amt .muted{font-weight:500;font-size:13px}
+.bgo{flex:none;align-self:stretch;border:0;border-left:1px solid var(--line);background:none;color:#9aa3ad;font-size:24px;padding:0 4px 0 10px;margin:-4px 0;min-width:34px}
+.bgo:hover{color:var(--ink)}
+.bdate{flex:none;width:46px;border-radius:9px;background:#eef0f3;color:#38414b;text-align:center;padding:4px 0 5px;line-height:1.05;border-top:4px solid #c3c9d1}
+.bdate span{display:block;font-size:11px;font-weight:700;color:#5d6670}
+.bdate b{display:block;font-size:19px;font-weight:800;font-variant-numeric:tabular-nums}
+.bdate.soon{background:#fff4dc;border-top-color:var(--accent)}
+.bdate.soon span{color:#7a4b00}
+.bdate.past{opacity:.75}
+.bdate.none b{font-size:12px;font-weight:700;padding-top:4px}
+.bdate.lg{width:58px}.bdate.lg b{font-size:24px}
+.bdate.sm{width:40px;padding:2px 0 3px}.bdate.sm b{font-size:16px}
+.bpill{display:inline-block;font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap;border:1px solid transparent;line-height:1.45}
+.s-open{background:#e7eef8;color:#1f4e8c}.s-submitted{background:#fff1d6;color:#7a4b00}.s-won{background:#dcf5e3;color:#14632e}.s-lost{background:#fde8e6;color:#b42318}.s-nobid{background:#eceef1;color:#5d6670}.s-rebid{background:#efe9fd;color:#5b3cc4}
+.mcard.wide{max-width:720px}
+.mcard.xwide{max-width:1180px}
+.bph{display:flex;gap:12px;align-items:flex-start;margin-bottom:12px}
+.bph h2{margin:0 0 2px;overflow-wrap:anywhere}
+.bpacts{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}
+.bpnum{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.bmoney{display:flex;align-items:center;border:1px solid var(--line);border-radius:10px;background:#fff;padding-left:12px;min-height:44px}
+.bmoney b{color:var(--muted);font-size:18px}
+.bmoney input{border:0!important;min-height:42px!important;font-size:20px;font-weight:800;font-variant-numeric:tabular-nums;padding-left:6px!important;background:none!important}
+.bstat{display:flex;flex-wrap:wrap;gap:6px}
+.bstat .bpill{font-size:14px;padding:6px 12px;cursor:pointer;opacity:.8;min-height:36px}
+.bstat .bpill.on{opacity:1;border-color:currentColor;box-shadow:0 0 0 1px currentColor inset}
+.bstat .bpill:not(.on){background:#fff;border-color:var(--line);color:#38414b}
+.bpsec{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:18px 0 8px;border-top:1px solid var(--line);padding-top:14px;flex-wrap:wrap}
+.bpsec h3{margin:0!important}
+.bgcs{border:1px solid var(--line);border-radius:10px}
+.bgc{display:flex;gap:6px;align-items:flex-start;padding:9px 6px 9px 12px;border-bottom:1px solid var(--line)}
+.bgc:last-child{border-bottom:0}
+.bgc a{color:inherit}
+.bgres{font-size:12px;font-weight:700;color:#5b3cc4;background:#efe9fd;border-radius:999px;padding:1px 8px}
+.bnone{padding:6px 2px}
+.blog{list-style:none;margin:0;padding:0;border-left:2px solid var(--line);margin-left:22px}
+.blog li{display:flex;gap:10px;align-items:flex-start;padding:6px 0 6px 0;position:relative}
+.blog .bld{flex:none;width:52px;margin-left:-30px;background:#fff;font-size:12px;font-weight:700;color:#5d6670;text-align:center;border:1px solid var(--line);border-radius:6px;padding:1px 0;font-variant-numeric:tabular-nums}
+.pyr{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 12px}
+.pyr label{font-weight:700;display:flex;gap:6px;align-items:center}
+.pyr select{border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:15px;background:#fff}
+.kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.kpi{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;min-width:0}
+.kpi .kb{font-size:26px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums;letter-spacing:-.3px}
+.kpi .kl{font-size:14px;font-weight:600;color:var(--muted);margin-top:2px}
+.kpi .ks{font-size:12.5px;color:var(--muted);margin-top:4px}
+.kpi.goal{grid-column:1/-1;background:var(--head);border-color:var(--head);color:#fff;padding:16px}
+.kpi.goal .kl{color:#aeb6c0;margin:0 0 2px}
+.kpi.goal .kb{font-size:40px}
+.kpi.goal .btn{background:#ffffff14;border-color:#ffffff30;color:#fff}
+.gbar{height:14px;background:#ffffff1c;border-radius:999px;overflow:hidden;margin:12px 0 8px}
+.gbar i{display:block;height:100%;background:var(--accent);border-radius:999px}
+.gl{font-size:14px;color:#d4d9df}.gl b{color:#fff}
+@media(min-width:700px){.kpis{grid-template-columns:2fr repeat(4,minmax(0,1fr))}.kpi.goal{grid-column:auto;grid-row:span 1}.kpi.goal .kb{font-size:36px}}
+@media(min-width:700px) and (max-width:1000px){.kpis{grid-template-columns:repeat(4,minmax(0,1fr))}.kpi.goal{grid-column:1/-1}}
+.chd{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.chd b{font-size:16px}
+.legend .sw,.wrn .sw,.ptip .sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:0}
+.chart{position:relative;width:100%;min-height:200px}
+.chart svg{display:block;overflow:visible}
+.chart .ax{font-size:11px;fill:#5d6670;font-variant-numeric:tabular-nums}
+.chart .vl{font-size:11.5px;font-weight:700;fill:var(--ink)}
+.chart .hit{cursor:pointer}
+.chart .hit.on{fill:#1d232b0d}
+.ptip{position:absolute;top:0;pointer-events:none;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 6px 18px #0002;padding:8px 10px;font-size:13px;min-width:160px;z-index:3}
+.ptip .tr{display:flex;align-items:center;gap:2px;margin-top:3px}.ptip .tr span{margin-left:auto;padding-left:12px;font-weight:700;font-variant-numeric:tabular-nums}
+.ptab summary{cursor:pointer;color:var(--muted);margin-top:6px}
+.ptab .ltab{margin-top:6px}
+.pgrid{display:grid;gap:12px;margin-bottom:12px}.pgrid .card{margin:0}
+@media(min-width:760px){.pgrid{grid-template-columns:1fr 1fr}}
+.wr{display:grid;grid-template-columns:minmax(70px,auto) 1fr auto;gap:10px;align-items:center;padding:7px 0;border-top:1px solid #eef0f3}
+.wr:first-of-type{border-top:0}
+.wrn{font-weight:700;font-size:14px;white-space:nowrap}
+.wrt{height:12px;background:#eceef1;border-radius:999px;overflow:hidden}.wrt i{display:block;height:100%;background:var(--head);border-radius:999px}
+.wrv{text-align:right;min-width:96px;line-height:1.15}.wrv b{display:block;font-size:16px;font-variant-numeric:tabular-nums}
+.uprow{display:flex;gap:10px;align-items:center;padding:7px 0;border-top:1px solid #eef0f3;cursor:pointer}
+.uprow:first-of-type{border-top:0}
+.upn{font-weight:700;font-size:14px;overflow-wrap:anywhere}
+.upa{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.gct td:first-child{font-weight:600}
+.tpm td,.tpm th{text-align:center}.tpm td:first-child{text-align:left}
+.tpw{max-height:52vh;overflow:auto;border:1px solid var(--line);border-radius:10px}
+.tpt{font-size:13px}.tpt th{position:sticky;top:0;z-index:1;text-align:left!important;width:auto!important}.tpt th:first-child{width:28px!important}.tpm{width:auto;min-width:50%}
+.tpt td{text-align:left!important;white-space:normal!important;vertical-align:top}
+.tpt td:nth-child(5),.tpt td:nth-child(6){white-space:nowrap!important}
+.tpt td:nth-child(6){text-align:right!important;font-variant-numeric:tabular-nums}
+.tpt tr.off td{opacity:.5}
+.tpt select{font-size:12px;margin-top:4px;max-width:220px;border:1px solid var(--line);border-radius:6px;padding:2px 4px;background:#fff}
+.tpt input[type=checkbox]{width:18px;height:18px}
+.tpf{color:#9a3412;min-width:150px}
+.gtag{display:inline-block;background:#eef0f3;border-radius:6px;padding:0 6px;margin:1px 3px 1px 0;font-size:12px;white-space:nowrap}
 .kv{font-size:14px;margin-top:4px;white-space:pre-wrap}
 .kv b{color:var(--muted);font-weight:600}
 .badge{display:inline-block;font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px;background:#e8ebef;color:#38414b;vertical-align:1px}
@@ -1191,10 +1314,10 @@ function render(){
   if(!sb||!S.me)return;
   if(S.sliding){S.pendingRender=true;return}
   const app=$('#app');
-  if(S.view==='tc'){if(!TC.force&&tcTyping())return;TC.force=false;app.dataset.job='';app.innerHTML=renderTc();bindTc();return}
-  if(S.view==='dash'){app.dataset.job='';app.innerHTML=renderDash();bindDash();return}
-  if(S.view==='look'){app.dataset.job='';app.innerHTML=renderLook();bindLook();return}
-  if(S.view!=='job'||!S.job){app.dataset.job='';app.innerHTML=renderJobs();bindJobs();return}
+  if(S.view==='tc'){if(!TC.force&&tcTyping())return;TC.force=false;app.dataset.job='';app.innerHTML=renderTc();bindTc();homeMount();return}
+  if(S.view==='dash'){app.dataset.job='';app.innerHTML=renderDash();bindDash();homeMount();return}
+  if(S.view==='look'){app.dataset.job='';app.innerHTML=renderLook();bindLook();homeMount();return}
+  if(S.view!=='job'||!S.job){if(homeTabs()&&S.jobsLoaded&&!S.homeBoot){S.homeBoot=1;const hs=homeSec();if(hs==='tc'||hs==='look'||hs==='dash'){homeGo(hs);return}}app.dataset.job='';app.innerHTML=renderJobs();bindJobs();homeMount();return}
   const j=S.job;
   if(S.tab==='tc'||((S.tab==='log'||S.tab==='labor'||S.tab==='mat')&&!canLog()))S.tab='plans';
   if(S.tab==='billing'&&!billTabOk())S.tab='progress';
@@ -1800,6 +1923,7 @@ const TIPS={
   home:[
     ['.job',"Tap a job to open its plans and progress sheets.","Toca un trabajo para abrir sus planos y hojas de avance."],
     ['#tcOpen',"Time cards for your crew are here.","Aquí están las tarjetas de tiempo de tu cuadrilla."],
+    ['.hsec',"Office: switch between jobs, bids, time cards, the crew lookahead and the dashboard here.","Oficina: cambia aquí entre trabajos, licitaciones, tarjetas de tiempo, el plan de cuadrilla y el tablero."],
     ['#newJob',"Office: start a new job here, then add its plans.","Oficina: crea un trabajo nuevo aquí y luego agrega los planos."],
     ['#acct',"Menu: turn tips on or off, switch to Español, and more.","Menú: activa o apaga los consejos, cambia a English, y más."]],
   tc:[
@@ -2201,30 +2325,14 @@ function bindLook(){$('#lkBack').onclick=closeLook;if(!$('#lkPrev'))return;
     if(LK.multi){const ks=cells.map(x=>x.n+'|'+x.d);if(one&&LK.sel.includes(ks[0]))LK.sel=LK.sel.filter(s=>s!==ks[0]);else ks.forEach(s=>{if(!LK.sel.includes(s))LK.sel.push(s)});render()}else lookPick(cells)};
   g.onclick=e=>{if(LK.multi||Date.now()-lastUp<500)return;const td=e.target.closest('td[data-c]');if(td)lookPick([{n:td.dataset.n,d:td.dataset.d}])}}
 function renderJobs(){
-  let h='<div class="top"><h1><div class="ttl"><span class="brand"></span>Alpha Operations</div></h1><button id="acct" aria-label="Account">☰</button></div><main>';
+  let h='<div class="top"><h1><div class="ttl"><span class="brand"></span>Alpha Operations</div></h1><button id="acct" aria-label="Account">☰</button></div>';
+  if(homeTabs())return h+'<main class="hm">'+(homeSec()==='bids'?renderBidsSec():renderJobsSec())+'</main>';
+  h+='<main>';
   if(S.isAdmin)h+='<button class="btn primary block" id="newJob" style="margin-bottom:10px">+ New job</button>';
-  if(dashOk())h+='<button class="btn block" id="dashOpen" style="margin-bottom:10px">\ud83d\udcca All jobs at a glance</button>';
   if(canSeeTc())h+='<button class="btn block" id="tcOpen" style="margin-bottom:14px">⏱ Time cards</button>';
-  if(lookCan())h+='<button class="btn block" id="lkOpen" style="margin:-4px 0 14px">🗓 Crew lookahead</button>';
   if(!S.jobsLoaded)h+='<div class="empty">Loading jobs…</div>';
-  else if(!S.jobs.length&&!(S.isAdmin&&(S.bids||[]).length))h+='<div class="empty"><b>No jobs yet</b>'+(S.asUser?esc(S.asUser.name)+' isn’t on any jobs right now.':S.isAdmin?'Add a job, upload its plan PDF, then invite your foreman from the job\'s ⋯ menu.':'Open the invite link the office texted you to get access to a job.')+'</div>';
-  else{
-    const card=j=>{const n=(S.nudges||{})[j.id];return '<div class="card job" data-id="'+esc(j.id)+'"><div class="grow"><div class="name">'+esc(j.name||'Untitled job')+'</div>'+(j.addr?'<div class="muted">'+esc(j.addr)+'</div>':'')+(n?'<div class="small" style="color:#9a3412;margin-top:2px">\u26a0 Progress not marked \u00b7 '+n.days+' days of hours</div>':'')+'</div><span class="chev">›</span></div>'};
-    if(S.isAdmin){
-      const mode=lsGet('crewplans.jobView')||'mine';
-      h+='<div class="chips"><button class="chip'+(mode==='mine'?' on':'')+'" data-view="mine">My jobs</button><button class="chip'+(mode==='all'?' on':'')+'" data-view="all">All jobs</button><button class="chip'+(mode==='bids'?' on':'')+'" data-view="bids">Bids'+((S.bids||[]).length?' ('+S.bids.length+')':'')+'</button></div>';
-      if(mode==='bids'){const bv=lsGet('crewplans.bidView')||'mine',td=today(),bids=(S.bids||[]).slice().sort((a,b)=>{const r=x=>!x.bid_date?2:x.bid_date<td?1:0,ra=r(a),rb=r(b);return ra!==rb?ra-rb:ra===1?String(b.bid_date).localeCompare(String(a.bid_date)):String(a.bid_date||'').localeCompare(String(b.bid_date||''))});
-        const bc=j=>{const past=j.bid_date&&j.bid_date<td;return '<div class="card job" data-id="'+esc(j.id)+'"'+(past?' style="opacity:.55"':'')+'><div class="grow"><div class="name">'+esc(j.name||'Untitled bid')+'</div><div class="muted">'+(j.bid_date?'Bid '+fmtDay(j.bid_date)+(past?' (due date passed)':''):'No bid date')+(j.gc_name?' · '+esc(j.gc_name):'')+'</div></div><span class="chev">›</span></div>'};
-        h+='<div class="chips"><button class="chip'+(bv==='mine'?' on':'')+'" data-bview="mine">My bids</button><button class="chip'+(bv==='all'?' on':'')+'" data-bview="all">All bids</button></div><button class="btn block" id="newBid" style="margin-bottom:10px">+ New bid (for a takeoff)</button>';
-        if(!bids.length)h+='<div class="empty"><b>No bids yet</b>Add a bid, upload its plans, then do the takeoff on its Takeoff tab. When it\'s awarded, use ⋯ → Mark awarded.</div>';
-        else if(bv==='mine'){const mine=bids.filter(j=>j.pm&&j.pm===S.myOfficeId);h+=mine.length?mine.map(bc).join(''):'<div class="empty"><b>No bids with you as estimator</b>Tap All bids to see everyone\'s.</div>'}
-        else{const groups={};bids.forEach(j=>{const k=pmName(j.pm)||'No estimator';(groups[k]=groups[k]||[]).push(j)});
-          Object.keys(groups).sort((a,b)=>a==='No estimator'?1:b==='No estimator'?-1:a.localeCompare(b)).forEach(k=>{h+='<div class="logday"><span>'+esc(k)+'</span><span class="muted">'+groups[k].length+' bid'+(groups[k].length===1?'':'s')+'</span></div>'+groups[k].map(bc).join('')})}}
-      else if(mode==='mine'){const mine=sortJobs(S.jobs.filter(j=>j.pm&&j.pm===S.myOfficeId));h+=jobSortBar(mine.length)+(mine.length?mine.map(card).join(''):'')+(mine.length?'':'<div class="empty"><b>No jobs with you as PM</b>Tap All jobs to see everyone\'s.</div>')}
-      else{h+=jobSortBar(S.jobs.length);const groups={};sortJobs(S.jobs).forEach(j=>{const k=pmName(j.pm)||'No PM';(groups[k]=groups[k]||[]).push(j)});
-        Object.keys(groups).sort((a,b)=>a==='No PM'?1:b==='No PM'?-1:a.localeCompare(b)).forEach(k=>{h+='<div class="logday"><span>'+esc(k)+'</span><span class="muted">'+groups[k].length+' job'+(groups[k].length===1?'':'s')+'</span></div>'+groups[k].map(card).join('')})}
-    }else h+=jobSortBar(S.jobs.length)+sortJobs(S.jobs).map(card).join('');
-  }
+  else if(!S.jobs.length)h+='<div class="empty"><b>No jobs yet</b>'+(S.asUser?esc(S.asUser.name)+' isn’t on any jobs right now.':S.isAdmin?'Add a job, upload its plan PDF, then invite your foreman from the job\'s ⋯ menu.':'Open the invite link the office texted you to get access to a job.')+'</div>';
+  else h+=jobSortBar(S.jobs.length)+sortJobs(S.jobs).map(jobCard).join('');
   return h+'</main>';
 }
 function bindJobs(){
@@ -2241,8 +2349,7 @@ function bindJobs(){
     if(d&&d.id){S.bids=(S.bids||[]).concat([d]);S.tab='takeoff';openJob(d.id)}
   };
   if($('#tcOpen'))$('#tcOpen').onclick=openTimecards;
-  if($('#dashOpen'))$('#dashOpen').onclick=openDash;
-  if($('#lkOpen'))$('#lkOpen').onclick=openLook;
+  if(homeTabs()&&homeSec()==='bids')bindBidsSec();
   $$('[data-view]').forEach(b=>b.onclick=()=>{lsSet('crewplans.jobView',b.dataset.view);render()});
   $$('[data-bview]').forEach(b=>b.onclick=()=>{lsSet('crewplans.bidView',b.dataset.bview);render()});
   const js=$('#jobSort');if(js)js.onchange=()=>{lsSet('crewplans.jobSort',js.value);if(js.value==='size'&&!S.jobSize)loadJobSizes();render()};
@@ -2250,7 +2357,7 @@ function bindJobs(){
   $('#acct').onclick=()=>{
     if(S.asUser){asMenu();return}
     const m=modal('<h2>Account</h2><p class="muted">'+(S.isAdmin?'Signed in as office: '+esc(S.me.email||who(S.me.id)):S.realAdmin?'Office login, looking at the field view.':isForeman()?'Signed in as foreman: '+esc(S.me.email||''):'Crew access on this phone. Your access comes from invite links; signing out would remove it from this phone.')+'</p><div style="display:grid;gap:10px;margin-top:12px">'+
-      (S.isAdmin?'<button class="btn" data-msc>Microsoft connection</button><button class="btn" data-users>Office users</button><button class="btn" data-pw>Change password</button><button class="btn" data-out>Sign out</button>':isForeman()?'<button class="btn" data-pw>Change password</button><button class="btn" data-out>Sign out</button>':'<button class="btn primary" data-fm>Make a foreman login</button><button class="btn" data-off>Office or foreman sign in on this device</button>')+(S.realAdmin?(S.isAdmin?'<button class="btn" data-vas="field">Test as a foreman (field view)</button><button class="btn" data-vas="viewer">Test as view-only crew</button><button class="btn" data-vap>View as a foreman or crew member (read-only)…</button><button class="btn" data-prac="foreman">Practice as Test Foreman</button><button class="btn" data-prac="viewer">Practice as Test Viewer</button>':'<button class="btn primary" data-vas="office">Switch back to office view</button>'):'')+'<button class="btn" data-tips>'+(tipLang()==='es'?'Consejos / Idioma':'Tips / Español')+'</button><button class="btn" data-intro>▶ Play intro</button><button class="btn" data-x>Close</button></div>');
+      (S.isAdmin?'<button class="btn" data-trk>Import bid tracker (.xlsx)</button><button class="btn" data-msc>Microsoft connection</button><button class="btn" data-users>Office users</button><button class="btn" data-pw>Change password</button><button class="btn" data-out>Sign out</button>':isForeman()?'<button class="btn" data-pw>Change password</button><button class="btn" data-out>Sign out</button>':'<button class="btn primary" data-fm>Make a foreman login</button><button class="btn" data-off>Office or foreman sign in on this device</button>')+(S.realAdmin?(S.isAdmin?'<button class="btn" data-vas="field">Test as a foreman (field view)</button><button class="btn" data-vas="viewer">Test as view-only crew</button><button class="btn" data-vap>View as a foreman or crew member (read-only)…</button><button class="btn" data-prac="foreman">Practice as Test Foreman</button><button class="btn" data-prac="viewer">Practice as Test Viewer</button>':'<button class="btn primary" data-vas="office">Switch back to office view</button>'):'')+'<button class="btn" data-tips>'+(tipLang()==='es'?'Consejos / Idioma':'Tips / Español')+'</button><button class="btn" data-intro>▶ Play intro</button><button class="btn" data-x>Close</button></div>');
     $('[data-x]',m).onclick=()=>m.close();
     const o=$('[data-out]',m);if(o)o.onclick=async()=>{if(!await okToSignOut())return;await sb.auth.signOut();await clearDeviceCache();lsSet('crewplans.lastJob',null);location.href=location.pathname+'?office'};
     $('[data-intro]',m).onclick=()=>{primeAudio();m.close();playSplash(true)};
@@ -2260,6 +2367,7 @@ function bindJobs(){
     $$('[data-prac]',m).forEach(b=>b.onclick=()=>{m.close();setViewAs('person',{practice:true,role:b.dataset.prac})});
     const ou=$('[data-users]',m);if(ou)ou.onclick=()=>{m.close();officeUsers()};
     const msc=$('[data-msc]',m);if(msc)msc.onclick=()=>{m.close();msPanel()};
+    const trk=$('[data-trk]',m);if(trk)trk.onclick=()=>{m.close();trkImport()};
     const pw=$('[data-pw]',m);if(pw)pw.onclick=()=>{m.close();setPasswordBox('Change password')};
     const fm=$('[data-fm]',m);if(fm)fm.onclick=()=>{m.close();makeForemanLogin()};
     const of=$('[data-off]',m);if(of)of.onclick=async()=>{m.close();if(!await okToSignOut())return;if(!await confirmBox('This phone or computer will stop being signed in as crew. You\'d need a new invite link to get crew access back here. Continue to office sign in?','Continue',false))return;location.href=location.pathname+'?office'};
@@ -2267,10 +2375,10 @@ function bindJobs(){
 }
 async function jobMenu(){
   const j=S.job;
-  const m=modal('<h2>'+esc(j.name)+'</h2><div style="display:grid;gap:10px">'+(j.stage==='bid'?'<button class="btn primary" data-a="award">Mark awarded (turn into a job)</button><button class="btn" data-a="bidedit">Edit bid (name, GC, date, folder)</button>':'')+'<button class="btn'+(j.stage==='bid'?'':' primary')+'" data-a="people">People & invite links</button><button class="btn" data-a="scope">Scope items</button><button class="btn" data-a="tm">T&amp;M log (extra work tickets)</button><button class="btn" data-a="dl">Download job (save to OneDrive)</button><button class="btn" data-a="edit">Edit job (name, PM, GC email)</button><button class="btn danger" data-a="del">Delete job</button><button class="btn" data-a="x">Close</button></div>');
+  const m=modal('<h2>'+esc(j.name)+'</h2><div style="display:grid;gap:10px">'+(j.stage==='bid'?'<button class="btn primary" data-a="award">Mark awarded (turn into a job)</button><button class="btn" data-a="bidinfo">Bid details: amount, status, GCs, follow-ups</button><button class="btn" data-a="bidedit">Edit bid (name, GC, date, folder)</button>':'')+'<button class="btn'+(j.stage==='bid'?'':' primary')+'" data-a="people">People & invite links</button><button class="btn" data-a="scope">Scope items</button><button class="btn" data-a="tm">T&amp;M log (extra work tickets)</button><button class="btn" data-a="dl">Download job (save to OneDrive)</button><button class="btn" data-a="edit">Edit job (name, PM, GC email)</button><button class="btn danger" data-a="del">Delete job</button><button class="btn" data-a="x">Close</button></div>');
   $('[data-a=x]',m).onclick=()=>m.close();
-  const aw=$('[data-a=award]',m);if(aw)aw.onclick=async()=>{m.close();const v=await formBox('Mark awarded',[{k:'name',label:'Job name with the job number first (so time cards and labor find its folder)',value:j.name,req:true,ph:'332 - '+j.name},{k:'pm',label:'PM',type:'select',value:j.pm||'',options:(S.office||[]).map(o=>[o.id,o.name]).concat([['','No PM']])}],'Make it a job','Plans and the takeoff stay with it. Then add the foreman from ⋯ → People & invite links.');if(!v)return;
-    if(await run(sb.from('jobs').update({stage:'job',name:v.name.slice(0,120),pm:v.pm||null}).eq('id',j.id))){j.stage='job';j.name=v.name;j.pm=v.pm||null;await loadJobs();toast('It\'s a job now.');const a=$('#app');a.dataset.tab='';render()}};
+  const aw=$('[data-a=award]',m);if(aw)aw.onclick=()=>{m.close();awardBid(j)};
+  const bi=$('[data-a=bidinfo]',m);if(bi)bi.onclick=()=>{m.close();bidPanel(j)};
   const be=$('[data-a=bidedit]',m);if(be)be.onclick=async()=>{m.close();const v=await formBox('Edit bid',[{k:'name',label:'Bid / project name',value:j.name,req:true},{k:'gc_name',label:'General contractor',value:j.gc_name||''},{k:'bid_date',label:'Bid date',type:'date',value:j.bid_date||''},{k:'bid_folder',label:'Folder in BID TRANSFER (or a full Shared Documents path)',value:j.bid_folder||''},{k:'pm',label:'Estimator',type:'select',value:j.pm||'',options:(S.office||[]).map(o=>[o.id,o.name]).concat([['','No estimator']])}]);if(!v)return;
     const o={name:v.name.slice(0,120),gc_name:v.gc_name.slice(0,120),bid_date:v.bid_date||null,bid_folder:v.bid_folder.slice(0,300),pm:v.pm||null};if(await run(sb.from('jobs').update(o).eq('id',j.id))){Object.assign(j,o);loadJobs();const a=$('#app');a.dataset.tab='';render()}};
   $('[data-a=people]',m).onclick=()=>{m.close();peoplePanel()};
@@ -2284,6 +2392,325 @@ async function jobMenu(){
     if(await run(sb.from('jobs').delete().eq('id',j.id))){toast('Job deleted.');S.jobs=S.jobs.filter(x=>x.id!==j.id);S.bids=(S.bids||[]).filter(x=>x.id!==j.id);closeJob()}
   };
 }
+
+/* ===== Home sections (office): one bar under the header for Jobs · Bids · Time cards · Lookahead · Dashboard. The last section is remembered.
+   Foremen and view-only crew keep the simple home (their jobs + their time cards). ===== */
+const HS_ICO={jobs:'<path d="M3 20.5h18M5 20.5V9.5l7-5.5 7 5.5v11M9.5 20.5v-6h5v6"/>',bids:'<path d="M6.5 3.5h8l4 4v13h-12z"/><path d="M14.5 3.5v4h4M9.5 12.5h6M9.5 16.5h4"/>',tc:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',look:'<rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4M7.5 14h3M13.5 14h3"/>',dash:'<path d="M5 20V12M10 20V6M15 20v-5M20 20V9"/>'};
+const HOME_SECS=[['jobs','Jobs'],['bids','Bids'],['tc','Time cards'],['look','Lookahead'],['dash','Dashboard']];
+const homeTabs=()=>!!(S.isAdmin&&!S.asUser&&!isPractice()&&!S.viewAs);
+const homeSecOk=s=>s==='jobs'||s==='bids'||(s==='tc'&&canSeeTc())||(s==='look'&&lookCan())||(s==='dash'&&dashOk());
+function homeSec(){let s=lsGet('crewplans.homeSec');if(!s){s=lsGet('crewplans.jobView')==='bids'?'bids':'jobs';lsSet('crewplans.homeSec',s)}if(lsGet('crewplans.jobView')==='bids')lsSet('crewplans.jobView','mine');return HOME_SECS.some(x=>x[0]===s)?s:'jobs'}
+function homeCur(){if(S.view==='tc'||S.view==='look'||S.view==='dash')return S.view;const s=homeSec();return s==='bids'?'bids':'jobs'}
+function homeBarHtml(){const cur=homeCur(),td=today();const nb=(S.bids||[]).filter(j=>j.bid_date&&j.bid_date>=td&&!['won','lost','nobid'].includes(bidStat(j,td))).length;
+  return '<nav class="hsec" aria-label="Sections">'+HOME_SECS.filter(s=>homeSecOk(s[0])).map(s=>'<button type="button" data-sec="'+s[0]+'"'+(s[0]===cur?' class="on" aria-current="page"':'')+'><svg viewBox="0 0 24 24" aria-hidden="true">'+HS_ICO[s[0]]+'</svg><span>'+s[1]+(s[0]==='bids'&&nb?'<i title="Bids due today or later">'+nb+'</i>':'')+'</span></button>').join('')+'</nav>'}
+/* wraps the screen's dark header and the section bar in one sticky block; on Time cards / Lookahead / Dashboard the back arrow hides (the bar is the way back) */
+function homeMount(){if(!homeTabs())return;const app=$('#app');const top=app.querySelector(':scope>.top');if(!top)return;
+  const w=document.createElement('div');w.className='jhead hhead';top.replaceWith(w);w.appendChild(top);w.insertAdjacentHTML('beforeend',homeBarHtml());
+  const bk=top.querySelector('#tcBack,#dBack,#lkBack');if(bk&&!(S.view==='tc'&&TC.backJob))bk.style.visibility='hidden';
+  $$('.hsec [data-sec]',w).forEach(b=>b.onclick=()=>homeGo(b.dataset.sec));
+  const on=$('.hsec .on',w);if(on&&on.scrollIntoView&&w.querySelector('.hsec').scrollWidth>w.clientWidth)on.scrollIntoView({block:'nearest',inline:'center'})}
+function homeGo(s){if(!homeSecOk(s))s='jobs';lsSet('crewplans.homeSec',s);
+  if(S.view==='tc'&&s!=='tc'){try{tcFlush()}catch(e){}TC.backJob=null}
+  if(S.view==='look'&&s!=='look'){LK.sel=[];LK.multi=false}
+  if(s==='tc'){TC.backJob=null;openTimecards();return}
+  if(s==='look'){openLook();return}
+  if(s==='dash'){openDash();return}
+  S.view='jobs';window.scrollTo(0,0);render()}
+const jobCard=j=>{const n=(S.nudges||{})[j.id];return '<div class="card job" data-id="'+esc(j.id)+'"><div class="grow"><div class="name">'+esc(j.name||'Untitled job')+'</div>'+(j.addr?'<div class="muted">'+esc(j.addr)+'</div>':'')+(n?'<div class="small" style="color:#9a3412;margin-top:2px">⚠ Progress not marked · '+n.days+' days of hours</div>':'')+'</div><span class="chev">›</span></div>'};
+function renderJobsSec(){const mode=lsGet('crewplans.jobView')==='all'?'all':'mine';
+  let h='<div class="hbar"><div class="chips"><button class="chip'+(mode==='mine'?' on':'')+'" data-view="mine">My jobs</button><button class="chip'+(mode==='all'?' on':'')+'" data-view="all">All jobs</button></div><button class="btn primary sm" id="newJob">+ New job</button></div>';
+  if(!S.jobsLoaded)return h+'<div class="empty">Loading jobs…</div>';
+  if(!S.jobs.length)return h+'<div class="empty"><b>No jobs yet</b>Add a job, upload its plan PDF, then invite your foreman from the job\'s ⋯ menu.</div>';
+  if(mode==='mine'){const mine=sortJobs(S.jobs.filter(j=>j.pm&&j.pm===S.myOfficeId));return h+jobSortBar(mine.length)+(mine.length?mine.map(jobCard).join(''):'<div class="empty"><b>No jobs with you as PM</b>Tap All jobs to see everyone\'s.</div>')}
+  h+=jobSortBar(S.jobs.length);const groups={};sortJobs(S.jobs).forEach(j=>{const k=pmName(j.pm)||'No PM';(groups[k]=groups[k]||[]).push(j)});
+  Object.keys(groups).sort((a,b)=>a==='No PM'?1:b==='No PM'?-1:a.localeCompare(b)).forEach(k=>{h+='<div class="logday"><span>'+esc(k)+'</span><span class="muted">'+groups[k].length+' job'+(groups[k].length===1?'':'s')+'</span></div>'+groups[k].map(jobCard).join('')});
+  return h}
+
+/* ===== Bids: tracker fields on each bid (amount, status, result, GCs invited, follow-up log) and the Pipeline page. Office only. ===== */
+const BID_ST=[['open','Open'],['submitted','Submitted'],['won','Won'],['lost','Lost'],['nobid','No bid'],['rebid','Re-bid']];
+const bidStLabel=s=>(BID_ST.find(x=>x[0]===s)||['',''])[1];
+const isoD=(y,m,d)=>y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+const dayDiff=(a,b)=>{const p=s=>{const [y,m,d]=String(s).split('-').map(Number);return Date.UTC(y,m-1,d)};return Math.round((p(b)-p(a))/864e5)};
+const MON3=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const shortDay=s=>{const [y,m,d]=String(s||'').split('-').map(Number);return y&&m?MON3[m-1]+' '+d:''};
+const moneyK=v=>{v=num(v);const a=Math.abs(v);return a>=1e6?'$'+(v/1e6).toFixed(a>=1e7?1:2).replace(/\.?0+$/,'')+'M':a>=1e4?'$'+Math.round(v/1e3)+'K':a>=1e3?'$'+(v/1e3).toFixed(1).replace(/\.0$/,'')+'K':'$'+Math.round(v)};
+/* status shown for a bid: the saved status, or Open / Submitted from the bid date (an awarded job counts as Won) */
+const bidStat=(j,td)=>j.bid_status&&BID_ST.some(s=>s[0]===j.bid_status)?j.bid_status:j.stage==='job'?'won':(j.bid_date&&j.bid_date<td?'submitted':'open');
+/* Open = due today or later, or still waiting (open / submitted / re-bid). Results = won, lost, no bid. */
+const bidFilt=(j,f,td)=>{const s=bidStat(j,td);return f==='res'?(s==='won'||s==='lost'||s==='nobid'):f==='all'?true:(!!(j.bid_date&&j.bid_date>=td)||s==='open'||s==='submitted'||s==='rebid')};
+/* GCs invited: bid_gcs, or (older bids) the GC name typed on the bid, split at commas */
+const bidGcs=j=>Array.isArray(j.bid_gcs)&&j.bid_gcs.length?j.bid_gcs:String(j.gc_name||'').split(/\s*[,;]\s*/).filter(Boolean).map((n,i,a)=>({name:n,email:a.length===1?String(j.gc_email||''):''}));
+const bidMatch=(j,q)=>{q=String(q||'').trim().toLowerCase();if(!q)return true;return [j.name,j.gc_name,pmName(j.pm)].concat(bidGcs(j).map(g=>g.name)).some(x=>String(x||'').toLowerCase().includes(q))};
+const pipeIn=j=>j.stage==='bid'||!!j.bid_status||j.bid_amount!=null;
+const bidYear=j=>+String(j.bid_date||j.created_at||'').slice(0,4)||0;
+const EST_COL=['#257de0','#f47230','#00b894','#f2a600','#ee7fac','#008a17','#6a4ce2','#ec4647'];
+/* estimator colors follow the person (office names in A-Z order), never their rank */
+function estColor(name){const ns=[...new Set((S.office||[]).map(o=>o.name))].sort((a,b)=>a.localeCompare(b));const i=ns.indexOf(name);return i>=0&&i<EST_COL.length?EST_COL[i]:'#9aa3ad'}
+function bidDateBlock(d,td,res,cls){if(!d)return '<div class="bdate none'+(cls||'')+'"><span>No</span><b>date</b></div>';const n=dayDiff(td,d),[y,m,dd]=d.split('-').map(Number);
+  return '<div class="bdate'+(res?'':n>=0&&n<=7?' soon':n<0?' past':'')+(cls||'')+'" title="'+esc(fmtDay(d))+'"><span>'+MON3[m-1]+(y!==+td.slice(0,4)?' ’'+String(y).slice(2):'')+'</span><b>'+dd+'</b></div>'}
+const bidPill=s=>'<span class="bpill s-'+s+'">'+bidStLabel(s)+'</span>';
+function bidCard(j,td){const s=bidStat(j,td),g=bidGcs(j),notes=Array.isArray(j.bid_notes)?j.bid_notes:[],last=notes[notes.length-1],d=j.bid_date,n=d?dayDiff(td,d):null,res=s==='won'||s==='lost'||s==='nobid';
+  let l2=d?(n===0?'<b class="due">Due today</b>':n>0&&n<=14?'<b class="due">Due in '+n+' day'+(n===1?'':'s')+'</b>':'Bid '+shortDay(d)+(d.slice(0,4)!==td.slice(0,4)?', '+d.slice(0,4):'')):'No bid date';
+  if(g.length)l2+=' · '+esc(g[0].name)+(g.length>1?' +'+(g.length-1):'');
+  let l3='';if(res&&j.bid_result)l3=esc(j.bid_result);else if(last)l3=esc(last.text)+(last.at?' · '+shortDay(last.at):'');else if(!res&&d&&n<-7)l3='<span class="bwarn">No follow-up yet · bid '+(-n)+' days ago</span>';
+  return '<div class="card bidc" data-bid="'+esc(j.id)+'" tabindex="0" role="button" aria-label="'+esc(j.name||'Bid')+' details">'+bidDateBlock(d,td,res)+'<div class="grow"><div class="name">'+esc(j.name||'Untitled bid')+'</div><div class="muted small">'+l2+'</div>'+(l3?'<div class="small bl3">'+l3+'</div>':'')+'</div>'+
+    '<div class="bidr"><div class="amt">'+(j.bid_amount!=null&&j.bid_amount!==''?money(j.bid_amount):'<span class="muted">No $ yet</span>')+'</div>'+bidPill(s)+'</div><button class="bgo" data-go="'+esc(j.id)+'" title="Open plans & takeoff" aria-label="Open plans and takeoff for '+esc(j.name||'bid')+'">›</button></div>'}
+function renderBidsSec(){const pane=lsGet('crewplans.bidPane')==='pipe'?'pipe':'list';
+  let h='<div class="hbar"><div class="hseg" role="tablist"><button role="tab" data-bpane="list"'+(pane==='list'?' class="on" aria-selected="true"':'')+'>Bid list</button><button role="tab" data-bpane="pipe"'+(pane==='pipe'?' class="on" aria-selected="true"':'')+'>Pipeline</button></div><button class="btn sm" id="trkDl" title="Download the bid tracker as an Excel file, one tab per month, Josh / Ken / Rob blocks">⤓ Tracker .xlsx</button></div>';
+  if(!S.jobsLoaded)return h+'<div class="empty">Loading bids…</div>';
+  return h+(pane==='pipe'?renderPipe():renderBidList())}
+function renderBidList(){const bv=lsGet('crewplans.bidView')==='all'?'all':'mine',f=lsGet('crewplans.bidFilt')||'open';
+  let h='<div class="hbar"><div class="chips"><button class="chip'+(bv==='mine'?' on':'')+'" data-bview="mine">My bids</button><button class="chip'+(bv==='all'?' on':'')+'" data-bview="all">All bids</button></div><button class="btn primary sm" id="newBid">+ New bid</button></div>';
+  h+='<div class="bfil"><div class="hseg sm">'+[['open','Open'],['res','Results'],['all','All']].map(x=>'<button data-bfilt="'+x[0]+'"'+(f===x[0]?' class="on"':'')+'>'+x[1]+'</button>').join('')+'</div><input type="search" id="bidQ" placeholder="Search bids" aria-label="Search bids" value="'+esc(S.bidQ||'')+'" autocomplete="off"></div>';
+  return h+'<div id="bidList">'+bidListHtml()+'</div>'}
+function bidListHtml(){const td=today(),bv=lsGet('crewplans.bidView')==='all'?'all':'mine',f=lsGet('crewplans.bidFilt')||'open';
+  if(!(S.bids||[]).length)return '<div class="empty"><b>No bids yet</b>Add a bid, upload its plans, then do the takeoff on its Takeoff tab. To bring in this year’s Excel tracker, use ☰ → Import bid tracker.</div>';
+  let list=(S.bids||[]).filter(j=>bidFilt(j,f,td)&&bidMatch(j,S.bidQ));if(bv==='mine')list=list.filter(j=>j.pm&&j.pm===S.myOfficeId);
+  if(!list.length)return '<div class="empty"><b>'+(S.bidQ?'Nothing matches “'+esc(S.bidQ)+'”':bv==='mine'?'No '+(f==='res'?'results':f==='open'?'open bids':'bids')+' with you as estimator':'No '+(f==='res'?'results yet':'open bids'))+'</b>'+(bv==='mine'?'Tap All bids to see everyone’s.':'Try All.')+'</div>';
+  const ph=j=>{const s=bidStat(j,td);return s==='won'||s==='lost'||s==='nobid'?3:!j.bid_date?2:j.bid_date>=td?0:1};
+  list.sort((a,b)=>{const pa=ph(a),pb=ph(b);if(pa!==pb)return pa-pb;if(pa===0)return String(a.bid_date).localeCompare(String(b.bid_date));return String(b.result_date||b.bid_date||b.created_at||'').localeCompare(String(a.result_date||a.bid_date||a.created_at||''))});
+  const tot=list.reduce((a,j)=>a+num(j.bid_amount),0);
+  let h='<div class="bsum">'+list.length+' bid'+(list.length===1?'':'s')+(tot?' · '+moneyK(tot)+' bid':'')+'</div>';
+  const grp=(k,arr,unit)=>'<div class="logday"><span>'+esc(k)+'</span><span class="muted">'+arr.length+' '+unit+(arr.length===1?'':'s')+(arr.some(j=>num(j.bid_amount))?' · '+moneyK(arr.reduce((a,j)=>a+num(j.bid_amount),0)):'')+'</span></div>'+arr.map(j=>bidCard(j,td)).join('');
+  if(bv==='all'){const g={};list.forEach(j=>{const k=pmName(j.pm)||'No estimator';(g[k]=g[k]||[]).push(j)});Object.keys(g).sort((a,b)=>a==='No estimator'?1:b==='No estimator'?-1:a.localeCompare(b)).forEach(k=>h+=grp(k,g[k],'bid'));return h}
+  const L=['Coming up','Waiting on results','No bid date','Results'],g=[[],[],[],[]];list.forEach(j=>g[ph(j)].push(j));g.forEach((arr,i)=>{if(arr.length)h+=grp(L[i],arr,'bid')});return h}
+function bindBidList(){const t=$('#bidList');if(!t)return;
+  $$('.bidc',t).forEach(el=>{const open=()=>{const j=(S.bids||[]).find(x=>x.id===el.dataset.bid);if(j)bidPanel(j)};el.onclick=e=>{if(e.target.closest('[data-go]'))return;open()};el.onkeydown=e=>{if((e.key==='Enter'||e.key===' ')&&e.target===el){e.preventDefault();open()}}});
+  $$('[data-go]',t).forEach(b=>b.onclick=e=>{e.stopPropagation();openJob(b.dataset.go)})}
+function bindBidsSec(){
+  $$('[data-bpane]').forEach(b=>b.onclick=()=>{lsSet('crewplans.bidPane',b.dataset.bpane);window.scrollTo(0,0);render()});
+  $$('[data-bfilt]').forEach(b=>b.onclick=()=>{lsSet('crewplans.bidFilt',b.dataset.bfilt);render()});
+  const qq=$('#bidQ');if(qq)qq.oninput=()=>{S.bidQ=qq.value;$('#bidList').innerHTML=bidListHtml();bindBidList()};
+  if($('#trkDl'))$('#trkDl').onclick=trkDownload;
+  bindBidList();if($('#pipe'))bindPipe()}
+async function bidSave(j,o){if(!await run(sb.from('jobs').update(o).eq('id',j.id)))return false;Object.assign(j,o);return true}
+const meOffice=()=>pmName(S.myOfficeId)||myName()||'Office';
+/* bid detail panel: everything the Excel tracker row held, plus GC contacts and a dated follow-up log */
+function bidPanel(j){const m=modal('<div class="bp"></div>',()=>{if(S.view!=='job'&&S.view!=='tc'&&S.view!=='dash'&&S.view!=='look')render()});$('.mcard',m).classList.add('wide');
+  const paint=()=>{const b=$('.bp',m);if(!b)return;b.innerHTML=bidPanelHtml(j);bidPanelBind(m,j,paint)};paint();return m}
+function bidPanelHtml(j){const td=today(),s=bidStat(j,td),g=bidGcs(j),notes=(Array.isArray(j.bid_notes)?j.bid_notes:[]).map((n,i)=>Object.assign({i},n)).reverse();
+  const rev=j.revision_of&&(S.bids||[]).concat(S.jobs||[]).find(x=>x.id===j.revision_of);const emails=g.map(x=>x.email).filter(Boolean);
+  let h='<div class="bph">'+bidDateBlock(j.bid_date,td,false,' lg')+'<div class="grow"><h2>'+esc(j.name||'Bid')+'</h2><div class="muted small">'+(j.bid_date?esc(fmtDay(j.bid_date)):'No bid date')+' · '+(pmName(j.pm)?'Estimator '+esc(pmName(j.pm)):'No estimator')+(rev?' · Re-bid of '+esc(rev.name)+(rev.bid_date?' ('+shortDay(rev.bid_date)+')':''):'')+(j.bid_source?' · from the Excel tracker':'')+'</div></div><button class="ico" data-x aria-label="Close">✕</button></div>';
+  h+='<div class="bpacts">'+(j.stage==='bid'?'<button class="btn primary sm" data-open>Open plans & takeoff</button><button class="btn sm" data-edit>Edit bid</button><button class="btn sm" data-award>Mark awarded</button>':'<button class="btn primary sm" data-open>Open job</button>')+'</div>';
+  h+='<div class="bpnum"><label class="field"><span>Bid amount</span><div class="bmoney"><b>$</b><input data-f="amt" inputmode="decimal" placeholder="0" value="'+(j.bid_amount!=null&&j.bid_amount!==''?esc(Math.round(num(j.bid_amount)).toLocaleString()):'')+'"></div></label>'+
+    '<label class="field"><span>Result date</span><input type="date" data-f="rdate" value="'+esc(j.result_date||'')+'"></label></div>';
+  h+='<div class="field"><span>Status</span><div class="bstat" role="radiogroup" aria-label="Bid status">'+BID_ST.map(x=>'<button type="button" role="radio" aria-checked="'+(x[0]===s)+'" data-st="'+x[0]+'" class="bpill s-'+x[0]+(x[0]===s?' on':'')+'">'+x[1]+'</button>').join('')+'</div>'+(!j.bid_status?'<div class="muted small" style="margin-top:4px">Not set yet: '+(s==='submitted'?'the bid date has passed, so it shows as Submitted.':'shows as Open until the bid date.')+'</div>':'')+'</div>';
+  h+='<label class="field"><span>Result: where we landed</span><input data-f="res" maxlength="200" placeholder="e.g. 3rd of 5, 10% high" value="'+esc(j.bid_result||'')+'"></label>';
+  h+='<div class="bpsec"><h3>GCs invited <span class="muted">'+g.length+'</span></h3><button class="btn sm" data-addgc>+ Add GC</button></div>';
+  h+=g.length?'<div class="bgcs">'+g.map((x,i)=>'<div class="bgc"><div class="grow"><div><b>'+esc(x.name||'GC')+'</b>'+(x.result?' <span class="bgres">'+esc(x.result)+'</span>':'')+'</div><div class="muted small">'+[x.contact,x.email?'<a href="mailto:'+esc(x.email)+'">'+esc(x.email)+'</a>':'',x.phone?'<a href="tel:'+esc(String(x.phone).replace(/[^\d+]/g,''))+'">'+esc(x.phone)+'</a>':'',x.invited_at?'Invited '+shortDay(x.invited_at):''].filter(Boolean).map(v=>v.startsWith('<a')?v:esc(v)).join(' · ')+'</div>'+(x.note?'<div class="small">'+esc(x.note)+'</div>':'')+'</div><button class="ico" data-egc="'+i+'" aria-label="Edit '+esc(x.name||'GC')+'">✎</button><button class="ico" data-rgc="'+i+'" aria-label="Remove '+esc(x.name||'GC')+'">✕</button></div>').join('')+'</div>':'<div class="muted small bnone">No GCs yet. Add each GC that invited you; their emails are where the proposal goes.</div>';
+  h+=emails.length?'<div class="muted small" style="margin-top:6px">Proposal goes to: '+esc(emails.join(', '))+'</div>':'';
+  h+='<div class="bpsec"><h3>Follow-ups & notes</h3><div class="row" style="gap:8px"><button class="btn sm primary" data-fu>Log follow-up</button><button class="btn sm" data-note>Add note</button></div></div>';
+  h+=notes.length?'<ol class="blog">'+notes.map(n=>'<li><span class="bld">'+(n.at?shortDay(n.at):'–')+'</span><div class="grow">'+esc(n.text)+(n.by?'<div class="muted small">'+esc(n.by)+'</div>':'')+'</div><button class="ico" data-dn="'+n.i+'" aria-label="Delete note">✕</button></li>').join('')+'</ol>':'<div class="muted small bnone">Nothing logged yet. After the bid goes in, tap Log follow-up each time you ask a GC for results.</div>';
+  return h}
+async function bidGcSave(j,list){const em=[];list.forEach(g=>String(g.email||'').split(/[,;\s]+/).filter(Boolean).forEach(e=>{if(!em.includes(e))em.push(e)}));
+  return bidSave(j,{bid_gcs:list,gc_name:list.map(g=>g.name).filter(Boolean).join(', ').slice(0,120),gc_email:em.join(', ').slice(0,400)})}
+function bidGcForm(x){return formBox(x?'Edit GC':'Add GC',[{k:'name',label:'General contractor',value:x&&x.name||'',req:true,ph:'e.g. Okland Construction'},{k:'contact',label:'Contact (estimator / PM)',value:x&&x.contact||''},{k:'email',label:'Email (several: separate with commas)',value:x&&x.email||'',ph:'estimating@gc.com'},{k:'phone',label:'Phone',value:x&&x.phone||''},{k:'invited_at',label:'Invited on',type:'date',value:x&&x.invited_at||(x?'':today())},{k:'result',label:'Their result for us (optional)',value:x&&x.result||'',ph:'e.g. we were 2nd, went with another sub'},{k:'note',label:'Note',value:x&&x.note||''}],x?'Save GC':'Add GC')}
+function bidPanelBind(m,j,paint){const b=$('.bp',m);
+  $('[data-x]',b).onclick=()=>m.close();
+  const op=$('[data-open]',b);if(op)op.onclick=()=>{m.close();if(!(S.view==='job'&&S.job&&S.job.id===j.id))openJob(j.id)};
+  const ed=$('[data-edit]',b);if(ed)ed.onclick=async()=>{if(await bidEdit(j))paint()};
+  const aw=$('[data-award]',b);if(aw)aw.onclick=()=>{m.close();awardBid(j)};
+  const amt=$('[data-f=amt]',b);amt.onchange=async()=>{const t=amt.value.replace(/[$,\s]/g,'');const v=t===''?null:Number(t);if(t!==''&&!Number.isFinite(v)){toast('Type the bid amount as a number, e.g. 124500');return}if(await bidSave(j,{bid_amount:v})){toast(v==null?'Amount cleared.':'Saved: '+money(v)+'.');paint()}};
+  const rd=$('[data-f=rdate]',b);rd.onchange=async()=>{if(await bidSave(j,{result_date:rd.value||null}))toast('Saved.')};
+  const rs=$('[data-f=res]',b);rs.onchange=async()=>{if(await bidSave(j,{bid_result:rs.value.trim().slice(0,200)||null}))toast('Saved.')};
+  $$('[data-st]',b).forEach(x=>x.onclick=async()=>{const st=x.dataset.st,o={bid_status:st};if((st==='won'||st==='lost'||st==='nobid')&&!j.result_date)o.result_date=today();if(await bidSave(j,o)){paint();toast(st==='won'?'Won! Use Mark awarded to turn it into a job.':'Status: '+bidStLabel(st)+'.')}});
+  $('[data-addgc]',b).onclick=async()=>{const v=await bidGcForm(null);if(!v)return;const bad=String(v.email||'').split(/[,;\s]+/).filter(x=>x&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x));if(bad.length){toast('Check this email: '+bad[0]);return}
+    const list=bidGcs(j).slice();list.push(Object.assign({},v,{invited_at:v.invited_at||null}));if(await bidGcSave(j,list))paint()};
+  $$('[data-egc]',b).forEach(x=>x.onclick=async()=>{const list=bidGcs(j).slice(),i=+x.dataset.egc;const v=await bidGcForm(list[i]);if(!v)return;const bad=String(v.email||'').split(/[,;\s]+/).filter(x=>x&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x));if(bad.length){toast('Check this email: '+bad[0]);return}
+    list[i]=Object.assign({},list[i],v,{invited_at:v.invited_at||null});if(await bidGcSave(j,list))paint()});
+  $$('[data-rgc]',b).forEach(x=>x.onclick=async()=>{const list=bidGcs(j).slice(),i=+x.dataset.rgc;if(!await confirmBox('Remove '+(list[i].name||'this GC')+' from this bid?','Remove'))return;list.splice(i,1);if(await bidGcSave(j,list))paint()});
+  $('[data-fu]',b).onclick=async()=>{const g=bidGcs(j);let who=g.length===1?g[0].name:'';
+    if(g.length>1){const v=await formBox('Log follow-up',[{k:'who',label:'Who did you ask for results?',type:'select',value:'',options:[['','All GCs on this bid']].concat(g.map(x=>[x.name,x.name]))},{k:'said',label:'What they said (optional)',ph:'e.g. still reviewing, award next week'}],'Log it');if(!v)return;who=v.who;if(v.said){await bidNote(j,(who?'Asked '+who:'Asked all GCs')+' for results: '+v.said);paint();return}}
+    await bidNote(j,who?'Asked '+who+' for results':g.length>1?'Asked all GCs for results':'Asked for results');paint()};
+  $('[data-note]',b).onclick=async()=>{const v=await formBox('Add note',[{k:'t',label:'Note',type:'textarea',req:true,ph:'e.g. Bid date moved to 12/12; GC says low number was $220,000'}],'Add note');if(v&&v.t&&await bidNote(j,v.t))paint()};
+  $$('[data-dn]',b).forEach(x=>x.onclick=async()=>{if(!await confirmBox('Delete this note?','Delete'))return;const n=(j.bid_notes||[]).slice();n.splice(+x.dataset.dn,1);if(await bidSave(j,{bid_notes:n}))paint()})}
+async function bidNote(j,text){const n=(Array.isArray(j.bid_notes)?j.bid_notes:[]).concat([{at:today(),by:meOffice(),text:String(text).slice(0,500)}]);const ok=await bidSave(j,{bid_notes:n});if(ok)toast('Logged: '+text);return ok}
+async function bidEdit(j){const others=(S.bids||[]).concat(S.jobs||[]).filter(x=>x.id!==j.id&&pipeIn(x)).sort((a,b)=>String(a.name).localeCompare(String(b.name)));
+  const v=await formBox('Edit bid',[{k:'name',label:'Bid / project name',value:j.name,req:true},{k:'bid_date',label:'Bid date',type:'date',value:j.bid_date||''},{k:'bid_folder',label:'Folder in BID TRANSFER (or a full Shared Documents path)',value:j.bid_folder||''},{k:'pm',label:'Estimator',type:'select',value:j.pm||'',options:(S.office||[]).map(o=>[o.id,o.name]).concat([['','No estimator']])},{k:'revision_of',label:'Re-bid of (the earlier bid stops counting in the Pipeline totals)',type:'select',value:j.revision_of||'',options:[['','Not a re-bid']].concat(others.map(x=>[x.id,x.name+(x.bid_date?' ('+shortDay(x.bid_date)+', '+x.bid_date.slice(0,4)+')':'')]))}],'Save');
+  if(!v)return false;return bidSave(j,{name:v.name.slice(0,120),bid_date:v.bid_date||null,bid_folder:v.bid_folder.slice(0,300),pm:v.pm||null,revision_of:v.revision_of||null})}
+/* Mark awarded: the bid becomes a job (plans and takeoff stay), and its tracker status becomes Won */
+async function awardBid(j){const v=await formBox('Mark awarded',[{k:'name',label:'Job name with the job number first (so time cards and labor find its folder)',value:j.name,req:true,ph:'332 - '+j.name},{k:'pm',label:'PM',type:'select',value:j.pm||'',options:(S.office||[]).map(o=>[o.id,o.name]).concat([['','No PM']])}],'Make it a job','Plans and the takeoff stay with it. Then add the foreman from ⋯ → People & invite links.');if(!v)return;
+  const o={stage:'job',name:v.name.slice(0,120),pm:v.pm||null,bid_status:'won',result_date:j.result_date||today()};
+  if(await run(sb.from('jobs').update(o).eq('id',j.id))){Object.assign(j,o);await loadJobs();toast('It\'s a job now.');const a=$('#app');a.dataset.tab='';render()}}
+
+/* ----- Pipeline (office only): KPIs for a year, $ bid by month by estimator, win rate by estimator, top GCs, next 14 days ----- */
+function pipeCalc(all,year,td,office){const sup=new Set(all.filter(j=>j.revision_of).map(j=>j.revision_of));const rows=all.filter(j=>pipeIn(j)&&!sup.has(j.id)&&bidYear(j)===year);
+  const nm=j=>{const o=(office||[]).find(x=>x.id===j.pm);return o?o.name:'No estimator'};const names=[...new Set((office||[]).map(o=>o.name))].sort((a,b)=>a.localeCompare(b));
+  const T={year,n:rows.length,total:0,priced:0,won:0,lost:0,nobid:0,open:0,unk:0,wonAmt:0,months:[],est:{},gcs:{}};for(let i=0;i<12;i++)T.months.push({n:0,total:0,by:{}});
+  rows.forEach(j=>{const s=bidStat(j,td),a=num(j.bid_amount),e=nm(j),mi=+String(j.bid_date||j.created_at).slice(5,7)-1,past=!!(j.bid_date&&j.bid_date<td);
+    if(a>0){T.total+=a;T.priced++}
+    if(s==='won'){T.won++;T.wonAmt+=a}else if(s==='lost')T.lost++;else if(s==='nobid')T.nobid++;else if(past)T.unk++;else T.open++;
+    const M=T.months[mi];if(M){M.n++;M.total+=a;if(a)M.by[e]=(M.by[e]||0)+a}
+    const E=T.est[e]=T.est[e]||{name:e,n:0,amt:0,won:0,lost:0,unk:0};E.n++;E.amt+=a;if(s==='won')E.won++;else if(s==='lost')E.lost++;else if(s!=='nobid'&&past)E.unk++;
+    bidGcs(j).forEach(g=>{const k=gcKey(g.name);if(!k)return;const G=T.gcs[k]=T.gcs[k]||{name:g.name,n:0,amt:0,won:0,lost:0,sp:{}};G.sp[g.name]=(G.sp[g.name]||0)+1;G.n++;G.amt+=a;if(s==='won')G.won++;else if(s==='lost')G.lost++})});
+  T.avg=T.priced?T.total/T.priced:0;T.rate=T.won+T.lost?T.won/(T.won+T.lost):null;
+  T.names=names.filter(n=>T.est[n]).concat(Object.keys(T.est).filter(n=>!names.includes(n)).sort());
+  T.estList=T.names.map(n=>{const E=T.est[n];E.rate=E.won+E.lost?E.won/(E.won+E.lost):null;return E});
+  T.gcList=Object.keys(T.gcs).map(k=>{const G=T.gcs[k];G.name=Object.keys(G.sp).sort((a,b)=>G.sp[b]-G.sp[a])[0];G.rate=G.won+G.lost?G.won/(G.won+G.lost):null;delete G.sp;return G}).sort((a,b)=>b.n-a.n||b.amt-a.amt);
+  return T}
+const niceMax=v=>{if(!(v>0))return {max:1,step:1};const raw=v/4,p=Math.pow(10,Math.floor(Math.log10(raw))),f=[1,2,2.5,5,10].find(x=>x*p>=raw)*p;return {max:Math.ceil(v/f-1e-9)*f,step:f}};
+const pipeAll=()=>(S.bids||[]).concat(S.jobs||[]);
+function pipeYears(){const y=new Date().getFullYear();const s=new Set([y]);pipeAll().forEach(j=>{if(pipeIn(j)&&bidYear(j))s.add(bidYear(j))});return [...s].sort((a,b)=>b-a)}
+function pipeYear(){const y=+lsGet('crewplans.pipeYear');return pipeYears().includes(y)?y:new Date().getFullYear()}
+async function pipeLoadGoal(){if(S.goalLoading)return;S.goalLoading=true;try{const r=await q(sb.from('office_settings').select('value').eq('key','sales_goal').maybeSingle());S.salesGoal=(r&&r.value)||{}}catch(e){S.salesGoal={}}S.goalLoading=false;if(S.view!=='job'&&$('#pipe'))render()}
+function renderPipe(){const td=today(),y=pipeYear(),T=pipeCalc(pipeAll(),y,td,S.office||[]);S.pipeT=T;if(!S.salesGoal)pipeLoadGoal();
+  const goal=num((S.salesGoal||{})[String(y)]),gp=goal?T.wonAmt/goal:0,pct=v=>v==null?'–':Math.round(v*100)+'%';
+  let h='<div id="pipe"><div class="pyr"><label>Year <select id="pipeYear">'+pipeYears().map(v=>'<option'+(v===y?' selected':'')+'>'+v+'</option>').join('')+'</select></label><span class="muted small">Each bid counts once; a re-bid replaces the bid it revises.</span></div>';
+  h+='<div class="kpis"><div class="kpi goal"><div class="row" style="align-items:flex-start"><div class="grow"><div class="kl">Won in '+y+'</div><div class="kb">'+moneyK(T.wonAmt)+'</div></div><button class="btn sm" id="goalEd" title="Change the sales goal for '+y+'">'+(goal?'Goal '+moneyK(goal):'Set sales goal')+' ✎</button></div>'+
+    (goal?'<div class="gbar" role="progressbar" aria-valuenow="'+Math.round(gp*100)+'" aria-valuemin="0" aria-valuemax="100" aria-label="Won vs sales goal"><i style="width:'+Math.min(100,gp*100).toFixed(1)+'%"></i></div><div class="gl"><b>'+pct(gp)+'</b> of the '+moneyK(goal)+' sales goal · '+T.won+' job'+(T.won===1?'':'s')+' won'+(goal>T.wonAmt?' · '+moneyK(goal-T.wonAmt)+' to go':'')+'</div>':'<div class="gl">'+T.won+' job'+(T.won===1?'':'s')+' won. Set a sales goal to track progress.</div>')+'</div>'+
+    '<div class="kpi"><div class="kb">'+T.n+'</div><div class="kl">Bids</div><div class="ks">'+T.open+' still to bid</div></div>'+
+    '<div class="kpi"><div class="kb">'+moneyK(T.total)+'</div><div class="kl">Total bid</div><div class="ks">'+T.priced+' with an amount</div></div>'+
+    '<div class="kpi"><div class="kb">'+pct(T.rate)+'</div><div class="kl">Win rate</div><div class="ks">'+T.won+' won · '+T.lost+' lost · '+T.unk+' no result yet</div></div>'+
+    '<div class="kpi"><div class="kb">'+moneyK(T.avg)+'</div><div class="kl">Average bid</div><div class="ks">Bids with an amount</div></div></div>';
+  if(!T.n)return h+'<div class="empty"><b>No bids in '+y+'</b>Add bids on the Bid list, or bring in the Excel tracker from ☰ → Import bid tracker.</div></div>';
+  const leg=T.names.filter(n=>T.months.some(m=>m.by[n]));
+  h+='<div class="card"><div class="chd"><b>$ bid by month</b>'+(leg.length>1?'<div class="legend">'+leg.map(n=>'<span><i class="sw" style="background:'+estColor(n)+'"></i>'+esc(n)+'</span>').join('')+'</div>':'')+'</div><div class="chart" id="pipeMon"></div>'+
+    '<details class="ptab"><summary class="small">Show as a table</summary><div class="lscroll"><table class="ltab"><thead><tr><th>Month</th>'+leg.map(n=>'<th>'+esc(n)+'</th>').join('')+'<th>Total</th><th>Bids</th></tr></thead><tbody>'+T.months.map((m,i)=>'<tr><td>'+MON3[i]+'</td>'+leg.map(n=>'<td>'+(m.by[n]?money(m.by[n]):'')+'</td>').join('')+'<td>'+(m.total?money(m.total):'')+'</td><td>'+(m.n||'')+'</td></tr>').join('')+'</tbody></table></div></details></div>';
+  const up=pipeAll().filter(j=>j.bid_date&&j.bid_date>=td&&dayDiff(td,j.bid_date)<=14&&j.stage==='bid').sort((a,b)=>a.bid_date.localeCompare(b.bid_date));
+  h+='<div class="pgrid"><div class="card"><div class="chd"><b>Win rate by estimator</b><span class="muted small">won ÷ (won + lost)</span></div>'+T.estList.map(E=>'<div class="wr"><div class="wrn"><i class="sw" style="background:'+estColor(E.name)+'"></i>'+esc(E.name)+'</div><div class="wrt"><i style="width:'+(E.rate==null?0:Math.max(E.rate*100,E.rate>0?2:0)).toFixed(1)+'%"></i></div><div class="wrv"><b>'+pct(E.rate)+'</b><span class="muted small">'+(E.won+E.lost?E.won+' of '+(E.won+E.lost):'no results')+(E.unk?' · '+E.unk+' waiting':'')+'</span></div></div>').join('')+'</div>';
+  h+='<div class="card"><div class="chd"><b>Bids due in the next 14 days</b><span class="muted small">'+up.length+'</span></div>'+(up.length?up.map(j=>'<div class="uprow" data-bid="'+esc(j.id)+'" tabindex="0" role="button">'+bidDateBlock(j.bid_date,td,false,' sm')+'<div class="grow"><div class="upn">'+esc(j.name)+'</div><div class="muted small">'+(pmName(j.pm)?esc(pmName(j.pm)):'No estimator')+(bidGcs(j).length?' · '+bidGcs(j).length+' GC'+(bidGcs(j).length===1?'':'s'):'')+'</div></div><div class="upa">'+(j.bid_amount!=null?moneyK(j.bid_amount):'')+'</div></div>').join(''):'<div class="muted small bnone">Nothing due in the next two weeks.</div>')+'</div></div>';
+  h+='<div class="card"><div class="chd"><b>Top GCs</b><span class="muted small">by bids they invited us to in '+y+'</span></div>'+(T.gcList.length?'<div class="lscroll"><table class="ltab gct"><thead><tr><th>GC</th><th>Bids</th><th>$ bid</th><th>Won</th><th>Lost</th><th>Win rate</th></tr></thead><tbody>'+T.gcList.slice(0,12).map(G=>'<tr><td>'+esc(G.name)+'</td><td>'+G.n+'</td><td>'+moneyK(G.amt)+'</td><td>'+(G.won||'')+'</td><td>'+(G.lost||'')+'</td><td>'+pct(G.rate)+'</td></tr>').join('')+'</tbody></table></div>':'<div class="muted small bnone">No GCs on these bids yet. Add them in each bid’s details.</div>')+'</div>';
+  return h+'</div>'}
+function pipeMonthSvg(T,W){const H=W<520?200:240,L=W<520?40:52,R=6,Tp=18,B=24,pw=W-L-R,ph=H-Tp-B;const mx=Math.max(0,...T.months.map(m=>m.total));const N=niceMax(mx);const y=v=>Tp+ph-(v/N.max)*ph;const band=pw/12,bw=Math.max(8,Math.min(40,band*.62));
+  let s='<svg width="'+W+'" height="'+H+'" role="img" aria-label="Dollars bid by month in '+T.year+'">';
+  for(let v=0;v<=N.max+1e-6;v+=N.step)s+='<line x1="'+L+'" x2="'+(W-R)+'" y1="'+y(v).toFixed(1)+'" y2="'+y(v).toFixed(1)+'" stroke="'+(v?'#eceef1':'#c3c9d1')+'"/><text x="'+(L-6)+'" y="'+(y(v)+4).toFixed(1)+'" text-anchor="end" class="ax">'+(v?moneyK(v):'$0')+'</text>';
+  let top=-1;T.months.forEach((m,i)=>{if(m.total>0&&(top<0||m.total>T.months[top].total))top=i});
+  T.months.forEach((m,i)=>{const cx=L+band*i+band/2,x=cx-bw/2;let acc=0;const segs=T.names.concat(Object.keys(m.by).filter(n=>!T.names.includes(n))).filter(n=>m.by[n]>0);
+    segs.forEach((n,k)=>{const v=m.by[n],y0=y(acc)-(k>0?2:0),y1=y(acc+v);acc+=v;const h=y0-y1;if(h<=.5)return;const c=estColor(n);
+      if(k===segs.length-1){const r=Math.min(4,h,bw/2);s+='<path d="M'+x+' '+y0.toFixed(1)+'V'+(y1+r).toFixed(1)+'Q'+x+' '+y1.toFixed(1)+' '+(x+r)+' '+y1.toFixed(1)+'H'+(x+bw-r)+'Q'+(x+bw)+' '+y1.toFixed(1)+' '+(x+bw)+' '+(y1+r).toFixed(1)+'V'+y0.toFixed(1)+'Z" fill="'+c+'"/>'}
+      else s+='<rect x="'+x+'" y="'+y1.toFixed(1)+'" width="'+bw+'" height="'+h.toFixed(1)+'" fill="'+c+'"/>'});
+    if(i===top)s+='<text x="'+cx+'" y="'+(y(m.total)-6).toFixed(1)+'" text-anchor="middle" class="vl">'+moneyK(m.total)+'</text>';
+    s+='<text x="'+cx+'" y="'+(H-7)+'" text-anchor="middle" class="ax">'+(band<30?MON3[i][0]:MON3[i])+'</text><rect class="hit" data-m="'+i+'" x="'+(L+band*i)+'" y="'+Tp+'" width="'+band+'" height="'+ph+'" fill="transparent"/>'});
+  return s+'</svg><div class="ptip" hidden></div>'}
+function pipeDraw(){const el=$('#pipeMon'),T=S.pipeT;if(!el||!T)return;const W=Math.max(280,Math.floor(el.clientWidth));el.innerHTML=pipeMonthSvg(T,W);const tip=$('.ptip',el);
+  const show=(r,e)=>{const i=+r.dataset.m,m=T.months[i];$$('.hit',el).forEach(x=>x.classList.toggle('on',x===r));
+    tip.innerHTML='<b>'+MON3[i]+' '+T.year+'</b><div>'+(m.total?moneyK(m.total)+' bid · ':'')+m.n+' bid'+(m.n===1?'':'s')+'</div>'+T.names.concat(Object.keys(m.by).filter(n=>!T.names.includes(n))).filter(n=>m.by[n]).map(n=>'<div class="tr"><i class="sw" style="background:'+estColor(n)+'"></i>'+esc(n)+'<span>'+money(m.by[n])+'</span></div>').join('');
+    tip.hidden=false;const bx=el.getBoundingClientRect(),rb=r.getBoundingClientRect();let lx=rb.left-bx.left+rb.width/2-tip.offsetWidth/2;lx=Math.max(0,Math.min(lx,bx.width-tip.offsetWidth));tip.style.left=lx+'px';tip.style.top='0px'};
+  $$('.hit',el).forEach(r=>{r.onpointerenter=e=>show(r,e);r.onclick=e=>show(r,e)});el.onpointerleave=()=>{tip.hidden=true;$$('.hit',el).forEach(x=>x.classList.remove('on'))}}
+function bindPipe(){const ys=$('#pipeYear');if(ys)ys.onchange=()=>{lsSet('crewplans.pipeYear',ys.value);render()};
+  const ge=$('#goalEd');if(ge)ge.onclick=async()=>{const y=String(pipeYear()),cur=(S.salesGoal||{})[y];const v=await formBox('Sales goal for '+y,[{k:'g',label:'Goal ($ of work won in '+y+')',type:'number',value:cur!=null?String(cur):'',ph:'6000000'}],'Save goal','Shared with the whole office.');if(!v)return;
+    const n=Math.round(num(String(v.g).replace(/[$,\s]/g,'')));const val=Object.assign({},S.salesGoal||{},{[y]:n||null});if(!n)delete val[y];
+    if(await run(sb.from('office_settings').upsert({key:'sales_goal',value:val,updated_at:new Date().toISOString()},{onConflict:'key'}))){S.salesGoal=val;toast('Sales goal saved.');render()}};
+  $$('#pipe .uprow').forEach(el=>{const open=()=>{const j=pipeAll().find(x=>x.id===el.dataset.bid);if(j)bidPanel(j)};el.onclick=open;el.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();open()}}});
+  requestAnimationFrame(pipeDraw);if(!S.pipeRs){S.pipeRs=1;let t;window.addEventListener('resize',()=>{clearTimeout(t);t=setTimeout(()=>{if($('#pipeMon'))pipeDraw()},150)})}}
+
+/* ===== Bid tracker import (one time, from "Alpha Bidding Tracker 2026.xlsx") and export (same columns, one tab per month).
+   Month tabs JAN..DEC hold Josh / Ken / Rob blocks: JOB NAME | ESTIMATOR | BID DATE | BID AMOUNT | AWARDED Y/N | BIDDING GC's.
+   The parser below is pure (tested by .github/scripts/tracker-test.js). The Excel file is only read, never written. ===== */
+const gcKey=n=>trkKey(String(n||'').replace(/\b(construction|constructors|contractors?|general|builders|company|co|inc|llc|corp|corporation|group)\b\.?/gi,' '))||trkKey(n);
+const TRK_TABS=['JAN','FEB','MAR','APRIL','MAY','JUNE','JULY','AUG','SEPT','OCT','NOV','DEC'];
+const trkMon=n=>{const t=String(n||'').trim().toUpperCase().replace(/[\s\d'’.-]+$/,'');return t.length<3?-1:['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'].findIndex(f=>f.startsWith(t))};
+const trkText=v=>{if(v==null)return '';if(v instanceof Date)return isNaN(v)?'':isoD(v.getUTCFullYear(),v.getUTCMonth()+1,v.getUTCDate());if(typeof v==='object'){if('result' in v)return trkText(v.result);if(Array.isArray(v.richText))return v.richText.map(t=>t.text).join('').replace(/\s+/g,' ').trim();if('text' in v)return String(v.text).trim();return ''}return String(v).replace(/\s+/g,' ').trim()};
+const trkDate=(v,year)=>{if(v instanceof Date)return isNaN(v)?null:isoD(v.getUTCFullYear(),v.getUTCMonth()+1,v.getUTCDate());if(typeof v==='number'&&v>20000&&v<80000){const d=new Date(Math.round((v-25569)*864e5));return isoD(d.getUTCFullYear(),d.getUTCMonth()+1,d.getUTCDate())}const s=String(v==null?'':v).trim();if(/^\d{4}-\d{2}-\d{2}/.test(s))return s.slice(0,10);const m=s.match(/^(\d{1,2})[\/.-](\d{1,2})(?:[\/.-](\d{2,4}))?$/);if(!m)return null;const mo=+m[1],da=+m[2];let y=m[3]?+m[3]:year;if(y<100)y+=2000;if(mo<1||mo>12||da<1||da>31)return null;return isoD(y,mo,da)};
+const trkAmt=v=>{if(typeof v==='number')return Number.isFinite(v)?v:null;if(v&&typeof v==='object'&&'result' in v)return trkAmt(v.result);const s=String(v==null?'':v).replace(/[$,\s]/g,'');if(/^-?\d+(\.\d+)?$/.test(s))return +s;if(/^=?\d+(\.\d+)?([+-]\d+(\.\d+)?)+$/.test(s))return s.replace(/^=/,'').match(/[+-]?\d+(\.\d+)?/g).reduce((a,x)=>a+Number(x),0);return null};
+/* AWARDED Y/N cleanup: YAYESS / YES / Y / AWARDED -> Won; NOPE / NO / N / LOST -> Lost; NO BID -> No bid; REVIEWED, Maybe, ?, blank -> Submitted (bid date passed) or Open */
+const trkStatus=(raw,bd,td)=>{const t=String(raw||'').toUpperCase().replace(/[^A-Z ]+/g,'').replace(/\s+/g,' ').trim();if(/^NO ?BID\b|^DID NOT BID\b|^PASSED\b/.test(t))return 'nobid';if(/^(NOPE|NO|N|LOST|LOSS)\b/.test(t))return 'lost';if(/^(YA+Y*E+S+|YES+|Y|AWARDED|WON|WIN)\b/.test(t))return 'won';return bd&&bd<td?'submitted':'open'};
+const trkKey=n=>String(n||'').toLowerCase().replace(/^\s*\d{2,4}\s*[-–—]\s*/,'').replace(/&/g,' and ').replace(/[^a-z0-9]+/g,'');
+/* estimator text ("Ken", "Josh/Tony") -> the office person with that first name */
+const trkEst=(t,office)=>{const f=String(t||'').split(/[\/&,+]|\band\b/i)[0].trim().split(/\s+/)[0].toLowerCase();if(!f)return null;const o=(office||[]).find(x=>String(x.name||'').trim().split(/\s+/)[0].toLowerCase()===f);return o?o.id:null};
+const TRK_FU=/(?:asked\s+(?:[\w.&'-]+\s+){0,4}?for\s+(?:bid\s+)?results|bid\s+results\s+requested|results\s+requested)(?:\s+on)?\s*(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)?/gi;
+const TRK_RES=/(\b\d+\s*(?:st|nd|rd|th)\b|\b\d+\s+(?:of|out of)\s+(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b|\d+(?:\.\d+)?\s*%|\blow(?:est)?\s+(?:bid|number)\b|\blowest\b|\bhighest\b|\bused our\b|\bwe were\b|\bcame in\b|\bhigh(?:er)?\b|\blow(?:er)?\b)/i;
+const TRK_CTX=/(invited|bid date|extended|postpon|cancel|budget|addend|walk|re-?bid|bafo|\bsee\b|\bper\b|maybe|still|\btbd\b|\?|awarded to|went with|pending|no response|waiting)/i;
+/* BIDDING GC's cell -> GC names, follow-up notes ("Asked for results on 10/19" -> dated note) and result text ("3rd of 5", "10% high") */
+function trkSplit(t,year,bd){const notes=[],res=[],gcs=[],seen=new Set();let s=String(t||'');
+  s=s.replace(TRK_FU,(m,d)=>{let at=d?trkDate(d,year):null;if(at&&bd&&at<bd&&dayDiff(at,bd)>45&&!/\/\d{2,4}$/.test(d))at=(+at.slice(0,4)+1)+at.slice(4);notes.push({at,by:'Tracker',text:'Asked for results'});return ' ; '});
+  s.split(/\s*(?:;|\n|\||,(?!\d{3}(?:\D|$)))\s*/).map(x=>x.trim().replace(/^[-–:.\s]+|[-–:.\s]+$/g,'')).filter(Boolean).forEach(p=>{const inv=p.match(/^invited by\s+(.+)$/i);
+    if(inv){const g=inv[1].trim(),k=gcKey(g);if(k&&!seen.has(k)){seen.add(k);gcs.push(g)}notes.push({at:null,by:'Tracker',text:p});return}
+    if(TRK_RES.test(p)){res.push(p);return}
+    if(TRK_CTX.test(p)||p.length>40||!/[a-z]/i.test(p)){notes.push({at:null,by:'Tracker',text:p});return}
+    const k=gcKey(p);if(k&&!seen.has(k)){seen.add(k);gcs.push(p)}});
+  return {gcs,notes,result:res.join('; ')}}
+/* one month tab (rows = arrays of cell values) -> bid records; placeholder "Josh / Ken / Rob" rows, blank rows and the TOTAL row are skipped */
+function trkParseSheet(name,rows,year,td){const mi=trkMon(name);if(mi<0)return [];const out=[],R=rows||[];let hi=-1;
+  for(let i=0;i<Math.min(R.length,8);i++){if((R[i]||[]).some(c=>/job\s*name/i.test(trkText(c)))){hi=i;break}}
+  const H=hi>=0?Array.from(R[hi],c=>trkText(c).toLowerCase()):[];const col=(re,d)=>{const i=H.findIndex(h=>re.test(h||''));return i>=0?i:d};
+  const C={name:col(/job\s*name|project/,0),est:col(/estimat/,1),date:col(/date/,2),amt:col(/amount|\$/,3),aw:col(/award|y\/n|status/,4),gc:col(/gc|contractor/,5)};
+  let blockEst='';
+  for(let i=hi+1;i<R.length;i++){const r=R[i]||[];const nm=trkText(r[C.name]),est=trkText(r[C.est]),gcT=trkText(r[C.gc]),rawA=trkText(r[C.amt]);
+    if(!nm&&!est&&!gcT&&!rawA){blockEst='';continue}
+    if(est)blockEst=est;
+    if(!nm||/^(total|totals|grand total|sum)\b/i.test(nm)||/job\s*name/i.test(nm))continue;
+    if(/^(josh|ken|rob|tony)(\s*[\/&]\s*\w+)?$/i.test(nm)&&!rawA&&!gcT)continue;
+    const flags=[];let bd=trkDate(r[C.date],year);
+    if(!bd){const dt=trkText(r[C.date]);bd=isoD(year,mi+1,1);flags.push(dt?'Bid date "'+dt+'" isn’t a date; used '+MON3[mi]+' 1':'No bid date; used '+MON3[mi]+' 1')}
+    else if(+bd.slice(0,4)!==year)flags.push('Bid date is in '+bd.slice(0,4));
+    const amt=trkAmt(r[C.amt]);if(rawA&&amt==null)flags.push('Amount "'+rawA+'" isn’t a number');
+    const rawS=trkText(r[C.aw]),st=trkStatus(rawS,bd,td);if(rawS&&!/^(ya+y*e+s+|yes|y|no|nope|n|reviewed|awarded|lost|won|no ?bid)$/i.test(rawS.replace(/[^a-z ]/gi,'').trim()))flags.push('Status "'+rawS+'" read as '+bidStLabel(st));
+    const sp=trkSplit(gcT,year,bd);
+    out.push({tab:String(name).trim(),row:i+1,name:nm,est:est||blockEst,bidDate:bd,amount:amt,statusRaw:rawS,status:st,gcs:sp.gcs,notes:sp.notes,result:sp.result,flags})}
+  return out}
+/* whole workbook (sheets = [{name, rows}]) -> records, with duplicates and possible re-bids flagged */
+function trkParseBook(sheets,year,td){const recs=[];(sheets||[]).forEach(s=>trkParseSheet(s.name,s.rows,year,td).forEach(r=>recs.push(r)));const by={};
+  recs.forEach(r=>{const k=trkKey(r.name);(by[k]=by[k]||[]).push(r)});
+  Object.keys(by).forEach(k=>{const g=by[k];if(g.length<2)return;g.forEach((r,i)=>{const same=g.slice(0,i).find(o=>o.bidDate===r.bidDate&&trkKey(o.est)===trkKey(r.est));
+    if(same){r.dup=true;r.flags.push('Same job, date and estimator as '+same.tab+' row '+same.row)}else r.flags.push('Also on '+g.filter(x=>x!==r).map(x=>x.tab+' row '+x.row).join(', ')+' (re-bid?)')})});
+  return recs}
+const trkRow=(r,pm,src)=>({name:String(r.name).slice(0,120),stage:'bid',pm:pm||null,bid_date:r.bidDate||null,bid_amount:r.amount,bid_status:r.status,bid_result:r.result||null,result_date:null,bid_gcs:r.gcs.map(n=>({name:n})),bid_notes:r.notes,bid_source:src,gc_name:r.gcs.join(', ').slice(0,120),bid_folder:String(r.name).slice(0,300)});
+/* fill only what an existing app bid / job is missing (never overwrite what someone typed in the app) */
+function trkPatch(e,r,pm){const p={};if(e.bid_amount==null&&r.amount!=null)p.bid_amount=r.amount;
+  if(!e.bid_status)p.bid_status=e.stage==='job'?'won':r.status;
+  if(!e.bid_date&&r.bidDate)p.bid_date=r.bidDate;
+  if(!e.bid_result&&r.result)p.bid_result=r.result;
+  if(!(Array.isArray(e.bid_gcs)&&e.bid_gcs.length)&&r.gcs.length){p.bid_gcs=r.gcs.map(n=>({name:n}));if(!e.gc_name)p.gc_name=r.gcs.join(', ').slice(0,120)}
+  const have=new Set((e.bid_notes||[]).map(n=>(n.at||'')+'|'+n.text));const add=r.notes.filter(n=>!have.has((n.at||'')+'|'+n.text));if(add.length)p.bid_notes=(e.bid_notes||[]).concat(add);
+  if(!e.pm&&pm&&e.stage==='bid')p.pm=pm;
+  return p}
+/* what the import will do per row: new bid, update a matching app bid / job (by name), or skip (already imported: same name + bid date + estimator) */
+function trkPlan(recs,existing,office,year){const ex=(existing||[]).map(e=>({e,k:trkKey(e.name)})),used=new Set();
+  return (recs||[]).map(r=>{const pm=trkEst(r.est,office),k=trkKey(r.name),flags=r.flags.slice();if(r.est&&!pm)flags.push('Estimator "'+r.est+'" isn’t an office user');
+    const done=ex.find(x=>x.e.bid_source&&String(x.e.bid_source).startsWith('tracker')&&x.k===k&&(x.e.bid_date||null)===(r.bidDate||null)&&(x.e.pm||null)===(pm||null));
+    if(done)return {r,pm,action:'skip',why:'Already imported',match:{id:done.e.id,name:done.e.name},flags};
+    if(r.dup)return {r,pm,action:'skip',why:'Duplicate row',match:null,flags};
+    const near=x=>!x.e.bid_date||!r.bidDate||Math.abs(dayDiff(x.e.bid_date,r.bidDate))<=21;const like=ex.filter(x=>!x.e.bid_source&&!used.has(x.e.id)&&x.k&&(x.k===k||(k.length>=6&&x.k.length>=6&&(x.k.includes(k)||k.includes(x.k)))));const m=like.find(near);
+    if(m){const p=trkPatch(m.e,r,pm);used.add(m.e.id);if(!Object.keys(p).length)return {r,pm,action:'skip',why:'Already up to date',match:{id:m.e.id,name:m.e.name,stage:m.e.stage},flags};return {r,pm,action:'merge',match:{id:m.e.id,name:m.e.name,stage:m.e.stage},patch:p,flags}}
+    if(like.length)flags.push('Same name as '+like[0].e.name+(like[0].e.bid_date?' (bid '+like[0].e.bid_date+')':'')+' in the app (re-bid?)');
+    return {r,pm,action:'new',match:null,flags}})}
+const TRK_AW={won:'YES',lost:'NO',nobid:'NO BID',submitted:'REVIEWED',open:'',rebid:'RE-BID'};
+const trkGcText=j=>[bidGcs(j).map(g=>g.name).join(', '),j.bid_result||'',(Array.isArray(j.bid_notes)?j.bid_notes:[]).map(n=>n.text+(n.at?' on '+(+n.at.slice(5,7))+'/'+(+n.at.slice(8,10)):'')).join('  ')].filter(Boolean).join('  ');
+/* export: month tabs (by bid date) with one block per estimator, same columns as the Excel tracker */
+function trkExportTabs(all,year,td,office){const nm=j=>{const o=(office||[]).find(x=>x.id===j.pm);return o?o.name:'No estimator'};const tabs=TRK_TABS.map(t=>({name:t,b:{}})),extra={name:'NO DATE',b:{}};
+  all.filter(j=>pipeIn(j)&&bidYear(j)===year).sort((a,b)=>String(a.bid_date||'').localeCompare(String(b.bid_date||''))||String(a.name).localeCompare(String(b.name))).forEach(j=>{const T=j.bid_date?tabs[+j.bid_date.slice(5,7)-1]:extra,e=nm(j);(T.b[e]=T.b[e]||[]).push([j.name||'',e,j.bid_date||'',j.bid_amount==null||j.bid_amount===''?null:num(j.bid_amount),TRK_AW[bidStat(j,td)]||'',trkGcText(j)])});
+  return tabs.concat(Object.keys(extra.b).length?[extra]:[]).map(t=>({name:t.name,blocks:Object.keys(t.b).sort((a,b)=>a==='No estimator'?1:b==='No estimator'?-1:a.localeCompare(b)).map(k=>({est:k,rows:t.b[k]}))}))}
+async function trkDownload(){const y=pipeYear(),td=today();const tabs=trkExportTabs(pipeAll(),y,td,S.office||[]);if(!tabs.some(t=>t.blocks.length)){toast('No bids in '+y+' to download.');return}
+  const pb=progressBox('Building the '+y+' bid tracker…');
+  try{await loadExcel();const wb=new window.ExcelJS.Workbook();const hdr=['JOB NAME','ESTIMATOR','BID DATE','BID AMOUNT','AWARDED Y/N',"BIDDING GC's"];
+    tabs.forEach(t=>{const ws=wb.addWorksheet(t.name,{views:[{state:'frozen',ySplit:1}]});[42,13,12,15,13,90].forEach((w,i)=>ws.getColumn(i+1).width=w);
+      const h=ws.getRow(1);hdr.forEach((x,i)=>{const c=h.getCell(i+1);c.value=x;c.font={bold:true};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFD9E1F2'}}});let r=2;
+      t.blocks.forEach((b,bi)=>{if(bi)r++;b.rows.forEach(x=>{const row=ws.getRow(r++);row.getCell(1).value=x[0];row.getCell(2).value=x[1];if(x[2]){const [yy,mm,dd]=x[2].split('-').map(Number);row.getCell(3).value=new Date(Date.UTC(yy,mm-1,dd));row.getCell(3).numFmt='m/d/yyyy'}if(x[3]!=null){row.getCell(4).value=x[3];row.getCell(4).numFmt='"$"#,##0'}row.getCell(5).value=x[4];row.getCell(6).value=x[5];row.getCell(6).alignment={wrapText:true,vertical:'top'}})});
+      const tr=ws.getRow(r+1);tr.getCell(1).value='TOTAL';tr.getCell(1).font={bold:true};const sum=t.blocks.reduce((a,b)=>a+b.rows.reduce((s,x)=>s+num(x[3]),0),0);tr.getCell(4).value={formula:'SUM(D2:D'+Math.max(2,r-1)+')',result:sum};tr.getCell(4).numFmt='"$"#,##0';tr.getCell(4).font={bold:true}});
+    const buf=await wb.xlsx.writeBuffer();const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));a.download='Alpha Bidding Tracker '+y+' (from Alpha Operations '+td+').xlsx';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},60000);pb.close();toast('Tracker downloaded. It’s a copy: changes in Excel don’t come back to the app.')}
+  catch(e){pb.close();toast('Couldn’t build the tracker: '+errMsg(e))}}
+/* workbook -> [{name, rows}]; a formula with no saved result (e.g. "=15918+4291" typed in an amount) is kept as its formula text */
+function trkSheets(wb){return (wb.worksheets||[]).filter(ws=>trkMon(ws.name)>=0).map(ws=>{const rows=[];ws.eachRow({includeEmpty:false},(row,rn)=>{const a=[];row.eachCell({includeEmpty:false},(c,cn)=>{const v=c.value;a[cn-1]=v&&typeof v==='object'&&!(v instanceof Date)&&v.formula&&v.result==null?'='+v.formula:payCell(v)});rows[rn-1]=a});return {name:ws.name,rows}})}
+function trkImport(){if(!homeTabs())return;const m=modal('<h2>Import bid tracker (.xlsx)</h2><p class="muted">Pick <b>Alpha Bidding Tracker 2026.xlsx</b> from your computer. The app reads the month tabs (JAN to DEC, with the Josh, Ken and Rob blocks) and shows you every row before anything is saved. The Excel file is only read, never changed.</p><label class="btn primary block">Choose the tracker file<input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden data-f></label><div class="mbtns"><button class="btn" data-x>Cancel</button></div>');
+  $('[data-x]',m).onclick=()=>m.close();
+  $('[data-f]',m).onchange=async e=>{const f=e.target.files&&e.target.files[0];if(!f)return;m.close();const pb=progressBox('Reading '+f.name+'…');let P;
+    try{await loadExcel();const wb=new window.ExcelJS.Workbook();await wb.xlsx.load(await f.arrayBuffer());const yr=+((f.name.match(/20\d\d/)||[])[0])||new Date().getFullYear();const recs=trkParseBook(trkSheets(wb),yr,today());P={yr,file:f.name,items:trkPlan(recs,pipeAll(),S.office||[],yr)}}
+    catch(err){pb.close();toast('Couldn’t read that file: '+errMsg(err));return}
+    pb.close();if(!P.items.length){toast('No bid rows found. Pick the tracker that has the JAN to DEC tabs.');return}trkPreview(P)}}
+function trkPreview(P){const it=P.items;it.forEach(x=>x.on=x.action!=='skip');let filt='all';const m=modal('<div class="tp"></div>');$('.mcard',m).classList.add('xwide');
+  const est=x=>x.pm?pmName(x.pm):(x.r.est||'?');
+  const paint=()=>{const c=a=>it.filter(x=>x.action===a).length,fl=it.filter(x=>x.flags.length).length,on=it.filter(x=>x.on);const tabs=TRK_TABS.filter(t=>it.some(x=>trkMon(x.r.tab)===trkMon(t)));const es=[...new Set(it.map(est))].sort();
+    const shown=it.map((x,i)=>[x,i]).filter(([x])=>filt==='all'||(filt==='flag'?x.flags.length:filt==='skip'?x.action==='skip':x.action===filt));
+    let h='<div class="bph"><div class="grow"><h2>Import '+esc(P.file)+'</h2><div class="muted small">'+it.length+' bid rows found · '+c('new')+' new · '+c('merge')+' update an app bid or job · '+c('skip')+' skipped · '+fl+' flagged</div></div><button class="ico" data-x aria-label="Close">✕</button></div>';
+    h+='<div class="lscroll"><table class="ltab tpm"><thead><tr><th>Estimator</th>'+tabs.map(t=>'<th>'+t+'</th>').join('')+'<th>Total</th></tr></thead><tbody>'+es.map(e=>'<tr><td>'+esc(e)+'</td>'+tabs.map(t=>{const n=it.filter(x=>est(x)===e&&trkMon(x.r.tab)===trkMon(t)).length;return '<td>'+(n||'')+'</td>'}).join('')+'<td><b>'+it.filter(x=>est(x)===e).length+'</b></td></tr>').join('')+'</tbody></table></div>';
+    h+='<div class="hseg sm" style="margin:10px 0">'+[['all','All '+it.length],['new','New '+c('new')],['merge','Updates '+c('merge')],['flag','Flagged '+fl],['skip','Skipped '+c('skip')]].map(x=>'<button data-tf="'+x[0]+'"'+(filt===x[0]?' class="on"':'')+'>'+x[1]+'</button>').join('')+'</div>';
+    h+='<div class="lscroll tpw"><table class="ltab tpt"><thead><tr><th></th><th>Tab</th><th>Estimator</th><th>Job</th><th>Bid date</th><th>Amount</th><th>Status</th><th>GCs</th><th>Result & follow-ups</th><th>Notes</th></tr></thead><tbody>'+
+      shown.map(([x,i])=>'<tr class="'+(x.on?'':'off')+'"><td><input type="checkbox" data-on="'+i+'"'+(x.on?' checked':'')+(x.action==='skip'?' disabled':'')+' aria-label="Import this row"></td><td>'+esc(x.r.tab)+' '+x.r.row+'</td><td>'+esc(est(x))+'</td><td><b>'+esc(x.r.name)+'</b>'+(x.action==='merge'?'<div><select data-act="'+i+'"><option value="merge">Update “'+esc(x.match.name)+'”'+(x.match.stage==='job'?' (job)':'')+'</option><option value="new"'+(x.act==='new'?' selected':'')+'>Add as a new bid</option></select></div>':x.action==='skip'?'<div class="muted small">'+esc(x.why)+(x.match?': '+esc(x.match.name):'')+'</div>':'')+'</td><td>'+shortDay(x.r.bidDate)+'</td><td>'+(x.r.amount!=null?money(x.r.amount):'')+'</td><td>'+(x.r.statusRaw?'<span class="muted small">'+esc(x.r.statusRaw)+' →</span> ':'')+bidPill(x.r.status)+'</td><td>'+x.r.gcs.map(g=>'<span class="gtag">'+esc(g)+'</span>').join('')+'</td><td class="small">'+[x.r.result?'<b>'+esc(x.r.result)+'</b>':''].concat(x.r.notes.map(n=>esc(n.text)+(n.at?' '+shortDay(n.at):''))).filter(Boolean).join('<br>')+'</td><td class="small tpf">'+x.flags.map(esc).join('<br>')+'</td></tr>').join('')+'</tbody></table></div>';
+    h+='<div class="mbtns"><span class="grow muted small" style="align-self:center">Imported bids are marked as from the tracker, so running this again skips them. Nothing is written to the Excel file.</span><button class="btn" data-x2>Cancel</button><button class="btn primary" data-go'+(on.length?'':' disabled')+'>Import '+on.length+' row'+(on.length===1?'':'s')+'</button></div>';
+    $('.tp',m).innerHTML=h;
+    $('[data-x]',m).onclick=$('[data-x2]',m).onclick=()=>m.close();
+    $$('[data-tf]',m).forEach(b=>b.onclick=()=>{filt=b.dataset.tf;paint()});
+    $$('[data-on]',m).forEach(b=>b.onchange=()=>{it[+b.dataset.on].on=b.checked;paint()});
+    $$('[data-act]',m).forEach(b=>b.onchange=()=>{it[+b.dataset.act].act=b.value});
+    $('[data-go]',m).onclick=()=>{m.close();trkSave(P)}};
+  paint()}
+async function trkSave(P){const sel=P.items.filter(x=>x.on&&x.action!=='skip'),src='tracker-'+P.yr;const news=sel.filter(x=>x.action==='new'||x.act==='new').map(x=>trkRow(x.r,x.pm,src)),ups=sel.filter(x=>x.action==='merge'&&x.act!=='new');
+  const pb=progressBox('Saving bids…');let added=0,upd=0,bad=0;
+  for(let i=0;i<news.length;i+=50){pb.set('Adding bids '+(i+1)+'–'+Math.min(i+50,news.length)+' of '+news.length+'…');try{await q(sb.from('jobs').insert(news.slice(i,i+50)));added+=Math.min(50,news.length-i)}catch(e){bad++;toast(errMsg(e))}}
+  for(const x of ups){pb.set('Updating '+x.match.name+'…');try{await q(sb.from('jobs').update(x.patch).eq('id',x.match.id));upd++}catch(e){bad++}}
+  pb.close();await loadJobs();lsSet('crewplans.homeSec','bids');lsSet('crewplans.bidView','all');if(S.view!=='job'){S.view='jobs';render()}
+  toast('Imported '+added+' bid'+(added===1?'':'s')+(upd?', updated '+upd:'')+'.'+(bad?' Some rows didn’t save; run the import again to retry them.':''))}
 
 /* download a whole job as one ZIP (for filing in OneDrive) */
 const csvCell=v=>{v=v==null?'':String(v);return /[",\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};

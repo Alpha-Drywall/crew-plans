@@ -31,3 +31,5 @@ jobs:
         run: node .github/scripts/payapp-test.js
       - name: Test the takeoff math (feet parsing, LF/SF, scale, totals, bid sheet rows, saving edits)
         run: node .github/scripts/takeoff-test.js
+      - name: Test the bid tracker (Excel tracker import, status cleanup, GC column split, Pipeline numbers, export)
+        run: node .github/scripts/tracker-test.js
