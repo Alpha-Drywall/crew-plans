@@ -948,6 +948,17 @@ const pmName=id=>{const o=(S.office||[]).find(x=>x.id===id);return o?o.name:''};
 /* Progress reminders: a job needs progress marked when 2+ days with crew hours (daily reports or time cards) were logged after the last progress markup.
    Only jobs that have progress sheets count. Everyone on the job sees it (office and foremen). */
 const NUDGE_DAYS=2;
+async function loadJobSizes(){if(!S.isAdmin||S.asUser||S.practice)return;try{const d=await q(sb.from('job_budget').select('job_id,labor'));const o={};(d||[]).forEach(r=>{const L=r.labor||{};const ls=(L.billing&&L.billing.lines)||[];const t=ls.reduce((a,l)=>a+num(l.v),0);if(t>0)o[r.job_id]=t});S.jobSize=o;render()}catch(e){}}
+const JOB_SORTS=[['num','Job # (newest first)'],['numUp','Job # (oldest first)'],['name','Name A\u2013Z'],['act','Recent activity'],['size','Size (contract $)']];
+const jobNum=j=>{const m=String(j.name||'').match(/^\s*0*(\d+)/);return m?+m[1]:-1};
+function sortJobs(list){const m=lsGet('crewplans.jobSort')||'num';const a=list.slice();const nm=(x,y)=>String(x.name||'').localeCompare(String(y.name||''),undefined,{numeric:true});
+  if(m==='numUp')return a.sort((x,y)=>(jobNum(x)<0?1e9:jobNum(x))-(jobNum(y)<0?1e9:jobNum(y))||nm(x,y));
+  if(m==='name')return a.sort((x,y)=>String(x.name||'').replace(/^\s*\d+\s*[-\u2013]?\s*/,'').localeCompare(String(y.name||'').replace(/^\s*\d+\s*[-\u2013]?\s*/,''))||nm(x,y));
+  if(m==='act'){const A=S.jobAct||{};return a.sort((x,y)=>String(A[y.id]||'').localeCompare(String(A[x.id]||''))||jobNum(y)-jobNum(x))}
+  if(m==='size'&&S.isAdmin){const Z=S.jobSize||{};return a.sort((x,y)=>num(Z[y.id])-num(Z[x.id])||jobNum(y)-jobNum(x))}
+  return a.sort((x,y)=>jobNum(y)-jobNum(x)||nm(x,y))}
+function jobSortBar(n){if(n<2)return '';const m=lsGet('crewplans.jobSort')||'num';const opts=JOB_SORTS.filter(o=>o[0]!=='size'||(S.isAdmin&&!S.asUser&&!S.practice));
+  return '<div class="row" style="justify-content:flex-end;gap:6px;margin:0 2px 8px"><span class="muted small">Sort</span><select id="jobSort" style="border:1px solid var(--line);border-radius:8px;padding:5px 8px;font:inherit;font-size:14px;background:#fff">'+opts.map(o=>'<option value="'+o[0]+'"'+(o[0]===m?' selected':'')+'>'+o[1]+'</option>').join('')+'</select></div>'}
 async function loadNudges(){try{const since=new Date(Date.now()-60*864e5);const sinceD=since.toISOString().slice(0,10);
   const [logs,marks,areas,ps,cards]=await Promise.all([q(sb.from('logs').select('job_id,date,hours').gte('date',sinceD)),q(sb.from('marks').select('job_id,created_at').eq('layer','progress').gte('created_at',since.toISOString())),q(sb.from('areas').select('job_id,updated_at')),q(sb.from('sheets').select('job_id').eq('on_progress',true).eq('is_current',true)),q(sb.from('timecards').select('owner,foreman,period_start,workers').gte('period_start',tcPeriodOf(sinceD))).then(c=>S.asUser?(c||[]).filter(x=>x.owner===S.me.id):c).catch(()=>[])]);
   const uses=new Set((ps||[]).map(x=>x.job_id));const last={};const bump=(j,t)=>{if(t&&(!last[j]||t>last[j]))last[j]=t};
@@ -955,6 +966,7 @@ async function loadNudges(){try{const since=new Date(Date.now()-60*864e5);const 
   const days={};(logs||[]).forEach(l=>{if(!uses.has(l.job_id)||!(num(l.hours)>0))return;const lp=last[l.job_id]?String(last[l.job_id]).slice(0,10):'';if(l.date>lp)(days[l.job_id]=days[l.job_id]||new Set()).add(l.date)});
   (S.jobs||[]).forEach(j=>{if(!uses.has(j.id)||!(cards||[]).length)return;const K=tcJobKey(j);const lp=last[j.id]?String(last[j.id]).slice(0,10):'';tcJobLive(cards,K[0],K[1],lp>sinceD?lp:sinceD).days.forEach(d=>{if(d<=tcToday())(days[j.id]=days[j.id]||new Set()).add(d)})});
   const out={};Object.keys(days).forEach(j=>{if(days[j].size>=NUDGE_DAYS)out[j]={days:days[j].size,last:last[j]||null}});
+  const act={};const bumpA=(j,t)=>{if(t&&(!act[j]||t>act[j]))act[j]=t};Object.keys(last).forEach(j=>bumpA(j,last[j]));(logs||[]).forEach(l=>bumpA(l.job_id,l.date));S.jobAct=act;
   S.nudges=out;render()}catch(e){}}
 function nudgeBanner(){const n=S.job&&(S.nudges||{})[S.job.id];if(!n)return '';
   return '<div class="card" id="nudgeCard" style="background:#fff4e5;border-color:#f5c27a;margin-bottom:12px"><b>\u26a0 Progress needs updating</b><div class="small" style="margin-top:4px">'+n.days+' days of crew hours logged since progress was '+(n.last?'last marked ('+esc(new Date(n.last).toLocaleDateString(undefined,{month:'short',day:'numeric'}))+')':'never marked')+'. Labor alerts and billing use these markups, so keep them current.</div>'+(S.tab!=='progress'?'<button class="btn sm primary" id="nudgeGo" style="margin-top:8px">Mark progress</button>':'')+'</div>'}
@@ -1716,10 +1728,10 @@ function renderJobs(){
     if(S.isAdmin){
       const mode=lsGet('crewplans.jobView')||'mine';
       h+='<div class="chips"><button class="chip'+(mode==='mine'?' on':'')+'" data-view="mine">My jobs</button><button class="chip'+(mode==='all'?' on':'')+'" data-view="all">All jobs</button></div>';
-      if(mode==='mine'){const mine=S.jobs.filter(j=>j.pm&&j.pm===S.myOfficeId);h+=mine.length?mine.map(card).join(''):'<div class="empty"><b>No jobs with you as PM</b>Tap All jobs to see everyone\'s.</div>'}
-      else{const groups={};S.jobs.forEach(j=>{const k=pmName(j.pm)||'No PM';(groups[k]=groups[k]||[]).push(j)});
+      if(mode==='mine'){const mine=sortJobs(S.jobs.filter(j=>j.pm&&j.pm===S.myOfficeId));h+=jobSortBar(mine.length)+(mine.length?mine.map(card).join(''):'')+(mine.length?'':'<div class="empty"><b>No jobs with you as PM</b>Tap All jobs to see everyone\'s.</div>')}
+      else{h+=jobSortBar(S.jobs.length);const groups={};sortJobs(S.jobs).forEach(j=>{const k=pmName(j.pm)||'No PM';(groups[k]=groups[k]||[]).push(j)});
         Object.keys(groups).sort((a,b)=>a==='No PM'?1:b==='No PM'?-1:a.localeCompare(b)).forEach(k=>{h+='<div class="logday"><span>'+esc(k)+'</span><span class="muted">'+groups[k].length+' job'+(groups[k].length===1?'':'s')+'</span></div>'+groups[k].map(card).join('')})}
-    }else h+=S.jobs.map(card).join('');
+    }else h+=jobSortBar(S.jobs.length)+sortJobs(S.jobs).map(card).join('');
   }
   return h+'</main>';
 }
@@ -1733,6 +1745,8 @@ function bindJobs(){
   $$('.job').forEach(el=>el.onclick=()=>openJob(el.dataset.id));
   if($('#tcOpen'))$('#tcOpen').onclick=openTimecards;
   $$('[data-view]').forEach(b=>b.onclick=()=>{lsSet('crewplans.jobView',b.dataset.view);render()});
+  const js=$('#jobSort');if(js)js.onchange=()=>{lsSet('crewplans.jobSort',js.value);if(js.value==='size'&&!S.jobSize)loadJobSizes();render()};
+  if(S.isAdmin&&!S.jobSize&&(lsGet('crewplans.jobSort')||'')==='size'&&!S.jobSizeT){S.jobSizeT=1;loadJobSizes()}
   $('#acct').onclick=()=>{
     if(S.asUser){asMenu();return}
     const m=modal('<h2>Account</h2><p class="muted">'+(S.isAdmin?'Signed in as office: '+esc(S.me.email||who(S.me.id)):S.realAdmin?'Office login, looking at the field view.':isForeman()?'Signed in as foreman: '+esc(S.me.email||''):'Crew access on this phone. Your access comes from invite links; signing out would remove it from this phone.')+'</p><div style="display:grid;gap:10px;margin-top:12px">'+
