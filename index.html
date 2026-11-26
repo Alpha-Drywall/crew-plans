@@ -221,7 +221,37 @@ input[type=range]{width:100%;height:32px}
 .hbar>.hseg{margin-right:auto}
 .bfil{display:flex;gap:8px;align-items:center;margin:0 0 10px;flex-wrap:wrap}
 .bfil input{flex:1;min-width:170px;min-height:40px;border:1px solid var(--line);border-radius:10px;padding:6px 12px;background:#fff;font-size:15px}
-.bsum{font-size:13px;color:var(--muted);margin:2px 2px -6px;font-variant-numeric:tabular-nums}
+.bsum{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.bsum{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:2px 2px 0}
+.blink{border:0;background:none;color:#1f4e8c;font-weight:700;font-size:13px;padding:6px 2px;min-height:32px;cursor:pointer}
+.blink:hover{text-decoration:underline}
+.bsh{display:flex;align-items:center;gap:8px;width:100%;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer;padding:6px 4px;border-radius:8px;min-height:40px}
+.bsh:hover{background:#0000000a}.bsh:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.bsh .bshn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bsh .muted{font-size:13px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.bchv{flex:none;width:16px;text-align:center;font-size:20px;line-height:1;color:#7b8591;transition:transform .15s;transform:rotate(90deg)}
+.bsh[aria-expanded=false] .bchv{transform:none}
+.bsh.l1{font-weight:800;font-size:17px;margin:16px 0 4px;border-bottom:2px solid var(--line);border-radius:8px 8px 0 0}
+.bsh.l1.solo{cursor:default;padding-left:4px}.bsh.l1.solo:hover{background:none}
+.bsh.l2{font-weight:700;font-size:14px;margin:6px 0 4px;padding-left:10px;min-height:36px}
+.bsh.l2 .bshn{text-transform:uppercase;letter-spacing:.04em;font-size:12.5px;color:#38414b}
+.bsh.l2.tdy .bshn{color:#b42318}
+.bsh .edot,.bests .edot{flex:none;width:10px;height:10px;border-radius:50%;display:inline-block}
+.bsh.l2 .edot+.bshn{text-transform:none;letter-spacing:0;font-size:15px;color:var(--ink)}
+.bests{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 0 6px;padding:2px 1px}.bests::-webkit-scrollbar{display:none}
+.bests .chip{flex:none;display:inline-flex;align-items:center;gap:6px}
+.best{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:var(--ink);background:color-mix(in srgb,var(--ec) 15%,#fff);border:1px solid color-mix(in srgb,var(--ec) 50%,#fff);border-radius:999px;padding:0 7px 0 5px;line-height:18px;margin-right:6px;vertical-align:1px;white-space:nowrap}
+.best i{width:8px;height:8px;border-radius:50%;background:var(--ec);flex:none}
+.bnext{display:flex;align-items:center;gap:4px 10px;flex-wrap:wrap;width:100%;text-align:left;border:1px solid var(--line);border-left:5px solid var(--accent);background:#fff;border-radius:10px;padding:8px 12px;margin:0 0 12px;font:inherit;color:inherit;cursor:pointer;min-height:44px}
+.bnext:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.bnext.tdy{border-left-color:#d92d20;background:#fff8f7}
+.bnext .bnk{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#7a4b00;flex:none}
+.bnext.tdy .bnk{color:#b42318}
+.bnext .bnn{font-weight:800;min-width:0;flex:1 1 150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bnext .bnw{font-size:13px;color:var(--muted);white-space:nowrap}
+.bnext .bnm{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.bnext .best{margin:0}
+main.dense .bsh.l1{margin:10px 0 2px;min-height:34px;padding:3px 4px}main.dense .bsh.l2{min-height:30px;margin:2px 0}main.dense .bnext{padding:5px 10px;margin-bottom:8px;min-height:36px}
+html.hc .best,html.hc .bnext{border-width:2px}html.hc .bsh.l1{border-bottom-color:#59626d}html.hc .bchv{color:#262c33}html.hc .blink{color:#0b3a75}
 .bidc{display:flex;align-items:center;gap:12px;cursor:pointer;padding:12px 8px 12px 12px}
 .bidc:focus-visible,.uprow:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .bidc .bchk{width:20px;height:20px;flex:none;margin:0;pointer-events:none;accent-color:var(--accent)}.bidc.bsel{outline:2px solid var(--accent);outline-offset:-2px}
@@ -2734,11 +2764,43 @@ const bidYear=j=>+String(j.bid_date||j.created_at||'').slice(0,4)||0;
 const EST_COL=['#257de0','#f47230','#00b894','#f2a600','#ee7fac','#008a17','#6a4ce2','#ec4647'];
 /* estimator colors follow the person (office names in A-Z order), never their rank */
 function estColor(name){const ns=[...new Set((S.office||[]).map(o=>o.name))].sort((a,b)=>a.localeCompare(b));const i=ns.indexOf(name);return i>=0&&i<EST_COL.length?EST_COL[i]:'#9aa3ad'}
+/* list phase of a bid: 0 coming up (bid date today or later, no result), 1 waiting on results, 2 no bid date, 3 results */
+const bidPh=(j,td)=>bidRes(bidStat(j,td))?3:!j.bid_date?2:String(j.bid_date).slice(0,10)>=td?0:1;
+/* Coming up split by urgency: Due today, This week (next 7 days), Later. Each sorted by bid date, then name. Empty groups dropped. */
+function bidComingGroups(list,td){
+  const g=[['today','Due today',[]],['week','This week',[]],['later','Later',[]]];
+  (list||[]).filter(j=>bidPh(j,td)===0).sort((a,b)=>String(a.bid_date).localeCompare(String(b.bid_date))||String(a.name||'').localeCompare(String(b.name||''))).forEach(j=>{const n=dayDiff(td,String(j.bid_date).slice(0,10));g[n<=0?0:n<=7?1:2][2].push(j)});
+  return g.filter(x=>x[2].length)}
+/* estimator groups A-Z, No estimator last */
+const bidEstSort=(a,b)=>a==='No estimator'?1:b==='No estimator'?-1:a.localeCompare(b);
+/* estimators that have bids (for the chips), A-Z */
+const bidEstNames=(list,nm)=>[...new Set((list||[]).map(nm).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+/* bid list sections: Coming up (split Due today / This week / Later), Waiting on results, No bid date, Results (newest first).
+   byEst (All bids): Waiting on results and Results are grouped by estimator. nm(j) -> estimator name. */
+function bidSecs(list,td,nm,byEst){
+  const L=[['up','Coming up'],['wait','Waiting on results'],['nodate','No bid date'],['res','Results']],b=[[],[],[],[]];
+  const rec=(x,y)=>String(y.result_date||y.bid_date||y.created_at||'').localeCompare(String(x.result_date||x.bid_date||x.created_at||''));
+  (list||[]).forEach(j=>b[bidPh(j,td)].push(j));
+  return L.map((x,i)=>{const s={k:x[0],label:x[1]};
+    if(i===0){s.subs=bidComingGroups(b[0],td);s.items=[].concat(...s.subs.map(g=>g[2]))}else s.items=b[i].slice().sort(rec);
+    if(byEst&&(i===1||i===3)){const g={};s.items.forEach(j=>{const k=nm(j)||'No estimator';(g[k]=g[k]||[]).push(j)});s.groups=Object.keys(g).sort(bidEstSort).map(k=>[k,g[k]])}
+    return s}).filter(s=>s.items.length)}
+/* collapsed sections of the bid list, saved per section key (view:section[:group]); Results start collapsed, everything else open */
+const bidCollOn=(st,k)=>st&&Object.prototype.hasOwnProperty.call(st,k)?!!st[k]:/:res$/.test(k);
+function bidCollSt(){try{const o=JSON.parse(lsGet('crewplans.bidColl')||'{}');return o&&typeof o==='object'?o:{}}catch(e){return {}}}
+function bidCollSet(keys,v){const o=bidCollSt();keys.forEach(k=>o[k]=!!v);lsSet('crewplans.bidColl',JSON.stringify(o))}
+const DOW3=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const wkDay=s=>{const [y,m,d]=String(s||'').split('-').map(Number);return y&&m?DOW3[new Date(Date.UTC(y,m-1,d)).getUTCDay()]+' '+MON3[m-1]+' '+d:''};
+const estBadge=n=>'<span class="best" style="--ec:'+(n==='No estimator'?'#9aa3ad':estColor(n))+'"><i></i>'+esc(n)+'</span>';
+/* "Next due" strip at the top of Bids: the soonest bid due today or later, everyone's */
+function bidNextHtml(){const td=today(),g=bidComingGroups(S.bids||[],td);if(!g.length)return '';const j=g[0][2][0],n=dayDiff(td,String(j.bid_date).slice(0,10)),same=g[0][2].filter(x=>x!==j&&x.bid_date===j.bid_date).length;
+  return '<button type="button" class="bnext'+(n===0?' tdy':'')+'" data-bnext="'+esc(j.id)+'" title="Open bid details"><span class="bnk">'+(n===0?'Due today':'Next due')+'</span><span class="bnn">'+esc(j.name||'Untitled bid')+'</span><span class="bnm"><span class="bnw">'+wkDay(j.bid_date)+(n>0?' · '+(n===1?'tomorrow':'in '+n+' days'):'')+'</span>'+estBadge(pmName(j.pm)||'No estimator')+(same?'<span class="bnw">+'+same+' more that day</span>':'')+'</span></button>'}
 function bidDateBlock(d,td,res,cls){if(!d)return '<div class="bdate none'+(cls||'')+'"><span>No</span><b>date</b></div>';const n=dayDiff(td,d),[y,m,dd]=d.split('-').map(Number);
   return '<div class="bdate'+(res?'':n>=0&&n<=7?' soon':n<0?' past':'')+(cls||'')+'" title="'+esc(fmtDay(d))+'"><span>'+MON3[m-1]+(y!==+td.slice(0,4)?' ’'+String(y).slice(2):'')+'</span><b>'+dd+'</b></div>'}
 const bidPill=s=>'<span class="bpill s-'+s+'">'+bidStLabel(s)+'</span>';
-function bidCard(j,td,sel){const s=bidStat(j,td),g=bidGcs(j),notes=Array.isArray(j.bid_notes)?j.bid_notes:[],last=notes[notes.length-1],d=j.bid_date,n=d?dayDiff(td,d):null,res=bidRes(s);
+function bidCard(j,td,sel,est){const s=bidStat(j,td),g=bidGcs(j),notes=Array.isArray(j.bid_notes)?j.bid_notes:[],last=notes[notes.length-1],d=j.bid_date,n=d?dayDiff(td,d):null,res=bidRes(s);
   let l2=d?(n===0?'<b class="due">Due today</b>':n>0&&n<=14?'<b class="due">Due in '+n+' day'+(n===1?'':'s')+'</b>':'Bid '+shortDay(d)+(d.slice(0,4)!==td.slice(0,4)?', '+d.slice(0,4):'')):'No bid date';
+  if(est)l2=estBadge(est)+l2;
   if(g.length)l2+=' · '+esc(g[0].name)+(g.length>1?' +'+(g.length-1):'');
   let l3='';if(res&&j.bid_result)l3=esc(j.bid_result);else if(last)l3=esc(last.text)+(last.at?' · '+shortDay(last.at):'');else if(!res&&d&&n<-7)l3='<span class="bwarn">No follow-up yet · bid '+(-n)+' days ago</span>';
   const on=sel&&sel.has(j.id);
@@ -2747,24 +2809,34 @@ function bidCard(j,td,sel){const s=bidStat(j,td),g=bidGcs(j),notes=Array.isArray
 function renderBidsSec(){const pane=lsGet('crewplans.bidPane')==='pipe'?'pipe':'list';
   let h='<div class="hbar"><div class="hseg" role="tablist"><button role="tab" data-bpane="list"'+(pane==='list'?' class="on" aria-selected="true"':'')+'>Bid list</button><button role="tab" data-bpane="pipe"'+(pane==='pipe'?' class="on" aria-selected="true"':'')+'>Pipeline</button></div><button class="btn sm" id="trkDl" title="Download the bid tracker as an Excel file, one tab per month, Josh / Ken / Rob blocks">⤓ Tracker .xlsx</button></div>';
   if(!S.jobsLoaded)return h+'<div class="empty">Loading bids…</div>';
-  return h+(pane==='pipe'?renderPipe():renderBidList())}
+  return h+bidNextHtml()+(pane==='pipe'?renderPipe():renderBidList())}
 function renderBidList(){const bv=lsGet('crewplans.bidView')==='all'?'all':'mine',f=lsGet('crewplans.bidFilt')||'open';
   let h='<div class="hbar"><div class="chips"><button class="chip'+(bv==='mine'?' on':'')+'" data-bview="mine">My bids</button><button class="chip'+(bv==='all'?' on':'')+'" data-bview="all">All bids</button></div>'+densChip('home')+'<div class="row" style="gap:8px"><button class="btn sm'+(S.bidSel?' on':'')+'" id="bidSelBtn" aria-pressed="'+!!S.bidSel+'" title="Pick several bids to mark didn’t bid or delete">'+(S.bidSel?'Done':'Select')+'</button><button class="btn primary sm" id="newBid">+ New bid</button></div></div>';
   h+='<div class="bfil"><div class="hseg sm">'+[['open','Open'],['res','Results'],['all','All']].map(x=>'<button data-bfilt="'+x[0]+'"'+(f===x[0]?' class="on"':'')+'>'+x[1]+'</button>').join('')+'</div><input type="search" id="bidQ" placeholder="Search bids" aria-label="Search bids" value="'+esc(S.bidQ||'')+'" autocomplete="off"></div>';
   return h+'<div id="bidList">'+bidListHtml()+'</div>'}
-function bidListHtml(){const td=today(),bv=lsGet('crewplans.bidView')==='all'?'all':'mine',f=lsGet('crewplans.bidFilt')||'open';
+function bidListHtml(){const td=today(),bv=lsGet('crewplans.bidView')==='all'?'all':'mine',f=lsGet('crewplans.bidFilt')||'open',nm=j=>pmName(j.pm);
   if(!(S.bids||[]).length)return '<div class="empty"><b>No bids yet</b>Add a bid, upload its plans, then do the takeoff on its Takeoff tab. To bring in this year’s Excel tracker, use ☰ → Import bid tracker.</div>';
-  let list=(S.bids||[]).filter(j=>bidFilt(j,f,td)&&bidMatch(j,S.bidQ));if(bv==='mine')list=list.filter(j=>j.pm&&j.pm===S.myOfficeId);
-  if(!list.length)return '<div class="empty"><b>'+(S.bidQ?'Nothing matches “'+esc(S.bidQ)+'”':bv==='mine'?'No '+(f==='res'?'results':f==='open'?'open bids':'bids')+' with you as estimator':'No '+(f==='res'?'results yet':'open bids'))+'</b>'+(bv==='mine'?'Tap All bids to see everyone’s.':'Try All.')+'</div>';
-  const ph=j=>{const s=bidStat(j,td);return bidRes(s)?3:!j.bid_date?2:j.bid_date>=td?0:1};
-  list.sort((a,b)=>{const pa=ph(a),pb=ph(b);if(pa!==pb)return pa-pb;if(pa===0)return String(a.bid_date).localeCompare(String(b.bid_date));return String(b.result_date||b.bid_date||b.created_at||'').localeCompare(String(a.result_date||a.bid_date||a.created_at||''))});
+  let h='',est='';
+  if(bv==='all'){const ns=bidEstNames(S.bids,nm);est=lsGet('crewplans.bidEst')||'';if(!ns.includes(est))est='';
+    if(ns.length>1)h+='<div class="bests chips" role="group" aria-label="Estimator"><button class="chip sm'+(est?'':' on')+'" data-best="" aria-pressed="'+!est+'">All</button>'+ns.map(n=>'<button class="chip sm'+(est===n?' on':'')+'" data-best="'+esc(n)+'" aria-pressed="'+(est===n)+'"><i class="edot" style="background:'+estColor(n)+'"></i>'+esc(n)+'</button>').join('')+'</div>'}
+  let list=(S.bids||[]).filter(j=>bidFilt(j,f,td)&&bidMatch(j,S.bidQ));if(bv==='mine')list=list.filter(j=>j.pm&&j.pm===S.myOfficeId);if(est)list=list.filter(j=>nm(j)===est);
+  if(!list.length)return h+'<div class="empty"><b>'+(S.bidQ?'Nothing matches “'+esc(S.bidQ)+'”':bv==='mine'?'No '+(f==='res'?'results':f==='open'?'open bids':'bids')+' with you as estimator':'No '+(f==='res'?'results yet':'open bids')+(est?' for '+esc(est):''))+'</b>'+(bv==='mine'?'Tap All bids to see everyone’s.':est?'Tap All to see everyone’s.':'Try All.')+'</div>';
   const amt=j=>bidStat(j,td)==='nobid'?0:num(j.bid_amount),tot=list.reduce((a,j)=>a+amt(j),0),sel=S.bidSel;
-  let h=sel?'<div class="bselbar" role="toolbar" aria-label="Selected bids"><b>'+sel.size+' selected</b><button class="btn sm" data-bsall>'+(list.every(j=>sel.has(j.id))?'Select none':'Select all '+list.length)+'</button><span class="grow"></span><button class="btn sm" data-bsnb'+(sel.size?'':' disabled')+'>Mark didn’t bid</button><button class="btn sm danger" data-bsdel'+(sel.size?'':' disabled')+'>Delete</button></div>':'';
-  S.bidVis=list.map(j=>j.id);
-  h+='<div class="bsum">'+list.length+' bid'+(list.length===1?'':'s')+(tot?' · '+moneyK(tot)+' bid':'')+'</div>';
-  const grp=(k,arr,unit)=>'<div class="logday"><span>'+esc(k)+'</span><span class="muted">'+arr.length+' '+unit+(arr.length===1?'':'s')+(arr.some(j=>amt(j))?' · '+moneyK(arr.reduce((a,j)=>a+amt(j),0)):'')+'</span></div>'+arr.map(j=>bidCard(j,td,sel)).join('');
-  if(bv==='all'){const g={};list.forEach(j=>{const k=pmName(j.pm)||'No estimator';(g[k]=g[k]||[]).push(j)});Object.keys(g).sort((a,b)=>a==='No estimator'?1:b==='No estimator'?-1:a.localeCompare(b)).forEach(k=>h+=grp(k,g[k],'bid'));return h}
-  const L=['Coming up','Waiting on results','No bid date','Results'],g=[[],[],[],[]];list.forEach(j=>g[ph(j)].push(j));g.forEach((arr,i)=>{if(arr.length)h+=grp(L[i],arr,'bid')});return h}
+  const secs=bidSecs(list,td,nm,bv==='all'),st=bidCollSt(),q=!!String(S.bidQ||'').trim(),one=secs.length===1,keys=[],vis=[];
+  const isC=k=>!q&&bidCollOn(st,bv+':'+k);
+  const cnt=arr=>arr.length+' bid'+(arr.length===1?'':'s')+(arr.some(j=>amt(j))?' · '+moneyK(arr.reduce((a,j)=>a+amt(j),0)):'');
+  const head=(k,lv,lab,arr,c,pre)=>{keys.push(bv+':'+k);return '<button type="button" class="bsh l'+lv+(k.endsWith(':today')?' tdy':'')+'" data-bcoll="'+esc(bv+':'+k)+'" aria-expanded="'+!c+'"><span class="bchv" aria-hidden="true">›</span>'+(pre||'')+'<span class="bshn">'+esc(lab)+'</span><span class="muted">'+cnt(arr)+'</span></button>'};
+  const cards=(arr,b)=>{arr.forEach(j=>vis.push(j.id));return arr.map(j=>bidCard(j,td,sel,b?nm(j)||'No estimator':'')).join('')};
+  let body='';
+  secs.forEach(s=>{const c=!one&&isC(s.k);if(one)body+='<div class="bsh l1 solo"><span class="bshn">'+esc(s.label)+'</span><span class="muted">'+cnt(s.items)+'</span></div>';else body+=head(s.k,1,s.label,s.items,c);
+    const badge=bv==='all'&&!est&&(s.k==='up'||s.k==='nodate');
+    const inner=()=>s.subs?s.subs.map(x=>{const k=s.k+':'+x[0],cc=isC(k);return head(k,2,x[1],x[2],cc)+(cc?'':cards(x[2],badge))}):s.groups?s.groups.map(x=>{const k=s.k+':'+x[0],cc=isC(k);return head(k,2,x[0],x[1],cc,'<i class="edot" style="background:'+(x[0]==='No estimator'?'#9aa3ad':estColor(x[0]))+'"></i>')+(cc?'':cards(x[1],false))}):[];
+    if(s.subs||s.groups){if(c)(s.subs||s.groups).forEach(x=>keys.push(bv+':'+s.k+':'+x[0]));else body+=inner().join('')}else if(!c)body+=cards(s.items,badge)});
+  S.bidVis=vis;S.bidKeys=keys;
+  const anyC=keys.some(k=>bidCollOn(st,k));
+  if(sel)h+='<div class="bselbar" role="toolbar" aria-label="Selected bids"><b>'+sel.size+' selected</b><button class="btn sm" data-bsall>'+(vis.length&&vis.every(id=>sel.has(id))?'Select none':'Select all '+vis.length)+'</button><span class="grow"></span><button class="btn sm" data-bsnb'+(sel.size?'':' disabled')+'>Mark didn’t bid</button><button class="btn sm danger" data-bsdel'+(sel.size?'':' disabled')+'>Delete</button></div>';
+  h+='<div class="bsum"><span>'+list.length+' bid'+(list.length===1?'':'s')+(tot?' · '+moneyK(tot)+' bid':'')+(est?' · '+esc(est):'')+'</span>'+(keys.length&&!q?'<button type="button" class="blink" data-bcall="'+(anyC?'open':'close')+'">'+(anyC?'Expand all':'Collapse all')+'</button>':'')+'</div>';
+  return h+body}
 function bidListRepaint(){const t=$('#bidList');if(!t)return;t.innerHTML=bidListHtml();bindBidList()}
 function bindBidList(){const t=$('#bidList');if(!t)return;const sel=S.bidSel,find=id=>(S.bids||[]).find(x=>x.id===id);
   $$('.bidc',t).forEach(el=>{const open=()=>{const j=find(el.dataset.bid);if(!j)return;if(sel){if(sel.has(j.id))sel.delete(j.id);else sel.add(j.id);bidListRepaint();const n=$('.bidc[data-bid="'+CSS.escape(j.id)+'"]');if(n)n.focus();return}bidPanel(j)};
@@ -2774,6 +2846,9 @@ function bindBidList(){const t=$('#bidList');if(!t)return;const sel=S.bidSel,fin
     el.onpointerdown=e=>{if(e.pointerType==='mouse')return;clearTimeout(el._lt);el._lt=setTimeout(()=>{el._lp=true;const j=find(el.dataset.bid);if(j)bidMenu(j)},550)};
     el.onpointerup=el.onpointercancel=el.onpointerleave=()=>clearTimeout(el._lt)});
   $$('[data-go]',t).forEach(b=>b.onclick=e=>{e.stopPropagation();openJob(b.dataset.go)});
+  $$('[data-bcoll]',t).forEach(b=>b.onclick=()=>{bidCollSet([b.dataset.bcoll],b.getAttribute('aria-expanded')==='true');bidListRepaint();const n=$('[data-bcoll="'+CSS.escape(b.dataset.bcoll)+'"]');if(n)n.focus()});
+  const ca=$('[data-bcall]',t);if(ca)ca.onclick=()=>{bidCollSet(S.bidKeys||[],ca.dataset.bcall==='close');bidListRepaint();const n=$('[data-bcall]');if(n)n.focus()};
+  $$('[data-best]',t).forEach(b=>b.onclick=()=>{lsSet('crewplans.bidEst',b.dataset.best);bidListRepaint();const n=$('[data-best="'+CSS.escape(b.dataset.best)+'"]');if(n)n.focus()});
   $$('[data-bm]',t).forEach(b=>b.onclick=e=>{e.stopPropagation();const j=find(b.dataset.bm);if(j)bidMenu(j)});
   if(!sel)return;
   const pick=()=>(S.bids||[]).filter(j=>sel.has(j.id));
@@ -2811,6 +2886,7 @@ async function bidDeleteMany(list){if(!S.isAdmin)return false;list=(list||[]).fi
 function bindBidsSec(){
   $$('[data-bpane]').forEach(b=>b.onclick=()=>{lsSet('crewplans.bidPane',b.dataset.bpane);window.scrollTo(0,0);render()});
   $$('[data-bfilt]').forEach(b=>b.onclick=()=>{lsSet('crewplans.bidFilt',b.dataset.bfilt);render()});
+  const nx=$('[data-bnext]');if(nx)nx.onclick=()=>{const j=(S.bids||[]).find(x=>x.id===nx.dataset.bnext);if(j)bidPanel(j)};
   const qq=$('#bidQ');if(qq)qq.oninput=()=>{S.bidQ=qq.value;$('#bidList').innerHTML=bidListHtml();bindBidList()};
   if($('#trkDl'))$('#trkDl').onclick=trkDownload;
   const sb2=$('#bidSelBtn');if(sb2)sb2.onclick=()=>{S.bidSel=S.bidSel?null:new Set();render()};
