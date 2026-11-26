@@ -1,10 +1,12 @@
-// Tests for the office "% complete" (Progress tab): grouping pay app lines into SOV area + trade, $ weighting,
-// labor alerts work done per cost code, billing suggestion from the groups, scope fallback, and the "new markups" reminder.
+// Tests for the billing suggestion from hours (Progress tab, office only): each pay app line's trade from its last trade word,
+// % = labor hours used on that cost code / budgeted hours (the Labor tab's laborCalc), Labor and Material and all areas of a trade share it,
+// Mobilization / Submittals go to 100 once any line is above 0, never below last month, and the job Done % used by All jobs.
 // Pulls the functions out of index.html and runs them with stubbed data.
 const fs = require('fs');
 const vm = require('vm');
 const assert = require('assert');
-const src = (fs.readFileSync('index.html', 'utf8').match(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/) || [])[1];
+const html = fs.readFileSync('index.html', 'utf8');
+const src = (html.match(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/) || [])[1];
 
 const lines = src.split('\n');
 function grab(name) {
@@ -15,144 +17,99 @@ function grab(name) {
   if (!lines[i].startsWith('const ')) while (j < lines.length && /^(\s|\})/.test(lines[j])) j++;
   return lines.slice(i, j).join('\n');
 }
-const names = ['num', 'clamp', 'esc', 'money', 'SCOPE_CATALOG', 'CUSTOM_COLORS', 'DEFAULT_SCOPE', 'normScope', 'isAdminRole', 'canEditLaborRate',
-  'PCT_SKIP', 'pctGroupName', 'pctCode', 'PCT_KCODE', 'pctRows', 'pctGet', 'pctVal', 'pctWeighted', 'pctForCode', 'pctNext', 'pctStale', 'pctDay',
-  'laborDone', 'billMonth', 'billMonthText', 'billCrewPct', 'billingCard', 'pctCard'];
-const code = names.map(grab).join('\n') + '\nlet PHASES=DEFAULT_SCOPE;\n;({' + names.join(',') + ',setPHASES:p=>{PHASES=normScope(p)}})';
+const names = ['num', 'clamp', 'esc', 'money', 'f0', 'isAdminRole', 'canEditLaborRate', 'LABOR_CODES', 'codeHrs', 'weekEnd', 'LABOR_SHOW_TC', 'laborCalc',
+  'PCT_SKIP', 'pctGroupName', 'pctCode', 'HRS_CODES', 'lineCode', 'hoursByCode', 'billHoursPct', 'hoursDone', 'billMonth', 'billMonthText', 'billingCard'];
+const code = names.map(grab).join('\n') + '\n;({' + names.join(',') + '})';
 const S = { loaded: {}, role: 'admin' };
 const T = vm.runInNewContext(code, { S, Math, Date, String, Number, Set, Object, Array, isFinite, parseFloat, who: id => id ? 'User ' + id : 'Someone' });
 const deq = (a, b) => assert.deepStrictEqual(JSON.parse(JSON.stringify(a)), b); // values from the vm are another realm
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok - ' + name); };
-const P = (g, at) => ({ set_at: at || '2026-11-20T12:00:00Z', groups: Object.fromEntries(Object.entries(g).map(([k, v]) => [k, { pct: v }])) });
 
-// a single-area job (block 1 = frame/hang/finish, block 2 = insulation) and a two-building job
+// the Labor tab's figures for a job: budget hours by code and used hours from the job cost sheet
+const labor = (budget, used, extra) => Object.assign({ hpd: 10, hours: budget, cost: { as_of: '2026-11-20', history: [{ date: '2026-11-20', used }] } }, extra || {});
+const H = L => { S.labor = L; S.laborLogs = []; return T.hoursByCode(T.laborCalc()); };
+
 const ONE = [{ n: 'Mobilization', v: 4000 }, { n: 'Submittals', v: 1000 }, { n: 'Framing Labor', v: 40000 }, { n: 'Framing Material', v: 20000 },
   { n: 'Hanging Labor', v: 20000 }, { n: 'Hanging Material', v: 10000 }, { n: 'Finishing Labor', v: 25000 }, { n: 'Finishing Material', v: 5000 },
   { n: 'Insulation Labor', v: 6000 }, { n: 'Insulation Material', v: 4000 }];
 const TWO = [{ n: 'Mobilization', v: 5000 }, { n: 'Bldg A Framing Labor', v: 30000 }, { n: 'Bldg A Framing Material', v: 30000 },
   { n: 'Bldg B Framing Labor', v: 10000 }, { n: 'Bldg B Framing Material', v: 10000 }, { n: 'Bldg A Hanging Labor', v: 20000 }, { n: 'Bldg B Hanging - Material', v: 10000 }];
 
-t('group names: trailing Labor / Material stripped, Mobilization and Submittals left out', () => {
-  const g = T.pctGroupName;
-  assert.strictEqual(g('Framing Labor'), 'Framing'); assert.strictEqual(g('Framing Material'), 'Framing');
-  assert.strictEqual(g('Insulation Materials'), 'Insulation'); assert.strictEqual(g('Finishing Labour'), 'Finishing');
-  assert.strictEqual(g('Bldg A Framing Labor'), 'Bldg A Framing'); assert.strictEqual(g('Bldg B Hanging - Material'), 'Bldg B Hanging');
-  assert.strictEqual(g('Level 2  Finishing (Labor)'), 'Level 2 Finishing'); assert.strictEqual(g('Hanging Mat’l'), 'Hanging');
-  assert.strictEqual(g('Framing'), 'Framing'); // a line without Labor/Material is its own group
-  assert.strictEqual(g('Mobilization'), null); assert.strictEqual(g('Submittals'), null); assert.strictEqual(g(''), null);
+t('the % complete panel, its reminders and its reads / writes of labor.progress are gone', () => {
+  for (const gone of ['pctCard', 'bindPct', 'pctListNote', 'pctSave', 'data-pr=', '% complete not set yet', 'New markups since % complete', 'Foremen added markups since', 'Save % complete', 'labor->progress', 'S.progress', '{progress:P}', 'L.progress'])
+    assert.ok(!html.includes(gone), 'still in index.html: ' + gone);
 });
 
-t('trade code from the last trade word (area first): 112 / 122 / 132 / 161', () => {
-  const c = T.pctCode;
-  assert.strictEqual(c('Framing'), '112'); assert.strictEqual(c('Bldg A Framing'), '112'); assert.strictEqual(c('Hanging'), '122'); assert.strictEqual(c('Board'), '122');
-  assert.strictEqual(c('Finishing'), '132'); assert.strictEqual(c('Tape'), '132'); assert.strictEqual(c('Insulation'), '161');
-  assert.strictEqual(c('Boardroom Wing Framing'), '112'); // area word before the trade does not win
-  assert.strictEqual(c('Doors & Frames'), null); assert.strictEqual(c('Frame'), '112'); assert.strictEqual(c('ACT'), null);
+t('trade code per line: Labor / Material stripped, last trade word wins, 112 / 122 / 132 / 161', () => {
+  const c = T.lineCode;
+  assert.strictEqual(c('Framing Labor'), '112'); assert.strictEqual(c('Framing Material'), '112'); assert.strictEqual(c('Bldg A Framing Labor'), '112');
+  assert.strictEqual(c('Hanging Labor'), '122'); assert.strictEqual(c('Bldg B Hanging - Material'), '122'); assert.strictEqual(c('Board'), '122');
+  assert.strictEqual(c('Finishing Labour'), '132'); assert.strictEqual(c('Tape Material'), '132'); assert.strictEqual(c('Insulation Materials'), '161');
+  assert.strictEqual(c('Boardroom Wing Framing Labor'), '112'); // an area word before the trade does not win
+  assert.strictEqual(c('Doors & Frames'), null); assert.strictEqual(c('ACT Labor'), null); assert.strictEqual(c('Mobilization'), null); assert.strictEqual(c(''), null);
 });
 
-t('rows: one per area + trade with the group $, Labor and Material combined, in pay app order', () => {
-  const r = T.pctRows(ONE, []);
-  deq(r.map(x => [x.name, x.v, x.code]), [['Framing', 60000, '112'], ['Hanging', 30000, '122'], ['Finishing', 30000, '132'], ['Insulation', 10000, '161']]);
-  deq(r[0].lines, [2, 3]); assert.strictEqual(r[0].src, 'lines');
-  const r2 = T.pctRows(TWO, []);
-  deq(r2.map(x => [x.name, x.v]), [['Bldg A Framing', 60000], ['Bldg B Framing', 20000], ['Bldg A Hanging', 20000], ['Bldg B Hanging', 10000]]);
-  const ci = T.pctRows([{ n: 'framing labor', v: 1 }, { n: 'Framing Material', v: 2 }], []);
-  assert.strictEqual(ci.length, 1); assert.strictEqual(ci[0].v, 3); // case does not split a group
+t('hours by code: used / budget from laborCalc, whole %, capped at 100, no budget = left out', () => {
+  deq(H(labor({ '112': 1000, '122': 400, '132': 0, '161': 200, '142c': 100 }, { '112': 625, '122': 500, '132': 80, '142c': 90 })),
+    { '112': { pct: 63, used: 625, bh: 1000 }, '122': { pct: 100, used: 500, bh: 400 }, '161': { pct: 0, used: 0, bh: 200 } });
+  deq(H({}), {});
+  // no job cost sheet yet: daily report hours by code (filled from time cards), like the Labor tab
+  S.labor = { hpd: 10, hours: { '112': 400 } }; S.laborLogs = [{ date: '2026-11-02', hours: 50, hours_by_code: { '112': 50 } }, { date: '2026-11-03', hours: 30, hours_by_code: { '112': 30 } }];
+  deq(T.hoursByCode(T.laborCalc()), { '112': { pct: 20, used: 80, bh: 400 } });
+  deq(T.hoursByCode(null), {});
 });
 
-t('fallback without pay app lines: one row per job scope item, SOV $ from the scope', () => {
-  const sc = T.normScope([{ k: 'framing', w: 50000 }, { k: 'board', w: 20000 }, { k: 'tape' }, { k: 'finish' }, { k: 'insulation' }, { k: 'soffits', n: 'Soffits' }]);
-  const r = T.pctRows([], sc);
-  deq(r.map(x => [x.name, x.v, x.code, x.src]), [['Framing', 50000, '112', 'scope'], ['Board', 20000, '122', 'scope'], ['Tape', 0, '132', 'scope'],
-    ['Finish', 0, '132', 'scope'], ['Insulation', 0, '161', 'scope'], ['Soffits', 0, null, 'scope']]);
-  assert.strictEqual(T.pctRows([{ n: 'Mobilization', v: 1 }], sc).length, 6); // only Mob / Submittals: still the scope rows
+t('billing %: Labor and Material and every area of a trade get the same %, no code or budget = no suggestion', () => {
+  const h = H(labor({ '112': 1000, '122': 500, '132': 800 }, { '112': 600, '122': 125 }));
+  deq(ONE.map(l => T.billHoursPct(l, h, ONE)), [100, 100, 60, 60, 25, 25, 0, 0, null, null]); // 161 has no budget: keep last month
+  deq(TWO.map(l => T.billHoursPct(l, h, TWO)), [100, 60, 60, 60, 60, 25, 25]);
+  assert.strictEqual(T.billHoursPct({ n: 'ACT Labor' }, h, ONE), null);
 });
 
-t('weighting: $-weighted, plain average without $, null until set, unset group = 0 once set', () => {
-  const r = T.pctRows(ONE, []);
-  assert.strictEqual(T.pctWeighted(r, null), null);
-  assert.strictEqual(T.pctWeighted(r, { groups: { Framing: { pct: 100 } } }), null); // no set_at: never saved
-  assert.strictEqual(T.pctWeighted(r, P({ Framing: 100, Hanging: 50, Finishing: 0, Insulation: 100 })), 65); // (60k + 15k + 0 + 10k) / 130k
-  assert.strictEqual(T.pctWeighted(r, P({ framing: 100 })), 46); // name match ignores case; others 0: 60k / 130k
-  assert.strictEqual(T.pctWeighted([{ name: 'A', v: 0 }, { name: 'B', v: 0 }], P({ A: 80, B: 20 })), 50);
-  assert.strictEqual(T.pctVal(P({ Framing: 140 }), 'Framing'), 100); // capped
+t('billing %: Mobilization / Submittals 100 once any trade line is above 0, otherwise no suggestion', () => {
+  const zero = H(labor({ '112': 1000 }, {}));
+  assert.strictEqual(T.billHoursPct(ONE[0], zero, ONE), null); assert.strictEqual(T.billHoursPct(ONE[2], zero, ONE), 0);
+  assert.strictEqual(T.billHoursPct(ONE[1], {}, ONE), null);
+  const some = H(labor({ '161': 100 }, { '161': 4 }));
+  assert.strictEqual(T.billHoursPct(ONE[0], some, ONE), 100); assert.strictEqual(T.billHoursPct(ONE[8], some, ONE), 4);
 });
 
-t('labor alerts work done: per cost code, $-weighted across areas, null when no group or not set', () => {
-  T.setPHASES(null);
-  S.labor = { billing: { lines: TWO }, progress: P({ 'Bldg A Framing': 50, 'Bldg B Framing': 100, 'Bldg A Hanging': 30, 'Bldg B Hanging': 0 }) };
-  assert.strictEqual(T.laborDone('112'), 63); // (60k*50 + 20k*100) / 80k = 62.5
-  assert.strictEqual(T.laborDone('122'), 20); // (20k*30 + 10k*0) / 30k
-  assert.strictEqual(T.laborDone('132'), null); assert.strictEqual(T.laborDone('161'), null); assert.strictEqual(T.laborDone('142'), null);
-  S.labor = { billing: { lines: TWO } }; assert.strictEqual(T.laborDone('112'), null); // never set
-  // foremen do not get the pay app lines: they use the per-code numbers saved with the % complete
-  const rows = T.pctRows(TWO, []);
-  const saved = T.pctNext(null, rows, [50, 100, 30, 0], '2026-11-25T15:00:00Z', 'ken');
-  deq(saved.codes, { '112': 63, '122': 20 });
-  S.labor = { progress: saved }; assert.strictEqual(T.laborDone('112'), 63); assert.strictEqual(T.laborDone('161'), null);
-  // no pay app lines on the job at all: scope rows (Tape and Finish both feed 132)
-  T.setPHASES([{ k: 'framing' }, { k: 'board' }, { k: 'tape' }, { k: 'finish' }]);
-  S.labor = { progress: P({ Framing: 90, Board: 60, Tape: 40, Finish: 20 }) };
-  assert.strictEqual(T.laborDone('112'), 90); assert.strictEqual(T.laborDone('122'), 60); assert.strictEqual(T.laborDone('132'), 30);
-  T.setPHASES(null);
+t('job Done %: line %s weighted by pay app $, Mob / Submittals and lines without a suggestion left out', () => {
+  const h = H(labor({ '112': 1000, '122': 500, '132': 800 }, { '112': 600, '122': 125 }));
+  // Framing $60k at 60, Hanging $30k at 25, Finishing $30k at 0; Insulation (no budget) left out
+  assert.strictEqual(T.hoursDone(ONE, h), 36); // (36000 + 7500) / 120000 = 36.25
+  assert.strictEqual(T.hoursDone(ONE, {}), null);
+  assert.strictEqual(T.hoursDone([{ n: 'Framing', v: 0 }, { n: 'Hanging', v: 0 }], h), 43); // no $: plain average of 60 and 25
+  // no pay app lines: each trade code weighted by its budgeted hours (142 / 172 not counted)
+  const h2 = H(labor({ '112': 1000, '122': 500, '142c': 300 }, { '112': 500, '122': 500, '142c': 300 }));
+  assert.strictEqual(T.hoursDone([], h2), 67); // (1000*50 + 500*100) / 1500
+  assert.strictEqual(T.hoursDone([{ n: 'Mobilization', v: 1 }], h2), 67); // only Mob: same as no lines
+  assert.strictEqual(T.hoursDone([], {}), null);
 });
 
-t('billing: each line uses its group %, Labor and Material share it, Mob / Submittals 100 once work is done', () => {
-  const rows = T.pctRows(ONE, []);
-  const pp = P({ Framing: 60, Hanging: 25 });
-  deq(ONE.map(l => T.billCrewPct(l, pp, rows)), [100, 100, 60, 60, 25, 25, 0, 0, 0, 0]);
-  const zero = P({});
-  assert.strictEqual(T.billCrewPct(ONE[0], zero, rows), 0); assert.strictEqual(T.billCrewPct(ONE[2], zero, rows), 0);
-  assert.strictEqual(T.billCrewPct(ONE[2], null, rows), null); assert.strictEqual(T.billCrewPct(ONE[0], null, rows), null);
-  assert.strictEqual(T.billCrewPct({ n: 'Bldg B Framing Material' }, P({ 'Bldg B Framing': 35 }), T.pctRows(TWO, [])), 35);
-});
-
-t('billing card: column renamed, suggestion from the groups and never below last month', () => {
+t('billing card: "% from hours" column, help line, never below last month, hours shown per line', () => {
   const cur = T.billMonth(); const [y, m] = cur.split('-').map(Number); const prevP = (m === 1 ? y - 1 : y) + '-' + String(m === 1 ? 12 : m - 1).padStart(2, '0');
-  S.loaded = { billing: true }; S.job = { id: 'j', pm: null }; S.role = 'admin';
-  S.billing = { lines: ONE, history: [{ period: prevP, pcts: [100, 100, 70, 70, 10, 10, 0, 0, 0, 0] }] };
-  S.progress = P({ Framing: 60, Hanging: 25 });
+  S.loaded = { billing: true, labor: true }; S.job = { id: 'j', pm: null }; S.role = 'admin'; S.laborLogs = [];
+  S.labor = labor({ '112': 1000, '122': 500, '132': 800 }, { '112': 600, '122': 125 });
+  S.billing = { lines: ONE, history: [{ period: prevP, pcts: [100, 100, 70, 70, 10, 10, 0, 0, 30, 30] }] };
   const h = T.billingCard();
-  assert.ok(h.includes('% complete (office)')); assert.ok(!h.includes('Crew progress'));
+  assert.ok(h.includes('% from hours')); assert.ok(!h.includes('% complete (office)')); assert.ok(!h.includes('Crew progress'));
+  assert.ok(h.includes('Suggested from time card hours on each cost code vs. the job’s budgeted hours. Check it against the field before confirming.'));
+  assert.ok(h.includes('112: 600 of 1,000 hrs')); assert.ok(h.includes('122: 125 of 500 hrs')); assert.ok(h.includes('id="billCard"'));
   const vals = [...h.matchAll(/data-bp="(\d+)"[^>]*value="(\d+)"/g)].map(x => +x[2]);
-  deq(vals, [100, 100, 70, 70, 25, 25, 0, 0, 0, 0]); // Framing 60 < last 70 -> stays 70
+  deq(vals, [100, 100, 70, 70, 25, 25, 0, 0, 30, 30]); // Framing 60 < last 70 -> stays 70; Insulation no budget -> keeps 30
   assert.ok(h.includes('(below last)'));
 });
 
-t('saving: only changed groups get a new date, history kept, codes + overall saved', () => {
-  const rows = T.pctRows(ONE, []);
-  const a = T.pctNext(null, rows, [20, 0, 0, 0], '2026-11-01T10:00:00Z', 'ken');
-  assert.strictEqual(a.src, 'lines'); assert.strictEqual(a.set_at, '2026-11-01T10:00:00Z'); assert.strictEqual(a.by, 'ken'); assert.strictEqual(a.history.length, 1);
-  deq(a.history[0].pcts, { Framing: 20, Hanging: 0, Finishing: 0, Insulation: 0 });
-  const b = T.pctNext(a, rows, [20, 15.4, 0, 0], '2026-11-25T10:00:00Z', 'josh');
-  assert.strictEqual(b.groups.Framing.at, '2026-11-01T10:00:00Z'); assert.strictEqual(b.groups.Framing.by, 'ken');
-  assert.strictEqual(b.groups.Hanging.pct, 15); assert.strictEqual(b.groups.Hanging.at, '2026-11-25T10:00:00Z'); assert.strictEqual(b.groups.Hanging.by, 'josh');
-  assert.strictEqual(b.history.length, 2); assert.strictEqual(b.overall, T.pctWeighted(rows, b));
-  const c = T.pctNext({ groups: { framing: { pct: 5 } }, set_at: 'x' }, rows, [5, 0, 0, 0], 'n', 'k');
-  deq(Object.keys(c.groups), ['Framing', 'Hanging', 'Finishing', 'Insulation']); // old key in other case replaced
-  assert.strictEqual(T.pctNext(null, T.pctRows([], T.normScope(null)), [10, 10, 10, 10], 'n', 'k').src, 'scope');
-});
-
-t('reminder: not set yet / new markups since last set / up to date', () => {
-  assert.strictEqual(T.pctStale(null, '2026-11-20T00:00:00Z'), 'none'); assert.strictEqual(T.pctStale({}, null), 'none');
-  const p = { set_at: '2026-11-25T15:00:00.000Z' };
-  assert.strictEqual(T.pctStale(p, '2026-11-25T16:00:00.123456+00:00'), 'stale');
-  assert.strictEqual(T.pctStale(p, '2026-11-25T14:59:00+00:00'), '');
-  assert.strictEqual(T.pctStale(p, null), '');
-});
-
-t('panel: PM edits, other office read-only, Mob / Submittals not listed, reminder shown', () => {
-  S.loaded = { billing: true }; S.role = 'admin'; S.billing = { lines: TWO }; S.myOfficeId = 'o-ken'; S.job = { id: 'j', pm: 'o-ken' };
-  S.progress = Object.assign(P({ 'Bldg A Framing': 40 }, '2026-11-20T12:00:00Z'), { by: 'u1' }); S.progMarkAt = '2026-11-22T12:00:00Z';
-  let h = T.pctCard();
-  assert.ok(h.includes('Bldg A Framing') && h.includes('Bldg B Hanging') && !h.includes('Mobilization'));
-  assert.strictEqual((h.match(/data-pn=/g) || []).length, 4); assert.ok(h.includes('pctSave')); assert.ok(h.includes('$60,000'));
-  assert.ok(h.includes('Foremen added markups since this was last set'));
-  S.myOfficeId = 'o-josh'; h = T.pctCard();
-  assert.ok(!h.includes('data-pn=') && !h.includes('pctSave') && h.includes('Only this job’s PM'));
-  S.progMarkAt = null; assert.ok(T.pctCard().includes('No new markups since'));
-  S.progress = null; assert.ok(T.pctCard().includes('Not set yet'));
-  S.billing = { lines: [] }; assert.ok(T.pctCard().includes('by scope item for the whole job'));
+t('billing card: no budget hours -> note, last month kept; hours still loading -> note', () => {
+  S.labor = {}; S.billing = { lines: ONE, history: [] };
+  let h = T.billingCard();
+  assert.ok(h.includes('No budget hours on the Labor tab yet'));
+  deq([...h.matchAll(/data-bp="(\d+)"[^>]*value="(\d+)"/g)].map(x => +x[2]), [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+  S.loaded = { billing: true, labor: false }; h = T.billingCard();
+  assert.ok(h.includes('Loading hours')); assert.ok(!h.includes('No budget hours'));
+  S.loaded = { billing: true, labor: true }; S.billing = { lines: [] };
+  assert.ok(T.billingCard().includes('No pay app lines for this job yet'));
 });
 
 console.log(n + ' tests passed');
