@@ -18,7 +18,7 @@ function grab(name) {
   return lines.slice(i, j).join('\n');
 }
 const names = ['num', 'clamp', 'esc', 'money', 'f0', 'isAdminRole', 'canEditLaborRate', 'LABOR_CODES', 'codeHrs', 'weekEnd', 'LABOR_SHOW_TC', 'laborCalc',
-  'PCT_SKIP', 'pctGroupName', 'pctCode', 'HRS_CODES', 'lineCode', 'hoursByCode', 'billHoursPct', 'hoursDone', 'billMonth', 'billMonthText',
+  'PCT_SKIP', 'pctGroupName', 'pctCode', 'HRS_CODES', 'lineCode', 'hoursByCode', 'billHoursPct', 'hoursDone', 'billMonth', 'billAdd', 'billSel', 'billMonthText',
   'r2', 'laborCut', 'billCut', 'billHoursByCode', 'billHrsNote', 'billKey', 'billPcts', 'billingCard',
   'tcKey', 'TC_ANCHOR', 'isoAddD', 'tcHrs', 'tcLineNo', 'tcIsJob', 'tcLabCode', 'tcJobNo', 'tcJobShort', 'tcJobKey', 'tcJobSplit'];
 const code = names.map(grab).join('\n') + '\n;({' + names.join(',') + '})';
@@ -164,4 +164,8 @@ t('billing card: last billed matched by line name when an older month has other 
   deq(T.billPcts({ pcts: [10, 20, 30] }, [{ n: 'Hanging' }, { n: 'Framing (rev)' }, { n: 'Mob' }], ['Mob', 'Framing', 'Hanging']), [30, 20, 10]);
 });
 
+
+t('billing month: ‹ › steps months, limited to 24 back and next month, per job', () => {
+  assert.strictEqual(T.billAdd('2026-11', 1), '2026-12'); assert.strictEqual(T.billAdd('2026-01', -1), '2025-12');
+});
 console.log(n + ' tests passed');
