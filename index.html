@@ -1227,7 +1227,7 @@ const tcRoster=n=>(TC.roster||[]).find(r=>tcKey(r.name)===tcKey(n));
 const tcFirst=n=>(String(n||'').trim().split(/\s+/)[0]||'');
 const tcTyping=()=>{const a=document.activeElement;return !!(a&&a.tagName==='INPUT'&&a.closest('.tcm,#tabBody')&&(a.id==='tcForeman'||a.id==='tcFolder'||a.dataset.name!=null||a.dataset.rate!=null||a.dataset.hrs!=null))};
 const TC_ANCHOR='2026-09-30',TC_OFF=[0,1,2,3,5,6,7,8,9,10,12,13];
-const TC_CODES=[['112','112 Framing'],['122','122 Hanging'],['132','132 Finishing'],['142','142 Clean/Sup/Layout'],['152','152 Acoustical'],['162','162 Insulation'],['172','172 Extra work']];
+const TC_CODES=[['001','001 Office'],['112','112 Framing'],['122','122 Hanging'],['132','132 Finishing'],['142','142 Clean/Sup/Layout'],['152','152 Acoustical'],['162','162 Insulation'],['172','172 Extra work']];
 const isoAddD=(iso,d)=>{const t=new Date(iso+'T12:00:00Z');t.setUTCDate(t.getUTCDate()+d);return t.toISOString().slice(0,10)};
 function tcPeriodOf(iso){const a=Date.parse(TC_ANCHOR+'T12:00:00Z'),t=Date.parse(iso+'T12:00:00Z');return isoAddD(TC_ANCHOR,Math.floor((t-a)/864e5/14)*14)}
 const tcToday=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
@@ -1249,7 +1249,7 @@ const tcJobKey=j=>[tcJobNo(j&&j.name),tcJobShort(j&&j.name)||(j&&j.name)||''];
 /** Does a time card line belong to the job? Match by job number (leading digits of the line's job), or by name when the job has no number. */
 function tcIsJob(l,no,nm){if(!l||l.kind==='vac'||l.kind==='off')return false;const n=tcLineNo(l);if(no)return n===String(no).replace(/^0+(?=\d)/,'');return !n&&!!nm&&tcKey(l.name)===tcKey(nm)}
 /** Time card code -> Labor tab code. 142 is cleanup, or supervision for the card's own foreman. 162 insulation -> 161. Other codes (152 acoustical…) -> 172 Extra. Blank -> '' (no code). */
-function tcLabCode(code,sup){const s=String(code||'').trim().toLowerCase();if(!s)return '';const d=(s.match(/^(\d{3})/)||[])[1]||'';
+function tcLabCode(code,sup){const s=String(code||'').trim().toLowerCase();if(!s||/^0*01\b|^office/.test(s))return '';const d=(s.match(/^(\d{3})/)||[])[1]||'';
   if(d==='142'||(!d&&/clean|sup/.test(s))){const c=/clean|cln|^142\s*-?\s*c/.test(s),p=/sup|^142\s*-?\s*s/.test(s);return c&&!p?'142c':p&&!c?'142s':sup?'142s':'142c'}
   if(d==='162')return '161';if(['112','122','132','161','172'].includes(d))return d;
   if(!d){const w=[[/fram/,'112'],[/hang|board/,'122'],[/finish|tap/,'132'],[/insul|batt|caulk/,'161']].find(x=>x[0].test(s));if(w)return w[1]}
