@@ -78,6 +78,13 @@ t('one day on one job, worker split across two jobs', () => {
   const r2 = T.tcJobDay([card()], '2026-11-25', '331', 'Nordic');
   assert.strictEqual(r2.hours, 4); assert.strictEqual(r2.workers, 1); assert.deepStrictEqual(JSON.parse(JSON.stringify(r2.by)), { '122': 4 });
 });
+t('workforce by trade from the time card', () => {
+  const r = T.tcJobDay([card()], '2026-11-25', '330', 'U of U');
+  // Mike is the foreman; Ana framed; Jose hung; Luis mostly 152 acoustical -> Carpenter
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(r.trades)), { Foreman: 1, Framer: 1, Drywall: 1, Carpenter: 1 });
+  const r2 = T.tcJobDay([card()], '2026-11-25', '331', 'Nordic');
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(r2.trades)), { Drywall: 1 });
+});
 t('no time card / day not filled / Off day / Sunday', () => {
   const none = T.tcJobDay([], '2026-11-25', '330', '');
   assert.strictEqual(none.hours, 0); assert.ok(!none.filled); assert.strictEqual(none.cards, 0);

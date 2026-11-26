@@ -1165,12 +1165,13 @@ function tcLabCode(code,sup){const s=String(code||'').trim().toLowerCase();if(!s
   if(!d){const w=[[/fram/,'112'],[/hang|board/,'122'],[/finish|tap/,'132'],[/insul|batt|caulk/,'161']].find(x=>x[0].test(s));if(w)return w[1]}
   return '172'}
 /** One job, one date: hours from the given time cards. filled = the card has that day filled in (any job, or Off). */
-function tcJobDay(cards,iso,no,nm){const o={hours:0,by:{},unc:0,other:0,workers:0,cards:0,filled:false};
+/** Workforce trade for a worker that day: the card's foreman is Foreman; everyone else by the code he spent the most hours on. */
+function tcJobDay(cards,iso,no,nm){const TC_TRADE={'112':'Framer','122':'Drywall','132':'Taper','161':'Laborer','142c':'Laborer','142s':'Super','172':'Carpenter'};const o={hours:0,by:{},unc:0,other:0,workers:0,cards:0,filled:false,trades:{}};
   (cards||[]).forEach(c=>{if(!c||!c.period_start)return;const d=tcDayIdx(c.period_start,iso);if(d<0)return;o.cards++;
-    (c.workers||[]).forEach(w=>{const L=(w.days&&w.days[d])||[];let wh=0;
-      L.forEach(l=>{const h=tcHrs(l);if(h||(l&&l.kind==='off'))o.filled=true;if(!h||!tcIsJob(l,no,nm))return;wh+=h;const k=tcLabCode(l.code,tcKey(w.name)===tcKey(c.foreman));
+    (c.workers||[]).forEach(w=>{const L=(w.days&&w.days[d])||[];let wh=0;const wk={};const isFm=tcKey(w.name)===tcKey(c.foreman);
+      L.forEach(l=>{const h=tcHrs(l);if(h||(l&&l.kind==='off'))o.filled=true;if(!h||!tcIsJob(l,no,nm))return;wh+=h;const k=tcLabCode(l.code,isFm);wk[k||'172']=(wk[k||'172']||0)+h;
         if(!k)o.unc=r2(o.unc+h);else{o.by[k]=r2((o.by[k]||0)+h);if(k==='172'&&!/^\s*172/.test(String(l.code)))o.other=r2(o.other+h)}});
-      if(wh>0){o.workers++;o.hours=r2(o.hours+wh)}})});
+      if(wh>0){o.workers++;o.hours=r2(o.hours+wh);const top=Object.keys(wk).sort((a,b)=>wk[b]-wk[a])[0];const t=isFm?'Foreman':(TC_TRADE[top]||'Carpenter');o.trades[t]=(o.trades[t]||0)+1}})});
   return o}
 /** One job: hours by Labor code on the time cards for dates after `after` (all dates when blank). */
 function tcJobLive(cards,no,nm,after){const by={},days=new Set();let hours=0;
@@ -2327,7 +2328,8 @@ function renderLogForm(){
   const setRows=(k,vals)=>{const b=$('[data-rows="'+k+'"]',form);const t=$('[data-tpl="'+k+'"]',form).innerHTML;b.innerHTML='';(vals&&vals.length?vals:[{}]).forEach(v=>{b.insertAdjacentHTML('beforeend',t);const rw=b.lastElementChild;$$('[data-c]',rw).forEach(i=>i.value=v[i.dataset.c]!=null?v[i.dataset.c]:'')})};
   let tcX=null;const tcBox=$('[data-tch]',form);
   const tcRef=async()=>{const d=form.date.value||today();tcX=null;tcBox.innerHTML='<span class="muted">Checking your time card\u2026</span>';const card=await tcCardFor(S.me.id,d);if((form.date.value||today())!==d||!S.job)return;
-    const K=tcJobKey(S.job);tcX={d,card,r:card?tcJobDay([card],d,K[0],K[1]):null};tcBox.innerHTML=tcFeedHtml(tcX);const b=$('[data-tcopen]',tcBox);if(b)b.onclick=()=>tcOpenDay(d)};
+    const K=tcJobKey(S.job);tcX={d,card,r:card?tcJobDay([card],d,K[0],K[1]):null};tcBox.innerHTML=tcFeedHtml(tcX);
+    {const T=tcX.r&&tcX.r.trades;const ins=$$('[data-wf]',form);if(T&&Object.keys(T).length&&ins.every(i=>!num(i.value))){ins.forEach(i=>i.value=T[i.dataset.wf]||'');wfTot();touched=true}}const b=$('[data-tcopen]',tcBox);if(b)b.onclick=()=>tcOpenDay(d)};
   const fill=()=>{tcRef();const e=mine(form.date.value);form.who.value=(e&&e.name)||lsGet('crewplans.logName')||myName();
     form.weather.value=(e&&e.weather)||'';form.work.value=(e&&e.work)||'';form.problems.value=(e&&(e.problems||e.notes))||'';form.subs.value=(e&&e.sub_progress)||'';form.damage.value=(e&&e.trade_damage)||'';
     const wf=(e&&e.workforce)||{};$$('[data-wf]',form).forEach(i=>i.value=wf[i.dataset.wf]||'');wfTot();
