@@ -25,5 +25,7 @@ jobs:
         run: node .github/scripts/tm-test.js
       - name: Test the crew lookahead board
         run: node .github/scripts/lookahead-test.js
-      - name: Test the billing suggestion from hours (trade codes, %, Mob/Submittals, Done %)
+      - name: Test the Billing tab % from hours (trade codes, %, Mob/Submittals, Done %, time cards past the job cost sheet)
         run: node .github/scripts/progress-test.js
+      - name: Test Load pay app (.xlsx) on the Billing tab (continuation sheet lines, G702, history)
+        run: node .github/scripts/payapp-test.js

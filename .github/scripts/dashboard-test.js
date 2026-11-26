@@ -16,7 +16,8 @@ function grab(name) {
 const names = ['num', 'clamp', 'areaPct', 'SCOPE_CATALOG', 'CUSTOM_COLORS', 'DEFAULT_SCOPE', 'normScope',
   'PCT_SKIP', 'pctGroupName', 'pctCode', 'HRS_CODES', 'lineCode', 'hoursByCode', 'billHoursPct', 'hoursDone',
   'LABOR_CODES', 'codeHrs', 'weekEnd', 'f1', 'fmtWk', 'LABOR_SHOW_TC', 'laborEff', 'laborCost', 'laborCalc', 'LABOR_WARN', 'laborAlerts',
-  'DASH_UNDERBILL', 'dashBill', 'dashCalc'];
+  'DASH_UNDERBILL', 'r2', 'laborCut', 'billCut', 'billHoursByCode', 'billKey', 'billPcts', 'dashBill', 'dashCalc',
+  'tcKey', 'TC_ANCHOR', 'isoAddD', 'tcHrs', 'tcLineNo', 'tcIsJob', 'tcLabCode', 'tcJobNo', 'tcJobShort', 'tcJobKey', 'tcJobSplit'];
 const code = names.map(grab).join('\n') + '\nlet PHASES=DEFAULT_SCOPE;\n;({' + names.join(',') + ',getPHASES:()=>PHASES})';
 const S = {};
 const T = vm.runInNewContext(code, { S, Math, Date, String, Number, Set, Object, Array, isFinite, parseFloat });
@@ -98,11 +99,12 @@ t('flags: over budget counts per cost code; Done caps at 100', () => {
   assert.strictEqual(r.done, 100);
 });
 
-t('flags: under-billed (hours % vs billed %) and progress not marked -> opens the Progress tab', () => {
+t('flags: under-billed (hours % vs billed %) and progress not marked -> opens the Billing tab', () => {
   const B = { billing: { lines: LINES, history: [{ period: '2026-10', pcts: [40, 0, 0] }] } }; // 20% billed
   const all = p => hrs({ '112': 1000, '122': 1000, '132': 1000 }, { '112': p * 10, '122': p * 10, '132': p * 10 }, B);
   const r = T.dashCalc(job('d', null), all(30), [], true, [], { days: 3 });
-  assert.strictEqual(r.done, 30); assert.strictEqual(r.under, 10); assert.ok(r.nudge); assert.strictEqual(r.flags, 2); assert.strictEqual(r.tab, 'progress');
+  assert.strictEqual(r.done, 30); assert.strictEqual(r.under, 10); assert.ok(r.nudge); assert.strictEqual(r.flags, 2); assert.strictEqual(r.tab, 'billing');
+  assert.strictEqual(T.dashCalc(job('d', null), all(30), [], true, [], { days: 3 }).tab, 'billing');
   const r9 = T.dashCalc(job('d', null), all(29), [], true, [], null);
   assert.strictEqual(r9.under, 0); assert.strictEqual(r9.flags, 0);
   // pay app lines but nothing confirmed yet counts as 0% billed; no pay app lines = no billing flag
@@ -110,6 +112,26 @@ t('flags: under-billed (hours % vs billed %) and progress not marked -> opens th
   assert.strictEqual(nb.billed, null); assert.strictEqual(nb.done, 30); assert.strictEqual(nb.under, 30);
   const nl = T.dashCalc(job('d', null), hrs({ '112': 1000 }, { '112': 300 }), [], true, [], null);
   assert.strictEqual(nl.done, 30); assert.strictEqual(nl.under, 0); assert.strictEqual(nl.contract, 0);
+});
+
+t('Done % counts time cards past the job cost sheet: max(job cost, time cards to its date) + time cards after (Dalling: 54 hrs on 112)', () => {
+  // job cost as of 2026-11-24 shows 0 used on 112 of 262 budget; two workers 9 hrs/day on 328 code 112 on Nov 23, 24 and 25 (Nov 23-24 on the 11-11 card, Nov 25 on the 11-25 card)
+  const day = (ps, iso) => [0, 1, 2, 3, 5, 6, 7, 8, 9, 10, 12, 13].indexOf(Math.round((Date.parse(iso) - Date.parse(ps)) / 864e5));
+  const wk = (name, ps, dates) => { const days = {}; dates.forEach(d => { days[day(ps, d)] = [{ job: '328 - Dalling Hangar', code: '112 Framing', hrs: 9 }] }); return { name, days }; };
+  const cards = [{ owner: 'f', foreman: 'Juan romero', period_start: '2026-11-11', workers: [wk('Juan romero', '2026-11-11', ['2026-11-23', '2026-11-24']), wk('Luis Duarte', '2026-11-11', ['2026-11-23', '2026-11-24'])] },
+    { owner: 'f', foreman: 'Juan romero', period_start: '2026-11-25', workers: [wk('Juan romero', '2026-11-25', ['2026-11-25']), wk('Luis Duarte', '2026-11-25', ['2026-11-25'])] }];
+  const L = { hpd: 10, hours: { '112': 262 }, cost: { as_of: '2026-11-24', history: [{ date: '2026-11-24', used: {} }] }, billing: { lines: [{ n: 'Framing Labor', v: 14781 }] } };
+  const j = { id: 'dal', name: '328 - Dalling Hangar' };
+  const tc = T.tcJobSplit(cards, ...T.tcJobKey(j), T.billCut(L.cost));
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(tc)), { pre: { '112': 36 }, post: { '112': 18 }, cut: '2026-11-24' });
+  assert.strictEqual(T.dashCalc(j, L, [], false, [], null, tc).done, 21); // 54 / 262
+  assert.strictEqual(T.dashCalc(j, L, [], false, [], null).done, 0); // without time cards: job cost only
+  assert.strictEqual(T.dashCalc(j, L, [], false, [], null, tc).used, 0); // Man days used stays the official job cost number
+});
+
+t('% billed reads a history entry by line name when it has names', () => {
+  const b = T.dashBill({ billing: { lines: LINES, history: [{ period: '2026-11', pcts: [100, 50], names: ['Hanging', 'Framing'] }] } });
+  assert.strictEqual(b.billed, 100000); // Framing 50% of 100k + Hanging 100% of 50k
 });
 
 t('the open job is left alone (globals restored)', () => {

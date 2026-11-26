@@ -1,6 +1,6 @@
-// Tests for the billing suggestion from hours (Progress tab, office only): each pay app line's trade from its last trade word,
+// Tests for the Billing tab "% from hours" (office only): each pay app line’s trade from its last trade word,
 // % = labor hours used on that cost code / budgeted hours (the Labor tab's laborCalc), Labor and Material and all areas of a trade share it,
-// Mobilization / Submittals go to 100 once any line is above 0, never below last month, and the job Done % used by All jobs.
+// Mobilization / Submittals go to 100 once any line is above 0, never below last month, the job Done % used by All jobs, and time card hours past the job cost sheet date.
 // Pulls the functions out of index.html and runs them with stubbed data.
 const fs = require('fs');
 const vm = require('vm');
@@ -18,10 +18,12 @@ function grab(name) {
   return lines.slice(i, j).join('\n');
 }
 const names = ['num', 'clamp', 'esc', 'money', 'f0', 'isAdminRole', 'canEditLaborRate', 'LABOR_CODES', 'codeHrs', 'weekEnd', 'LABOR_SHOW_TC', 'laborCalc',
-  'PCT_SKIP', 'pctGroupName', 'pctCode', 'HRS_CODES', 'lineCode', 'hoursByCode', 'billHoursPct', 'hoursDone', 'billMonth', 'billMonthText', 'billingCard'];
+  'PCT_SKIP', 'pctGroupName', 'pctCode', 'HRS_CODES', 'lineCode', 'hoursByCode', 'billHoursPct', 'hoursDone', 'billMonth', 'billMonthText',
+  'r2', 'laborCut', 'billCut', 'billHoursByCode', 'billHrsNote', 'billKey', 'billPcts', 'billingCard',
+  'tcKey', 'TC_ANCHOR', 'isoAddD', 'tcHrs', 'tcLineNo', 'tcIsJob', 'tcLabCode', 'tcJobNo', 'tcJobShort', 'tcJobKey', 'tcJobSplit'];
 const code = names.map(grab).join('\n') + '\n;({' + names.join(',') + '})';
 const S = { loaded: {}, role: 'admin' };
-const T = vm.runInNewContext(code, { S, Math, Date, String, Number, Set, Object, Array, isFinite, parseFloat, who: id => id ? 'User ' + id : 'Someone' });
+const T = vm.runInNewContext(code, { S, Math, Date, String, Number, Set, Object, Array, isFinite, parseFloat, who: id => id ? 'User ' + id : 'Someone', fmtWhen: v => String(v) });
 const deq = (a, b) => assert.deepStrictEqual(JSON.parse(JSON.stringify(a)), b); // values from the vm are another realm
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok - ' + name); };
 
@@ -87,15 +89,17 @@ t('job Done %: line %s weighted by pay app $, Mob / Submittals and lines without
   assert.strictEqual(T.hoursDone([], {}), null);
 });
 
-t('billing card: "% from hours" column, help line, never below last month, hours shown per line', () => {
+t('billing card: "Billing" title, "% from hours" column, help line, never below last month, hours shown per line', () => {
   const cur = T.billMonth(); const [y, m] = cur.split('-').map(Number); const prevP = (m === 1 ? y - 1 : y) + '-' + String(m === 1 ? 12 : m - 1).padStart(2, '0');
   S.loaded = { billing: true, labor: true }; S.job = { id: 'j', pm: null }; S.role = 'admin'; S.laborLogs = [];
   S.labor = labor({ '112': 1000, '122': 500, '132': 800 }, { '112': 600, '122': 125 });
   S.billing = { lines: ONE, history: [{ period: prevP, pcts: [100, 100, 70, 70, 10, 10, 0, 0, 30, 30] }] };
-  const h = T.billingCard();
+  S.billTc = { pre: {}, post: {} }; // time cards read, none on this job
+  const h = T.billingCard(); S.billTc = null;
   assert.ok(h.includes('% from hours')); assert.ok(!h.includes('% complete (office)')); assert.ok(!h.includes('Crew progress'));
-  assert.ok(h.includes('Suggested from time card hours on each cost code vs. the job’s budgeted hours. Check it against the field before confirming.'));
-  assert.ok(h.includes('112: 600 of 1,000 hrs')); assert.ok(h.includes('122: 125 of 500 hrs')); assert.ok(h.includes('id="billCard"'));
+  assert.ok(h.includes('% from hours = time card hours on each cost code vs. the job’s budgeted hours, for reference. Type this month’s % for each line, then Confirm.'));
+  assert.ok(h.includes('>Billing · ')); assert.ok(!/suggest/i.test(h), 'no “suggestion” wording on the card');
+  assert.ok(h.includes('112: 600 of 1,000 hrs (job cost)')); assert.ok(h.includes('122: 125 of 500 hrs (job cost)')); assert.ok(h.includes('id="billCard"'));
   const vals = [...h.matchAll(/data-bp="(\d+)"[^>]*value="(\d+)"/g)].map(x => +x[2]);
   deq(vals, [100, 100, 70, 70, 25, 25, 0, 0, 30, 30]); // Framing 60 < last 70 -> stays 70; Insulation no budget -> keeps 30
   assert.ok(h.includes('(below last)'));
@@ -110,6 +114,54 @@ t('billing card: no budget hours -> note, last month kept; hours still loading -
   assert.ok(h.includes('Loading hours')); assert.ok(!h.includes('No budget hours'));
   S.loaded = { billing: true, labor: true }; S.billing = { lines: [] };
   assert.ok(T.billingCard().includes('No pay app lines for this job yet'));
+});
+
+// Dalling Hangar: job cost sheet as of 2026-11-24 shows 0 used on 112 (262 budget); app time cards have Juan romero and Luis Duarte 9 hrs/day on 328 code 112 on Nov 23, 24, 25
+const TC_OFF = [0, 1, 2, 3, 5, 6, 7, 8, 9, 10, 12, 13];
+const day = (ps, iso) => TC_OFF.indexOf(Math.round((Date.parse(iso) - Date.parse(ps)) / 864e5));
+const card = (ps, dates, extra) => ({ owner: 'f', foreman: 'Juan romero', period_start: ps, workers: ['Juan romero', 'Luis Duarte'].map(name => {
+  const days = {}; dates.forEach(d => { days[day(ps, d)] = [{ job: '328 - Dalling Hangar', code: '112 Framing', hrs: 9 }].concat(extra || []) }); return { name, days }; }) });
+const DAL = [card('2026-11-11', ['2026-11-23', '2026-11-24'], [{ job: '328 - Dalling Hangar', code: '001 Office', hrs: 1 }, { job: '329 - Other', code: '112', hrs: 4 }]), card('2026-11-25', ['2026-11-25'])];
+const dalJob = { id: 'dal', name: '328 - Dalling Hangar', pm: null };
+const dalLabor = used => ({ hpd: 10, hours: { '112': 262, '122': 300 }, cost: { as_of: '2026-11-24', history: [{ date: '2026-11-24', used }] } });
+
+t('hours rule: used = max(job cost to its date, time cards to that date) + time cards after; 001 Office and other jobs never count', () => {
+  const sp = T.tcJobSplit(DAL, ...T.tcJobKey(dalJob), '2026-11-24');
+  deq(sp, { pre: { '112': 36 }, post: { '112': 18 }, cut: '2026-11-24' });
+  const C = L => { S.labor = L; S.laborLogs = []; return T.laborCalc(); };
+  deq(T.billHoursByCode(C(dalLabor({})), sp)['112'], { pct: 21, used: 54, bh: 262, cost: 0, tcAll: true, tc: 54 });
+  // job cost ahead of the time cards up to its date: job cost + time cards after
+  deq(T.billHoursByCode(C(dalLabor({ '112': 100 })), sp)['112'], { pct: 45, used: 118, bh: 262, cost: 100, tcAll: false, tc: 18 });
+  assert.strictEqual(T.billHrsNote('112', T.billHoursByCode(C(dalLabor({ '112': 100 })), sp)['112']), '112: 118 of 262 hrs (100 job cost + 18 time cards)');
+  // no time cards read: job cost only; no job cost sheet: daily reports as before
+  deq(T.billHoursByCode(C(dalLabor({})), null)['112'], { pct: 0, used: 0, bh: 262 });
+  S.labor = { hpd: 10, hours: { '112': 400 } }; S.laborLogs = [{ date: '2026-11-02', hours: 40, hours_by_code: { '112': 40 } }];
+  deq(T.billHoursByCode(T.laborCalc(), sp)['112'], { pct: 10, used: 40, bh: 400 });
+  assert.strictEqual(T.billCut({ as_of: '2026-11-24', history: [{ date: '2026-11-20' }] }), '2026-11-24');
+  assert.strictEqual(T.billCut({ history: [{ date: '2026-11-20' }, { date: '2026-11-13' }] }), '2026-11-20');
+});
+
+t('billing card on Dalling: 112 shows 54 of 262 hrs (54 time cards), not 0', () => {
+  S.loaded = { billing: true, labor: true }; S.job = dalJob; S.role = 'admin'; S.laborLogs = [];
+  S.labor = dalLabor({}); S.billTc = T.tcJobSplit(DAL, ...T.tcJobKey(dalJob), T.billCut(S.labor.cost));
+  S.billing = { lines: [{ n: 'Mobilization', v: 2013 }, { n: 'Framing Labor', v: 14781 }, { n: 'Framing Material', v: 17252 }, { n: 'Hanging Labor', v: 20958 }], history: [] };
+  const h = T.billingCard();
+  assert.ok(h.includes('112: 54 of 262 hrs (54 time cards)'), h.slice(0, 200)); assert.ok(!h.includes('112: 0 of 262'));
+  assert.ok(h.includes('122: 0 of 300 hrs (job cost)'));
+  deq([...h.matchAll(/data-bp="(\d+)"[^>]*value="([\d.]+)"/g)].map(x => +x[2]), [100, 21, 21, 0]);
+  S.billTc = null;
+});
+
+t('billing card: last billed matched by line name when an older month has other lines', () => {
+  const cur = T.billMonth(); const [y, m] = cur.split('-').map(Number); const prevP = (m === 1 ? y - 1 : y) + '-' + String(m === 1 ? 12 : m - 1).padStart(2, '0');
+  S.labor = {}; S.billing = { lines: [{ n: 'Mobilization', v: 1 }, { n: 'Framing Labor', v: 1 }, { n: 'CO # 1', v: 1 }],
+    history: [{ period: prevP, pcts: [40, 100], names: ['Framing Labor', 'Mobilization'] }] };
+  const h = T.billingCard();
+  deq([...h.matchAll(/data-bp="(\d+)"[^>]*value="([\d.]+)"/g)].map(x => +x[2]), [100, 40, 0]);
+  // no names and fewer %s: by position, missing = 0
+  deq(T.billPcts({ pcts: [10, 20] }, [{ n: 'A' }, { n: 'B' }, { n: 'C' }]), [10, 20, 0]);
+  // old names given (pay app reload): re-matched by name, renamed line at the same spot keeps its %
+  deq(T.billPcts({ pcts: [10, 20, 30] }, [{ n: 'Hanging' }, { n: 'Framing (rev)' }, { n: 'Mob' }], ['Mob', 'Framing', 'Hanging']), [30, 20, 10]);
 });
 
 console.log(n + ' tests passed');
