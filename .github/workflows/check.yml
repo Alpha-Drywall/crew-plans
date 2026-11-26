@@ -25,3 +25,5 @@ jobs:
         run: node .github/scripts/tm-test.js
       - name: Test the crew lookahead board
         run: node .github/scripts/lookahead-test.js
+      - name: Test the office % complete (groups, billing, labor alerts, reminder)
+        run: node .github/scripts/progress-test.js
