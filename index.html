@@ -178,12 +178,12 @@ input[type=range]{width:100%;height:32px}
 .codes legend{font-weight:700;font-size:14px;padding:0 4px}
 .codes .field span{font-size:13px}
 .ltab{width:100%;border-collapse:collapse;font-size:14px}
-.ltab th,.ltab td{padding:6px 4px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+.ltab th,.ltab td{padding:6px 4px;border:1px solid var(--line);text-align:right;white-space:nowrap}
 .ltab th:first-child,.ltab td:first-child{text-align:left;white-space:normal}
-.ltab th{font-size:12px;color:#5d6670;font-weight:700;white-space:normal;vertical-align:bottom;line-height:1.2;width:1%}
+.ltab th{font-size:12px;color:#5d6670;font-weight:700;white-space:normal;vertical-align:bottom;line-height:1.2;width:1%;background:#f6f7f9}
 .ltab th:first-child{width:auto}
 .ltab th.grp{text-align:center;border-bottom:2px solid #5d6670;color:var(--ink,#1a1a1a);font-size:12.5px}
-.ltab .gl{border-left:1px solid var(--line)}.ltab .gr{border-right:1px solid var(--line)}
+.ltab tbody tr:nth-child(even):not(.tot) td{background:#fafbfc}
 .ltab tr.tot td{font-weight:800;border-top:2px solid #333}
 .ltab td.used{}
 .ltab .over{color:var(--danger);font-weight:700}
@@ -1050,6 +1050,8 @@ async function laborTcRead(L,logs){const after=laborCut(laborCost(L));let p=sb.f
   if(!S.isAdmin)(logs||[]).forEach(l=>{if(l.user_id===S.me.id||(after&&l.date<=after))return;const h=l.hours_by_code||{};LABOR_CODES.forEach(c=>{if(num(h[c.k]))x.by[c.k]=r2((x.by[c.k]||0)+num(h[c.k]))});const u=num(l.hours)-codeHrs(l);if(u>0)x.by.unc=r2((x.by.unc||0)+u);x.hours=r2(x.hours+num(l.hours))});
   x.after=after;return x}
 /** Alerts use the higher of the official used and official used + time cards since the last job cost update (no job cost: time cards alone). */
+/* Live time card hours on the Labor tab (column + alerts). Off: the Labor tab uses the official job cost numbers only. Daily reports still fill from time cards. */
+const LABOR_SHOW_TC=false;
 function laborEff(r,cost){const off=num(r.used);if(r.live==null)return {v:off,tc:false};const mix=(cost?off:0)+num(r.live);return mix>off+1e-9?{v:mix,tc:true}:{v:off,tc:false}}
 function laborCalc(){
   const L=S.labor||{};const hpd=num(L.hpd)||10;const budget=L.hours||{};const weeks={};let unc=0;
@@ -1057,7 +1059,7 @@ function laborCalc(){
   if(cost){const prev={};cost.history.slice().sort((a,b)=>a.date<b.date?-1:1).forEach(hh=>{const x=weeks[hh.date]={};LABOR_CODES.forEach(c=>{const u=num((hh.used||{})[c.k]);x[c.k]=u-num(prev[c.k]);prev[c.k]=u})})}
   else (S.laborLogs||[]).forEach(l=>{const h=l.hours_by_code||{};if(!codeHrs(l)){unc+=num(l.hours);return}const w=weekEnd(l.date);weeks[w]=weeks[w]||{};LABOR_CODES.forEach(c=>{if(num(h[c.k]))weeks[w][c.k]=(weeks[w][c.k]||0)+num(h[c.k])})});
   const wk=Object.keys(weeks).sort();
-  const T=S.laborTc,hide142s=!!(cost&&!num(budget['142s'])),tcH=k=>T?num(T.by[k])+(hide142s&&k==='142c'?num(T.by['142s']):0):0;
+  const T=LABOR_SHOW_TC?S.laborTc:null,hide142s=!!(cost&&!num(budget['142s'])),tcH=k=>T?num(T.by[k])+(hide142s&&k==='142c'?num(T.by['142s']):0):0;
   const rows=LABOR_CODES.filter(c=>!(hide142s&&c.k==='142s')).map(c=>{const bh=num(budget[c.k]);const md=bh/hpd;const usedH=wk.reduce((a,w)=>a+num(weeks[w][c.k]),0);const used=usedH/hpd;return {c,bh,md,usedH,used,left:md-used,pct:md?(md-used)/md:0,live:T?tcH(c.k)/hpd:null}});
   const t={bh:rows.reduce((a,r)=>a+r.bh,0),md:rows.reduce((a,r)=>a+r.md,0),usedH:rows.reduce((a,r)=>a+r.usedH,0),used:rows.reduce((a,r)=>a+r.used,0),live:T?rows.reduce((a,r)=>a+r.live,0):null};t.left=t.md-t.used;t.pct=t.md?t.left/t.md:0;
   return {hpd,rows,t,weeks,wk,unc,jobNo:L.job_no||'',cost,src:L.source||{},tc:T?{after:T.after,unc:num(T.by.unc)/hpd}:null};
@@ -1099,7 +1101,7 @@ function renderLabor(){
     (!isAdminRole()?(canLog()?'<div class="row" style="margin-top:10px"><button class="btn sm primary" id="labSync">↻ Sync from SharePoint</button></div>':'')+'</div>':'<div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><button class="btn sm primary" id="labSync">↻ Sync from SharePoint</button><button class="btn sm" id="labBudget">Budget hours ✎</button><button class="btn sm" id="labDl">⬇ Download labor workbook</button></div></div>');
   if(AL.length)h+='<div class="card" style="background:#fff4f2;border-color:#f3c3ba"><b>\u26a0 Labor alerts</b>'+AL.map(a=>'<div class="small" style="margin-top:4px;color:'+(a.lvl==='over'?'#b42318':'#9a3412')+'">'+esc(a.t)+'</div>').join('')+'<div class="muted small" style="margin-top:6px">Work done comes from the crew\u2019s progress markups. Keep progress current so these stay accurate.</div></div>';
   if(noBudget)h+='<div class="card" style="background:#fff8e6"><b>No budget hours yet.</b><div class="muted small" style="margin-top:4px">'+(isAdminRole()?'Tap <b>Sync from SharePoint</b> to read the job cost sheet, or enter <b>Budget hours</b> by hand.':'The office hasn\'t entered the budget hours for this job yet.')+'</div></div>';
-  h+='<div class="card lscroll"><table class="ltab"><thead><tr><th rowspan="2">Code</th><th rowspan="2">Budget hrs</th><th class="grp gl gr" colspan="'+(C.tc?5:4)+'">Man days</th><th rowspan="2">Work done</th></tr><tr><th class="gl">Budget</th><th>Used</th>'+(C.tc?'<th title="Live man days from time cards'+(C.cost?' since the last job cost update':'')+'">Time cards</th>':'')+'<th>Left</th><th class="gr">% left</th></tr></thead><tbody>'+
+  h+='<div class="card lscroll"><table class="ltab"><thead><tr><th rowspan="2">Code</th><th rowspan="2">Budget hrs</th><th class="grp" colspan="'+(C.tc?4:3)+'">Man days</th><th rowspan="2">% left</th><th rowspan="2">Work done</th></tr><tr><th class="gl">Budget</th><th>Used</th>'+(C.tc?'<th title="Live man days from time cards'+(C.cost?' since the last job cost update':'')+'">Time cards</th>':'')+'<th>Left</th></tr></thead><tbody>'+
     C.rows.map(r=>'<tr><td>'+(r.alert?'<span title="See labor alerts">\u26a0 </span>':'')+esc(C.cost&&r.c.k==='142c'?'142-Misc Labor':r.c.n)+'</td><td>'+f0(r.bh)+'</td><td class="gl">'+f0(r.md)+'</td><td class="used">'+f0(r.used)+'</td>'+(C.tc?'<td>'+(r.live?f0(r.live):'')+'</td>':'')+'<td'+(r.left<0?' class="over"':'')+'>'+f0(r.left)+'</td><td class="gr'+(r.left<0?' over':'')+'">'+(r.md?pctS(r.pct):'–')+'</td><td'+(r.alert==='behind'?' class="over"':'')+'>'+(r.done==null?'–':r.done+'%')+'</td></tr>').join('')+
     '<tr class="tot"><td>TOTAL</td><td>'+f0(C.t.bh)+'</td><td class="gl">'+f0(C.t.md)+'</td><td class="used">'+f0(C.t.used)+'</td>'+(C.tc?'<td>'+f0(C.t.live)+'</td>':'')+'<td'+(C.t.left<0?' class="over"':'')+'>'+f0(C.t.left)+'</td><td class="gr">'+(C.t.md?pctS(C.t.pct):'–')+'</td><td></td></tr></tbody></table>'+
     '<div class="muted small" style="margin-top:6px">Man days = budget hours ÷ '+C.hpd+'. '+(C.cost?(isAdminRole()?'Budget and used come from the job cost sheet: estimated and actual labor $ ÷ $'+num((S.labor||{}).rate)+'/hr.':'Budget and used come from the office\'s job cost sheet.'):'Used = hours from daily logs ÷ '+C.hpd+'.')+'</div>'+
