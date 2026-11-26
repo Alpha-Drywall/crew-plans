@@ -277,6 +277,38 @@ body.noscroll .netpill{bottom:auto;top:calc(56px + env(safe-area-inset-top))}
 .tmed [data-row].lrow{padding:0;border:0;margin-bottom:6px}.tmed [data-row].lrow input{height:auto;min-height:40px;width:0;flex:1 1 0;min-width:0;border:1px solid var(--line);border-radius:8px;padding:8px 10px}.tmed fieldset{min-width:0}
 body:has(#fvPill) .mcard{padding-bottom:72px}#tmLog{scroll-margin-top:140px}
 .tmtab{width:100%;border-collapse:collapse;font-size:14px;margin:4px 0}.tmtab td,.tmtab th{border-bottom:1px solid var(--line);padding:4px 2px;text-align:left}.tmtab td+td,.tmtab th+th{text-align:right}
+.lkm{max-width:1240px}
+.lkgrid{overflow-x:auto;background:#fff;border:1px solid var(--line);border-radius:12px;-webkit-overflow-scrolling:touch}
+.lkt{border-collapse:separate;border-spacing:0;font-size:13px;min-width:100%}
+.lkt th,.lkt td{border-bottom:1px solid var(--line);border-right:1px solid #eef0f3;padding:2px 1px;text-align:center;height:36px;min-width:46px}
+.lkt thead th{background:#f6f7f9;font-size:11.5px;color:#5d6670;font-weight:700;line-height:1.15;padding:4px 2px}
+.lkt thead th span{font-weight:500}
+.lkt thead th.td{background:#fff0cc;color:var(--ink)}
+.lkt .lkn{position:sticky;left:0;z-index:2;background:#fff;text-align:left;padding:0 8px;min-width:88px;max-width:128px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;border-right:2px solid var(--line)}
+.lkt thead .lkn{z-index:3;background:#f6f7f9}
+.lkt .lkn.fm{font-weight:800}.lkt .lkn.fm::after{content:' FM';font-size:10px;color:#5d6670;font-weight:700}
+.lkt tr.lkg td{background:#f1f2f4;text-align:left;font-size:12px;font-weight:700;color:#5d6670;height:24px;padding:0}
+.lkt tr.lkg td span{position:sticky;left:8px}
+.lkt .wk{border-left:2px solid #8a939d}
+.lkt tfoot td{font-size:11.5px;color:#5d6670;background:#f6f7f9;height:28px}
+.lkc{cursor:pointer;user-select:none;-webkit-user-select:none}
+.lkc b{display:inline-block;min-width:34px;padding:3px 4px;border-radius:6px;color:#fff;font-size:12px;font-weight:700;line-height:1.2}
+.lkc.td{background:#fffcf2}
+.lkc.idle{background:#fff7ea}
+.lkc.past b{opacity:.6}
+.lkc.dbl{background:#fde8e8;box-shadow:inset 0 0 0 2px #c62828}
+.lkc.dbl b{min-width:0;display:block;margin:1px 2px;padding:1px 3px;font-size:10.5px}
+.lkc i{display:block;font-style:normal;font-size:10px;line-height:1.15;color:#8a939d;margin-top:1px}
+.lkc i.ok{color:#2e7d32}.lkc i.mm{color:#b45309;font-weight:700}
+.lkc.sel,.lkc.drag{box-shadow:inset 0 0 0 3px var(--accent)}
+.lkc.zero{background:#fff4e5;color:#9a3412;font-weight:700}
+.lkm.multi .lkc{touch-action:none}
+.lkdot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.lkbar{position:sticky;bottom:calc(8px + env(safe-area-inset-bottom));display:flex;gap:8px;align-items:center;background:var(--head);color:#fff;border-radius:12px;padding:8px 10px;margin-top:8px;z-index:5}
+.lkck{display:flex;gap:8px;align-items:center;margin:10px 0;font-size:15px}.lkck input{width:20px;height:20px}
+.lkjobs .chip i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}.lkjobs .chip span{font-weight:500;font-size:13px}
+.lksel{width:100%;min-height:42px;border:1px solid var(--line);border-radius:10px;padding:6px 8px;background:#fff;font-size:15px;margin-top:10px}
+.lkwarn summary{cursor:pointer;font-size:14px}.lkwh{font-weight:700;margin:8px 0 2px}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js"></script>
 </head>
@@ -1141,6 +1173,7 @@ function render(){
   const app=$('#app');
   if(S.view==='tc'){if(!TC.force&&tcTyping())return;TC.force=false;app.dataset.job='';app.innerHTML=renderTc();bindTc();return}
   if(S.view==='dash'){app.dataset.job='';app.innerHTML=renderDash();bindDash();return}
+  if(S.view==='look'){app.dataset.job='';app.innerHTML=renderLook();bindLook();return}
   if(S.view!=='job'||!S.job){app.dataset.job='';app.innerHTML=renderJobs();bindJobs();return}
   const j=S.job;
   if(S.tab==='tc'||((S.tab==='log'||S.tab==='labor'||S.tab==='mat')&&!canLog()))S.tab='plans';
@@ -1916,11 +1949,206 @@ function bindTc(){
 }
 
 /* jobs list */
+/* ===== crew lookahead (office only): who is planned on which job for the next two weeks =====
+   Plans live per job in job_budget.labor.lookahead = {date:[worker names]}. Every labor write in the app copies the whole labor object
+   (Object.assign({},L0,…)) and the lookahead save re-reads labor first, so the key survives wage/hrs/budget/billing saves and the SharePoint sync. */
+const LK={start:'',mode:'people',plans:{},loaded:false,loading:false,roster:[],cards:[],fms:[],sel:[],multi:false,sat:false,sx:0,q:null,M:null,addJobs:[]};
+const LK_COLORS=['#1f6feb','#d97706','#16a34a','#9333ea','#dc2626','#0891b2','#a16207','#db2777','#4f46e5','#059669','#ea580c','#475569'];
+const lookCan=()=>!!(S.isAdmin&&S.realAdmin&&!S.asUser&&!S.viewAs);
+const lookDow=iso=>new Date(iso+'T12:00:00Z').getUTCDay();
+/** Monday that starts the board: this week’s Monday; on Saturday or Sunday the coming Monday. */
+function lookMonday(iso){const d=lookDow(iso);return isoAddD(iso,d===0?1:d===6?2:1-d)}
+/** The board’s work days: Mon–Fri for two weeks from the Monday. A Saturday is added only when sat(iso) says so (something planned, or Saturdays switched on). Never Sundays. */
+function lookDays(mon,sat){const out=[];for(let w=0;w<2;w++)for(let d=0;d<6;d++){const iso=isoAddD(mon,w*7+d);if(d<5||(sat&&sat(iso)))out.push(iso)}return out}
+/** The rest of that week after a day, through Friday, from today on (for Repeat for the week). */
+function lookWeekRest(d,td){const out=[d];for(let x=isoAddD(d,1);lookDow(x)>=1&&lookDow(x)<=5;x=isoAddD(x,1))if(x>=td)out.push(x);return out}
+/** Plans by person: {nameKey:{n:name,d:{date:[jobIds]}}} from {jobId:{date:[names]}}. */
+function lookByPerson(plans){const o={};Object.keys(plans||{}).forEach(j=>{const p=plans[j]||{};Object.keys(p).forEach(d=>(p[d]||[]).forEach(n=>{const k=tcKey(n);if(!k)return;const P=o[k]=o[k]||{n:String(n).trim(),d:{}};const a=P.d[d]=P.d[d]||[];if(!a.includes(j))a.push(j)}))});return o}
+/** Plan a job (or null = nothing) for these names on these dates. keep=true keeps their other jobs that day (split day); otherwise they come off other jobs that day. Returns new plans. */
+function lookSet(plans,job,names,dates,keep){const P=JSON.parse(JSON.stringify(plans||{}));const ks=names.map(tcKey);
+  dates.forEach(d=>{Object.keys(P).forEach(j=>{if(j===job||(keep&&job))return;const a=P[j][d];if(a){P[j][d]=a.filter(n=>!ks.includes(tcKey(n)));if(!P[j][d].length)delete P[j][d]}});
+    if(job){const p=P[job]=P[job]||{};const a=p[d]=p[d]||[];names.forEach(n=>{if(!a.some(x=>tcKey(x)===tcKey(n)))a.push(String(n).trim())})}});
+  return P}
+/** Take these names off one job on these dates (other jobs untouched). */
+function lookDrop(plans,job,names,dates){const P=JSON.parse(JSON.stringify(plans||{}));const ks=names.map(tcKey);const p=P[job];if(!p)return P;
+  dates.forEach(d=>{if(!p[d])return;p[d]=p[d].filter(n=>!ks.includes(tcKey(n)));if(!p[d].length)delete p[d]});return P}
+/** Copy last week: each person planned in the week starting `from` goes on the same job, same weekday, in the week starting `to` (dates before minIso are skipped). People not planned in the source week keep what they have. */
+function lookCopyWeek(plans,from,to,minIso){let P=plans||{};const by=lookByPerson(P);
+  for(let d=0;d<6;d++){const s=isoAddD(from,d),t=isoAddD(to,d);if(t<minIso)continue;
+    Object.keys(by).forEach(k=>{const js=by[k].d[s];if(!js||!js.length)return;P=lookSet(P,js[0],[by[k].n],[t],false);js.slice(1).forEach(j=>{P=lookSet(P,j,[by[k].n],[t],true)})})}
+  return P}
+/** What each worker worked most recently on the time cards: {nameKey:{job,date,name}} = the app job with the most hours that day. Lines that match no job (office, vacation) are skipped. Only days before `before`. */
+function lookLastWorked(cards,jobs,before){const keys=(jobs||[]).map(j=>[j.id,tcJobKey(j)]);const o={};
+  (cards||[]).forEach(c=>{if(!c||!c.period_start)return;(c.workers||[]).forEach(w=>{const k=tcKey(w.name);if(!k)return;for(let d=0;d<12;d++){const iso=isoAddD(c.period_start,TC_OFF[d]);if(before&&iso>=before)continue;if(o[k]&&o[k].date>=iso)continue;
+    const h={};((w.days&&w.days[d])||[]).forEach(l=>{const x=tcHrs(l);if(!x)return;const m=keys.find(J=>tcIsJob(l,J[1][0],J[1][1]));if(m)h[m[0]]=(h[m[0]]||0)+x});
+    const top=Object.keys(h).sort((a,b)=>h[b]-h[a])[0];if(top)o[k]={job:top,date:iso,name:w.name}}})});
+  return o}
+/** Same as time card: put each person on the job he last worked, on the empty Mon–Fri days in `dates` from minIso on. Days already planned are left alone. */
+function lookPrefill(plans,people,dates,last,minIso){let P=plans||{};const by=lookByPerson(P);
+  people.forEach(n=>{const k=tcKey(n),L=last[k];if(!L)return;const b=by[k];dates.forEach(d=>{const w=lookDow(d);if(d<minIso||w<1||w>5)return;if(b&&b.d[d]&&b.d[d].length)return;P=lookSet(P,L.job,[n],[d],true)})});
+  return P}
+/** Time card jobs on one date: {nameKey:[jobIds]} (hours > 0; 'other' = lines that match no job in the app, like office or vacation). null when no card covers that date. */
+function lookActual(cards,jobs,iso){const keys=(jobs||[]).map(j=>[j.id,tcJobKey(j)]);const o={};let seen=false;
+  (cards||[]).forEach(c=>{if(!c||!c.period_start)return;const d=tcDayIdx(c.period_start,iso);if(d<0)return;seen=true;
+    (c.workers||[]).forEach(w=>{const k=tcKey(w.name);((w.days&&w.days[d])||[]).forEach(l=>{if(!tcHrs(l))return;const m=keys.find(J=>tcIsJob(l,J[1][0],J[1][1]));const id=m?m[0]:'other';const a=o[k]=o[k]||[];if(!a.includes(id))a.push(id)})})});
+  return seen?o:null}
+/** Board warnings. dbl: a person on 2+ jobs the same day. idle: nothing planned on a Mon–Fri from today on. empty: an active job with nobody planned on any board day from today on.
+    miss: a past day where the time card differs from the plan (planned job not on the card, or worked an app job with no plan). actual = {date:lookActual(…)}. */
+function lookWarn(plans,people,days,td,active,actual){const by=lookByPerson(plans),out={dbl:[],idle:[],empty:[],miss:[]};
+  people.forEach(n=>{const b=(by[tcKey(n)]||{d:{}}).d;days.forEach(d=>{const js=b[d]||[],w=lookDow(d);if(js.length>1)out.dbl.push({name:n,date:d,jobs:js});
+    if(!js.length&&d>=td&&w>=1&&w<=5)out.idle.push({name:n,date:d});
+    const A=d<td&&actual&&actual[d];if(A){const a=A[tcKey(n)]||[];if(js.some(j=>!a.includes(j))||(!js.length&&a.some(j=>j!=='other')))out.miss.push({name:n,date:d,plan:js,act:a})}})});
+  const fut=days.filter(d=>d>=td);if(fut.length)(active?[...active]:[]).forEach(j=>{const p=(plans||{})[j]||{};if(!fut.some(d=>(p[d]||[]).length))out.empty.push(j)});
+  return out}
+/** Board rows: [{fm, names}] grouped by foreman. A worker goes under the foreman whose time card had him most recently; a foreman heads his own group.
+    Crew list names never on a card (and planned names not on the list) go in the last group (fm ''). Cards owned by office logins (skip) are left out. */
+function lookGroups(cards,roster,fms,skip,extra){const fmOf={},nm={},isFm=new Set();const add=n=>{const k=tcKey(n);if(k&&!nm[k])nm[k]=String(n).trim();return k};
+  (fms||[]).forEach(f=>{const k=f&&add(f.name);if(k)isFm.add(k)});
+  (cards||[]).filter(c=>c&&!(skip||[]).includes(c.owner)).sort((a,b)=>String(a.period_start).localeCompare(String(b.period_start))).forEach(c=>{const fk=add(c.foreman);if(!fk)return;isFm.add(fk);(c.workers||[]).forEach(w=>{const k=add(w.name);if(k&&k!==fk)fmOf[k]=fk})});
+  (roster||[]).forEach(r=>add(r&&r.name!=null?r.name:r));(extra||[]).forEach(add);
+  const G={};Object.keys(nm).forEach(k=>{const g=isFm.has(k)?k:(fmOf[k]||'');(G[g]=G[g]||[]).push(k)});
+  return Object.keys(G).sort((a,b)=>!a?1:!b?-1:nm[a].localeCompare(nm[b])).map(g=>({fm:g?nm[g]:'',names:G[g].sort((a,b)=>a===g?-1:b===g?1:nm[a].localeCompare(nm[b])).map(k=>nm[k])}))}
+/** Which job/date plans changed between two plan sets: {jobId:{date:names or null}}. */
+function lookDiff(a,b){const o={};a=a||{};b=b||{};new Set(Object.keys(a).concat(Object.keys(b))).forEach(j=>{const x=a[j]||{},y=b[j]||{};
+    new Set(Object.keys(x).concat(Object.keys(y))).forEach(d=>{if(JSON.stringify(x[d]||[])!==JSON.stringify(y[d]||[]))(o[j]=o[j]||{})[d]=(y[d]&&y[d].length)?y[d]:null})});
+  return o}
+const lookShort=j=>tcJobNo(j&&j.name)||String((j&&j.name)||'?').slice(0,4);
+const lkJob=id=>(S.jobs||[]).find(j=>j.id===id);
+function lookClean(la){const o={};if(!la||typeof la!=='object'||Array.isArray(la))return o;Object.keys(la).forEach(d=>{if(/^\d{4}-\d\d-\d\d$/.test(d)&&Array.isArray(la[d])){const a=la[d].filter(n=>typeof n==='string'&&n.trim());if(a.length)o[d]=a}});return o}
+function openLook(){if(!lookCan())return;S.view='look';LK.start=LK.start||lookMonday(tcToday());LK.sel=[];LK.multi=false;window.scrollTo(0,0);loadLook()}
+function closeLook(){S.view='jobs';LK.sel=[];LK.multi=false;render()}
+async function loadLook(){LK.loading=true;if(S.view==='look')render();
+  try{const since=tcPeriodOf(isoAddD(LK.start,-35));
+    const [bud,ro,cards,fms]=await Promise.all([q(sb.from('job_budget').select('job_id,lookahead:labor->lookahead')),q(sb.from('crew_roster').select('name').eq('active',true).order('name')).catch(()=>[]),
+      q(sb.from('timecards').select('owner,foreman,period_start,workers').gte('period_start',since)).catch(()=>[]),q(sb.rpc('foreman_accounts')).catch(()=>[])]);
+    const ids=new Set((S.jobs||[]).map(j=>j.id));const P={};(bud||[]).forEach(r=>{const la=lookClean(r.lookahead);if(ids.has(r.job_id)&&Object.keys(la).length)P[r.job_id]=la});
+    LK.plans=P;LK.roster=ro||[];LK.cards=cards||[];LK.fms=fms||[];LK.loaded=true}catch(e){toast(errMsg(e))}
+  LK.loading=false;if(S.view==='look')render()}
+/** Save: show the change now, then per changed job re-read labor and write back only the changed dates into labor.lookahead (other labor keys and other dates stay). Saves run one after another. */
+function lookSave(next,msg){const prev=LK.plans;LK.plans=next;LK.sel=[];render();LK.q=(LK.q||Promise.resolve()).then(()=>lookWrite(prev,next,msg));return LK.q}
+async function lookWrite(prev,next,msg){const ch=lookDiff(prev,next);const ids=Object.keys(ch);if(!ids.length)return;let bad=false;
+  for(const j of ids){try{const b=await q(sb.from('job_budget').select('labor').eq('job_id',j).maybeSingle());const L=(b&&b.labor)||{};const la=lookClean(L.lookahead);
+      Object.keys(ch[j]).forEach(d=>{if(ch[j][d])la[d]=ch[j][d];else delete la[d]});const cut=isoAddD(tcToday(),-70);Object.keys(la).forEach(d=>{if(d<cut)delete la[d]});
+      await q(sb.from('job_budget').upsert({job_id:j,labor:Object.assign({},L,{lookahead:la})},{onConflict:'job_id'}));if(S.labor&&S.job&&S.job.id===j)S.labor.lookahead=la}catch(e){bad=true;toast(errMsg(e))}}
+  if(bad)loadLook();else if(msg)toast(msg)}
+function lookModel(){const td=tcToday(),jobs=S.jobs||[];const by=lookByPerson(LK.plans);
+  const days=lookDays(LK.start,iso=>LK.sat||Object.keys(by).some(k=>(by[k].d[iso]||[]).length));
+  const offIds=(S.office||[]).map(o=>o.user_id).filter(Boolean);const groups=lookGroups(LK.cards,LK.roster,LK.fms,offIds,Object.keys(by).map(k=>by[k].n));
+  const people=[].concat(...groups.map(g=>g.names));const act={};days.forEach(d=>{if(d<td)act[d]=lookActual(LK.cards,jobs,d)});
+  const since=isoAddD(td,-14),active=new Set();jobs.forEach(j=>{const K=tcJobKey(j);const a=S.jobAct&&S.jobAct[j.id];if(tcJobLive(LK.cards,K[0],K[1],since).days.size||(a&&String(a).slice(0,10)>=since))active.add(j.id)});
+  const W=lookWarn(LK.plans,people,days,td,active,act);const miss={};W.miss.forEach(x=>miss[tcKey(x.name)+'|'+x.date]=x);
+  const num0=j=>+(tcJobNo(j.name)||1e9);const shown=jobs.filter(j=>active.has(j.id)||LK.addJobs.includes(j.id)||days.some(d=>((LK.plans[j.id]||{})[d]||[]).length)).sort((a,b)=>num0(a)-num0(b)||String(a.name).localeCompare(String(b.name)));
+  const col={},short={other:'oth'};jobs.forEach(j=>short[j.id]=lookShort(j));shown.forEach((j,i)=>col[j.id]=LK_COLORS[i%LK_COLORS.length]);jobs.forEach(j=>{if(!col[j.id])col[j.id]='#475569'});
+  return LK.M={td,days,by,groups,people,act,active,W,miss,shown,col,short}}
+function renderLook(){let h='<div class="top"><button id="lkBack" aria-label="Back">‹</button><h1><div class="ttl"><span class="brand"></span>Alpha Operations</div></h1></div><main class="lkm'+(LK.multi?' multi':'')+'">';
+  if(!lookCan())return h+'<div class="empty"><b>Office only</b>The crew lookahead is for the office login.</div></main>';
+  if(!LK.loaded)return h+'<div class="empty">Loading crew lookahead…</div></main>';
+  const M=lookModel(),d0=M.days[0],d1=M.days[M.days.length-1];
+  h+='<div class="card" style="padding:12px"><div class="row" style="flex-wrap:wrap;gap:8px"><div class="grow"><b style="font-size:18px">🗓 Crew lookahead</b><div class="muted small">'+esc(tcFmt(d0,{month:'short',day:'numeric'})+' – '+tcFmt(d1,{month:'short',day:'numeric'}))+(LK.loading?' · loading…':'')+'</div></div>'+
+    '<div class="row" style="gap:6px"><button class="btn sm" id="lkPrev" aria-label="Earlier week">‹</button><button class="btn sm" id="lkNow">This week</button><button class="btn sm" id="lkNext" aria-label="Later week">›</button></div></div>'+
+    '<div class="chips" style="margin:10px 0 8px"><button class="chip'+(LK.mode==='people'?' on':'')+'" data-lkm="people">By person</button><button class="chip'+(LK.mode==='jobs'?' on':'')+'" data-lkm="jobs">By job</button></div>'+
+    '<div class="row lktools" style="flex-wrap:wrap;gap:6px">'+(LK.mode==='people'?'<button class="btn sm'+(LK.multi?' primary':'')+'" id="lkMulti">'+(LK.multi?'✓ Selecting':'Select several')+'</button>':'')+
+    '<button class="btn sm" id="lkCopy">Copy last week</button><button class="btn sm" id="lkSame">Same as time card</button><button class="btn sm" id="lkSat">'+(LK.sat?'Hide':'Show')+' Saturdays</button></div></div>';
+  h+=lookWarnCard(M);
+  h+=LK.mode==='jobs'?lookJobGrid(M):lookPeopleGrid(M);
+  h+='<p class="muted small" style="margin:8px 2px">'+(LK.mode==='jobs'?'Numbers = people planned. Tap a day to pick who’s on that job. Amber 0 = active job with nobody planned.':'Tap a cell to plan. '+(LK.multi?'Tap or drag cells to select, then Assign.':'Drag with a mouse, or tap Select several, to plan many at once.')+' Past days: ✓ time card matches · ≠ worked a different job · no hrs = nothing on the time card · grey # = worked but wasn’t planned.')+'</p>';
+  if(LK.multi&&LK.mode==='people')h+='<div class="lkbar"><span class="grow">'+LK.sel.length+' selected</span><button class="btn sm" id="lkSelClr">Clear</button><button class="btn sm primary" id="lkSelGo"'+(LK.sel.length?'':' disabled')+'>Assign…</button></div>';
+  return h+'</main>'}
+/** Board days as short ranges: 11/30–12/2, 12/4 (consecutive board days join up). */
+function lookRanges(ds,all){const ix=ds.map(d=>all.indexOf(d)).sort((a,b)=>a-b),out=[];let s=null,p=null;ix.concat([null]).forEach(i=>{if(s!=null&&i===p+1){p=i;return}if(s!=null)out.push(tcFmt(all[s])+(p>s?'–'+tcFmt(all[p]):''));s=p=i});return out.join(', ')}
+function lookWarnCard(M){const W=M.W,nm=j=>{const x=lkJob(j);if(!x)return '?';const t=(tcJobNo(x.name)?tcJobNo(x.name)+' ':'')+(tcJobShort(x.name)||x.name);return t.length>26?t.slice(0,25)+'…':t},dt=d=>tcFmt(d,{weekday:'short',month:'numeric',day:'numeric'});
+  const parts=[];if(W.dbl.length)parts.push('<span style="color:#b42318">'+W.dbl.length+' double-booked</span>');if(W.empty.length)parts.push('<span style="color:#9a3412">'+W.empty.length+' active job'+(W.empty.length===1?'':'s')+' with nobody planned</span>');
+  const idleP={};W.idle.forEach(x=>(idleP[x.name]=idleP[x.name]||[]).push(x.date));const ip=Object.keys(idleP);if(ip.length)parts.push('<span style="color:#9a3412">'+ip.length+' with open days</span>');if(W.miss.length)parts.push('<span class="muted">'+W.miss.length+' plan ≠ time card</span>');
+  if(!parts.length)return '<div class="card small" style="padding:10px 12px;color:#2e7d32">✓ Everyone is planned and nobody is double-booked.</div>';
+  let b='';if(W.dbl.length)b+='<div class="lkwh" style="color:#b42318">Double-booked</div>'+W.dbl.map(x=>'<div>'+esc(x.name)+' · '+esc(dt(x.date))+': '+esc(x.jobs.map(nm).join(' + '))+'</div>').join('');
+  if(W.empty.length)b+='<div class="lkwh" style="color:#9a3412">Active job, nobody planned</div>'+W.empty.map(j=>'<div>'+esc(nm(j))+' <span class="muted">(crew hours or progress in the last 2 weeks)</span></div>').join('');
+  if(ip.length)b+='<div class="lkwh" style="color:#9a3412">Nothing planned (idle)</div>'+ip.map(p=>'<div>'+esc(p)+': '+(idleP[p].length>=M.days.filter(d=>d>=M.td&&lookDow(d)<6).length?'every day':esc(lookRanges(idleP[p],M.days)))+'</div>').join('');
+  if(W.miss.length)b+='<div class="lkwh muted">Plan vs. time card (past days)</div>'+W.miss.map(x=>'<div class="muted">'+esc(x.name)+' · '+esc(dt(x.date))+': planned '+esc(x.plan.length?x.plan.map(j=>M.short[j]).join('+'):'nothing')+', worked '+esc(x.act.length?x.act.map(j=>M.short[j]||'?').join('+'):'no hours')+'</div>').join('');
+  return '<details class="card lkwarn"'+(LK.wOpen?' open':'')+'><summary><b>⚠</b> '+parts.join(' · ')+'</summary><div class="small" style="margin-top:6px">'+b+'</div></details>'}
+function lookHead(M){return M.days.map((d,i)=>'<th class="'+(i&&lookDow(d)===1?'wk':'')+(d===M.td?' td':'')+(lookDow(d)===6?' sat':'')+'">'+esc(tcFmt(d,{weekday:'short'}))+'<br><span>'+esc(tcFmt(d))+'</span></th>').join('')}
+function lookPeopleGrid(M){if(!M.people.length)return '<div class="empty"><b>No crew yet</b>Add people to the crew list (⏱ Time cards → Crew list & rates).</div>';
+  let h='<div class="lkgrid" id="lkGrid"><table class="lkt"><thead><tr><th class="lkn">Crew</th>'+lookHead(M)+'</tr></thead><tbody>';let r=0;
+  M.groups.forEach(g=>{h+='<tr class="lkg"><td colspan="'+(M.days.length+1)+'"><span>'+esc(g.fm?g.fm+'’s crew':'Not on a recent time card')+'</span></td></tr>';
+    g.names.forEach(n=>{const k=tcKey(n),b=(M.by[k]||{d:{}}).d;h+='<tr><td class="lkn'+(g.fm&&k===tcKey(g.fm)?' fm':'')+'" title="'+esc(n)+'">'+esc(n)+'</td>'+M.days.map((d,c)=>lookCell(M,n,k,b[d]||[],d,r,c)).join('')+'</tr>';r++})});
+  const cnt=d=>M.people.filter(n=>((M.by[tcKey(n)]||{d:{}}).d[d]||[]).length).length;
+  return h+'</tbody><tfoot><tr><td class="lkn">Planned</td>'+M.days.map((d,i)=>'<td class="lkf'+(i&&lookDow(d)===1?' wk':'')+'">'+cnt(d)+'/'+M.people.length+'</td>').join('')+'</tr></tfoot></table></div>'}
+function lookCell(M,n,k,js,d,r,c){const past=d<M.td,w=lookDow(d);let cls='lkc'+(c&&w===1?' wk':'')+(d===M.td?' td':'')+(past?' past':'')+(js.length>1?' dbl':'')+(LK.sel.includes(n+'|'+d)?' sel':'');
+  let x=js.map(j=>'<b style="background:'+M.col[j]+'">'+esc(M.short[j]||'?')+'</b>').join('');
+  if(!js.length&&!past&&w>=1&&w<=5)cls+=' idle';
+  const A=past&&M.act[d];if(A){const a=A[k]||[],mm=M.miss[k+'|'+d];
+    if(js.length&&!mm)x+='<i class="ok" title="Time card matches">✓</i>';
+    else if(js.length&&mm)x+='<i class="mm" title="Time card: '+esc(a.length?a.map(j=>M.short[j]||'?').join('+'):'no hours')+'">'+(a.length?'≠'+esc(a.map(j=>M.short[j]||'?').join('+')):'no hrs')+'</i>';
+    else if(a.length)x+='<i class="un" title="Worked, not planned">'+esc(a.map(j=>M.short[j]||'?').join('+'))+'</i>'}
+  return '<td class="'+cls+'" data-c="'+r+','+c+'" data-n="'+esc(n)+'" data-d="'+d+'">'+x+'</td>'}
+function lookJobGrid(M){const opts=sortJobs((S.jobs||[]).filter(j=>!M.shown.includes(j)));
+  let h='';if(!M.shown.length)h+='<div class="empty"><b>No jobs planned yet</b>Pick a job below, or plan people in By person.</div>';
+  else{h+='<div class="lkgrid" id="lkGrid"><table class="lkt"><thead><tr><th class="lkn">Job</th>'+lookHead(M)+'</tr></thead><tbody>';
+    M.shown.forEach(j=>{const p=LK.plans[j.id]||{};h+='<tr><td class="lkn" title="'+esc(j.name)+'"><i class="lkdot" style="background:'+M.col[j.id]+'"></i>'+esc(lookShort(j))+' <span class="muted">'+esc(tcJobShort(j.name)||'')+'</span></td>'+
+      M.days.map((d,i)=>{const c=(p[d]||[]).length,zero=!c&&d>=M.td&&M.active.has(j.id)&&lookDow(d)<6;return '<td class="lkc lkj'+(i&&lookDow(d)===1?' wk':'')+(d===M.td?' td':'')+(d<M.td?' past':'')+(zero?' zero':'')+'" data-j="'+esc(j.id)+'" data-d="'+d+'">'+(c?'<b style="background:'+M.col[j.id]+'">'+c+'</b>':(zero?'0':''))+'</td>'}).join('')+'</tr>'});
+    h+='</tbody></table></div>'}
+  return h+(opts.length?'<select id="lkAddJob" class="lksel"><option value="">+ Plan another job…</option>'+opts.map(j=>'<option value="'+esc(j.id)+'">'+esc(j.name)+'</option>').join('')+'</select>':'')}
+/** Job list for the picker: active and planned jobs first (as chips), then the rest. */
+function lookPickJobs(M){const top=M.shown.slice();const rest=sortJobs((S.jobs||[]).filter(j=>!top.includes(j)));return [top,rest]}
+function lookPick(cells){if(!cells.length)return;const M=LK.M||lookModel();const ns=[...new Set(cells.map(x=>x.n))],ds=[...new Set(cells.map(x=>x.d))].sort();const [top,rest]=lookPickJobs(M);
+  const cur=cells.length===1?((M.by[tcKey(cells[0].n)]||{d:{}}).d[cells[0].d]||[]):[];
+  const m=modal('<h2>'+esc(ns.length===1?ns[0]:ns.length+' people')+'</h2><p class="muted small" style="margin:-4px 0 10px">'+esc(ds.length===1?fmtDay(ds[0]):ds.length+' days · '+tcFmt(ds[0])+' – '+tcFmt(ds[ds.length-1]))+(cur.length?' · now on '+cur.map(j=>M.short[j]).join(' + '):'')+'</p>'+
+    '<div class="chips lkjobs">'+top.map(j=>'<button type="button" class="chip'+(cur.includes(j.id)?' on':'')+'" data-j="'+esc(j.id)+'"><i style="background:'+M.col[j.id]+'"></i>'+esc(lookShort(j))+' <span>'+esc(tcJobShort(j.name)||'')+'</span></button>').join('')+'</div>'+
+    (rest.length?'<select class="lksel" data-other><option value="">'+(top.length?'Other job…':'Pick a job…')+'</option>'+rest.map(j=>'<option value="'+esc(j.id)+'">'+esc(j.name)+'</option>').join('')+'</select>':'')+
+    '<label class="lkck"><input type="checkbox" data-rep> Repeat for the week (through Friday)</label><label class="lkck"><input type="checkbox" data-keep> Split day: keep their other job too</label>'+
+    '<div class="mbtns"><button class="btn" data-clr>Nothing planned</button><button class="btn" data-x>Cancel</button></div>');
+  const apply=job=>{const rep=$('[data-rep]',m).checked,keep=$('[data-keep]',m).checked;let P=LK.plans;
+    ns.forEach(n=>{let dd=cells.filter(x=>x.n===n).map(x=>x.d);if(rep)dd=[...new Set([].concat(...dd.map(d=>lookWeekRest(d,M.td))))];P=lookSet(P,job,[n],dd,keep&&!!job)});
+    m.close();lookSave(P,job?'Planned on '+(lookShort(lkJob(job))||'job')+'.':'Cleared.')};
+  $$('[data-j]',m).forEach(b=>b.onclick=()=>apply(b.dataset.j));const o=$('[data-other]',m);if(o)o.onchange=()=>{if(o.value)apply(o.value)};
+  $('[data-clr]',m).onclick=()=>apply(null);$('[data-x]',m).onclick=()=>m.close()}
+function lookJobDay(j,d){const M=LK.M||lookModel(),job=lkJob(j);if(!job)return;const on=new Set(((LK.plans[j]||{})[d]||[]).map(tcKey));
+  const m=modal('<h2>'+esc(lookShort(job)+' '+(tcJobShort(job.name)||''))+'</h2><p class="muted small" style="margin:-4px 0 6px">'+esc(fmtDay(d))+' · tap who’s on this job</p>'+
+    M.groups.map(g=>'<div class="small muted" style="margin:8px 0 4px;font-weight:700">'+esc(g.fm?g.fm+'’s crew':'Others')+'</div><div class="chips" style="margin-bottom:4px">'+g.names.map(n=>{const o=((M.by[tcKey(n)]||{d:{}}).d[d]||[]).filter(x=>x!==j);
+      return '<button type="button" class="chip'+(on.has(tcKey(n))?' on':'')+'" data-p="'+esc(n)+'">'+esc(n)+(o.length?' <small style="opacity:.7">'+esc(o.map(x=>M.short[x]).join('/'))+'</small>':'')+'</button>'}).join('')+'</div>').join('')+
+    '<label class="lkck"><input type="checkbox" data-rep> Repeat for the week (through Friday)</label><label class="lkck"><input type="checkbox" data-keep> Split day: keep people on their other job too</label>'+
+    '<div class="mbtns"><button class="btn" data-x>Cancel</button><button class="btn primary" data-ok>Save</button></div>');
+  $$('[data-p]',m).forEach(b=>b.onclick=()=>b.classList.toggle('on'));$('[data-x]',m).onclick=()=>m.close();
+  $('[data-ok]',m).onclick=()=>{const sel=$$('[data-p].on',m).map(b=>b.dataset.p),off=$$('[data-p]:not(.on)',m).map(b=>b.dataset.p);const dd=$('[data-rep]',m).checked?lookWeekRest(d,M.td):[d];
+    let P=lookDrop(LK.plans,j,off,dd);if(sel.length)P=lookSet(P,j,sel,dd,$('[data-keep]',m).checked);m.close();lookSave(P,'Saved '+lookShort(job)+'.')}}
+function lookCopyBox(){const M=LK.M||lookModel(),a=LK.start,b=isoAddD(a,7),f=d=>tcFmt(d,{month:'short',day:'numeric'});
+  const m=modal('<h2>Copy last week</h2><p class="muted small" style="margin:-4px 0 10px">Each person goes on the same job, same weekday. Past days aren’t changed. People with nothing planned last week keep what they have.</p><div style="display:grid;gap:8px">'+
+    '<button class="btn" data-w="'+isoAddD(a,-7)+'|'+a+'">Week of '+esc(f(isoAddD(a,-7)))+' → week of '+esc(f(a))+'</button><button class="btn" data-w="'+a+'|'+b+'">Week of '+esc(f(a))+' → week of '+esc(f(b))+'</button></div><div class="mbtns"><button class="btn" data-x>Cancel</button></div>');
+  $('[data-x]',m).onclick=()=>m.close();$$('[data-w]',m).forEach(x=>x.onclick=async()=>{const [s,t]=x.dataset.w.split('|');m.close();
+    const P=lookCopyWeek(LK.plans,s,t,M.td);const n=Object.keys(lookDiff(LK.plans,P)).length;
+    if(!n){toast('Nothing to copy: no plan that week (or those days are past).');return}lookSave(P,'Copied the week of '+f(s)+'.')})}
+async function lookSameBox(){const M=LK.M||lookModel();const last=lookLastWorked(LK.cards,S.jobs,isoAddD(M.td,1));const P=lookPrefill(LK.plans,M.people,M.days,last,M.td);
+  const ch=lookDiff(LK.plans,P);let cells=0;const B=lookByPerson(P),A=M.by;Object.keys(B).forEach(k=>Object.keys(B[k].d).forEach(d=>{if(!((A[k]||{d:{}}).d[d]||[]).length)cells++}));
+  if(!Object.keys(ch).length){toast('Nothing to fill: everyone is planned, or nobody has recent time card hours.');return}
+  if(!await confirmBox('Fill '+cells+' empty day'+(cells===1?'':'s')+' with the job each person worked most recently on the time cards? Days already planned stay the same.','Fill',false))return;
+  lookSave(P,'Filled from time cards.')}
+function bindLook(){$('#lkBack').onclick=closeLook;if(!$('#lkPrev'))return;
+  const nav=n=>{LK.start=n==null?lookMonday(tcToday()):isoAddD(LK.start,7*n);LK.sel=[];LK.sx=0;loadLook()};
+  $('#lkPrev').onclick=()=>nav(-1);$('#lkNext').onclick=()=>nav(1);$('#lkNow').onclick=()=>nav(null);
+  $$('[data-lkm]').forEach(b=>b.onclick=()=>{LK.mode=b.dataset.lkm;LK.multi=false;LK.sel=[];LK.sx=0;render()});
+  const mu=$('#lkMulti');if(mu)mu.onclick=()=>{LK.multi=!LK.multi;LK.sel=[];render()};
+  $('#lkCopy').onclick=lookCopyBox;$('#lkSame').onclick=lookSameBox;$('#lkSat').onclick=()=>{LK.sat=!LK.sat;render()};
+  const sc=$('#lkSelClr');if(sc)sc.onclick=()=>{LK.sel=[];render()};
+  const sg=$('#lkSelGo');if(sg)sg.onclick=()=>lookPick(LK.sel.map(s=>{const i=s.lastIndexOf('|');return {n:s.slice(0,i),d:s.slice(i+1)}}));
+  const wd=$('.lkwarn');if(wd)wd.ontoggle=()=>{LK.wOpen=wd.open};
+  const aj=$('#lkAddJob');if(aj)aj.onchange=()=>{if(aj.value&&!LK.addJobs.includes(aj.value))LK.addJobs.push(aj.value);render()};
+  const g=$('#lkGrid');if(!g)return;g.scrollLeft=LK.sx||0;g.onscroll=()=>{LK.sx=g.scrollLeft};
+  if(LK.mode==='jobs'){g.onclick=e=>{const td=e.target.closest('td[data-j]');if(td)lookJobDay(td.dataset.j,td.dataset.d)};return}
+  let drag=null,lastUp=0;const rc=td=>td.dataset.c.split(',').map(Number);
+  const rect=()=>{const [r1,c1]=rc(drag.a),[r2,c2]=rc(drag.b);return $$('td[data-c]',g).filter(td=>{const [r,c]=rc(td);return r>=Math.min(r1,r2)&&r<=Math.max(r1,r2)&&c>=Math.min(c1,c2)&&c<=Math.max(c1,c2)})};
+  const paint=()=>{$$('td.drag',g).forEach(td=>td.classList.remove('drag'));if(drag)rect().forEach(td=>td.classList.add('drag'))};
+  const cellAt=(x,y)=>{const el=document.elementFromPoint(x,y);return el&&el.closest?el.closest('#lkGrid td[data-c]'):null};
+  g.onpointerdown=e=>{const td=e.target.closest('td[data-c]');if(!td||(e.pointerType!=='mouse'&&!LK.multi)||e.button>0)return;e.preventDefault();drag={a:td,b:td};try{g.setPointerCapture(e.pointerId)}catch(_){}paint()};
+  g.onpointermove=e=>{if(!drag)return;const td=cellAt(e.clientX,e.clientY);if(td&&td!==drag.b){drag.b=td;paint()}};
+  g.onpointercancel=()=>{drag=null;paint()};
+  g.onpointerup=()=>{if(!drag)return;const cells=rect().map(td=>({n:td.dataset.n,d:td.dataset.d}));const one=drag.a===drag.b;drag=null;paint();lastUp=Date.now();
+    if(LK.multi){const ks=cells.map(x=>x.n+'|'+x.d);if(one&&LK.sel.includes(ks[0]))LK.sel=LK.sel.filter(s=>s!==ks[0]);else ks.forEach(s=>{if(!LK.sel.includes(s))LK.sel.push(s)});render()}else lookPick(cells)};
+  g.onclick=e=>{if(LK.multi||Date.now()-lastUp<500)return;const td=e.target.closest('td[data-c]');if(td)lookPick([{n:td.dataset.n,d:td.dataset.d}])}}
 function renderJobs(){
   let h='<div class="top"><h1><div class="ttl"><span class="brand"></span>Alpha Operations</div></h1><button id="acct" aria-label="Account">☰</button></div><main>';
   if(S.isAdmin)h+='<button class="btn primary block" id="newJob" style="margin-bottom:10px">+ New job</button>';
   if(dashOk())h+='<button class="btn block" id="dashOpen" style="margin-bottom:10px">\ud83d\udcca All jobs at a glance</button>';
   if(canSeeTc())h+='<button class="btn block" id="tcOpen" style="margin-bottom:14px">⏱ Time cards</button>';
+  if(lookCan())h+='<button class="btn block" id="lkOpen" style="margin:-4px 0 14px">🗓 Crew lookahead</button>';
   if(!S.jobsLoaded)h+='<div class="empty">Loading jobs…</div>';
   else if(!S.jobs.length)h+='<div class="empty"><b>No jobs yet</b>'+(S.asUser?esc(S.asUser.name)+' isn’t on any jobs right now.':S.isAdmin?'Add a job, upload its plan PDF, then invite your foreman from the job\'s ⋯ menu.':'Open the invite link the office texted you to get access to a job.')+'</div>';
   else{
@@ -1945,6 +2173,7 @@ function bindJobs(){
   $$('.job').forEach(el=>el.onclick=()=>openJob(el.dataset.id));
   if($('#tcOpen'))$('#tcOpen').onclick=openTimecards;
   if($('#dashOpen'))$('#dashOpen').onclick=openDash;
+  if($('#lkOpen'))$('#lkOpen').onclick=openLook;
   $$('[data-view]').forEach(b=>b.onclick=()=>{lsSet('crewplans.jobView',b.dataset.view);render()});
   const js=$('#jobSort');if(js)js.onchange=()=>{lsSet('crewplans.jobSort',js.value);if(js.value==='size'&&!S.jobSize)loadJobSizes();render()};
   if(S.isAdmin&&!S.jobSize&&(lsGet('crewplans.jobSort')||'')==='size'&&!S.jobSizeT){S.jobSizeT=1;loadJobSizes()}

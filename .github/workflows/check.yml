@@ -23,3 +23,5 @@ jobs:
         run: node .github/scripts/materials-test.js
       - name: Test T&M tickets (numbering, time card 172, status, CSV)
         run: node .github/scripts/tm-test.js
+      - name: Test the crew lookahead board
+        run: node .github/scripts/lookahead-test.js
