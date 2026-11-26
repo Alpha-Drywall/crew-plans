@@ -13,7 +13,7 @@ jobs:
           node-version: 20
       - name: Check the app's JavaScript for errors
         run: node .github/scripts/check.js
-      - name: Test the time card hours math
+      - name: Test the time card hours math, labor alerts and office people off the crew list
         run: node .github/scripts/timecards-test.js
       - name: Test view-as (read-only) and practice mode
         run: node .github/scripts/viewas-test.js
@@ -25,5 +25,5 @@ jobs:
         run: node .github/scripts/tm-test.js
       - name: Test the crew lookahead board
         run: node .github/scripts/lookahead-test.js
-      - name: Test the office % complete (groups, billing, labor alerts, reminder)
+      - name: Test the billing suggestion from hours (trade codes, %, Mob/Submittals, Done %)
         run: node .github/scripts/progress-test.js

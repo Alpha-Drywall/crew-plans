@@ -15,9 +15,10 @@ function grab(name) {
   return lines.slice(i, j).join('\n');
 }
 const names = ['num', 'r2', 'tcKey', 'TC_ANCHOR', 'isoAddD', 'tcPeriodOf', 'tcJobNo', 'tcJobShort', 'tcHrs', 'LABOR_CODES', 'codeHrs', 'f1', 'fmtWk',
-  'tcDayIdx', 'tcLineNo', 'tcJobKey', 'tcIsJob', 'tcLabCode', 'tcJobDay', 'tcJobLive', 'sameBy', 'labK', 'laborCost', 'laborCut', 'laborEff', 'laborAlerts'];
+  'tcDayIdx', 'tcLineNo', 'tcJobKey', 'tcIsJob', 'tcLabCode', 'tcJobDay', 'tcJobLive', 'sameBy', 'labK', 'laborCost', 'laborCut', 'laborEff', 'LABOR_WARN', 'laborAlerts',
+  'nameKey', 'isOfficeName', 'isOfficeUser', 'tcOfficeCode', 'tcAllOffice', 'tcSkipRoster', 'crewOnly'];
 const code = names.map(grab).join('\n') + '\n;({' + names.filter(n => n !== 'TC_ANCHOR').concat(['TC_OFF']).join(',') + '})';
-const ctx = { S: {}, PHASES: [], laborDone: () => null, Math, Date, String, Number, Set, Object, Array, isFinite, parseFloat };
+const ctx = { S: {}, PHASES: [], Math, Date, String, Number, Set, Object, Array, isFinite, parseFloat };
 const T = vm.runInNewContext(code, ctx);
 const J = x => JSON.parse(JSON.stringify(x));
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok - ' + name); };
@@ -126,11 +127,17 @@ t('alert merge: higher of official vs official + time cards', () => {
   const C = { cost: { history: [{}] }, tc: { after: '2026-11-28' }, rows: [
     { c: { k: '112', n: '112-Framing' }, md: 10, used: 9, live: 2 },
     { c: { k: '122', n: '122-Hanging' }, md: 10, used: 5, live: 0 },
-    { c: { k: '132', n: '132-Finishing' }, md: 10, used: 8.5, live: 0 }] };
+    { c: { k: '132', n: '132-Finishing' }, md: 10, used: 9.2, live: 0 },
+    { c: { k: '161', n: '161-Batts & Caulk' }, md: 10, used: 8.9, live: 0 }] };
   const A = T.laborAlerts(C);
-  assert.strictEqual(A.length, 2);
-  assert.ok(/over budget: 11 of 10 man days used \(incl\. time cards since /.test(A[0].t), A[0].t);
+  assert.strictEqual(A.length, 2); // 112 over (110%), 132 near (92%); 122 at 50% and 161 at 89% are fine
+  assert.ok(/over budget: 11 of 10 man days used \(110% of the budgeted hours\) \(incl\. time cards since /.test(A[0].t), A[0].t);
+  assert.strictEqual(A[0].lvl, 'over'); assert.strictEqual(A[1].lvl, 'near');
+  assert.ok(/^132-Finishing: 92% of the budgeted hours used, 0\.8 man days left\.$/.test(A[1].t), A[1].t);
   assert.ok(A[0].tc); assert.ok(!A[1].tc); assert.ok(!/time cards/.test(A[1].t));
+  assert.ok(!/complete|work done/i.test(A.map(a => a.t).join(' '))); // hours only now
+  const edge = T.laborAlerts({ rows: [{ c: { k: '112', n: '112-Framing' }, md: 10, used: 9, live: null }, { c: { k: '122', n: '122-Hanging' }, md: 10, used: 10, live: null }] });
+  assert.deepStrictEqual(J(edge.map(a => a.lvl)), ['near', 'near']); // exactly 90% warns; exactly 100% is not over yet
 });
 t('report form and report list text', () => {
   const H = vm.runInNewContext(['tcFmt', 'tcFeedHtml', 'logHrsHtml'].map(grab).join('\n') + ';({tcFeedHtml,logHrsHtml})',
@@ -150,4 +157,46 @@ t('report form and report list text', () => {
   ctx.S.logTc = { c: r };
   assert.ok(H.logHrsHtml({ id: 'c', hours: 0 }).includes('32'));
 });
-console.log(n + ' tests passed');
+t('office people: matched by name ignoring case, accents and punctuation', () => {
+  ctx.S.office = [{ id: 'o1', user_id: 'u-ken', name: 'Ken VanSickle' }, { id: 'o2', user_id: 'u-jo', name: 'José Ramírez' }, { id: 'o3', user_id: null, name: 'Shayla Hunter' }];
+  assert.ok(T.isOfficeName('Ken VanSickle')); assert.ok(T.isOfficeName('  ken vansickle ')); assert.ok(T.isOfficeName('KEN VANSICKLE'));
+  assert.ok(T.isOfficeName('Jose Ramirez')); assert.ok(T.isOfficeName('josé ramírez')); assert.ok(T.isOfficeName('Shayla  Hunter'));
+  assert.ok(!T.isOfficeName('Ken')); assert.ok(!T.isOfficeName('Javier Mena')); assert.ok(!T.isOfficeName('')); assert.ok(!T.isOfficeName(null));
+  assert.ok(T.isOfficeUser('u-ken')); assert.ok(!T.isOfficeUser('u-foreman')); assert.ok(!T.isOfficeUser(null));
+  assert.deepStrictEqual(J(T.crewOnly([{ name: 'Javier Mena' }, { name: 'ken vansickle' }, { name: 'Luis Ortiz' }])).map(r => r.name), ['Javier Mena', 'Luis Ortiz']);
+  assert.deepStrictEqual(J(T.crewOnly(['Javier Mena', 'Jose Ramirez'])), ['Javier Mena']); // lookahead roster rows can be plain names
+  assert.deepStrictEqual(J(T.crewOnly(null)), []);
+});
+t('office people: a worker whose hours are all 001 Office, and the office user on his own card', () => {
+  ctx.S.office = [{ id: 'o1', user_id: 'u-ken', name: 'Ken VanSickle' }];
+  const w = days => ({ name: 'Kenny V', days });
+  assert.ok(T.tcAllOffice(w({ 0: [{ job: '1 - Office', code: '001', hrs: '8' }], 1: [{ code: '001 Office', hrs: '4' }, { kind: 'vac', hrs: '4' }] })));
+  assert.ok(!T.tcAllOffice(w({ 0: [{ code: '001', hrs: '4' }, { job: '330', code: '112', hrs: '4' }] })));
+  assert.ok(!T.tcAllOffice(w({}))); assert.ok(!T.tcAllOffice(w({ 0: [{ code: '001', hrs: '' }] }))); // no hours yet: not decided
+  assert.ok(!T.tcAllOffice(w({ 0: [{ code: '', hrs: '8' }] }))); // no code is not office
+  assert.ok(T.tcOfficeCode('001')); assert.ok(T.tcOfficeCode('Office')); assert.ok(!T.tcOfficeCode('112')); assert.ok(!T.tcOfficeCode('010'));
+  const kenCard = { owner: 'u-ken', foreman: 'Kenneth V' }, fmCard = { owner: 'u-fm', foreman: 'Luis Ortiz' };
+  assert.ok(T.tcSkipRoster('Ken VanSickle', null, fmCard)); // office name, even on a foreman card
+  assert.ok(T.tcSkipRoster('kenneth v', null, kenCard)); // office user's own card: his own line
+  assert.ok(!T.tcSkipRoster('Javier Mena', null, kenCard)); // a crew member on the office user's card still goes on
+  assert.ok(!T.tcSkipRoster('Luis Ortiz', null, fmCard)); // a foreman on his own card is crew
+  assert.ok(T.tcSkipRoster('Javier Mena', w({ 0: [{ code: '001', hrs: '8' }] }), fmCard));
+  assert.ok(!T.tcSkipRoster('Javier Mena', w({ 0: [{ code: '112', hrs: '8' }] }), fmCard));
+});
+(async () => {
+  const calls = [];
+  const chain = (tbl) => { const o = { op: null, tbl }; const p = new Proxy(o, { get: (x, k) => k === 'then' ? undefined : (k === 'insert' || k === 'update' || k === 'select') ? (...a) => { if (k !== 'select' || !x.op) x.op = k; calls.push(tbl + '.' + k); return p; } : () => p }); return p; };
+  const TC = { roster: [{ id: 'r1', name: 'Javier Mena', rate: 30 }], card: { owner: 'u-ken', foreman: 'Ken VanSickle' } };
+  const R = vm.runInNewContext(grab('tcRosterSave') + ';tcRosterSave', Object.assign({}, ctx, T, { TC, tcRoster: n => TC.roster.find(r => T.tcKey(r.name) === T.tcKey(n)),
+    sb: { from: chain }, q: async () => [], run: async () => null, Object, String, isFinite }));
+  ctx.S.office = [{ id: 'o1', user_id: 'u-ken', name: 'Ken VanSickle' }];
+  await R('Ken VanSickle', '45'); await R('ken  vansickle'); // office name
+  await R('Ken V', '', { name: 'Ken V', days: { 0: [{ code: '001', hrs: '8' }] } }); // all 001 Office
+  assert.deepStrictEqual(calls, []); assert.strictEqual(TC.roster.length, 1);
+  await R('Luis Ortiz', '32', { name: 'Luis Ortiz', days: { 0: [{ code: '112', hrs: '8' }] } }); // crew: added
+  assert.ok(calls.includes('crew_roster.insert'), calls.join()); assert.deepStrictEqual(J(TC.roster.map(r => r.name)), ['Javier Mena', 'Luis Ortiz']);
+  calls.length = 0; await R('Javier Mena', '31', { name: 'Javier Mena', days: { 0: [{ code: '001', hrs: '8' }] } }); // already crew: rate still updates
+  assert.ok(calls.includes('crew_roster.update')); assert.strictEqual(TC.roster[0].rate, 31);
+  console.log('ok - crew list save: office names and all-001 workers are not added; crew still is');
+  console.log(n + ' tests passed');
+})().catch(e => { console.error(e); process.exit(1); });
