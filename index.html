@@ -3083,6 +3083,10 @@ function matCalc(M,logs,day){
   return {lines,extra,flags}}
 const matRowText=x=>[num(x.qty)?matQ(x.qty)+(x.unit?' '+x.unit:''):'',x.text||''].filter(Boolean).join(' ')+(x.po?' (PO '+x.po+')':'')+(x.short?' – SHORT/BACKORDERED'+(x.note?': '+x.note:''):(x.note?' – '+x.note:''));
 const matClean=m=>Object.assign({lines:Array.isArray(m&&m.lines)?m.lines.filter(l=>l&&l.item):[],updated_at:(m&&m.updated_at)||null,by:(m&&m.by)||null},m&&m.pos&&typeof m.pos==='object'&&!Array.isArray(m.pos)?{pos:m.pos}:{});
+/* PO order on the Materials tab: by PO number (the last number in it, e.g. 321-013 → 13), newest first by default; the choice is kept on this device */
+const matPoNewest=()=>{try{return localStorage.getItem('acv.matPoOrder')!=='old'}catch(e){return true}};
+function matPoSort(keys,newest){const n=k=>{const m=String(k.split('|')[0]||'').match(/(\d+)(?!.*\d)/);return m?+m[1]:-1};
+  return keys.map((k,i)=>({k,i,n:n(k)})).sort((a,b)=>a.n!==b.n?(newest?b.n-a.n:a.n-b.n):(newest?b.i-a.i:a.i-b.i)).map(x=>x.k)}
 const matPoOpenKey=k=>(S.job&&S.job.id)+'|'+k;
 const matHere=()=>!!(S.job&&S.mat&&S.mat.job===S.job.id);
 const matNow=()=>matCalc(S.mat.M,S.mat.logs,today());
@@ -3111,8 +3115,9 @@ function renderMat(){if(!matHere())return '<div class="empty">Loading materials�
   if(C.flags.length)h+='<div class="card" style="padding:10px 14px">'+C.flags.map(f=>{const x=MAT_FL[f.lvl];return '<div class="kv" style="color:'+x[1]+'"><b>'+x[0]+'</b> '+esc(f.t)+'</div>'}).join('')+'</div>';
   if(!C.lines.length)h+='<div class="empty"><b>No order yet</b>'+(ad?'Tap <b>Upload PO PDF</b> to load the PO you sent the supplier, or <b>Paste PO from Excel</b> and paste the item, qty and unit columns from the PO, or add lines one at a time. Foremen then pick these items on the daily report.':'The office hasn’t entered the material order for this job yet. Keep logging deliveries on the daily report.')+'</div>';
   else{const G={};C.lines.forEach(l=>{const k=(l.po||'')+'|'+(l.sup||'');(G[k]=G[k]||[]).push(l)});S.matOpen=S.matOpen||{};
-    if(Object.keys(G).length>1)h+='<div class="row" style="justify-content:flex-end;gap:6px;margin:-4px 2px 8px"><button class="btn sm" data-mpoall="1">Open all</button><button class="btn sm" data-mpoall="0">Close all</button></div>';
-    h+=Object.keys(G).map(k=>{const ls=G[k];const [po,sup]=k.split('|');const dn=ls.filter(l=>l.st==='complete'||l.st==='over').length;
+    const nf=matPoNewest();const keys=matPoSort(Object.keys(G),nf);
+    if(keys.length>1)h+='<div class="row" style="justify-content:flex-end;gap:6px;margin:-4px 2px 8px;flex-wrap:wrap"><button class="btn sm" data-mposort title="Change the order of the POs">'+(nf?'↓ Newest first':'↑ Oldest first')+'</button><button class="btn sm" data-mpoall="1">Open all</button><button class="btn sm" data-mpoall="0">Close all</button></div>';
+    h+=keys.map(k=>{const ls=G[k];const [po,sup]=k.split('|');const dn=ls.filter(l=>l.st==='complete'||l.st==='over').length;
       const pk=ad&&matPdfFor(po);
       const fl=ls.some(l=>l.short||l.late);const ok=matPoOpenKey(k);const op=ok in S.matOpen?S.matOpen[ok]:fl;
       return '<details class="card mpo" style="padding-bottom:4px" data-pok="'+esc(k)+'"'+(op?' open':'')+'><summary class="row" style="margin-bottom:4px;gap:8px"><span class="mchev" aria-hidden="true">▸</span><b class="grow">'+(po?'PO '+esc(po):'No PO #')+(sup?' · '+esc(sup):'')+(fl?' <span class="badge" style="background:#fdecea;color:#b42318">⚠</span>':'')+'</b>'+(pk?'<button class="btn sm" data-popdf="'+esc(pk)+'" title="The PO PDF (office only)">📄 Open PDF</button>':'')+(ad&&dn<ls.length?'<button class="btn sm" data-popre="'+esc(po)+'" title="Mark every line on this PO as delivered before the app (no daily report needed)">✓ All delivered</button>':'')+'<span class="muted small" style="white-space:nowrap">'+dn+' of '+ls.length+' complete</span></summary>'+ls.map(l=>matLineHtml(l,ad)).join('')+'</details>'}).join('');
@@ -3121,6 +3126,7 @@ function renderMat(){if(!matHere())return '<div class="empty">Loading materials�
     C.extra.slice().reverse().map(r=>'<div class="kv">'+matDay(r.date)+' · '+esc(matRowText({text:r.item,qty:r.qty,unit:r.unit,po:r.po,short:r.short,note:r.note}))+(r.by?' <span class="muted small">('+esc(r.by)+')</span>':'')+'</div>').join('')+'</details>';
   return h}
 function bindMat(){$$('details.mpo').forEach(d=>d.ontoggle=()=>{S.matOpen=S.matOpen||{};S.matOpen[matPoOpenKey(d.dataset.pok)]=d.open});
+  $$('[data-mposort]').forEach(b=>b.onclick=()=>{try{localStorage.setItem('acv.matPoOrder',matPoNewest()?'old':'new')}catch(e){}render()});
   $$('[data-mpoall]').forEach(b=>b.onclick=()=>{const o=b.dataset.mpoall==='1';$$('details.mpo').forEach(d=>{d.open=o})});
   if(!isAdminRole())return;const p=$('#matPaste');if(p)p.onclick=matPasteBox;
   const pf=$('#poPdfFile');if(pf)pf.onchange=()=>{const f=pf.files&&pf.files[0];pf.value='';if(f)matPoFromFile(f,{})};
