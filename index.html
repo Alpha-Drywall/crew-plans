@@ -473,6 +473,132 @@ body:has(#fvPill) .mcard{padding-bottom:72px}#tmLog{scroll-margin-top:140px}
 @media (max-width:760px){.tkwrap{flex-direction:column}.tkside{width:auto;max-height:34vh;border-left:0;border-top:1px solid var(--line)}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js"></script>
+<style id="viewcss">
+/* view settings popover */
+.vpop{position:fixed;z-index:1100;background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:14px;box-shadow:0 10px 34px #0004;padding:10px 12px 12px;width:340px;max-width:calc(100vw - 16px);max-height:calc(100vh - 16px);overflow:auto}
+.vpop.vpsheet{left:8px!important;right:8px;bottom:calc(8px + env(safe-area-inset-bottom));top:auto!important;width:auto;max-width:none;max-height:75vh}
+.vpoph{display:flex;align-items:center;justify-content:space-between;margin:0 0 4px}
+.vpoph b{font-size:16px}
+.vprow{display:flex;flex-direction:column;gap:6px;padding:9px 0;border-top:1px solid #eef0f3}
+.vpoph+.vprow{border-top:0}
+.vplab{font-size:14px;font-weight:700}
+.vplab span{display:block;font-size:12px;font-weight:400;color:var(--muted);margin-top:1px}
+.vprow .hseg{align-self:flex-start;flex-wrap:wrap;max-width:100%}
+.vpfoot{display:flex;justify-content:flex-end;padding-top:8px;border-top:1px solid #eef0f3}
+.mcard .vprow .hseg button{min-height:40px}
+/* takeoff viewer: items panel left/right/hidden, resizable, compact, text size, big buttons */
+.tkv .tkside{width:var(--tkw,290px)}
+.tkv .vbar .tkvb{padding:8px 10px;white-space:nowrap}
+.tkv .vbar .tkvb.on{background:#ffffff2e;box-shadow:inset 0 -3px 0 var(--accent)}
+.tkgrip{flex:0 0 10px;align-self:stretch;cursor:col-resize;touch-action:none;background:#e9ecef;border-left:1px solid var(--line);display:flex;align-items:center;justify-content:center;user-select:none;-webkit-user-select:none}
+.tkgrip i{display:block;width:3px;height:44px;border-radius:3px;background:#9aa3ad}
+.tkgrip:hover,.tkgrip.drag,.tkgrip:focus-visible{background:#dfe3e8;outline:0}.tkgrip:hover i,.tkgrip.drag i,.tkgrip:focus-visible i{background:var(--accent)}
+.tkv .tkside{border-left:0}
+.tkv.tvl .tkside{order:-2}
+.tkv.tvl .tkgrip{order:-1;border-left:0;border-right:1px solid var(--line)}
+.tkv.tvh .tkside,.tkv.tvh .tkgrip{display:none}
+.tkit .tkd{font-size:12px;color:var(--muted);line-height:1.25;margin-top:1px;overflow-wrap:anywhere}
+.tkv.tvc .tkit{padding:3px 4px;gap:5px}
+.tkv.tvc .tkit .small,.tkv.tvc .tkit .tkd,.tkv.tvc .tkeye:not(.off){display:none}
+.tkv.tvc .tkit .c{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tkv.tvc .tksec{margin:6px 0 2px;padding:4px}
+.tkv[data-tt=S] .tkside>*{zoom:.88}.tkv[data-tt=L] .tkside>*{zoom:1.2}
+.tkv[data-tt=S] .vtools .trow{zoom:.9}.tkv[data-tt=L] .vtools .trow{zoom:1.15}
+.tkv.tvbig .vtools .tb{min-height:50px;padding:10px 14px;font-size:15px}
+.tkv.tvbig .vbar button{min-height:46px}
+.tkv.tvbig .tkit{padding:10px 6px}
+.tkv.tvbig.tvc .tkit{padding:7px 6px}
+.tkv.tvbig .tkeye,.tkv.tvbig .tkdot{min-width:30px;min-height:40px;font-size:17px;padding:2px}
+.tkv.tvbig .tkgrip{flex-basis:18px}.tkv.tvbig .tkgrip i{width:5px}
+@media (max-width:760px){
+ .tkv .tkside{width:auto;height:var(--tksh,auto);max-height:var(--tksh,34vh);border-top:0}
+ .tkv .tkgrip{flex:0 0 14px;cursor:row-resize;border-left:0;border-right:0;border-top:1px solid var(--line)}
+ .tkv .tkgrip i{width:44px;height:4px}
+ .tkv.tvbig .tkgrip{flex-basis:22px}.tkv.tvbig .tkgrip i{width:56px;height:5px}
+ .tkv.tvl:not(.tvdrw) .tkside,.tkv.tvl:not(.tvdrw) .tkgrip{order:0}
+ .tkv.tvl:not(.tvdrw) .tkgrip{border-right:0}
+ .tkv.tvdrw .tkwrap{position:relative}
+ .tkv.tvdrw .tkgrip{display:none}
+ .tkv.tvdrw .tkside{position:absolute;top:0;bottom:0;right:0;z-index:8;width:min(var(--tkw,290px),86vw);height:auto;max-height:none;box-shadow:-8px 0 24px #0003;border-left:1px solid var(--line);animation:tkdrwR .18s ease-out}
+ .tkv.tvdrw.tvl .tkside{right:auto;left:0;box-shadow:8px 0 24px #0003;border-left:0;border-right:1px solid var(--line);animation-name:tkdrwL}
+ .tkv .vbar .vlbl{display:none}
+ .tkv .vbar .tkvb{padding:8px 9px}
+}
+@keyframes tkdrwR{from{transform:translateX(100%)}to{transform:none}}
+@keyframes tkdrwL{from{transform:translateX(-100%)}to{transform:none}}
+@media (prefers-reduced-motion:reduce){.tkv.tvdrw .tkside{animation:none}}
+/* Plans tab: grid sizes and list view */
+.grid.gS{grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px}
+.grid.gS .sheet .sname{font-size:12px;padding:6px 30px 6px 8px}
+.grid.gL{grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.grid.lst{display:block;background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.grid.lst .sheet{display:flex;align-items:center;gap:8px;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:6px 44px 6px 10px;min-height:46px}
+.grid.lst .sheet:last-child{border-bottom:0}
+.grid.lst .sheet:hover{background:#f7f8f9}
+.grid.lst .revb,.grid.lst .chgb{position:static;flex:none;max-width:none}
+.grid.lst .sname{padding:0;flex:1;min-width:0}
+.grid.lst .sfor{padding:0;margin:0;flex:0 1 auto;max-width:42%}
+.grid.lst .sheet .ico{top:50%;bottom:auto;transform:translateY(-50%)}
+.grid.lst .sheet.oldv{border-style:solid;border-left:3px dashed #b9c0c8}
+@media (max-width:520px){.grid.lst .sfor{display:none}}
+/* plan viewer: tool bar on the right (wide screens), hide markups */
+#viewer.nomk #marksG,#viewer.nomk #pinLayer{display:none}
+@media (min-width:900px){
+ #viewer.vtr:not([hidden]){display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto minmax(0,1fr)}
+ #viewer.vtr>.vbar,#viewer.vtr>.supbar{grid-column:1/-1}
+ #viewer.vtr>.vbar{grid-row:1}#viewer.vtr>.supbar{grid-row:2}
+ #viewer.vtr>#stage{grid-row:3;grid-column:1}
+ #viewer.vtr>.vtools{grid-row:3;grid-column:2;width:178px;border-top:0;border-left:1px solid var(--line);overflow-y:auto;padding:8px}
+ #viewer.vtr .trow{flex-direction:column;overflow:visible}
+ #viewer.vtr .trow .tb,#viewer.vtr .trow .pc{width:100%;text-align:left}
+ #viewer.vtr .trow+.trow{margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+}
+/* list density: Compact */
+.vdens{flex:none}
+@media (max-width:520px){.hbar .vdens .vdl{display:none}.hbar .vdens{min-width:38px;padding:3px 10px}}
+.vdrow{display:flex;justify-content:flex-end;margin:0 0 6px}
+main.dense .card{padding:8px 12px;margin-bottom:6px}
+main.dense .job .name,main.dense .bidc .name{font-size:15px}
+main.dense .bidc{padding:6px 6px 6px 10px;gap:10px}
+main.dense .bdate{width:40px;padding:2px 0 3px}main.dense .bdate b{font-size:16px}
+main.dense .bidr{gap:2px}main.dense .bidr .amt{font-size:15px}
+main.dense .logday{margin:10px 2px 4px}
+main.dense .muted{font-size:13px}
+#logList.dense .card{padding:8px 10px;margin-bottom:6px}
+#logList.dense .kv{font-size:13px;margin-top:1px}
+#logList.dense .logday{margin:10px 2px 4px}
+#logList.dense .btn.sm{min-height:32px;padding:4px 9px}
+main.tcm.dense .tcrow{padding:5px 2px}
+main.tcm.dense .tcwh{padding:7px 12px}
+main.tcm.dense .tcw{margin-bottom:6px}
+main.tcm.dense .tcday{padding:4px 8px}
+main.tcm.dense .tcl{margin:3px 0;padding:4px}
+/* high contrast (☰ → Display): darker text, thicker lines, for bright sunlight */
+html.hc{--ink:#000;--muted:#262c33;--line:#7b8591;--bg:#e8eaed}
+html.hc body{color:#000}
+html.hc .card,html.hc .sheet,html.hc .kpi,html.hc .chip,html.hc .tcall,html.hc .grid.lst,html.hc .bgcs{border-width:2px}
+html.hc .btn:not(.primary):not(.danger){border:2px solid #4a535d}
+html.hc .btn.primary{border:2px solid #000}
+html.hc .field input,html.hc .field textarea,html.hc .field select,html.hc .pbar select,html.hc .bfil input,html.hc .sfilt select,html.hc .tcl select,html.hc .tcl input{border:2px solid #59626d}
+html.hc .chev,html.hc .bgo{color:#262c33}
+html.hc .tabs button,html.hc .hsec button{color:#e3e7ec}
+html.hc .top .sub{color:#dfe4ea}
+html.hc .tabs button.on,html.hc .hsec button.on{border-bottom-width:4px}
+html.hc .hseg{background:#c9ced5}
+html.hc .hseg button{color:#000}
+html.hc .hseg button.on{box-shadow:0 0 0 2px #000 inset}
+html.hc .bpill,html.hc .tcst,html.hc .badge,html.hc .tmst{border:1px solid currentColor}
+html.hc .bdate{background:#dde1e6;color:#000}
+html.hc .bdate span{color:#262c33}
+html.hc .chip.on{border-color:#000}
+html.hc .tb{border-color:#59626d}
+html.hc .tb.on{border-color:#000}
+html.hc .tkit .c,html.hc .tkit .q{color:#000}
+html.hc .muted,html.hc .small.muted{color:#262c33}
+html.hc ::placeholder{color:#4a535d;opacity:1}
+html.hc a{color:#0b3d91}
+html.hc .vpop{border:2px solid #000}
+</style>
 </head>
 <body>
 <div id="app"><div class="top"><h1><div class="ttl"><span class="brand"></span>Alpha Operations</div></h1></div><main><div class="empty">Loading…</div></main></div>
@@ -1843,7 +1969,7 @@ function tcJobOptions(l){
   opts.push('<option value="vac"'+(l&&l.kind==='vac'?' selected':'')+'>Vacation</option><option value="off"'+(l&&l.kind==='off'?' selected':'')+'>Off</option><option value="other">Other job…</option>');
   return opts.join('');
 }
-function renderTc(){return '<div class="top"><button id="tcBack" aria-label="Back">‹</button><h1><div class="ttl"><span class="brand"></span>Alpha Operations</div></h1></div><main class="tcm">'+(tcAllowed()?tcBody():tcLoginCard())+'</main>'}
+function renderTc(){return '<div class="top"><button id="tcBack" aria-label="Back">‹</button><h1><div class="ttl"><span class="brand"></span>Alpha Operations</div></h1></div><main class="tcm'+(densOn('tc')?' dense':'')+'">'+(tcAllowed()?tcBody():tcLoginCard())+'</main>'}
 function tcLoginCard(){return '<div class="card"><b style="font-size:18px">Make your foreman login</b><p class="muted" style="margin:6px 0 12px">Time cards need a foreman login so your cards are yours and follow you to any phone or computer. It takes a minute: your email, then a password. Everything on this phone carries over.</p><button class="btn primary block" id="fmMake">Make my foreman login</button></div>'}
 async function makeForemanLogin(){
   const v=await formBox('Make your foreman login',[{k:'name',label:'Your full name (goes on your time cards)',req:true,ph:'e.g. Mike Lopez'},{k:'email',label:'Your email',type:'email',req:true,ph:'e.g. mike@gmail.com'}],'Send confirm email');
@@ -1865,7 +1991,7 @@ function tcBody(){
   if(S.isAdmin)h+='<div class="muted small" style="margin:-4px 0 10px">Saves to <b>Timecards/'+esc(c.folder||'?')+'</b> · <a href="#" id="tcFolderBtn">Change folder</a></div>';
   h+='<button class="btn sm" id="tcRosterBtn" style="margin:0 0 10px">Crew list & rates</button>';
   const tot=c.workers.reduce((a,w)=>a+tcWHrs(w),0),dol=c.workers.reduce((a,w)=>a+tcWHrs(w)*tcRate(w),0);
-  h+='<div class="tcsum"><span><b id="tcTot">'+Math.round(tot*100)/100+'</b> hrs</span><span id="tcDol">'+tcMoney(dol)+'</span><span>'+c.workers.length+' workers</span></div>';
+  h+='<div class="tcsum"><span><b id="tcTot">'+Math.round(tot*100)/100+'</b> hrs</span><span id="tcDol">'+tcMoney(dol)+'</span><span>'+c.workers.length+' workers</span><span class="grow"></span>'+densChip('tc')+'</div>';
   h+='<div id="tcStat" class="muted small" style="margin:0 0 10px">'+esc(tcStatusText(c))+'</div>';
   c.workers.forEach((w,i)=>{
     const open=TC.open===i;
@@ -2343,15 +2469,143 @@ function bindLook(){$('#lkBack').onclick=closeLook;if(!$('#lkPrev'))return;
   g.onpointerup=()=>{if(!drag)return;const cells=rect().map(td=>({n:td.dataset.n,d:td.dataset.d}));const one=drag.a===drag.b;drag=null;paint();lastUp=Date.now();
     if(LK.multi){const ks=cells.map(x=>x.n+'|'+x.d);if(one&&LK.sel.includes(ks[0]))LK.sel=LK.sel.filter(s=>s!==ks[0]);else ks.forEach(s=>{if(!LK.sel.includes(s))LK.sel.push(s)});render()}else lookPick(cells)};
   g.onclick=e=>{if(LK.multi||Date.now()-lastUp<500)return;const td=e.target.closest('td[data-c]');if(td)lookPick([{n:td.dataset.n,d:td.dataset.d}])}}
+/* ===== View settings (per device, localStorage 'acv.view.<page>'): takeoff items panel side/size/style, list density, Plans grid/list, whole-app text size and high contrast.
+   Only how things look on this device; nothing here changes data, roles or what a foreman or crew member can do. ===== */
+function viewGet(pg,def){let o={};try{o=JSON.parse(lsGet('acv.view.'+pg)||'{}')||{}}catch(e){}return Object.assign({},def||{},typeof o==='object'?o:{})}
+function viewSet(pg,patch,def){const o=Object.assign(viewGet(pg,def),patch);const out={};Object.keys(o).forEach(k=>{if(!def||o[k]!==def[k])out[k]=o[k]});lsSet('acv.view.'+pg,Object.keys(out).length?JSON.stringify(out):null);return o}
+const vpick=(v,ok,d)=>ok.includes(v)?v:d;
+/* small settings popover (no browser dialogs): build() returns {title,rows:[{label,v,opts:[[val,label]],set(val),note}],foot}; re-drawn after each pick */
+let VPOP=null;
+function vpopClose(){if(!VPOP)return;const p=VPOP;VPOP=null;p.el.remove();document.removeEventListener('pointerdown',p.out,true);document.removeEventListener('keydown',p.key,true);if(p.anchor)p.anchor.setAttribute('aria-expanded','false')}
+function vpopOpen(anchor,build){
+  if(VPOP&&(VPOP.anchor===anchor||VPOP.anchor.id&&VPOP.anchor.id===anchor.id)){vpopClose();return}vpopClose();
+  const P={};const el=document.createElement('div');el.className='vpop';el.setAttribute('role','dialog');document.body.appendChild(el);
+  const draw=()=>{const b=build();el.setAttribute('aria-label',b.title||'View');
+    el.innerHTML='<div class="vpoph"><b>'+esc(b.title||'View')+'</b><button class="ico" data-vpx aria-label="Close">✕</button></div>'+b.rows.filter(Boolean).map((r,i)=>'<div class="vprow"><div class="vplab">'+esc(r.label)+(r.note?'<span>'+esc(r.note)+'</span>':'')+'</div><div class="hseg sm" role="group" aria-label="'+esc(r.label)+'">'+r.opts.map(o=>'<button type="button" data-r="'+i+'" data-v="'+esc(String(o[0]))+'"'+(String(r.v)===String(o[0])?' class="on" aria-pressed="true"':' aria-pressed="false"')+(o[2]?' title="'+esc(o[2])+'"':'')+'>'+esc(o[1])+'</button>').join('')+'</div></div>').join('')+(b.foot||'');
+    const rows=b.rows.filter(Boolean);
+    $$('[data-r]',el).forEach(x=>x.onclick=()=>{const r=rows[+x.dataset.r];const o=r.opts.find(o=>String(o[0])===x.dataset.v);r.set(o?o[0]:x.dataset.v);if(VPOP&&VPOP.el===el){draw();place()}});
+    $('[data-vpx]',el).onclick=vpopClose;if(b.bind)b.bind(el,()=>{if(VPOP&&VPOP.el===el){draw();place()}})};
+  const place=()=>{const W=innerWidth,H=innerHeight;if(W<560){el.classList.add('vpsheet');el.style.left=el.style.top='';return}el.classList.remove('vpsheet');
+    const a=P.anchor&&P.anchor.isConnected?P.anchor:anchor,r=a.getBoundingClientRect(),w=el.offsetWidth,h=el.offsetHeight;let x=Math.min(Math.max(8,r.right-w),W-w-8),y=r.bottom+6;if(y+h>H-8)y=Math.max(8,r.top-h-6);if(y+h>H-8)y=Math.max(8,H-h-8);el.style.left=x+'px';el.style.top=y+'px'};
+  const out=e=>{if(!el.contains(e.target)&&!(P.anchor&&P.anchor.contains(e.target)))vpopClose()};
+  const key=e=>{if(e.key==='Escape'){e.stopPropagation();e.preventDefault();vpopClose();try{P.anchor.focus()}catch(_){}}};
+  Object.assign(P,{el,anchor,out,key});VPOP=P;anchor.setAttribute('aria-expanded','true');draw();place();
+  document.addEventListener('pointerdown',out,true);document.addEventListener('keydown',key,true);
+  const f=$('button.on',el)||$('button',el);if(f)try{f.focus({preventScroll:true})}catch(_){}
+}
+window.addEventListener('resize',()=>vpopClose());
+
+/* ---- whole app: text size S/M/L and high contrast (jobsite sunlight) ---- */
+const DISP_DEF={text:'M',hc:false};
+const DISP_F={S:.9,M:1,L:1.15};
+function dispGet(){const o=viewGet('app',DISP_DEF);return {text:vpick(o.text,['S','M','L'],'M'),hc:o.hc===true}}
+/* text size: one extra style sheet that re-states every px font-size in the page's CSS, scaled (inline sizes keep theirs) */
+function dispFont(f){let st=$('#dispFs');if(f===1){if(st)st.remove();return}
+  const out=[];const walk=(rules,wrap)=>{[...rules].forEach(r=>{
+    if(r.type===1){const fs=r.style&&r.style.fontSize;const m=/^([\d.]+)px$/.exec(fs||'');if(m){const s=r.selectorText+'{font-size:'+(Math.round(+m[1]*f*10)/10)+'px'+(r.style.getPropertyPriority('font-size')?'!important':'')+'}';out.push(wrap?wrap(s):s)}}
+    else if(r.type===4&&r.cssRules){const c=r.conditionText||(r.media&&r.media.mediaText)||'';walk(r.cssRules,s=>'@media '+c+'{'+(wrap?wrap(s):s)+'}')}})};
+  [...document.styleSheets].forEach(sh=>{if(sh.ownerNode&&sh.ownerNode.id==='dispFs')return;let rs;try{rs=sh.cssRules}catch(e){return}if(rs)walk(rs,null)});
+  if(!st){st=document.createElement('style');st.id='dispFs';document.head.appendChild(st)}st.textContent=out.join('\n')}
+function dispApply(){const d=dispGet(),h=document.documentElement;h.classList.toggle('hc',d.hc);h.dataset.ts=d.text;h.style.setProperty('--fs',String(DISP_F[d.text]));try{dispFont(DISP_F[d.text])}catch(e){}
+  const tc=$('meta[name=theme-color]');if(tc)tc.setAttribute('content',d.hc?'#000000':'#1d232b')}
+function displayBox(){
+  const m=modal('<h2 style="display:flex;align-items:center"><span class="grow">Display</span><button class="ico" data-close aria-label="Close">✕</button></h2><p class="muted" style="margin-top:0">Only changes how the app looks on this device.</p><div id="dispRows"></div><div class="mbtns"><button class="btn" data-reset>Reset</button><button class="btn primary" data-x>Done</button></div>');
+  const draw=()=>{const d=dispGet();$('#dispRows',m).innerHTML=
+    '<div class="vprow"><div class="vplab">Text size<span>Whole app; the takeoff sheet has its own under ⚙ View</span></div><div class="hseg">'+[['S','Small'],['M','Medium'],['L','Large']].map(x=>'<button type="button" data-ts="'+x[0]+'"'+(d.text===x[0]?' class="on" aria-pressed="true"':' aria-pressed="false"')+'>'+x[1]+'</button>').join('')+'</div></div>'+
+    '<div class="vprow"><div class="vplab">High contrast<span>Darker text and thicker lines for bright sunlight</span></div><div class="hseg">'+[[false,'Off'],[true,'On']].map(x=>'<button type="button" data-hc="'+x[0]+'"'+(d.hc===x[0]?' class="on" aria-pressed="true"':' aria-pressed="false"')+'>'+x[1]+'</button>').join('')+'</div></div>';
+    $$('[data-ts]',m).forEach(b=>b.onclick=()=>{viewSet('app',{text:b.dataset.ts},DISP_DEF);dispApply();draw()});
+    $$('[data-hc]',m).forEach(b=>b.onclick=()=>{viewSet('app',{hc:b.dataset.hc==='true'},DISP_DEF);dispApply();draw()})};
+  draw();$('[data-x]',m).onclick=()=>m.close();$('[data-close]',m).onclick=()=>m.close();
+  $('[data-reset]',m).onclick=()=>{lsSet('acv.view.app',null);dispApply();draw()};
+}
+
+/* ---- list density (Compact / Comfortable): home Jobs & Bids, daily reports, time cards ---- */
+const densOn=pg=>viewGet(pg).dens==='compact';
+const densChip=(pg,extra)=>'<button type="button" class="chip sm vdens'+(densOn(pg)?' on':'')+'" data-dens="'+pg+'" aria-pressed="'+densOn(pg)+'" title="Compact or comfortable list (this device)"'+(extra||'')+' aria-label="Compact list">≡<span class="vdl"> Compact</span></button>';
+document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-dens]');if(!b)return;const pg=b.dataset.dens;viewSet(pg,{dens:densOn(pg)?'comfy':'compact'},{dens:'comfy'});
+  if(pg==='log'){renderLogList();return}if(pg==='tc'&&typeof TC!=='undefined')TC.force=true;render()});
+
+/* ---- Plans tab: grid (thumbnails S/M/L) or list (names only), sort by sheet number or upload order ---- */
+const PLV_DEF={layout:'grid',size:'M',sort:'upload'};
+function plvGet(){const o=viewGet('plans',PLV_DEF);return {layout:vpick(o.layout,['grid','list'],'grid'),size:vpick(o.size,['S','M','L'],'M'),sort:vpick(o.sort,['upload','num'],'upload')}}
+const plNumCmp=(a,b)=>String(sheetNo(a)||a.name||'').localeCompare(String(sheetNo(b)||b.name||''),undefined,{numeric:true,sensitivity:'base'});
+function plOrder(list){if(plvGet().sort!=='num')return list;return list.map((s,i)=>[s,i]).sort((x,y)=>plNumCmp(x[0],y[0])||x[1]-y[1]).map(x=>x[0])}
+function plansViewPop(btn){vpopOpen(btn,()=>{const o=plvGet(),set=p=>{viewSet('plans',p,PLV_DEF);if(S.tab==='plans')render();const nb=$('#plView');if(nb&&VPOP)VPOP.anchor=nb};return {title:'Sheet list view',rows:[
+  {label:'Layout',v:o.layout,opts:[['grid','▦ Grid'],['list','☰ List']],set:v=>set({layout:v})},
+  o.layout==='grid'?{label:'Thumbnail size',v:o.size,opts:[['S','S'],['M','M'],['L','L']],set:v=>set({size:v})}:null,
+  {label:'Sort',v:o.sort,opts:[['num','Sheet number'],['upload','Upload order']],set:v=>set({sort:v}),note:'Also the ‹ › order in the sheet viewer'}]}})}
+
+/* ---- plan viewer (field): tool bar at the bottom or on the right (wide screens), quick hide of markups & pins (not remembered) ---- */
+const vwTools=()=>viewGet('viewer').tools==='right'?'right':'bottom';
+function vwApply(){const el=$('#viewer');if(!el)return;el.classList.toggle('vtr',vwTools()==='right')}
+function mkHideSet(on){const el=$('#viewer');if(!el)return;el.classList.toggle('nomk',!!on);const b=$('#mkHide');if(b){b.classList.toggle('on',!!on);b.setAttribute('aria-pressed',String(!!on));b.textContent=on?'🙈 Markups hidden':'👁 Markups'}}
+
+/* ---- takeoff sheet viewer: items panel ---- */
+const TKVW_DEF={side:'right',width:290,hidden:false,style:'detail',text:'M',big:'auto',narrow:'sheet',sheetH:0};
+function tkvwGet(){const o=viewGet('takeoff',TKVW_DEF);return {side:vpick(o.side,['left','right'],'right'),width:clamp(Math.round(num(o.width,290)),200,2000),hidden:o.hidden===true,style:vpick(o.style,['detail','compact'],'detail'),text:vpick(o.text,['S','M','L'],'M'),big:vpick(o.big,['auto','on','off'],'auto'),narrow:vpick(o.narrow,['sheet','drawer'],'sheet'),sheetH:Math.max(0,Math.round(num(o.sheetH,0)))}}
+const tkvwMaxW=()=>Math.max(200,Math.round(innerWidth*(tkvwNarrow()&&tkvwGet().narrow==='drawer'?.86:.6)));
+const tkvwNarrow=()=>innerWidth<760;
+const tkvwCoarse=()=>{try{return matchMedia('(pointer:coarse)').matches}catch(e){return false}};
+function tkvwSet(p,keepStage){const o=viewSet('takeoff',p,TKVW_DEF);tkvViewApply(keepStage);return o}
+/* adds the panel button, ⚙ View and the resize handle to an open takeoff viewer (called from tkvSide, once per viewer) */
+function tkvViewInit(){
+  const el=$('#tkv');if(!el||el._vw)return;const side=$('#tkSide',el),bar=$('.vbar',el);if(!side||!bar)return;el._vw=1;
+  const nx=$('#tkPrev',el);const h='<button id="tkPanT" class="tkvb" title="Show or hide the items list ( \\ key)" aria-controls="tkSide">☰<span class="vlbl"> Items</span></button><button id="tkViewB" class="tkvb" title="View settings: items panel side, width, style, text size" aria-haspopup="dialog" aria-expanded="false">⚙<span class="vlbl"> View</span></button>';
+  if(nx)nx.insertAdjacentHTML('beforebegin',h);else bar.insertAdjacentHTML('beforeend',h);
+  side.insertAdjacentHTML('beforebegin','<div class="tkgrip" id="tkGrip" role="separator" aria-orientation="vertical" aria-label="Resize the items list" tabindex="0" title="Drag to resize · double-click to reset"><i></i></div>');
+  $('#tkPanT',el).onclick=()=>tkvwSet({hidden:!tkvwGet().hidden});
+  $('#tkViewB',el).onclick=e=>tkvViewPop(e.currentTarget);
+  tkvGripBind($('#tkGrip',el));tkvViewApply(true);
+}
+function tkvViewApply(keepStage){
+  const el=$('#tkv');if(!el)return;const o=tkvwGet(),st=$('#tkStage',el);const r0=st&&st.getBoundingClientRect();
+  el.classList.toggle('tvl',o.side==='left');el.classList.toggle('tvh',o.hidden);el.classList.toggle('tvc',o.style==='compact');
+  el.classList.toggle('tvbig',o.big==='on'||(o.big==='auto'&&tkvwCoarse()));el.classList.toggle('tvdrw',o.narrow==='drawer');el.dataset.tt=o.text;
+  el.style.setProperty('--tkw',Math.min(o.width,tkvwMaxW())+'px');if(o.sheetH)el.style.setProperty('--tksh',Math.min(o.sheetH,Math.round(innerHeight*.75))+'px');else el.style.removeProperty('--tksh');
+  const pb=$('#tkPanT',el);if(pb){pb.classList.toggle('on',!o.hidden);pb.setAttribute('aria-pressed',String(!o.hidden))}
+  const g=$('#tkGrip',el);if(g)g.setAttribute('aria-orientation',tkvwNarrow()&&o.narrow!=='drawer'?'horizontal':'vertical');
+  /* keep the drawing where it was on screen when the panel moves or resizes */
+  if(keepStage!==false&&st&&r0&&typeof TKV!=='undefined'&&TKV&&TKV.W&&TKV.t){const r1=st.getBoundingClientRect();const dx=r0.left-r1.left,dy=r0.top-r1.top;if(dx||dy){TKV.t.x+=dx;TKV.t.y+=dy;tkvT()}}
+}
+function tkvGripBind(g){
+  let drag=null;const el=$('#tkv');
+  const vert=()=>tkvwNarrow()&&tkvwGet().narrow!=='drawer';
+  g.addEventListener('pointerdown',e=>{if(e.button>0)return;e.preventDefault();e.stopPropagation();try{g.setPointerCapture(e.pointerId)}catch(_){}
+    const wrap=$('.tkwrap',el).getBoundingClientRect();drag={id:e.pointerId,wrap,left:tkvwGet().side==='left',v:vert(),w:0};g.classList.add('drag')});
+  g.addEventListener('pointermove',e=>{if(!drag||e.pointerId!==drag.id)return;e.preventDefault();const st=$('#tkStage',el),r0=st.getBoundingClientRect();
+    if(drag.v){drag.w=Math.round(clamp(drag.wrap.bottom-e.clientY,110,drag.wrap.height*.75));el.style.setProperty('--tksh',drag.w+'px')}
+    else{drag.w=Math.round(clamp(drag.left?e.clientX-drag.wrap.left:drag.wrap.right-e.clientX,200,tkvwMaxW()));el.style.setProperty('--tkw',drag.w+'px')}
+    if(TKV&&TKV.W){const r1=st.getBoundingClientRect();if(r0.left!==r1.left){TKV.t.x+=r0.left-r1.left;tkvT()}}});
+  const up=e=>{if(!drag||e.pointerId!==drag.id)return;const d=drag;drag=null;g.classList.remove('drag');try{g.releasePointerCapture(e.pointerId)}catch(_){}if(d.w)tkvwSet(d.v?{sheetH:d.w}:{width:d.w},false)};
+  g.addEventListener('pointerup',up);g.addEventListener('pointercancel',up);
+  g.addEventListener('dblclick',e=>{e.preventDefault();tkvwSet(vert()?{sheetH:0}:{width:TKVW_DEF.width})});
+  g.addEventListener('keydown',e=>{const o=tkvwGet();if(vert()){const d=e.key==='ArrowUp'?24:e.key==='ArrowDown'?-24:0;if(!d)return;e.preventDefault();const cur=$('#tkSide',el).getBoundingClientRect().height;tkvwSet({sheetH:Math.round(clamp(cur+d,110,innerHeight*.75))});return}
+    const d=e.key==='ArrowLeft'?(o.side==='left'?-20:20):e.key==='ArrowRight'?(o.side==='left'?20:-20):0;if(!d)return;e.preventDefault();tkvwSet({width:clamp(Math.min(o.width,tkvwMaxW())+d,200,tkvwMaxW())})});
+}
+function tkvViewPop(btn){vpopOpen(btn,()=>{const o=tkvwGet(),nw=tkvwNarrow(),cw=Math.min(o.width,tkvwMaxW());
+  const wopts=[[240,'Narrow'],[290,'Normal'],[400,'Wide'],[560,'Extra wide']].filter(x=>x[0]<=tkvwMaxW()||x[0]===240);
+  return {title:'Takeoff view',rows:[
+    {label:'Items list',v:o.hidden?'hidden':o.side,opts:[['left','◧ Left'],['right','Right ◨'],['hidden','Hidden']],set:v=>tkvwSet(v==='hidden'?{hidden:true}:{side:v,hidden:false}),note:'\\ key or ☰ Items shows / hides it'},
+    nw&&o.narrow!=='drawer'?null:{label:'Width',v:wopts.some(x=>x[0]===cw)?cw:'',opts:wopts,set:v=>tkvwSet({width:+v,hidden:false}),note:nw?'':'Or drag the panel edge; double-click it to reset'},
+    {label:'Style',v:o.style,opts:[['detail','Detailed','Code, height, width, totals on this sheet and all sheets'],['compact','Compact','Color, code and this sheet’s total']],set:v=>tkvwSet({style:v})},
+    {label:'Text size',v:o.text,opts:[['S','S'],['M','M'],['L','L']],set:v=>tkvwSet({text:v}),note:'Items list and tool buttons'},
+    {label:'Big buttons for touch',v:o.big,opts:[['auto','Auto'],['on','On'],['off','Off']],set:v=>tkvwSet({big:v}),note:'Auto = on for iPads and phones'},
+    nw?{label:'On this small screen',v:o.narrow,opts:[['sheet','Bottom sheet'],['drawer','Side drawer']],set:v=>tkvwSet({narrow:v}),note:o.narrow==='sheet'?'Drag the bar above the list to make it taller':'Slides over the sheet from the '+o.side}:null],
+    foot:'<div class="vpfoot"><button type="button" class="btn sm" data-vreset>Reset to default</button></div>',
+    bind:(el,redraw)=>{$('[data-vreset]',el).onclick=()=>{lsSet('acv.view.takeoff',null);tkvViewApply();redraw()}}}})}
+window.addEventListener('keydown',e=>{if(e.key!=='\\'||e.ctrlKey||e.metaKey||e.altKey||!$('#tkv')||$('.mwrap')||/INPUT|TEXTAREA|SELECT/.test((e.target&&e.target.tagName)||'')||(e.target&&e.target.isContentEditable))return;e.preventDefault();tkvwSet({hidden:!tkvwGet().hidden})});
+window.addEventListener('resize',()=>{if($('#tkv'))tkvViewApply(false)});
+dispApply();
+
 function renderJobs(){
   let h='<div class="top"><h1><div class="ttl"><span class="brand"></span>Alpha Operations</div></h1><button id="acct" aria-label="Account">☰</button></div>';
-  if(homeTabs())return h+'<main class="hm">'+(homeSec()==='bids'?renderBidsSec():renderJobsSec())+'</main>';
-  h+='<main>';
+  if(homeTabs())return h+'<main class="hm'+(densOn('home')?' dense':'')+'">'+(homeSec()==='bids'?renderBidsSec():renderJobsSec())+'</main>';
+  h+='<main'+(densOn('home')?' class="dense"':'')+'>';
   if(S.isAdmin)h+='<button class="btn primary block" id="newJob" style="margin-bottom:10px">+ New job</button>';
   if(canSeeTc())h+='<button class="btn block" id="tcOpen" style="margin-bottom:14px">⏱ Time cards</button>';
   if(!S.jobsLoaded)h+='<div class="empty">Loading jobs…</div>';
   else if(!S.jobs.length)h+='<div class="empty"><b>No jobs yet</b>'+(S.asUser?esc(S.asUser.name)+' isn’t on any jobs right now.':S.isAdmin?'Add a job, upload its plan PDF, then invite your foreman from the job\'s ⋯ menu.':'Open the invite link the office texted you to get access to a job.')+'</div>';
-  else h+=jobSortBar(S.jobs.length)+sortJobs(S.jobs).map(jobCard).join('');
+  else h+=(S.jobs.length>3?'<div class="vdrow">'+densChip('home')+'</div>':'')+jobSortBar(S.jobs.length)+sortJobs(S.jobs).map(jobCard).join('');
   return h+'</main>';
 }
 function bindJobs(){
@@ -2376,10 +2630,11 @@ function bindJobs(){
   $('#acct').onclick=()=>{
     if(S.asUser){asMenu();return}
     const m=modal('<h2>Account</h2><p class="muted">'+(S.isAdmin?'Signed in as office: '+esc(S.me.email||who(S.me.id)):S.realAdmin?'Office login, looking at the field view.':isForeman()?'Signed in as foreman: '+esc(S.me.email||''):'Crew access on this phone. Your access comes from invite links; signing out would remove it from this phone.')+'</p><div style="display:grid;gap:10px;margin-top:12px">'+
-      (S.isAdmin?'<button class="btn" data-trk>Import bid tracker (.xlsx)</button><button class="btn" data-msc>Microsoft connection</button><button class="btn" data-users>Office users</button><button class="btn" data-pw>Change password</button><button class="btn" data-out>Sign out</button>':isForeman()?'<button class="btn" data-pw>Change password</button><button class="btn" data-out>Sign out</button>':'<button class="btn primary" data-fm>Make a foreman login</button><button class="btn" data-off>Office or foreman sign in on this device</button>')+(S.realAdmin?(S.isAdmin?'<button class="btn" data-vas="field">Test as a foreman (field view)</button><button class="btn" data-vas="viewer">Test as view-only crew</button><button class="btn" data-vap>View as a foreman or crew member (read-only)…</button><button class="btn" data-prac="foreman">Practice as Test Foreman</button><button class="btn" data-prac="viewer">Practice as Test Viewer</button>':'<button class="btn primary" data-vas="office">Switch back to office view</button>'):'')+'<button class="btn" data-tips>'+(tipLang()==='es'?'Consejos / Idioma':'Tips / Español')+'</button><button class="btn" data-intro>▶ Play intro</button><button class="btn" data-x>Close</button></div>');
+      (S.isAdmin?'<button class="btn" data-trk>Import bid tracker (.xlsx)</button><button class="btn" data-msc>Microsoft connection</button><button class="btn" data-users>Office users</button><button class="btn" data-pw>Change password</button><button class="btn" data-out>Sign out</button>':isForeman()?'<button class="btn" data-pw>Change password</button><button class="btn" data-out>Sign out</button>':'<button class="btn primary" data-fm>Make a foreman login</button><button class="btn" data-off>Office or foreman sign in on this device</button>')+(S.realAdmin?(S.isAdmin?'<button class="btn" data-vas="field">Test as a foreman (field view)</button><button class="btn" data-vas="viewer">Test as view-only crew</button><button class="btn" data-vap>View as a foreman or crew member (read-only)…</button><button class="btn" data-prac="foreman">Practice as Test Foreman</button><button class="btn" data-prac="viewer">Practice as Test Viewer</button>':'<button class="btn primary" data-vas="office">Switch back to office view</button>'):'')+'<button class="btn" data-disp>Display: text size &amp; high contrast</button><button class="btn" data-tips>'+(tipLang()==='es'?'Consejos / Idioma':'Tips / Español')+'</button><button class="btn" data-intro>▶ Play intro</button><button class="btn" data-x>Close</button></div>');
     $('[data-x]',m).onclick=()=>m.close();
     const o=$('[data-out]',m);if(o)o.onclick=async()=>{if(!await okToSignOut())return;await sb.auth.signOut();await clearDeviceCache();lsSet('crewplans.lastJob',null);location.href=location.pathname+'?office'};
     $('[data-intro]',m).onclick=()=>{primeAudio();m.close();playSplash(true)};
+    $('[data-disp]',m).onclick=()=>{m.close();displayBox()};
     $('[data-tips]',m).onclick=()=>{m.close();tipsMenu()};
     $$('[data-vas]',m).forEach(va=>va.onclick=()=>{m.close();setViewAs(va.dataset.vas)});
     const vp=$('[data-vap]',m);if(vp)vp.onclick=()=>{m.close();viewAsPicker()};
@@ -2437,7 +2692,7 @@ function homeGo(s){if(!homeSecOk(s))s='jobs';lsSet('crewplans.homeSec',s);
   S.view='jobs';window.scrollTo(0,0);render()}
 const jobCard=j=>{const n=(S.nudges||{})[j.id];return '<div class="card job" data-id="'+esc(j.id)+'"><div class="grow"><div class="name">'+esc(j.name||'Untitled job')+'</div>'+(j.addr?'<div class="muted">'+esc(j.addr)+'</div>':'')+(n?'<div class="small" style="color:#9a3412;margin-top:2px">⚠ Progress not marked · '+n.days+' days of hours</div>':'')+'</div><span class="chev">›</span></div>'};
 function renderJobsSec(){const mode=lsGet('crewplans.jobView')==='all'?'all':'mine';
-  let h='<div class="hbar"><div class="chips"><button class="chip'+(mode==='mine'?' on':'')+'" data-view="mine">My jobs</button><button class="chip'+(mode==='all'?' on':'')+'" data-view="all">All jobs</button></div><button class="btn primary sm" id="newJob">+ New job</button></div>';
+  let h='<div class="hbar"><div class="chips"><button class="chip'+(mode==='mine'?' on':'')+'" data-view="mine">My jobs</button><button class="chip'+(mode==='all'?' on':'')+'" data-view="all">All jobs</button></div>'+densChip('home')+'<button class="btn primary sm" id="newJob">+ New job</button></div>';
   if(!S.jobsLoaded)return h+'<div class="empty">Loading jobs…</div>';
   if(!S.jobs.length)return h+'<div class="empty"><b>No jobs yet</b>Add a job, upload its plan PDF, then invite your foreman from the job\'s ⋯ menu.</div>';
   if(mode==='mine'){const mine=sortJobs(S.jobs.filter(j=>j.pm&&j.pm===S.myOfficeId));return h+jobSortBar(mine.length)+(mine.length?mine.map(jobCard).join(''):'<div class="empty"><b>No jobs with you as PM</b>Tap All jobs to see everyone\'s.</div>')}
@@ -2479,7 +2734,7 @@ function renderBidsSec(){const pane=lsGet('crewplans.bidPane')==='pipe'?'pipe':'
   if(!S.jobsLoaded)return h+'<div class="empty">Loading bids…</div>';
   return h+(pane==='pipe'?renderPipe():renderBidList())}
 function renderBidList(){const bv=lsGet('crewplans.bidView')==='all'?'all':'mine',f=lsGet('crewplans.bidFilt')||'open';
-  let h='<div class="hbar"><div class="chips"><button class="chip'+(bv==='mine'?' on':'')+'" data-bview="mine">My bids</button><button class="chip'+(bv==='all'?' on':'')+'" data-bview="all">All bids</button></div><button class="btn primary sm" id="newBid">+ New bid</button></div>';
+  let h='<div class="hbar"><div class="chips"><button class="chip'+(bv==='mine'?' on':'')+'" data-bview="mine">My bids</button><button class="chip'+(bv==='all'?' on':'')+'" data-bview="all">All bids</button></div>'+densChip('home')+'<button class="btn primary sm" id="newBid">+ New bid</button></div>';
   h+='<div class="bfil"><div class="hseg sm">'+[['open','Open'],['res','Results'],['all','All']].map(x=>'<button data-bfilt="'+x[0]+'"'+(f===x[0]?' class="on"':'')+'>'+x[1]+'</button>').join('')+'</div><input type="search" id="bidQ" placeholder="Search bids" aria-label="Search bids" value="'+esc(S.bidQ||'')+'" autocomplete="off"></div>';
   return h+'<div id="bidList">'+bidListHtml()+'</div>'}
 function bidListHtml(){const td=today(),bv=lsGet('crewplans.bidView')==='all'?'all':'mine',f=lsGet('crewplans.bidFilt')||'open';
@@ -2937,13 +3192,14 @@ function renderPlans(){
   {if(f.rev&&!spec.includes(f.rev)&&!ro.some(r=>r.k===f.rev))f.rev='';
     const so=(v,l,n)=>'<option value="'+v+'"'+(f.rev===v?' selected':'')+'>'+l+' ('+n+')</option>';
     h+='<div class="ptools"><div class="pbar">'+addB+nameB+'<select id="revFilt" aria-label="Show revisions"><option value="">Current sheets</option>'+(nOld?so('__all','All sheets incl. old versions',S.sheets.length):'')+so('__revised','Revised sheets',nRev)+(nChg||nDoc?so('__changed','Sheets changed by RFI / PR / ASI',nChg)+so('__docs','RFI / PR / ASI pages',nDoc):'')+ro.map(r=>'<option value="'+esc(r.k)+'"'+(f.rev===r.k?' selected':'')+'>'+esc(r.k)+' ('+r.n+' sheet'+(r.n>1?'s':'')+')</option>').join('')+'</select>'+
-      '</div><div class="pbar2"><span class="muted grow">'+cs.length+' sheets · '+(nRev||nChg?nRev+' revised'+(nChg?' · '+nChg+' RFI/PR':''):'no revisions')+(nOld?' · '+nOld+' old version'+(nOld>1?'s':'')+(f.rev==='__all'?' shown':' hidden'):'')+'</span>'+offH+'</div></div>';}
-  const list=shownSheets();
+      '</div><div class="pbar2"><span class="muted grow">'+cs.length+' sheets · '+(nRev||nChg?nRev+' revised'+(nChg?' · '+nChg+' RFI/PR':''):'no revisions')+(nOld?' · '+nOld+' old version'+(nOld>1?'s':'')+(f.rev==='__all'?' shown':' hidden'):'')+'</span>'+offH+'<button class="btn sm" id="plView" title="Grid or list, thumbnail size, sort (this device)" aria-haspopup="dialog" aria-expanded="false">⚙ View</button></div></div>';}
+  const list=plOrder(shownSheets()),pv=plvGet(),lst=pv.layout==='list';
   if(!list.length)return h+'<div class="empty">No sheets match this filter.</div>';
-  return h+'<div class="grid">'+list.map(s=>'<div class="sheet'+(s.is_current===false?' oldv':'')+'" data-id="'+esc(s.id)+'"><img loading="lazy" alt="" data-path="'+esc(s.thumb_path||s.path)+'">'+sheetBadge(s)+'<div class="sname">'+esc(s.name||'Sheet')+'</div>'+(Array.isArray(s.changes)&&s.changes.length?'<div class="sfor">'+esc((s.change_ref?s.change_ref+' · ':'')+'changes '+s.changes.join(', '))+'</div>':'')+(admin&&s.is_current!==false?'<button class="ico" data-edit aria-label="Edit sheet">✎</button>':'')+'</div>').join('')+'</div>';
+  return h+'<div class="grid'+(lst?' lst':pv.size!=='M'?' g'+pv.size:'')+'">'+list.map(s=>'<div class="sheet'+(s.is_current===false?' oldv':'')+'" data-id="'+esc(s.id)+'"'+(lst?' role="button" tabindex="0"':'')+'>'+(lst?'':'<img loading="lazy" alt="" data-path="'+esc(s.thumb_path||s.path)+'">')+sheetBadge(s)+'<div class="sname">'+esc(s.name||'Sheet')+'</div>'+(Array.isArray(s.changes)&&s.changes.length?'<div class="sfor">'+esc((s.change_ref?s.change_ref+' · ':'')+'changes '+s.changes.join(', '))+'</div>':'')+(admin&&s.is_current!==false?'<button class="ico" data-edit aria-label="Edit sheet">✎</button>':'')+'</div>').join('')+'</div>';
 }
 function bindPlans(){
   const an=$('#autoName');if(an)an.onclick=organizeSheets;
+  const pv=$('#plView');if(pv)pv.onclick=()=>plansViewPop(pv);
   const so=$('#saveOff');if(so)so.onclick=saveJobOffline;
   const ro=$('#rmOff');if(ro)ro.onclick=removeJobOffline;
   const rf=$('#revFilt');if(rf)rf.onchange=()=>{const x=sheetFilter();x.rev=rf.value;setSheetFilter(x);render()};
@@ -2951,7 +3207,7 @@ function bindPlans(){
   const f=$('#planFile');if(f)f.onchange=()=>{const files=[...f.files];f.value='';if(files.length)addPlans(files)};
   const tb=$('#tabBody');if(f&&tb&&!tb._drop){tb._drop=1;tb.addEventListener('dragover',e=>{if(S.tab!=='plans'||!$('#planFile'))return;e.preventDefault();tb.classList.add('dropon')});tb.addEventListener('dragleave',e=>{if(!tb.contains(e.relatedTarget))tb.classList.remove('dropon')});
     tb.addEventListener('drop',e=>{if(S.tab!=='plans'||!$('#planFile'))return;e.preventDefault();tb.classList.remove('dropon');const files=[...(e.dataTransfer&&e.dataTransfer.files||[])].filter(x=>/pdf/.test(x.type)||isImgFile(x));if(files.length)addPlans(files);else toast('Drop PDF plan sets or images here.')})}
-  $$('.sheet').forEach(el=>{el.onclick=e=>{if(e.target.closest('[data-edit]'))return;openSheet(el.dataset.id)};const b=$('[data-edit]',el);if(b)b.onclick=()=>editSheet(el.dataset.id)});
+  $$('.sheet').forEach(el=>{el.onclick=e=>{if(e.target.closest('[data-edit]'))return;openSheet(el.dataset.id)};if(el.tabIndex===0)el.onkeydown=e=>{if((e.key==='Enter'||e.key===' ')&&e.target===el){e.preventDefault();openSheet(el.dataset.id)}};const b=$('[data-edit]',el);if(b)b.onclick=()=>editSheet(el.dataset.id)});
 }
 function offSig(list){return (list||[]).map(s=>s.id+':'+s.path).sort().join('|')}
 function offSaved(id){const v=lsGet('acv.saved.'+id);if(!v)return null;try{const o=JSON.parse(v);if(o&&o.at)return o}catch(e){}return {at:v,sig:null}}
@@ -4079,8 +4335,8 @@ function renderLogList(){
   if(!S.loaded.logs){box.innerHTML='<div class="empty">Loading reports…</div>';return}
   if(S.logs.some(l=>l.pdf_path&&(!l.filed_at||(l.send_gc&&!l.sent_at))&&num(l.file_tries)<6))nudgeReports();
   if(!S.logs.length){box.innerHTML='<div class="empty"><b>No daily reports yet</b>Each foreman saves one report per day. Saved reports show up here, newest first.</div>';return}
-  const byDay={};S.logs.forEach(l=>{(byDay[l.date]=byDay[l.date]||[]).push(l)});
-  box.innerHTML=Object.keys(byDay).sort().reverse().map(d=>{const ls=byDay[d];const crew=ls.reduce((a,l)=>a+num(l.crew),0);
+  const byDay={};S.logs.forEach(l=>{(byDay[l.date]=byDay[l.date]||[]).push(l)});box.classList.toggle('dense',densOn('log'));
+  box.innerHTML='<div class="vdrow">'+densChip('log')+'</div>'+Object.keys(byDay).sort().reverse().map(d=>{const ls=byDay[d];const crew=ls.reduce((a,l)=>a+num(l.crew),0);
     return '<div class="logday"><span>'+fmtDay(d)+'</span><span class="muted">'+crew+' on site</span></div>'+ls.map(l=>{const wf=l.workforce||{};
       return '<div class="card"><div class="row"><b class="grow">'+esc(logName(l))+'</b><span class="muted small">'+num(l.crew)+' crew'+(l.weather?' · '+esc(l.weather):'')+'</span></div>'+
       logHrsHtml(l)+(Object.keys(wf).length?'<div class="kv"><b>Crew:</b> '+WORKFORCE.filter(w=>num(wf[w])).map(w=>esc(w)+' '+num(wf[w])).join(' · ')+'</div>':'')+
@@ -4466,8 +4722,8 @@ function tkvTools(){
   h.style.display='block';
 }
 function tkvSide(){
-  const el=$('#tkSide');if(!el||!TK)return;const d=TK.data,tot=tkTotals(d,S.sheets.filter(s=>s.id===TKV.id)),all=tkTotals(d,tkSheets());const sc=tkScaleOf(TKV.id);
-  const row=it=>{const t=tot[it.id]||{},a=all[it.id]||{};return '<div class="tkit'+(it.id===TKV.item?' on':'')+(TKV.hl===it.id?' hl':'')+'" data-it="'+esc(it.id)+'"><button class="tkeye" data-eye="'+esc(it.id)+'" title="Show/hide">'+(TKV.hide[it.id]?'◌':'●')+'</button><span class="sw" style="background:'+esc(it.color)+'"></span><div class="grow"><div class="c">'+esc(it.code)+'</div><div class="small muted">'+(it.h?esc(tkFtIn(+it.h)):'')+(it.unit==='LF'?(it.h?' · ':'')+esc(tkInStr(tkItemWidthIn(it)))+' wide':'')+'</div></div><div class="q"><div>'+esc(tkFmtQty(t.qty||0,it.unit))+'</div><div class="small muted">all: '+esc(tkFmtQty(a.qty||0,it.unit))+'</div></div><button class="tkdot" data-ed="'+esc(it.id)+'" title="Edit">⋯</button></div>'};
+  tkvViewInit();const el=$('#tkSide');if(!el||!TK)return;const d=TK.data,tot=tkTotals(d,S.sheets.filter(s=>s.id===TKV.id)),all=tkTotals(d,tkSheets());const sc=tkScaleOf(TKV.id);
+  const row=it=>{const t=tot[it.id]||{},a=all[it.id]||{};return '<div class="tkit'+(it.id===TKV.item?' on':'')+(TKV.hl===it.id?' hl':'')+'" data-it="'+esc(it.id)+'"><button class="tkeye'+(TKV.hide[it.id]?' off':'')+'" data-eye="'+esc(it.id)+'" title="Show/hide">'+(TKV.hide[it.id]?'◌':'●')+'</button><span class="sw" style="background:'+esc(it.color)+'"></span><div class="grow"><div class="c" title="'+esc(it.code+(it.desc?' — '+it.desc:''))+'">'+esc(it.code)+'</div>'+(it.desc?'<div class="tkd">'+esc(it.desc)+'</div>':'')+'<div class="small muted">'+(it.h?esc(tkFtIn(+it.h)):'')+(it.unit==='LF'?(it.h?' · ':'')+esc(tkInStr(tkItemWidthIn(it)))+' wide':'')+'</div></div><div class="q"><div>'+esc(tkFmtQty(t.qty||0,it.unit))+'</div><div class="small muted">all: '+esc(tkFmtQty(a.qty||0,it.unit))+'</div></div><button class="tkdot" data-ed="'+esc(it.id)+'" title="Edit">⋯</button></div>'};
   let list='';
   TK_SECS.forEach(sec=>{const its=d.items.filter(it=>(TK_SECS.includes(it.sec)?it.sec:'INTERIOR')===sec).sort((a,b)=>(a.n||0)-(b.n||0));if(!its.length)return;const k='v:'+sec;
     list+=tkGroupHd(k,sec.charAt(0)+sec.slice(1).toLowerCase(),its.length+' · '+esc(tkSumText(its,tot)||'—'),'tksec');
@@ -4961,7 +5217,7 @@ window.alphaTakeoff={
 
 /* ===== sheet viewer ===== */
 let V=null;let sheetHashPushed=false;
-function navList(layer){return layer==='progress'?progSheets():curSheets()}
+function navList(layer){return layer==='progress'?progSheets():plOrder(curSheets())}
 function progSheets(){return curSheets().filter(s=>s.on_progress)}
 async function openSheet(id,layer){
   layer=layer==='progress'?'progress':'plans';
@@ -4976,7 +5232,8 @@ async function openSheet(id,layer){
     '<div id="stage"><div id="board"><img id="planImg" alt="" draggable="false"><svg id="ink" xmlns="http://www.w3.org/2000/svg"><g id="marksG"></g><g id="liveG"></g></svg></div><div id="pinLayer"></div><div class="hint" id="hint">Loading sheet…</div>'+(ni>=0&&nl.length>1?'<button class="snav" id="snPrev" aria-label="Previous sheet"'+(ni===0?' disabled':'')+'>‹</button><button class="snav" id="snNext" aria-label="Next sheet"'+(ni===nl.length-1?' disabled':'')+'>›</button>':'')+'</div>'+
     '<div class="vtools">'+(cw?'<div class="trow" id="phaseRow">'+PHASES.map(p=>'<button class="pc" data-ph="'+p.k+'" style="background:'+p.c+'">'+p.n+'</button>').join('')+'<button class="tb" id="penBtn">Pen: Thin</button></div>':'')+
     '<div class="trow" id="modeRow"><button class="tb" data-mode="pan">✋ Move</button>'+(!cw&&!sup&&canPin()?'<button class="tb" data-mode="pin">📍 Pin</button>':'')+(cw?'<button class="tb" data-mode="straight">📏 Straight</button><button class="tb" data-mode="line">🖍 Highlight</button><button class="tb" data-mode="box">▭ Area</button><button class="tb" data-mode="pin">📍 Pin</button><button class="tb" data-mode="erase">⌫ Erase</button><button class="tb" id="undoBtn">↶ Undo</button>':'')+
-    '<button class="tb" id="fitBtn">⤢ Fit</button></div></div>';
+    '<button class="tb" id="mkHide" aria-pressed="false" title="Hide markups and pins for a clean look at the sheet">👁 Markups</button><button class="tb" id="fitBtn">⤢ Fit</button></div></div>';
+  el.classList.remove('nomk');vwApply();$('#mkHide').onclick=()=>mkHideSet(!el.classList.contains('nomk'));
   V.stage=$('#stage');V.board=$('#board');V.img=$('#planImg');
   $('#vBack').onclick=()=>{const v=V;if(location.hash==='#sheet'&&sheetHashPushed){history.back();setTimeout(()=>{if(V&&V===v)closeSheet()},400)}else closeSheet()};
   $('#vLayers').onclick=layersPanel;$('#fitBtn').onclick=fit;
@@ -5030,7 +5287,7 @@ function closeSheet(keep){
   const el=$('#viewer');el.hidden=true;el.innerHTML='';document.body.classList.remove('noscroll');
 }
 window.addEventListener('hashchange',()=>{if(V&&location.hash!=='#sheet'){$$('.mwrap').forEach(m=>m.close());closeSheet()}});
-function setMode(m){V.mode=m;syncTools();hint()}
+function setMode(m){V.mode=m;if(m!=='pan'){const vw=$('#viewer');if(vw&&vw.classList.contains('nomk'))mkHideSet(false)}syncTools();hint()}
 function syncTools(){
   $$('#modeRow [data-mode]').forEach(b=>b.classList.toggle('on',b.dataset.mode===V.mode));
   $$('#phaseRow [data-ph]').forEach(b=>b.classList.toggle('on',b.dataset.ph===V.phase));
@@ -5133,7 +5390,9 @@ function layersPanel(){
   const m=modal('<h2 style="display:flex;align-items:center"><span class="grow">Layers</span><button class="ico" data-close aria-label="Close">✕</button></h2>'+PHASES.map(p=>'<label class="lrow"><input type="checkbox" data-ph="'+p.k+'" '+(S.hidden.has(p.k)?'':'checked')+'><span class="dot" style="background:'+p.c+'"></span><span class="grow">'+p.n+'</span><span class="muted">'+(counts[p.k]||0)+' marks</span></label>').join('')+
     '<div style="margin-top:14px"><b>Pins</b> <span class="muted small">('+open+' open of '+V.pins.length+')</span></div><div class="chips" style="margin-top:8px">'+[['all','All'],['open','Open only'],['none','Hide']].map(([k,n])=>'<button class="chip'+(S.pinFilter===k?' on':'')+'" data-pf="'+k+'">'+n+'</button>').join('')+'</div>'+
     '<div class="legend"><span><span class="dot" style="background:#d32f2f"></span>Issue</span><span><span class="dot" style="background:#f59e0b"></span>Question</span><span><span class="dot" style="background:#0f766e"></span>Extra work</span><span><span class="dot" style="background:#475569"></span>Note</span><span><span class="dot" style="background:#2e7d32"></span>Done</span></div>'+
+    (innerWidth>=900?'<div class="vprow" style="margin-top:12px"><div class="vplab">Tool bar<span>Where the drawing tools sit on wide screens (this device)</span></div><div class="hseg sm">'+[['bottom','Bottom'],['right','Right']].map(x=>'<button type="button" data-vtp="'+x[0]+'"'+(vwTools()===x[0]?' class="on"':'')+'>'+x[1]+'</button>').join('')+'</div></div>':'')+
     '<div class="mbtns"><button class="btn primary" data-x>Done</button></div>',()=>{layersM=null;document.removeEventListener('keydown',esc1)});
+  $$('[data-vtp]',m).forEach(b=>b.onclick=()=>{viewSet('viewer',{tools:b.dataset.vtp},{tools:'bottom'});vwApply();$$('[data-vtp]',m).forEach(x=>x.classList.toggle('on',x===b));fit()});
   const esc1=e=>{if(e.key==='Escape')m.close()};document.addEventListener('keydown',esc1);layersM=m;
   $$('[data-ph]',m).forEach(c=>c.onchange=()=>{c.checked?S.hidden.delete(c.dataset.ph):S.hidden.add(c.dataset.ph);drawMarks()});
   $$('[data-pf]',m).forEach(b=>b.onclick=()=>{S.pinFilter=b.dataset.pf;$$('[data-pf]',m).forEach(x=>x.classList.toggle('on',x===b));buildPins()});
