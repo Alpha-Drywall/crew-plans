@@ -466,7 +466,10 @@ body:has(#fvPill) .mcard{padding-bottom:72px}#tmLog{scroll-margin-top:140px}
 .tkctx button:hover{background:#f1f3f5}.tkctx button.on{font-weight:700;background:#e8eefc}
 .tkctx .sw{width:12px;height:12px;border-radius:3px;flex:0 0 auto}
 .tkctxh{font-size:12px;color:var(--muted);padding:6px 12px 2px}
-.tkctxrow{display:flex;gap:2px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin:3px 0;padding:3px 0}.tkctxrow button{flex:1;justify-content:center;padding:8px 6px}
+.tkctxrow{display:flex;gap:2px;padding:1px 0}.tkctxrow button{flex:1;justify-content:center;padding:8px 6px}
+.tkctxsep{border-top:1px solid var(--line);margin:3px 0}
+.tkctx .kb{margin-left:auto;padding-left:18px;color:var(--muted);font-size:12px;white-space:nowrap}
+.tkctxi{display:flex;align-items:center;gap:8px;color:var(--ink);font-weight:600;padding:6px 12px 4px}
 @media (max-width:760px){.tkwrap{flex-direction:column}.tkside{width:auto;max-height:34vh;border-left:0;border-top:1px solid var(--line)}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js"></script>
@@ -4103,7 +4106,8 @@ function renderLogList(){
 /* ===== Takeoff (office only): measure walls (LF), ceilings/soffits (SF) and counts (EA) on plan sheets, send rows to the bid sheet's TAKEOFF tab.
    Stored in table takeoffs (one row per job, office-only RLS): data = {v,items[],shapes[],scales{},sent{}}.
    item  = {id,n,code,desc,sec,unit:'LF'|'SF'|'EA',h,w (line width in inches, optional; blank = full wall thickness from the code: framing + 5/8" per board layer),color}
-   shape = {id,item,sheet,k:'line'|'poly'|'count',p:[x0,y0,x1,y1,...] (0-1 of the sheet image),by,at, deduct:true on a poly = cut-out that subtracts its area}
+   shape = {id,item,sheet,k:'line'|'poly'|'count',p:[x0,y0,x1,y1,...] (0-1 of the sheet image),by,at, deduct:true on a poly = cut-out that subtracts its area,
+           h: this line's own wall height in feet (optional; LF the same, but its own bid row "@ h"), note: short label shown on the sheet and in the markup PDF}
    sheets.scale_text = the printed scale(s) read at upload (PDF text) or later by OCR, best first, '; ' between; '' = looked, none found
    scales[sheetId] = {fpp:feet per image pixel,label,how:'cal'|'preset'}
    Claude (or anyone in the signed-in app page) can use window.alphaTakeoff — see the end of this section. ===== */
@@ -4204,7 +4208,7 @@ function tkApply(data,ops){
   for(const o of ops||[]){
     if(o.t==='item'){const i=d.items.findIndex(x=>x.id===o.v.id);if(i>=0)d.items[i]={...d.items[i],...o.v};else d.items.push({...o.v})}
     else if(o.t==='del_item'){d.items=d.items.filter(x=>x.id!==o.id);d.shapes=d.shapes.filter(s=>s.item!==o.id)}
-    else if(o.t==='shape'){if(!d.items.some(x=>x.id===o.v.item))continue;const i=d.shapes.findIndex(x=>x.id===o.v.id);if(i<0&&!o.v.sheet)continue;if(i>=0)d.shapes[i]={...d.shapes[i],...o.v};else d.shapes.push({...o.v})}
+    else if(o.t==='shape'){const i=d.shapes.findIndex(x=>x.id===o.v.id);if((i<0||o.v.item!=null)&&!d.items.some(x=>x.id===o.v.item))continue;if(i<0&&!o.v.sheet)continue;if(i>=0)d.shapes[i]={...d.shapes[i],...o.v};else d.shapes.push({...o.v})}
     else if(o.t==='del_shape'){d.shapes=d.shapes.filter(s=>s.id!==o.id)}
     else if(o.t==='scale'){if(o.v)d.scales[o.sheet]=o.v;else delete d.scales[o.sheet]}
     else if(o.t==='sent'){d.sent=o.v||{}}
@@ -4215,16 +4219,45 @@ function tkApply(data,ops){
 /* totals per item: {qty, sheets, unscaled (shapes on sheets with no scale), wallSf (LF x height x 1 side)} */
 function tkTotals(data,sheets){
   const byId={};(sheets||[]).forEach(s=>byId[s.id]=s);const out={};
-  (data.items||[]).forEach(it=>out[it.id]={qty:0,sheets:{},unscaled:0,shapes:0});
-  (data.shapes||[]).forEach(sh=>{const t=out[sh.item];if(!t)return;const sheet=byId[sh.sheet];if(!sheet)return;
-    const q=tkShapeQty(sh,sheet,(data.scales||{})[sh.sheet]);t.shapes++;t.sheets[sh.sheet]=1;if(q==null)t.unscaled++;else t.qty+=q});
-  (data.items||[]).forEach(it=>{const t=out[it.id];t.sheets=Object.keys(t.sheets).length;t.wallSf=it.unit==='LF'&&+it.h>0?t.qty*tkEvenUp(it.h):0});
+  const its={};(data.items||[]).forEach(it=>{its[it.id]=it;out[it.id]={qty:0,sheets:{},unscaled:0,shapes:0,wallSf:0}});
+  (data.shapes||[]).forEach(sh=>{const t=out[sh.item];if(!t)return;const sheet=byId[sh.sheet];if(!sheet)return;const it=its[sh.item];
+    const q=tkShapeQty(sh,sheet,(data.scales||{})[sh.sheet]);t.shapes++;t.sheets[sh.sheet]=1;if(q==null)t.unscaled++;else{t.qty+=q;if(it.unit==='LF')t.wallSf+=q*tkEvenUp(+sh.h>0?sh.h:it.h)}});
+  (data.items||[]).forEach(it=>{const t=out[it.id];t.sheets=Object.keys(t.sheets).length;if(it.unit!=='LF')t.wallSf=0});
+  return out;
+}
+/* LF marks with their own height (shape.h) that evens up to a different height than the item's: {[itemId]: [{h (even-up), qty, unscaled, marks}]} by height */
+function tkHeightSplits(data,sheets){
+  const byId={};(sheets||[]).forEach(s=>byId[s.id]=s);const its={};(data.items||[]).forEach(it=>its[it.id]=it);const out={};
+  (data.shapes||[]).forEach(sh=>{const it=its[sh.item],sheet=byId[sh.sheet];if(!it||!sheet||it.unit!=='LF'||sh.k!=='line'||!(+sh.h>0))return;const h=tkEvenUp(sh.h);if(h===tkEvenUp(it.h))return;
+    const l=out[it.id]||(out[it.id]=[]);let g=l.find(x=>x.h===h);if(!g){g={h,qty:0,unscaled:0,marks:0};l.push(g)}
+    const q=tkShapeQty(sh,sheet,(data.scales||{})[sh.sheet]);g.marks++;if(q==null)g.unscaled++;else g.qty+=q});
+  Object.keys(out).forEach(k=>out[k].sort((a,b)=>a.h-b.h));
   return out;
 }
 /* bid sheet rows: one per item with a quantity, in section order. LF/SF round up to the next whole unit; heights to the next even foot. */
 function tkRows(data,sheets){
   const tot=tkTotals(data,sheets);const items=(data.items||[]).slice().sort((a,b)=>TK_SECS.indexOf(a.sec)-TK_SECS.indexOf(b.sec)||(a.n||0)-(b.n||0));
-  return items.filter(it=>tot[it.id]&&tot[it.id].qty>0).map(it=>({id:it.id,sec:TK_SECS.includes(it.sec)?it.sec:'INTERIOR',code:String(it.code||'').trim(),desc:String(it.desc||'').trim(),qty:Math.ceil(tot[it.id].qty-1e-9),unit:it.unit||'LF',h:it.unit==='EA'?null:(+it.h>0?tkEvenUp(it.h):null),unscaled:tot[it.id].unscaled}));
+  const sp=tkHeightSplits(data,sheets);const out=[];
+  items.forEach(it=>{const t=tot[it.id];if(!t)return;const sec=TK_SECS.includes(it.sec)?it.sec:'INTERIOR',code=String(it.code||'').trim(),desc=String(it.desc||'').trim(),l=sp[it.id]||[];
+    const qty=t.qty-l.reduce((a,g)=>a+g.qty,0),un=t.unscaled-l.reduce((a,g)=>a+g.unscaled,0);
+    if(qty>1e-9)out.push({id:it.id,sec,code,desc,qty:Math.ceil(qty-1e-9),unit:it.unit||'LF',h:it.unit==='EA'?null:(+it.h>0?tkEvenUp(it.h):null),unscaled:un});
+    l.forEach(g=>{if(g.qty>1e-9)out.push({id:it.id+'@'+g.h,sec,code,desc:(desc?desc+' ':'')+'@'+g.h+"'",qty:Math.ceil(g.qty-1e-9),unit:'LF',h:g.h,unscaled:g.unscaled,note:g.marks+' mark'+(g.marks===1?'':'s')+' at '+g.h+"' (item "+(+it.h>0?tkEvenUp(it.h)+"'":'no height')+')'})})});
+  return out;
+}
+/* split a polyline (normalized points) at a point on segment seg (between point seg and seg+1): [first part, second part], both through (x,y) */
+function tkSplitLine(p,seg,x,y){
+  const n=Math.floor((p||[]).length/2);if(!(seg>=0&&seg<n-1))return null;
+  return [p.slice(0,2*(seg+1)).concat([x,y]),[x,y].concat(p.slice(2*(seg+1),2*n))];
+}
+/* add a corner (x,y) on segment seg (after point seg; for an area seg = n-1 is the closing edge) */
+function tkInsertCorner(p,seg,x,y){const q=(p||[]).slice();const n=Math.floor(q.length/2);if(!(seg>=0&&seg<n))return q;q.splice(2*(seg+1),0,x,y);return q}
+/* move corner i to (x,y) */
+function tkMoveCorner(p,i,x,y){const q=(p||[]).slice();if(i>=0&&2*i+1<q.length){q[2*i]=x;q[2*i+1]=y}return q}
+/* remove corner i, keeping at least min corners (2 for a line, 3 for an area); null when it can't */
+function tkDeleteCorner(p,i,min){const q=(p||[]).slice();const n=Math.floor(q.length/2);if(!(i>=0&&i<n)||n<=(min||2))return null;q.splice(2*i,2);return q}
+/* copies of shapes moved by (dx,dy) (0-1 of the sheet) with new ids, points rounded like drawn ones */
+function tkOffsetShapes(shapes,dx,dy,mkId){
+  return (shapes||[]).map(s=>({...s,id:mkId(),p:(s.p||[]).map((v,i)=>Math.round((+v+(i%2?dy:dx))*10000)/10000)}));
 }
 /* copy one sheet's shapes onto another sheet (same spots), for typical floors */
 function tkCopyShapes(data,fromSheet,toSheet,mkId,itemIds){
@@ -4347,7 +4380,7 @@ function tkvWidths(){if(!TKV)return;const mn=1.2/TKV.t.s;$$('#tkShapes [data-w]'
 async function tkOpen(sid){
   const sh=S.sheets.find(s=>s.id===sid);if(!sh||!TK)return;
   const list=tkSheets();const ni=list.findIndex(s=>s.id===sid);
-  TKV={id:sid,sh,list,ni,W:0,H:0,t:{x:0,y:0,s:1},minS:.05,mode:'draw',item:TKV&&TKV.item||null,draft:[],cur:null,pts:new Map(),g:null,sel:null,hide:{},wmul:tkWmulGet(),hl:TKV&&TKV.hl||null,mine:[],lm:['seg','area'].includes(lsGet('acv.tkLineMode'))?lsGet('acv.tkLineMode'):'run',last:TKV&&TKV.last||{},dNext:false};
+  TKV={id:sid,sh,list,ni,W:0,H:0,t:{x:0,y:0,s:1},minS:.05,mode:'draw',item:TKV&&TKV.item||null,draft:[],cur:null,pts:new Map(),g:null,sel:null,hide:{},wmul:tkWmulGet(),hl:TKV&&TKV.hl||null,mine:[],lm:['seg','area'].includes(lsGet('acv.tkLineMode'))?lsGet('acv.tkLineMode'):'run',last:TKV&&TKV.last||{},dNext:false,msel:[],cont:null,contN:0,drag:null,box:null};
   if(TKV.hl&&!tkItem(TKV.hl))TKV.hl=null;
   if(!TKV.item||!tkItem(TKV.item)){const f=TK.data.items[0];TKV.item=f?f.id:null}
   {const ci=tkItem(TKV.item);if(ci&&ci.unit==='SF')TKV.lm='area';else if(ci&&ci.unit==='LF'&&TKV.lm==='area')TKV.lm='run'}
@@ -4414,7 +4447,7 @@ function tkvImg(cx,cy){const r=TKV.stage.getBoundingClientRect();return {x:(cx-r
 function tkvMode(m){
   if(!TKV)return;if(TKV.draft.length&&m!==TKV.mode)tkvFinish();
   if(m==='draw'&&!TKV.item){toast('Pick or add a takeoff item first.');tkItemForm(null).then(it=>{if(it&&TKV){TKV.item=it.id;tkvMode('draw')}});return}
-  TKV.mode=m;TKV.draft=[];TKV.sel=null;tkvTools();tkvPaint();
+  TKV.mode=m;TKV.draft=[];TKV.sel=null;TKV.msel=[];tkvTools();tkvPaint();
 }
 function tkvTools(){
   if(!TKV)return;$$('#tkv [data-tm]').forEach(b=>b.classList.toggle('on',b.dataset.tm===TKV.mode));
@@ -4427,8 +4460,9 @@ function tkvTools(){
   const h=$('#tkHint');if(!h||!TKV.W)return;
   const sc=tkScaleOf(TKV.id);
   h.textContent=!sc&&TKV.mode!=='scale'?'No scale on this sheet yet: tap 📐 Scale':
+    TKV.mode==='draw'&&TKV.cont?'Continuing the run: click each next corner · Enter or right-click ■ Stop to finish · Esc cancels (the mark stays as it was)':
     TKV.mode==='draw'?(it?(it.unit==='LF'?(TKV.lm==='seg'?'Segments: click both ends of each wall piece · right-click for more · drag to move':'Click each corner along the wall · double-click or ✓ Finish to end the run · right-click for more · drag to move'):it.unit==='SF'?(TKV.dNext?'Deduct: click the corners of the cut-out (or drag a rectangle) · ✓ Finish':'Area: click the corners (click the first one or ✓ Finish to close) or drag a rectangle · Alt+drag/click = deduct · space+drag to move'):'Click each item to count it · drag to move'):'Pick a takeoff item on the right'):
-    TKV.mode==='pan'?'Drag to move · wheel or pinch to zoom':TKV.mode==='select'?'Click a mark to change or delete it':TKV.mode==='scale'?'Click both ends of a dimension you know, then ✓ Finish':'Click points to measure (not saved) · ✓ Finish';
+    TKV.mode==='pan'?'Drag to move · wheel or pinch to zoom':TKV.mode==='select'?'Click a mark to select it, then drag its corners · double-click an edge to add a corner · shift-click or drag a box to pick several · right-click for more':TKV.mode==='scale'?'Click both ends of a dimension you know, then ✓ Finish':'Click points to measure (not saved) · ✓ Finish';
   h.style.display='block';
 }
 function tkvSide(){
@@ -4451,23 +4485,27 @@ function tkvSide(){
   $$('[data-eye]',el).forEach(b=>b.onclick=()=>{TKV.hide[b.dataset.eye]=!TKV.hide[b.dataset.eye];tkvSide();tkvPaint()});
   tkBindGroups(el,tkvSide);
 }
-function tkvPaint(){
+function tkvPaint(fast){
   if(!TKV||!TKV.W||!TK)return;const g=$('#tkShapes');if(!g)return;const W=TKV.W,H=TKV.H,M=Math.max(W,H),sw=M*.004;
   const its={};TK.data.items.forEach(i=>its[i.id]=i);
+  const on={};TK.data.shapes.forEach(s=>{if(s.sheet===TKV.id&&its[s.item])on[s.id]=1});TKV.msel=(TKV.msel||[]).filter(id=>on[id]);if(TKV.sel&&!on[TKV.sel])TKV.sel=null;
   const hl=TKV.hl&&its[TKV.hl]?TKV.hl:null;{const ci=its[TKV.item];if(ci)TKV.last[ci.unit]=ci.id}
-  g.innerHTML=TK.data.shapes.filter(s=>s.sheet===TKV.id&&its[s.item]&&!TKV.hide[s.item]).map(s=>{const it=its[s.item],c=esc(it.color),p=(s.p||[]).map(Number),sel=TKV.sel===s.id;
+  const tags=[],fs=M*.009;
+  g.innerHTML=TK.data.shapes.filter(s=>s.sheet===TKV.id&&its[s.item]&&!TKV.hide[s.item]&&s.id!==TKV.cont).map(s=>{const it=its[s.item],c=esc(it.color),p=(TKV.drag&&TKV.drag.id===s.id?TKV.drag.p:(s.p||[])).map(Number),sel=TKV.sel===s.id||TKV.msel.includes(s.id);
     const dim=hl&&s.item!==hl&&!sel?' opacity="0.2" data-dim="1"':'';
     const pts=[];for(let i=0;i+1<p.length;i+=2)pts.push((p[i]*W).toFixed(1)+','+(p[i+1]*H).toFixed(1));
     const op=it.id===TKV.item?.75:.5;
+    const tg=(s.k==='line'&&+s.h>0?'@'+tkFtIn(+s.h):'')+(s.note?(s.k==='line'&&+s.h>0?' ':'')+s.note:'');
+    if(tg){let x,y;if(s.k==='count'){x=p[0]*W+M*.009;y=p[1]*H-M*.009}else if(s.k==='poly'){x=0;y=0;const n=p.length/2;for(let i=0;i<n;i++){x+=p[2*i]*W;y+=p[2*i+1]*H}x/=n;y/=n}else{const i=Math.floor((p.length/2-1)/2)*2;x=(p[i]+p[i+2])/2*W;y=(p[i+1]+p[i+3])/2*H-M*.008}tags.push([tg,x,y,c,dim])}
     if(s.k==='count')return '<g'+dim+'><circle cx="'+(p[0]*W).toFixed(1)+'" cy="'+(p[1]*H).toFixed(1)+'" r="'+(M*.007).toFixed(1)+'" fill="'+c+'" fill-opacity="'+op+'" stroke="'+(sel?'#000':c)+'" stroke-width="'+(sw*(sel?.8:.4)).toFixed(1)+'"/></g>';
     if(s.k==='poly'&&s.deduct)return '<polygon'+dim+' data-deduct="1" points="'+pts.join(' ')+'" fill="url(#tkHatch)" stroke="'+(sel?'#000':c)+'" stroke-width="'+(sw*(sel?.8:.5)).toFixed(1)+'" stroke-dasharray="'+(sw*2.5).toFixed(1)+' '+(sw*1.5).toFixed(1)+'" stroke-linejoin="round"/>';
     if(s.k==='poly')return '<polygon'+dim+' points="'+pts.join(' ')+'" fill="'+c+'" fill-opacity="'+(op*.4).toFixed(2)+'" stroke="'+(sel?'#000':c)+'" stroke-width="'+(sw*(sel?.8:.5)).toFixed(1)+'" stroke-linejoin="round"/>';
     const lw=tkvLineW(it,0)*(sel?1.15:1);
     return '<polyline'+dim+' points="'+pts.join(' ')+'" fill="none" stroke="'+(sel?'#000':c)+'" stroke-opacity="'+(sel?.85:it.id===TKV.item?.9:.7)+'" data-w="'+lw.toFixed(2)+'" stroke-width="'+Math.max(lw,1.2/TKV.t.s).toFixed(2)+'" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4"/>';
-  }).join('');
-  tkvLive();tkvSide();tkvTools();tkvHlBar();
+  }).join('')+tags.map(([t,x,y,c,dim])=>{const w=fs*.62*t.length+fs*.8;return '<g data-tag="1"'+dim+'><rect x="'+(x-w/2).toFixed(1)+'" y="'+(y-fs*.75).toFixed(1)+'" width="'+w.toFixed(1)+'" height="'+(fs*1.5).toFixed(1)+'" rx="'+(fs*.3).toFixed(1)+'" fill="#fff" fill-opacity=".9" stroke="'+c+'" stroke-width="'+(fs*.12).toFixed(1)+'"/><text x="'+x.toFixed(1)+'" y="'+(y+fs*.35).toFixed(1)+'" font-size="'+fs.toFixed(1)+'" font-family="sans-serif" font-weight="700" text-anchor="middle" fill="#111">'+esc(t)+'</text></g>'}).join('');
+  tkvLive();if(fast===true)return;tkvSide();tkvTools();tkvHlBar();
 }
-/* live drawing, rubber band to the cursor and the running length/area */
+/* live drawing, rubber band to the cursor and the running length/area; corner handles of the selected mark; the selection box */
 function tkvLive(){
   if(!TKV||!TKV.W)return;const g=$('#tkLive');if(!g)return;const W=TKV.W,H=TKV.H,M=Math.max(W,H),sw=M*.003;
   const it=tkItem(TKV.item);const c=TKV.mode==='draw'&&it?it.color:TKV.mode==='scale'?'#c62828':'#1d232b';
@@ -4476,9 +4514,12 @@ function tkvLive(){
   if(pts.length){const ps=pts.map(p=>p.x.toFixed(1)+','+p.y.toFixed(1)).join(' ');
     const poly=TKV.mode==='draw'&&it&&it.unit==='SF';
     const lf=TKV.mode==='draw'&&it&&it.unit==='LF',lw=lf?tkvLineW(it,1.5):sw;
-    s+=poly&&pts.length>2&&TKV.dDraft?'<polygon points="'+ps+'" fill="url(#tkHatch)" stroke="#c62828" stroke-width="'+sw+'" stroke-dasharray="'+(sw*3)+' '+(sw*2)+'"/>':poly&&pts.length>2?'<polygon points="'+ps+'" fill="'+c+'" fill-opacity=".18" stroke="'+c+'" stroke-width="'+sw+'" stroke-dasharray="'+(sw*3)+' '+(sw*2)+'"/>':'<polyline points="'+ps+'" fill="none" stroke="'+c+'"'+(lf?' stroke-opacity=".7"':'')+' stroke-width="'+lw.toFixed(2)+'" stroke-linecap="'+(lf?'butt':'round')+'" stroke-linejoin="'+(lf?'miter':'round')+'"/>';
+    s+=poly&&pts.length>2&&TKV.dDraft?'<polygon points="'+ps+'" fill="url(#tkHatch)" stroke="#c62828" stroke-width="'+sw+'" stroke-dasharray="'+(sw*3)+' '+(sw*2)+'"/>':poly&&pts.length>2?'<polygon points="'+ps+'" fill="'+c+'" fill-opacity=".18" stroke="'+c+'" stroke-width="'+sw+'" stroke-dasharray="'+(sw*3)+' '+(sw*2)+'"/>':'<polyline points="'+ps+'" fill="none" stroke="'+c+'"'+(lf?' stroke-opacity="'+(TKV.cont?'.85':'.7')+'"':'')+' stroke-width="'+lw.toFixed(2)+'" stroke-linecap="'+(lf?'butt':'round')+'" stroke-linejoin="'+(lf?'miter':'round')+'"/>';
     s+=TKV.draft.map(p=>'<circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="'+(M*.0025/Math.max(.2,TKV.t.s*3)+M*.0012).toFixed(1)+'" fill="#fff" stroke="'+c+'" stroke-width="'+(sw*.6)+'"/>').join('');
   }
+  if(TKV.mode==='select'&&TKV.sel&&!TKV.box){const sh=tkvShape(TKV.sel);if(sh&&sh.k!=='count'){const q=TKV.drag&&TKV.drag.id===sh.id?TKV.drag.p:(sh.p||[]);const r=(6/TKV.t.s).toFixed(2),w=(1.6/TKV.t.s).toFixed(2);
+    for(let i=0;i+1<q.length;i+=2)s+='<circle data-hv="'+(i/2)+'" cx="'+(q[i]*W).toFixed(1)+'" cy="'+(q[i+1]*H).toFixed(1)+'" r="'+r+'" fill="#fff" stroke="#1565c0" stroke-width="'+w+'"/>'}}
+  if(TKV.box){const a=TKV.box.a,b=TKV.box.b,k=1/TKV.t.s;s+='<rect data-box="1" x="'+Math.min(a.x,b.x).toFixed(1)+'" y="'+Math.min(a.y,b.y).toFixed(1)+'" width="'+Math.abs(b.x-a.x).toFixed(1)+'" height="'+Math.abs(b.y-a.y).toFixed(1)+'" fill="#1e88e5" fill-opacity=".08" stroke="#1e88e5" stroke-width="'+(1.2*k).toFixed(2)+'" stroke-dasharray="'+(5*k).toFixed(1)+' '+(3*k).toFixed(1)+'"/>'}
   g.innerHTML=s;
   const rd=$('#tkRead');if(!rd)return;const sc=tkScaleOf(TKV.id);
   if(!pts.length||(TKV.mode!=='draw'&&TKV.mode!=='measure'&&TKV.mode!=='scale')){rd.style.display='none';return}
@@ -4487,14 +4528,14 @@ function tkvLive(){
   else if(!sc)txt='Set the scale to see feet';
   else if(TKV.mode==='draw'&&it&&it.unit==='SF')txt=(pts.length>2?(TKV.dDraft?'Deduct −':'')+Math.round(tkAreaPx(np,W,H)*sc.fpp*sc.fpp).toLocaleString()+' SF':TKV.dDraft?'Deduct…':'…');
   else if(TKV.mode==='draw'&&it&&it.unit==='EA')txt='';
-  else{const L=tkLenPx(np,W,H)*sc.fpp;const last=pts.length>1?Math.hypot(pts[pts.length-1].x-pts[pts.length-2].x,pts[pts.length-1].y-pts[pts.length-2].y)*sc.fpp:0;txt=tkFtIn(L)+(pts.length>2?'  (this leg '+tkFtIn(last)+')':'')}
+  else{const L=tkLenPx(np,W,H)*sc.fpp;const last=pts.length>1?Math.hypot(pts[pts.length-1].x-pts[pts.length-2].x,pts[pts.length-1].y-pts[pts.length-2].y)*sc.fpp:0;txt=(TKV.cont?'Continuing: ':'')+tkFtIn(L)+(pts.length>2?'  (this leg '+tkFtIn(last)+')':'')}
   rd.textContent=txt;rd.style.display=txt?'block':'none';
 }
-/* snap: to an existing corner/end on this sheet within 10 screen px, else level/plumb/45 from the last point */
-function tkvSnapPt(p){
+/* snap: to an existing corner/end on this sheet within 10 screen px (skip = {id,i}: a corner being dragged), else level/plumb/45 from the last point */
+function tkvSnapPt(p,skip){
   if(!TKV.snap)return p;const tol=10/TKV.t.s;let best=null,bd=tol;
   const W=TKV.W,H=TKV.H;
-  TK.data.shapes.forEach(s=>{if(s.sheet!==TKV.id||s.k==='count'||TKV.hide[s.item])return;const q=s.p||[];for(let i=0;i+1<q.length;i+=2){const d=Math.hypot(q[i]*W-p.x,q[i+1]*H-p.y);if(d<bd){bd=d;best={x:q[i]*W,y:q[i+1]*H}}}});
+  TK.data.shapes.forEach(s=>{if(s.sheet!==TKV.id||s.k==='count'||TKV.hide[s.item])return;const q=s.p||[];for(let i=0;i+1<q.length;i+=2){if(skip&&skip.id===s.id&&skip.i===i/2)continue;const d=Math.hypot(q[i]*W-p.x,q[i+1]*H-p.y);if(d<bd){bd=d;best={x:q[i]*W,y:q[i+1]*H}}}});
   TKV.draft.forEach((q,i)=>{if(i===TKV.draft.length-1)return;const d=Math.hypot(q.x-p.x,q.y-p.y);if(d<bd){bd=d;best={x:q.x,y:q.y}}});
   if(best)return best;
   const a=TKV.draft[TKV.draft.length-1];return a?snapLine(a,p):p;
@@ -4504,19 +4545,25 @@ function tkvBind(){
   st.addEventListener('pointerdown',e=>{
     if(!TKV||!TKV.W)return;try{st.setPointerCapture(e.pointerId)}catch(_){}
     TKV.pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
-    if(TKV.pts.size===2){const [a,b]=[...TKV.pts.values()];TKV.g={type:'pinch',d0:Math.max(1,dist(a,b)),c0:mid(a,b),t0:Object.assign({},TKV.t)}}
-    else if(TKV.pts.size===1){const it=tkItem(TKV.item);TKV.g={type:'pan',sx:e.clientX,sy:e.clientY,t0:Object.assign({},TKV.t),moved:false,time:Date.now(),btn:TKV.space?1:e.ctrlKey?2:e.button,alt:e.altKey,
-      rect:!TKV.space&&e.button===0&&!e.ctrlKey&&TKV.mode==='draw'&&!!it&&it.unit==='SF'&&!TKV.draft.length&&!!tkScaleOf(TKV.id)}}
+    if(TKV.pts.size===2){const [a,b]=[...TKV.pts.values()];TKV.g={type:'pinch',d0:Math.max(1,dist(a,b)),c0:mid(a,b),t0:Object.assign({},TKV.t)};if(TKV.box||TKV.drag){TKV.box=null;TKV.drag=null;tkvPaint(true)}}
+    else if(TKV.pts.size===1){const it=tkItem(TKV.item),btn=TKV.space?1:e.ctrlKey?2:e.button,sm=TKV.mode==='select'&&btn===0;
+      const cs=sm&&TKV.sel&&!e.shiftKey?tkvShape(TKV.sel):null,ci=cs&&cs.k!=='count'?tkvNearCorner(cs,tkvImg(e.clientX,e.clientY),12):-1;
+      TKV.g={type:'pan',sx:e.clientX,sy:e.clientY,t0:Object.assign({},TKV.t),moved:false,time:Date.now(),btn,alt:e.altKey,shift:e.shiftKey,
+      rect:!TKV.space&&e.button===0&&!e.ctrlKey&&TKV.mode==='draw'&&!!it&&it.unit==='SF'&&!TKV.draft.length&&!!tkScaleOf(TKV.id),
+      corner:ci>=0?{id:cs.id,i:ci,p0:(cs.p||[]).slice()}:null,box:sm&&ci<0}}
     clearTimeout(TKV.lp);
     if(e.pointerType!=='mouse'&&TKV.pts.size===1){const g0=TKV.g,x=e.clientX,y=e.clientY;TKV.lp=setTimeout(()=>{if(TKV&&TKV.g===g0&&!g0.moved&&TKV.pts.size===1){g0.long=true;tkCtx(x,y)}},500)}
     const h=$('#tkHint');if(h)h.style.display='none';
   });
   st.addEventListener('pointermove',e=>{
-    if(!TKV)return;
+    if(!TKV)return;TKV.mouse={x:e.clientX,y:e.clientY};
     if(!TKV.pts.has(e.pointerId)){if(e.pointerType==='mouse'&&TKV.draft.length){const p=tkvImg(e.clientX,e.clientY);TKV.cur=tkvSnapPt(p);tkvLive()}return}
-    TKV.pts.set(e.pointerId,{x:e.clientX,y:e.clientY});const g=TKV.g;if(!g)return;
+    TKV.pts.set(e.pointerId,{x:e.clientX,y:e.clientY});const g=TKV.g;if(!g)return;const far=n=>Math.hypot(e.clientX-g.sx,e.clientY-g.sy)>n;
     if(g.type==='pinch'&&TKV.pts.size>=2){const [a,b]=[...TKV.pts.values()];const c=mid(a,b);const r=st.getBoundingClientRect();const s=clamp(g.t0.s*dist(a,b)/g.d0,TKV.minS,6);const ix=(g.c0.x-r.left-g.t0.x)/g.t0.s,iy=(g.c0.y-r.top-g.t0.y)/g.t0.s;TKV.t={s,x:c.x-r.left-ix*s,y:c.y-r.top-iy*s};tkvT()}
-    else if(g.type==='rect'||(g.type==='pan'&&g.rect&&Math.hypot(e.clientX-g.sx,e.clientY-g.sy)>10)){
+    else if(g.corner&&(g.type==='corner'||far(4))){clearTimeout(TKV.lp);g.type='corner';g.moved=true;const q=tkvSnapPt(tkvImg(e.clientX,e.clientY),g.corner);
+      TKV.drag={id:g.corner.id,p:tkMoveCorner(g.corner.p0,g.corner.i,clamp(q.x,0,TKV.W)/TKV.W,clamp(q.y,0,TKV.H)/TKV.H)};tkvPaint(true)}
+    else if(g.box&&(g.type==='box'||far(6))){clearTimeout(TKV.lp);g.type='box';g.moved=true;TKV.box={a:tkvImg(g.sx,g.sy),b:tkvImg(e.clientX,e.clientY)};tkvLive()}
+    else if(g.type==='rect'||(g.type==='pan'&&g.rect&&far(10))){
       clearTimeout(TKV.lp);if(g.type!=='rect'){g.type='rect';g.a=tkvSnapPt(tkvImg(g.sx,g.sy));TKV.dDraft=!!(g.alt||e.altKey||TKV.dNext)}
       const a=g.a,b=tkvImg(e.clientX,e.clientY);b.x=clamp(b.x,0,TKV.W);b.y=clamp(b.y,0,TKV.H);TKV.draft=[a,{x:b.x,y:a.y},b,{x:a.x,y:b.y}];TKV.cur=null;tkvLive()}
     else if(g.type==='pan'){const dx=e.clientX-g.sx,dy=e.clientY-g.sy;if(Math.hypot(dx,dy)>6){g.moved=true;clearTimeout(TKV.lp)}if(g.moved){TKV.t=Object.assign({},g.t0,{x:g.t0.x+dx,y:g.t0.y+dy});tkvT()}}
@@ -4524,40 +4571,47 @@ function tkvBind(){
   const end=e=>{
     if(!TKV||!TKV.pts.has(e.pointerId))return;TKV.pts.delete(e.pointerId);clearTimeout(TKV.lp);const g=TKV.g;if(!g)return;
     if(g.type==='pinch'){if(TKV.pts.size===1){const [a]=[...TKV.pts.values()];TKV.g={type:'pan',sx:a.x,sy:a.y,t0:Object.assign({},TKV.t),moved:true,time:0}}else if(!TKV.pts.size)TKV.g=null;return}
-    TKV.g=null;if(TKV.skipTap){TKV.skipTap=false;return}
+    TKV.g=null;if(TKV.skipTap){TKV.skipTap=false;TKV.drag=null;TKV.box=null;tkvPaint(true);return}
+    if(g.type==='corner'){const dr=TKV.drag;TKV.drag=null;if(dr&&e.type!=='pointercancel')tkDo({t:'shape',v:{id:dr.id,p:dr.p.map(v=>r4(v))}});tkvPaint();return}
+    if(g.type==='box'){const b=TKV.box;TKV.box=null;if(b&&e.type!=='pointercancel')tkvBoxSel(b,g.shift||e.shiftKey);else tkvLive();return}
     if(g.type==='rect'){const q=TKV.draft;if(e.type==='pointercancel'||q.length!==4||Math.abs(q[2].x-q[0].x)*TKV.t.s<6||Math.abs(q[2].y-q[0].y)*TKV.t.s<6){TKV.draft=[];TKV.dDraft=false;tkvLive();tkvTools()}else tkvFinish();return}
-    if(g.type==='pan'&&!g.moved&&!g.long&&e.type!=='pointercancel'&&g.btn!==2&&g.btn!==1)tkvTap(e.clientX,e.clientY,g.alt||e.altKey);
+    if(g.type==='pan'&&!g.moved&&!g.long&&e.type!=='pointercancel'&&g.btn!==2&&g.btn!==1)tkvTap(e.clientX,e.clientY,g.alt||e.altKey,g.shift||e.shiftKey);
   };
   st.addEventListener('pointerup',end);st.addEventListener('pointercancel',end);
-  st.addEventListener('dblclick',e=>{e.preventDefault();if(TKV&&TKV.draft.length)tkvFinish()});
+  st.addEventListener('dblclick',e=>{e.preventDefault();if(TKV&&TKV.draft.length&&TKV.mode!=='select')tkvFinish()});
   st.addEventListener('contextmenu',e=>{e.preventDefault();if(!TKV||!TKV.W)return;if($('#tkCtx')&&Date.now()-(TKV.ctxAt||0)<800)return;if(TKV.g)TKV.g.long=true;tkCtx(e.clientX,e.clientY)});
-  st.addEventListener('wheel',e=>{if(!TKV||!TKV.W)return;e.preventDefault();const r=st.getBoundingClientRect();const s=clamp(TKV.t.s*Math.exp(-e.deltaY*.0015),TKV.minS,6);const ix=(e.clientX-r.left-TKV.t.x)/TKV.t.s,iy=(e.clientY-r.top-TKV.t.y)/TKV.t.s;TKV.t={s,x:e.clientX-r.left-ix*s,y:e.clientY-r.top-iy*s};tkvT()},{passive:false});
+  st.addEventListener('wheel',e=>{if(!TKV||!TKV.W)return;e.preventDefault();tkvZoomAt(e.clientX,e.clientY,Math.exp(-e.deltaY*.0015))},{passive:false});
   window.addEventListener('keydown',tkvKey);window.addEventListener('keyup',tkvKeyUp);
 }
+/* zoom by f keeping the screen point (cx,cy) still */
+function tkvZoomAt(cx,cy,f){if(!TKV||!TKV.W)return;const r=TKV.stage.getBoundingClientRect();const s=clamp(TKV.t.s*f,TKV.minS,6);const ix=(cx-r.left-TKV.t.x)/TKV.t.s,iy=(cy-r.top-TKV.t.y)/TKV.t.s;TKV.t={s,x:cx-r.left-ix*s,y:cy-r.top-iy*s};tkvT()}
 /* space held = pan with a drag, in any mode */
 function tkvKeyUp(e){if(TKV&&e.key===' ')TKV.space=false}
 function tkvKey(e){
   if(!TKV||$('.mwrap')||/INPUT|TEXTAREA|SELECT/.test((e.target&&e.target.tagName)||''))return;
   if($('#tkCtx')){if(e.key==='Escape'){e.preventDefault();tkCtxClose()}return}
+  const mod=e.ctrlKey||e.metaKey,k=String(e.key||'').toLowerCase();
   if(e.key===' '){e.preventDefault();TKV.space=true;return}
-  if(e.key==='Escape'&&!TKV.draft.length&&!TKV.sel&&TKV.hl){TKV.hl=null;tkvPaint();return}
+  if(e.key==='Escape'&&!TKV.draft.length&&!TKV.sel&&!TKV.msel.length&&TKV.hl){TKV.hl=null;tkvPaint();return}
   if(e.key==='Enter'){e.preventDefault();tkvFinish()}
-  else if(e.key==='Escape'){if(TKV.draft.length){TKV.draft=[];TKV.dDraft=false;tkvLive();tkvTools()}else if(TKV.dNext){TKV.dNext=false;tkvTools()}else if(TKV.sel){TKV.sel=null;tkvPaint()}}
-  else if(e.key==='Backspace'||e.key==='Delete'){if(TKV.draft.length){e.preventDefault();tkvUndoPt()}else if(TKV.sel){e.preventDefault();const id=TKV.sel;TKV.sel=null;tkDo({t:'del_shape',id});tkvPaint()}}
-  else if(e.key==='z'&&(e.ctrlKey||e.metaKey)){e.preventDefault();tkvUndoPt()}
+  else if(e.key==='Escape'){if(TKV.draft.length)tkvCancel();else if(TKV.dNext){TKV.dNext=false;tkvTools()}else if(TKV.sel||TKV.msel.length){TKV.sel=null;TKV.msel=[];tkvPaint()}}
+  else if(e.key==='Backspace'||e.key==='Delete'){if(TKV.draft.length){e.preventDefault();tkvUndoPt()}else if(tkvSelIds().length){e.preventDefault();tkvDelMarks(tkvSelIds())}}
+  else if(k==='z'&&mod){e.preventDefault();tkvUndoPt()}
+  else if(k==='c'&&mod){const ids=tkvSelIds();if(ids.length){e.preventDefault();tkvCopyMarks(ids)}}
+  else if(k==='v'&&mod){if(TK_CLIP&&TK_CLIP.length){e.preventDefault();const m=TKV.mouse,r=TKV.stage.getBoundingClientRect();tkvPaste(m&&m.x>=r.left&&m.x<=r.right&&m.y>=r.top&&m.y<=r.bottom?tkvImg(m.x,m.y):null)}}
 }
-function tkvTap(cx,cy,alt){
+function tkvTap(cx,cy,alt,shift){
   const p0=tkvImg(cx,cy);if(p0.x<0||p0.y<0||p0.x>TKV.W||p0.y>TKV.H)return;
   if(TKV.mode==='pan')return;
-  if(TKV.mode==='select'){TKV.sel=tkvHit(p0);tkvPaint();if(TKV.sel)tkvShapeMenu(TKV.sel);return}
+  if(TKV.mode==='select'){tkvSelTap(p0,shift);return}
   const it=tkItem(TKV.item);
   if(TKV.mode==='draw'){
     if(!it){toast('Pick a takeoff item first.');return}
     if(!tkScaleOf(TKV.id)&&it.unit!=='EA'){tkScaleBox();return}
-    if(it.unit==='EA'){const id=uuid();tkDo({t:'shape',v:{id,item:it.id,sheet:TKV.id,k:'count',p:[r4(p0.x/TKV.W),r4(p0.y/TKV.H)],by:'office',at:new Date().toISOString()}});TKV.mine.push(id);tkvPaint();return}
+    if(it.unit==='EA'){tkvCountAt(it.id,p0);return}
   }
   const p=tkvSnapPt(p0);
-  const segs=TKV.mode==='draw'&&it&&it.unit==='LF'&&TKV.lm==='seg';
+  const segs=TKV.mode==='draw'&&it&&it.unit==='LF'&&TKV.lm==='seg'&&!TKV.cont;
   if(TKV.mode==='draw'&&it&&it.unit==='SF'&&!TKV.draft.length)TKV.dDraft=!!(alt||TKV.dNext);
   if(segs&&TKV.draft.length===1&&Math.hypot(TKV.draft[0].x-p.x,TKV.draft[0].y-p.y)<4/TKV.t.s)return;
   if(it&&TKV.mode==='draw'&&it.unit==='SF'&&TKV.draft.length>2){const f=TKV.draft[0];if(Math.hypot(f.x-p.x,f.y-p.y)<12/TKV.t.s){tkvFinish();return}}
@@ -4566,56 +4620,188 @@ function tkvTap(cx,cy,alt){
   if(segs&&TKV.draft.length===2){tkvFinish();return}
   tkvLive();tkvTools();
 }
-function tkvUndoPt(){if(!TKV||!TKV.draft.length)return;TKV.draft.pop();tkvLive();tkvTools()}
-/* right-click (or long-press on a tablet) menu on the sheet, at the cursor. Never adds a point. */
+/* Select tool: click = select one mark (its corners show as handles), shift-click = add/remove, double-click on the selected mark's edge = add a corner; a count opens its details */
+function tkvSelTap(p0,shift){
+  const h=tkvHit(p0),now=Date.now(),lt=TKV.lastTap;TKV.lastTap={t:now,x:p0.x,y:p0.y,h};
+  if(shift){if(!h)return;const l=TKV.msel.slice();if(TKV.sel&&!l.includes(TKV.sel))l.push(TKV.sel);const i=l.indexOf(h);if(i>=0)l.splice(i,1);else l.push(h);TKV.msel=l;TKV.sel=l.length===1?l[0]:null;tkvPaint();return}
+  if(h&&h===TKV.sel&&lt&&lt.h===h&&now-lt.t<450&&Math.hypot(lt.x-p0.x,lt.y-p0.y)*TKV.t.s<14){TKV.lastTap=null;tkvAddCorner(h,p0);return}
+  TKV.sel=h;TKV.msel=h?[h]:[];tkvPaint();
+  const s=h&&tkvShape(h);if(s&&s.k==='count')tkvShapeMenu(h);
+}
+/* marks with a corner (or a count) inside the dragged box; add = keep what was selected */
+function tkvBoxSel(b,add){
+  const W=TKV.W,H=TKV.H,x0=Math.min(b.a.x,b.b.x),x1=Math.max(b.a.x,b.b.x),y0=Math.min(b.a.y,b.b.y),y1=Math.max(b.a.y,b.b.y);
+  const got=TK.data.shapes.filter(s=>{if(s.sheet!==TKV.id||TKV.hide[s.item]||!tkItem(s.item))return false;const q=s.p||[];for(let i=0;i+1<q.length;i+=2){const x=q[i]*W,y=q[i+1]*H;if(x>=x0&&x<=x1&&y>=y0&&y<=y1)return true}return false}).map(s=>s.id);
+  const l=add?tkvSelIds().slice():[];got.forEach(id=>{if(!l.includes(id))l.push(id)});TKV.msel=l;TKV.sel=l.length===1?l[0]:null;tkvPaint();
+  if(l.length>1)toast(l.length+' marks selected · right-click to copy or delete');
+}
+function tkvSelIds(){if(!TKV)return [];const l=(TKV.msel||[]).slice();if(TKV.sel&&!l.includes(TKV.sel))l.push(TKV.sel);return l}
+function tkvShape(id){return TK&&id?TK.data.shapes.find(x=>x.id===id)||null:null}
+/* nearest edge of a mark to image point p: {seg,x,y,d,t} in image px (an area includes its closing edge) */
+function tkvNearSeg(s,p){
+  const W=TKV.W,H=TKV.H,q=s.p||[],n=Math.floor(q.length/2);let best=null;
+  for(let i=0;i<n-1+(s.k==='poly'&&n>2?1:0);i++){const j=(i+1)%n,ax=q[2*i]*W,ay=q[2*i+1]*H,bx=q[2*j]*W,by=q[2*j+1]*H,dx=bx-ax,dy=by-ay,l=dx*dx+dy*dy;const t=l?clamp(((p.x-ax)*dx+(p.y-ay)*dy)/l,0,1):0;const x=ax+t*dx,y=ay+t*dy,d=Math.hypot(p.x-x,p.y-y);if(!best||d<best.d)best={seg:i,x,y,d,t}}
+  return best;
+}
+/* corner of a mark within tol screen px of image point p, or -1 */
+function tkvNearCorner(s,p,tol){const q=s.p||[];let bi=-1,bd=tol/TKV.t.s;for(let i=0;i+1<q.length;i+=2){const d=Math.hypot(q[i]*TKV.W-p.x,q[i+1]*TKV.H-p.y);if(d<bd){bd=d;bi=i/2}}return bi}
+function tkvAddCorner(id,p0){
+  const s=tkvShape(id);if(!s||s.k==='count')return;if(tkvNearCorner(s,p0,12)>=0)return;const ns=tkvNearSeg(s,p0);if(!ns||ns.d>14/TKV.t.s)return;
+  tkDo({t:'shape',v:{id,p:tkInsertCorner(s.p,ns.seg,r4(ns.x/TKV.W),r4(ns.y/TKV.H))}});TKV.sel=id;TKV.msel=[id];tkvPaint();toast('Corner added. Drag it to move.');
+}
+function tkvDelCorner(id,i){const s=tkvShape(id);if(!s)return;const q=tkDeleteCorner(s.p,i,s.k==='poly'?3:2);if(!q){toast(s.k==='poly'?'An area needs at least 3 corners.':'A line needs at least 2 ends.');return}tkDo({t:'shape',v:{id,p:q}});tkvPaint()}
+/* where "Split here" would cut a line mark: the two parts, or null when the point is at an end */
+function tkvSplitAt(s,p0){
+  if(!s||s.k!=='line')return null;const ns=tkvNearSeg(s,p0);if(!ns||ns.d>14/TKV.t.s)return null;const r=tkSplitLine(s.p,ns.seg,r4(ns.x/TKV.W),r4(ns.y/TKV.H));if(!r)return null;
+  const mn=3/TKV.t.s;return tkLenPx(r[0],TKV.W,TKV.H)>mn&&tkLenPx(r[1],TKV.W,TKV.H)>mn?r:null;
+}
+function tkvSplit(id,p0){
+  const s=tkvShape(id),r=tkvSplitAt(s,p0);if(!r)return;const nid=uuid();
+  tkDo([{t:'shape',v:{id,p:r[0]}},{t:'shape',v:{...s,id:nid,p:r[1],at:new Date().toISOString()}}]);TKV.mine.push(nid);tkvPaint();toast('Split into 2 marks. Right-click a half to change its item.');
+}
+/* the line to pick back up: the last one drawn here this visit, else the newest line on this sheet */
+function tkvLastLine(){
+  const m=TKV.mine.slice().reverse().map(tkvShape).find(s=>s&&s.k==='line'&&s.sheet===TKV.id&&tkItem(s.item));if(m)return m;
+  return TK.data.shapes.filter(s=>s.sheet===TKV.id&&s.k==='line'&&tkItem(s.item)&&!TKV.hide[s.item]).sort((a,b)=>String(a.at||'').localeCompare(String(b.at||''))).pop()||null;
+}
+/* keep drawing a finished line from its end nearest p0; Stop saves the longer line on the same mark */
+function tkvContinue(id,p0){
+  const s=tkvShape(id);if(!s||s.k!=='line'||!tkItem(s.item))return;if(TKV.draft.length)tkvFinish();
+  const W=TKV.W,H=TKV.H,q=s.p||[],n=Math.floor(q.length/2),pts=[];for(let i=0;i<n;i++)pts.push({x:q[2*i]*W,y:q[2*i+1]*H});if(n<2)return;
+  if(p0&&Math.hypot(pts[0].x-p0.x,pts[0].y-p0.y)<Math.hypot(pts[n-1].x-p0.x,pts[n-1].y-p0.y))pts.reverse();
+  TKV.mode='draw';TKV.sel=null;TKV.msel=[];tkvUseItem(s.item);TKV.cont=id;TKV.contN=n;TKV.draft=pts;TKV.cur=null;tkvPaint();
+}
+function tkvCancel(){if(!TKV)return;const c=TKV.cont;TKV.draft=[];TKV.cur=null;TKV.dDraft=false;TKV.cont=null;TKV.contN=0;if(c)tkvPaint();else{tkvLive();tkvTools()}}
+function tkvCountAt(iid,p0){const it=tkItem(iid);if(!it)return;const id=uuid();tkDo({t:'shape',v:{id,item:iid,sheet:TKV.id,k:'count',p:[r4(p0.x/TKV.W),r4(p0.y/TKV.H)],by:'office',at:new Date().toISOString()}});TKV.mine.push(id);tkvPaint()}
+function tkvDelMarks(ids){if(!ids.length)return;tkDo(ids.map(id=>({t:'del_shape',id})));TKV.mine=TKV.mine.filter(x=>!ids.includes(x));TKV.sel=null;TKV.msel=[];tkvPaint()}
+/* copied marks, kept when you go to another sheet */
+let TK_CLIP=null;
+function tkvCopyMarks(ids){const l=ids.map(tkvShape).filter(Boolean);if(!l.length)return;TK_CLIP=l.map(s=>({...s,p:(s.p||[]).slice()}));toast('Copied '+l.length+' mark'+(l.length===1?'':'s')+'. Right-click → Paste here, or '+(tkMac()?'⌘':'Ctrl+')+'V.')}
+/* paste so the first copied mark's first point lands on p (image px); no p = a little down-right of where they were */
+function tkvPaste(p){
+  if(!TKV||!TK_CLIP||!TK_CLIP.length)return;const src=TK_CLIP.filter(s=>tkItem(s.item));if(!src.length){toast('The copied marks\' items were deleted.');return}
+  const f=src[0].p||[0,0];let dx=p?p.x/TKV.W-f[0]:.02,dy=p?p.y/TKV.H-f[1]:.02,x0=1,x1=0,y0=1,y1=0;
+  src.forEach(s=>(s.p||[]).forEach((v,i)=>{if(i%2){y0=Math.min(y0,v);y1=Math.max(y1,v)}else{x0=Math.min(x0,v);x1=Math.max(x1,v)}}));
+  dx=Math.max(-x0,Math.min(1-x1,dx));dy=Math.max(-y0,Math.min(1-y1,dy));
+  const at=new Date().toISOString(),sh=tkOffsetShapes(src,dx,dy,uuid).map(s=>({...s,sheet:TKV.id,by:'office',at}));
+  tkDo(sh.map(v=>({t:'shape',v})));sh.forEach(s=>TKV.mine.push(s.id));TKV.msel=sh.map(s=>s.id);TKV.sel=sh.length===1?sh[0].id:null;tkvPaint();toast('Pasted '+sh.length+' mark'+(sh.length===1?'':'s')+'.');
+}
+/* per-mark wall height (feet): its LF goes on its own bid row "@ height"; blank = the item's */
+async function tkvSetH(id){
+  const s=tkvShape(id),it=s&&tkItem(s.item);if(!s||!it)return;
+  const v=await formBox('Height for this mark',[{k:'h',label:'Wall height for just this mark (blank = the item\'s'+(+it.h>0?' '+tkFtIn(+it.h):'')+')',value:+s.h>0?tkFtIn(+s.h):'',ph:'e.g. 12\'-0"'}],'Save','The LF stays the same. On the bid sheet, this mark\'s LF goes on its own row: same code, with "@ height" added to the description.');
+  if(!v||!TKV)return;const h=v.h?tkFeet(v.h):null;if(v.h&&!(h>0)){toast('Type a height like 12\' or 12\'-6"');return}
+  tkDo({t:'shape',v:{id,h:h>0?Math.round(h*1000)/1000:null}});tkvPaint();
+}
+async function tkvSetNote(id){
+  const s=tkvShape(id);if(!s)return;
+  const v=await formBox('Note on this mark',[{k:'n',label:'Shows as a tag on the sheet and next to the mark number in the markup PDF (blank = none)',value:s.note||'',ph:'e.g. above ceiling only'}],'Save');
+  if(!v||!TKV)return;tkDo({t:'shape',v:{id,note:v.n.slice(0,80)||null}});tkvPaint();
+}
+function tkMac(){return /Mac|iP(hone|ad|od)/.test(navigator.platform||'')}
+function tkvQtyText(s){const q=tkShapeQty(s,TKV.sh,tkScaleOf(TKV.id));return s.k==='count'?'1 EA':q==null?'no scale on this sheet':s.k==='poly'?(s.deduct?'deduct ':'')+Math.round(q).toLocaleString()+' SF':tkFtIn(q)+' ('+(Math.round(q*10)/10)+' LF)'}
+function tkvUndoPt(){if(!TKV||!TKV.draft.length||(TKV.cont&&TKV.draft.length<=TKV.contN))return;TKV.draft.pop();tkvLive();tkvTools()}
+/* right-click (or long-press on a tablet) menu on the sheet, at the cursor. Never adds a point. Only shows what applies here; sub = a list of items to pick from. */
 function tkCtxClose(){const m=$('#tkCtx');if(m)m.remove();document.removeEventListener('pointerdown',tkCtxOut,true)}
 function tkCtxOut(e){const m=$('#tkCtx');if(!m||m.contains(e.target))return;if(TKV&&TKV.stage&&TKV.stage.contains(e.target))TKV.skipTap=true;tkCtxClose()}
 function tkCtx(cx,cy,sub){
-  if(!TKV||!TKV.W)return;tkCtxClose();TKV.ctxAt=Date.now();const p0=tkvImg(cx,cy),it=tkItem(TKV.item),dr=TKV.draft.length,draw=TKV.mode==='draw';
-  const hit=tkvHit(p0),last=TKV.mine.slice().reverse().find(id=>TK.data.shapes.some(s=>s.id===id&&s.sheet===TKV.id));
-  const A=[];const add=(k,t,on)=>{if(on!==false)A.push('<button data-c="'+k+'">'+t+'</button>')};
-  if(sub){A.push('<div class="tkctxh">Switch item</div>');TK.data.items.slice().sort((a,b)=>TK_SECS.indexOf(a.sec)-TK_SECS.indexOf(b.sec)||(a.n||0)-(b.n||0)).forEach(x=>A.push('<button data-si="'+esc(x.id)+'"'+(x.id===TKV.item?' class="on"':'')+'><span class="sw" style="background:'+esc(x.color)+'"></span>'+esc(x.code)+' <span class="muted">'+esc(x.unit)+'</span></button>'));add('back','‹ Back')}
+  if(!TKV||!TKV.W)return;tkCtxClose();TKV.ctxAt=Date.now();const p0=tkvImg(cx,cy),it=tkItem(TKV.item),dr=TKV.draft.length,draw=TKV.mode==='draw',sel=TKV.mode==='select';
+  const hit=tkvHit(p0),hs=tkvShape(hit),hit_it=hs&&tkItem(hs.item),last=TKV.mine.slice().reverse().find(id=>TK.data.shapes.some(s=>s.id===id&&s.sheet===TKV.id));
+  const ids=tkvSelIds(),many=ids.length>1,C=tkMac()?'⌘':'Ctrl+',eas=TK.data.items.filter(x=>x.unit==='EA');
+  const srt=l=>l.slice().sort((a,b)=>TK_SECS.indexOf(a.sec)-TK_SECS.indexOf(b.sec)||(a.n||0)-(b.n||0));
+  const G=[];let A=[];const sep=()=>{if(A.length)G.push(A.join(''));A=[]};
+  const add=(k,t,on,kb)=>{if(on===undefined||on)A.push('<button data-c="'+k+'"><span>'+t+'</span>'+(kb?'<span class="kb">'+esc(kb)+'</span>':'')+'</button>')};
+  if(sub){const pick=sub==='count'?eas:sub==='run'?TK.data.items.filter(x=>it&&x.unit===it.unit):sub==='mark'?TK.data.items.filter(x=>hit_it&&x.unit===hit_it.unit):TK.data.items;const cur=sub==='mark'?hs&&hs.item:sub==='count'?null:TKV.item;
+    A.push('<div class="tkctxh">'+{items:'Switch item',run:'Change item for this run',mark:'Change item for this mark',count:'Count here: which item?'}[sub]+'</div>');
+    srt(pick).forEach(x=>A.push('<button data-si="'+esc(x.id)+'"'+(x.id===cur?' class="on"':'')+'><span class="sw" style="background:'+esc(x.color)+'"></span>'+esc(x.code)+' <span class="muted">'+esc(x.unit)+'</span></button>'));add('back','‹ Back');sep()}
   else{
-    add('undo','↶ Undo last point',dr>0);
-    add('fin','✓ Finish run',dr>=2&&(TKV.mode!=='draw'||!it||it.unit==='LF'));
-    add('newseg','New segment here',draw&&!!it&&it.unit==='LF');
-    add('close','Close area',draw&&!!it&&it.unit==='SF'&&dr>=3);
+    if(hs&&hit_it&&!dr)A.push('<div class="tkctxh tkctxi"><span class="sw" style="background:'+esc(hit_it.color)+'"></span><span>'+esc(hit_it.code)+' · '+esc(tkvQtyText(hs))+(hs.k==='line'&&+hs.h>0?' · @'+esc(tkFtIn(+hs.h)):'')+(hs.note?' · “'+esc(hs.note)+'”':'')+'</span></div>');
+    add('undo','↶ Undo last point',dr>(TKV.cont?TKV.contN:0),'Backspace');
+    add('fin','■ Stop',dr>=2&&(!draw||!it||it.unit==='LF'),'Enter');
+    add('close','Close area',draw&&!!it&&it.unit==='SF'&&dr>=3,'Enter');
+    add('cancel','✕ Cancel drawing',dr>0,'Esc');
+    add('runit','Change item for this run ▸',draw&&dr>0&&!!it&&it.unit!=='EA'&&TK.data.items.some(x=>x.id!==it.id&&x.unit===it.unit));
+    sep();
+    add('newm','New measurement here',draw&&!!it&&it.unit!=='EA');
+    const cl=!dr?(hs&&hs.k==='line'?hs:tkvLastLine()):null;
+    add('cont',hs&&hs.k==='line'?'Continue this run':'Continue last run',!!cl);
     add('deduct',TKV.dNext?'Deduct: on (next area is a cut-out) → off':'Deduct area (cut-out)',draw&&!!it&&it.unit==='SF'&&!dr);
-    add('cancel','✕ Cancel drawing',dr>0);
+    add('count',eas.length===1?'Count here: '+esc(eas[0].code):'Count here ▸',eas.length>0);
+    sep();
+    if(hs&&hit_it&&!dr&&!(many&&ids.includes(hit))){
+      const own=sel&&hit===TKV.sel&&hs.k!=='count',ci=own?tkvNearCorner(hs,p0,12):-1,ns=own&&ci<0?tkvNearSeg(hs,p0):null;
+      add('dcorner','Delete corner',ci>=0&&(hs.p||[]).length/2>(hs.k==='poly'?3:2));
+      add('acorner','Add corner here',!!ns&&ns.d<14/TKV.t.s);
+      add('split','✂ Split here',hs.k==='line'&&!!tkvSplitAt(hs,p0));
+      add('mitem','Change item for this mark ▸',TK.data.items.some(x=>x.id!==hs.item&&x.unit===hit_it.unit));
+      add('mh','Height for this mark…'+(+hs.h>0?' ('+esc(tkFtIn(+hs.h))+')':''),hs.k==='line');
+      add('mnote',hs.note?'Edit note…':'Add note / label…');
+      add('msel',ids.includes(hit)?'Remove from selection':'Add to selection',sel);
+      add('mcopy','⧉ Copy',true,C+'C');
+      add('mdel','Delete this mark',true,'Del');
+      sep()}
+    if(many){add('scopy','⧉ Copy '+ids.length+' marks',true,C+'C');add('sdel','Delete '+ids.length+' marks',true,'Del');add('sclear','Clear selection',true,'Esc');sep()}
+    add('paste','Paste '+(TK_CLIP?TK_CLIP.length:0)+' mark'+(TK_CLIP&&TK_CLIP.length===1?'':'s')+' here',!!(TK_CLIP&&TK_CLIP.length),C+'V');
     add('umark','Undo last mark',!!last);
-    add('del','Delete mark under cursor',!!hit);
-    add('items','Switch item ▸',TK.data.items.length>0);
+    sep();
+    add('items','Switch item ▸',!dr&&TK.data.items.length>0);
     add('snap','Snap: '+(TKV.snap?'on → off':'off → on'));
+    sep();
     const cur=it&&it.unit==='SF'?'area':TKV.lm==='seg'?'seg':'run';
     A.push('<div class="tkctxrow">'+[['run','Run'],['seg','Segments'],['area','Area']].map(([k,t])=>'<button data-lm2="'+k+'"'+(k===cur&&draw?' class="on"':'')+'>'+t+'</button>').join('')+'</div>');
     add('meas','📏 Measure from here');
+    sep();
+    add('zin','Zoom here (2x)');add('zfit','⤢ Zoom to fit');
+    sep();
   }
-  const m=document.createElement('div');m.id='tkCtx';m.className='tkctx';m.innerHTML=A.join('');(($('#tkv'))||document.body).appendChild(m);
+  const m=document.createElement('div');m.id='tkCtx';m.className='tkctx';m.innerHTML=G.join('<div class="tkctxsep"></div>');(($('#tkv'))||document.body).appendChild(m);
   const r=m.getBoundingClientRect();m.style.left=Math.max(4,Math.min(cx,innerWidth-r.width-4))+'px';m.style.top=Math.max(4,Math.min(cy,innerHeight-r.height-4))+'px';
   m.addEventListener('contextmenu',e=>e.preventDefault());
   setTimeout(()=>document.addEventListener('pointerdown',tkCtxOut,true),0);
   $$('[data-lm2]',m).forEach(b=>b.onclick=()=>{tkCtxClose();tkvSetLm(b.dataset.lm2)});
-  $$('[data-si]',m).forEach(b=>b.onclick=()=>{tkCtxClose();if(TKV.draft.length&&TKV.mode==='draw')tkvFinish();tkvUseItem(b.dataset.si);TKV.mode='draw';tkvPaint()});
+  $$('[data-si]',m).forEach(b=>b.onclick=()=>{tkCtxClose();const id=b.dataset.si;
+    if(sub==='count'){tkvCountAt(id,p0);return}
+    if(sub==='mark'){if(hit)tkDo({t:'shape',v:{id:hit,item:id}});tkvPaint();return}
+    if(sub==='run'){tkvUseItem(id);tkvPaint();return}
+    if(TKV.draft.length&&TKV.mode==='draw')tkvFinish();tkvUseItem(id);TKV.mode='draw';tkvPaint()});
   $$('[data-c]',m).forEach(b=>b.onclick=()=>{const c=b.dataset.c;
-    if(c==='items'||c==='back'){tkCtx(cx,cy,c==='items');return}
+    const subs={items:'items',runit:'run',mitem:'mark'};if(subs[c]||(c==='count'&&eas.length>1)){tkCtx(cx,cy,subs[c]||'count');return}
+    if(c==='back'){tkCtx(cx,cy);return}
     tkCtxClose();
     if(c==='undo')tkvUndoPt();
     else if(c==='fin'||c==='close')tkvFinish();
-    else if(c==='cancel'){TKV.draft=[];TKV.cur=null;TKV.dDraft=false;tkvLive();tkvTools()}
+    else if(c==='cancel')tkvCancel();
     else if(c==='deduct'){TKV.dNext=!TKV.dNext;tkvTools()}
-    else if(c==='newseg'){if(TKV.draft.length)tkvFinish();if(!tkScaleOf(TKV.id)){tkScaleBox();return}TKV.draft=[tkvSnapPt(p0)];TKV.cur=null;tkvLive();tkvTools()}
+    else if(c==='newm'){if(TKV.draft.length)tkvFinish();if(!tkScaleOf(TKV.id)){tkScaleBox();return}const ci=tkItem(TKV.item);TKV.dDraft=!!(ci&&ci.unit==='SF'&&TKV.dNext);TKV.draft=[tkvSnapPt(p0)];TKV.cur=null;tkvLive();tkvTools()}
+    else if(c==='cont'){const s=hs&&hs.k==='line'?hs:tkvLastLine();if(s)tkvContinue(s.id,p0)}
+    else if(c==='count')tkvCountAt(eas[0].id,p0);
+    else if(c==='dcorner')tkvDelCorner(hit,tkvNearCorner(hs,p0,12));
+    else if(c==='acorner')tkvAddCorner(hit,p0);
+    else if(c==='split')tkvSplit(hit,p0);
+    else if(c==='mh')tkvSetH(hit);
+    else if(c==='mnote')tkvSetNote(hit);
+    else if(c==='msel'){const l=ids.slice(),i=l.indexOf(hit);if(i>=0)l.splice(i,1);else l.push(hit);TKV.msel=l;TKV.sel=l.length===1?l[0]:null;tkvPaint()}
+    else if(c==='mcopy')tkvCopyMarks([hit]);
+    else if(c==='mdel')tkvDelMarks([hit]);
+    else if(c==='scopy')tkvCopyMarks(ids);
+    else if(c==='sdel')tkvDelMarks(ids);
+    else if(c==='sclear'){TKV.sel=null;TKV.msel=[];tkvPaint()}
+    else if(c==='paste')tkvPaste(p0);
     else if(c==='umark'){TKV.mine=TKV.mine.filter(id=>id!==last);tkDo({t:'del_shape',id:last});if(TKV.sel===last)TKV.sel=null;tkvPaint()}
-    else if(c==='del'){tkDo({t:'del_shape',id:hit});TKV.mine=TKV.mine.filter(id=>id!==hit);if(TKV.sel===hit)TKV.sel=null;tkvPaint()}
     else if(c==='snap'){TKV.snap=!TKV.snap;lsSet('acv.tkSnap',TKV.snap?null:'off');tkvTools()}
     else if(c==='meas'){tkvMode('measure');TKV.draft=[tkvSnapPt(p0)];tkvLive();tkvTools()}
+    else if(c==='zin')tkvZoomAt(cx,cy,2);
+    else if(c==='zfit')tkvFit();
   });
 }
 async function tkvFinish(){
-  if(!TKV)return;const d=TKV.draft;TKV.draft=[];TKV.cur=null;tkvLive();tkvTools();
+  if(!TKV)return;const d=TKV.draft,cont=TKV.cont;TKV.draft=[];TKV.cur=null;TKV.cont=null;TKV.contN=0;tkvLive();tkvTools();
   const np=[];d.forEach(p=>np.push(r4(p.x/TKV.W),r4(p.y/TKV.H)));
   if(TKV.mode==='scale'){if(d.length<2)return;tkScaleBox(tkLenPx(d.flatMap(p=>[p.x/TKV.W,p.y/TKV.H]),TKV.W,TKV.H));return}
   if(TKV.mode==='measure'){if(d.length<2)return;const sc=tkScaleOf(TKV.id);toast(sc?'Measured '+tkFtIn(tkLenPx(np,TKV.W,TKV.H)*sc.fpp):'Set the scale first.');return}
-  if(TKV.mode!=='draw')return;const it=tkItem(TKV.item);if(!it)return;
+  if(TKV.mode!=='draw'){if(cont)tkvPaint();return}const it=tkItem(TKV.item);if(!it){if(cont)tkvPaint();return}
+  if(cont&&it.unit==='LF'&&tkvShape(cont)&&d.length>=2){tkDo({t:'shape',v:{id:cont,item:it.id,p:np}});TKV.mine=TKV.mine.filter(x=>x!==cont);TKV.mine.push(cont);tkvPaint();return}
+  if(cont)tkvPaint();
   if(it.unit==='LF'&&d.length<2)return;if(it.unit==='SF'&&d.length<3){if(d.length)toast('An area needs at least 3 corners.');return}
   const v={id:uuid(),item:it.id,sheet:TKV.id,k:it.unit==='SF'?'poly':'line',p:np,by:'office',at:new Date().toISOString()};
   if(it.unit==='SF'&&TKV.dDraft){v.deduct=true;let cx=0,cy=0;d.forEach(p=>{cx+=p.x;cy+=p.y});const c={x:cx/d.length,y:cy/d.length};
@@ -4625,7 +4811,7 @@ async function tkvFinish(){
 }
 function tkvHit(p){
   const W=TKV.W,H=TKV.H,tol=14/TKV.t.s;let best=null,bd=tol;
-  TK.data.shapes.forEach(s=>{if(s.sheet!==TKV.id||TKV.hide[s.item])return;const q=s.p||[];
+  TK.data.shapes.forEach(s=>{if(s.sheet!==TKV.id||TKV.hide[s.item]||s.id===TKV.cont)return;const q=s.p||[];
     if(s.k==='count'){const d=Math.hypot(q[0]*W-p.x,q[1]*H-p.y);if(d<bd){bd=d;best=s.id}return}
     const n=q.length/2;for(let i=1;i<n+(s.k==='poly'?1:0);i++){const a={x:q[2*(i-1)]*W,y:q[2*(i-1)+1]*H},b={x:q[2*(i%n)]*W,y:q[2*(i%n)+1]*H};const d=segDist(p.x,p.y,a.x,a.y,b.x,b.y);if(d<bd){bd=d;best=s.id}}
     if(s.k==='poly'&&!best&&tkInPoly(p,q,W,H))best=s.id;
@@ -4634,11 +4820,12 @@ function tkvHit(p){
 }
 function tkInPoly(p,q,W,H){let inside=false;const n=q.length/2;for(let i=0,j=n-1;i<n;j=i++){const xi=q[2*i]*W,yi=q[2*i+1]*H,xj=q[2*j]*W,yj=q[2*j+1]*H;if(((yi>p.y)!==(yj>p.y))&&(p.x<(xj-xi)*(p.y-yi)/(yj-yi)+xi))inside=!inside}return inside}
 function tkvShapeMenu(id){
-  const s=TK.data.shapes.find(x=>x.id===id);if(!s)return;const it=tkItem(s.item);const q=tkShapeQty(s,TKV.sh,tkScaleOf(TKV.id));
+  const s=TK.data.shapes.find(x=>x.id===id);if(!s)return;const it=tkItem(s.item);
   const others=TK.data.items.filter(x=>x.id!==s.item&&x.unit===(it&&it.unit));
-  const m=modal('<h2>'+esc(it?it.code:'Mark')+'</h2><p class="muted">'+(s.k==='count'?'1 EA':q==null?'No scale on this sheet':s.k==='poly'?(s.deduct?'Deduct (cut-out) ':'')+Math.round(q).toLocaleString()+' SF':tkFtIn(q)+' ('+(Math.round(q*10)/10)+' LF)')+(s.by&&s.by!=='office'?' · drawn by '+esc(s.by):'')+'</p><div style="display:grid;gap:10px">'+(others.length?'<label class="field"><span>Move to item</span><select data-mv><option value="">—</option>'+others.map(o=>'<option value="'+esc(o.id)+'">'+esc(o.code)+'</option>').join('')+'</select></label>':'')+'<button class="btn danger" data-a="del">Delete this mark</button><button class="btn" data-a="x">Close</button></div>');
+  const m=modal('<h2>'+esc(it?it.code:'Mark')+'</h2><p class="muted">'+esc(tkvQtyText(s))+(s.k==='line'&&+s.h>0?' · @'+esc(tkFtIn(+s.h))+' high':'')+(s.by&&s.by!=='office'?' · drawn by '+esc(s.by):'')+(s.note?'<br>Note: '+esc(s.note):'')+'</p><div style="display:grid;gap:10px">'+(others.length?'<label class="field"><span>Move to item</span><select data-mv><option value="">—</option>'+others.map(o=>'<option value="'+esc(o.id)+'">'+esc(o.code)+'</option>').join('')+'</select></label>':'')+(s.k==='line'?'<button class="btn" data-a="h">Height for this mark…</button>':'')+'<button class="btn" data-a="note">'+(s.note?'Edit note…':'Add note / label…')+'</button><button class="btn danger" data-a="del">Delete this mark</button><button class="btn" data-a="x">Close</button></div>');
   $('[data-a=x]',m).onclick=()=>m.close();
   $('[data-a=del]',m).onclick=()=>{m.close();tkDo({t:'del_shape',id});if(TKV){TKV.sel=null;tkvPaint()}};
+  const hb=$('[data-a=h]',m);if(hb)hb.onclick=()=>{m.close();tkvSetH(id)};$('[data-a=note]',m).onclick=()=>{m.close();tkvSetNote(id)};
   const mv=$('[data-mv]',m);if(mv)mv.onchange=()=>{if(!mv.value)return;m.close();tkDo({t:'shape',v:{id,item:mv.value}});if(TKV){TKV.sel=null;tkvPaint()}};
 }
 /* printed scale(s) in a PDF page's text, stored on the sheet as sheets.scale_text: best first, '; ' between, e.g. 3/32" = 1'-0"; 1/4" = 1'-0" */
@@ -4747,12 +4934,12 @@ async function tkMarkupPdf(){
       let img;try{img=await sheetImage(sh)}catch(e){continue}
       const c=document.createElement('canvas');c.width=img.naturalWidth;c.height=img.naturalHeight;const g=c.getContext('2d');g.drawImage(img,0,0);
       const W=c.width,H=c.height,M=Math.max(W,H),scl=tkScaleOf(sh.id),wmul=tkWmulGet();g.globalCompositeOperation='multiply';g.lineCap='round';g.lineJoin='round';
-      const labels=[];d.shapes.filter(s=>s.sheet===sh.id).forEach(s=>{const it=d.items.find(x=>x.id===s.item);if(!it)return;const p=s.p||[];g.strokeStyle=it.color;g.fillStyle=it.color;
-        if(s.k==='count'){g.globalAlpha=.6;g.beginPath();g.arc(p[0]*W,p[1]*H,M*.007,0,7);g.fill();labels.push([num[it.id],p[0]*W+M*.009,p[1]*H]);return}
+      const labels=[],lab=(n,s)=>String(n)+(s.k==='line'&&+s.h>0?' @'+tkFtIn(+s.h):'')+(s.note?' '+String(s.note):'');d.shapes.filter(s=>s.sheet===sh.id).forEach(s=>{const it=d.items.find(x=>x.id===s.item);if(!it)return;const p=s.p||[];g.strokeStyle=it.color;g.fillStyle=it.color;
+        if(s.k==='count'){g.globalAlpha=.6;g.beginPath();g.arc(p[0]*W,p[1]*H,M*.007,0,7);g.fill();labels.push([lab(num[it.id],s),p[0]*W+M*.009,p[1]*H]);return}
         g.beginPath();for(let i=0;i+1<p.length;i+=2){const x=p[i]*W,yy=p[i+1]*H;if(i)g.lineTo(x,yy);else g.moveTo(x,yy)}
-        if(s.k==='poly'&&s.deduct){g.closePath();g.globalAlpha=.85;g.fillStyle='#fff';g.fill();g.setLineDash([M*.004,M*.003]);g.lineWidth=M*.002;g.stroke();g.setLineDash([]);let cx=0,cy=0;const n=p.length/2;for(let i=0;i<n;i++){cx+=p[2*i];cy+=p[2*i+1]}labels.push(['-'+num[it.id],cx/n*W,cy/n*H])}
-        else if(s.k==='poly'){g.closePath();g.globalAlpha=.25;g.fill();g.globalAlpha=.8;g.lineWidth=M*.002;g.stroke();let cx=0,cy=0;const n=p.length/2;for(let i=0;i<n;i++){cx+=p[2*i];cy+=p[2*i+1]}labels.push([num[it.id],cx/n*W,cy/n*H])}
-        else{g.globalAlpha=.55;g.lineWidth=scl&&+scl.fpp>0?Math.max(tkItemWidthIn(it)/12/scl.fpp*wmul,M*.0006,1.5):M*.0055*wmul;g.lineCap='butt';g.lineJoin='miter';g.stroke();g.lineCap='round';g.lineJoin='round';const i=Math.floor((p.length/2-1)/2)*2;labels.push([num[it.id],(p[i]+p[i+2])/2*W,(p[i+1]+p[i+3])/2*H])}});
+        if(s.k==='poly'&&s.deduct){g.closePath();g.globalAlpha=.85;g.fillStyle='#fff';g.fill();g.setLineDash([M*.004,M*.003]);g.lineWidth=M*.002;g.stroke();g.setLineDash([]);let cx=0,cy=0;const n=p.length/2;for(let i=0;i<n;i++){cx+=p[2*i];cy+=p[2*i+1]}labels.push([lab('-'+num[it.id],s),cx/n*W,cy/n*H])}
+        else if(s.k==='poly'){g.closePath();g.globalAlpha=.25;g.fill();g.globalAlpha=.8;g.lineWidth=M*.002;g.stroke();let cx=0,cy=0;const n=p.length/2;for(let i=0;i<n;i++){cx+=p[2*i];cy+=p[2*i+1]}labels.push([lab(num[it.id],s),cx/n*W,cy/n*H])}
+        else{g.globalAlpha=.55;g.lineWidth=scl&&+scl.fpp>0?Math.max(tkItemWidthIn(it)/12/scl.fpp*wmul,M*.0006,1.5):M*.0055*wmul;g.lineCap='butt';g.lineJoin='miter';g.stroke();g.lineCap='round';g.lineJoin='round';const i=Math.floor((p.length/2-1)/2)*2;labels.push([lab(num[it.id],s),(p[i]+p[i+2])/2*W,(p[i+1]+p[i+3])/2*H])}});
       g.globalCompositeOperation='source-over';g.globalAlpha=1;const fs=Math.round(M*.011);g.font='bold '+fs+'px sans-serif';g.textAlign='center';g.textBaseline='middle';
       labels.forEach(([n,x,yy])=>{const t=String(n);const w=g.measureText(t).width+fs*.6;g.fillStyle='#fff';g.strokeStyle='#000';g.lineWidth=Math.max(1,fs*.08);g.beginPath();g.rect(x-w/2,yy-fs*.65,w,fs*1.3);g.fill();g.stroke();g.fillStyle='#000';g.fillText(t,x,yy)});
       const land=W>=H;const pw=land?1224:792,ph=land?792:1224;pdf.addPage([pw,ph],land?'landscape':'portrait');const sc=Math.min((pw-40)/W,(ph-60)/H);
