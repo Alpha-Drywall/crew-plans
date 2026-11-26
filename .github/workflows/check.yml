@@ -17,3 +17,5 @@ jobs:
         run: node .github/scripts/timecards-test.js
       - name: Test view-as (read-only) and practice mode
         run: node .github/scripts/viewas-test.js
+      - name: Test the all-jobs-at-a-glance math
+        run: node .github/scripts/dashboard-test.js

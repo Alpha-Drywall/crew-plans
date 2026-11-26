@@ -191,6 +191,10 @@ input[type=range]{width:100%;height:32px}
 .ltab td.used{}
 .ltab .over{color:var(--danger);font-weight:700}
 .lscroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.dmain{max-width:1100px}.dtab td{vertical-align:top}.dtab .dnm{font-weight:700;line-height:1.25}.drow{cursor:pointer}.drow:active td{background:#fff8e6}
+.dtab tr.dhot td:first-child{box-shadow:inset 3px 0 0 #d92d20}.dtab td .small{font-size:12px;font-weight:400}
+.dflag{display:inline-block;font-size:11.5px;font-weight:700;line-height:1.3;padding:1px 7px;border-radius:999px;margin:4px 4px 0 0;background:#fde8e6;color:#b42318;white-space:nowrap}.dflag.w{background:#fff1e0;color:#9a3412}
+.dcon{display:none}@media (min-width:600px){.dtab .dcon{display:table-cell}.dcon2{display:none}}
 .logday{font-weight:700;margin:18px 2px 8px;display:flex;justify-content:space-between}
 .logday .muted{font-weight:400}
 .kv{font-size:14px;margin-top:4px;white-space:pre-wrap}
@@ -1050,7 +1054,7 @@ const NUDGE_DAYS=2;
 async function loadJobSizes(){if(!S.isAdmin||S.asUser||S.practice)return;try{const d=await q(sb.from('job_budget').select('job_id,labor'));const o={};(d||[]).forEach(r=>{const L=r.labor||{};const ls=(L.billing&&L.billing.lines)||[];const t=ls.reduce((a,l)=>a+num(l.v),0);if(t>0)o[r.job_id]=t});S.jobSize=o;render()}catch(e){}}
 const JOB_SORTS=[['num','Job # (newest first)'],['numUp','Job # (oldest first)'],['name','Name A\u2013Z'],['act','Recent activity'],['size','Size (contract $)']];
 const jobNum=j=>{const m=String(j.name||'').match(/^\s*0*(\d+)/);return m?+m[1]:-1};
-function sortJobs(list){const m=lsGet('crewplans.jobSort')||'num';const a=list.slice();const nm=(x,y)=>String(x.name||'').localeCompare(String(y.name||''),undefined,{numeric:true});
+function sortJobs(list,mode){const m=mode||lsGet('crewplans.jobSort')||'num';const a=list.slice();const nm=(x,y)=>String(x.name||'').localeCompare(String(y.name||''),undefined,{numeric:true});
   if(m==='numUp')return a.sort((x,y)=>(jobNum(x)<0?1e9:jobNum(x))-(jobNum(y)<0?1e9:jobNum(y))||nm(x,y));
   if(m==='name')return a.sort((x,y)=>String(x.name||'').replace(/^\s*\d+\s*[-\u2013]?\s*/,'').localeCompare(String(y.name||'').replace(/^\s*\d+\s*[-\u2013]?\s*/,''))||nm(x,y));
   if(m==='act'){const A=S.jobAct||{};return a.sort((x,y)=>String(A[y.id]||'').localeCompare(String(A[x.id]||''))||jobNum(y)-jobNum(x))}
@@ -1113,7 +1117,7 @@ async function loadInvites(){const id=jobId();if(!id||!isAdminRole())return [];t
 function closeJob(){
   if(V)closeSheet();
   if(S.chan){sb.removeChannel(S.chan);S.chan=null}
-  S.job=null;S.role=null;S.view='jobs';lsSet('crewplans.lastJob',null);render();
+  S.job=null;S.role=null;S.view=S.fromDash&&dashOk()?'dash':'jobs';S.fromDash=false;lsSet('crewplans.lastJob',null);render();
 }
 
 /* ===== render ===== */
@@ -1122,6 +1126,7 @@ function render(){
   if(S.sliding){S.pendingRender=true;return}
   const app=$('#app');
   if(S.view==='tc'){if(!TC.force&&tcTyping())return;TC.force=false;app.dataset.job='';app.innerHTML=renderTc();bindTc();return}
+  if(S.view==='dash'){app.dataset.job='';app.innerHTML=renderDash();bindDash();return}
   if(S.view!=='job'||!S.job){app.dataset.job='';app.innerHTML=renderJobs();bindJobs();return}
   const j=S.job;
   if(S.tab==='tc'||((S.tab==='log'||S.tab==='labor')&&!canLog()))S.tab='plans';
@@ -1205,6 +1210,79 @@ function laborAlerts(C){const out=[];C.rows.forEach(r=>{if(!r.md)return;const E=
     if(d!=null&&u>=20&&u-d>=15){const proj=d>0?r.md*u/d:null;r.alert='behind';out.push({lvl:'behind',tc:E.tc,t:nm+': '+Math.round(u)+'% of the man days used'+tg+' but only '+d+'% of the work marked done.'+(proj?' At this pace it finishes at about '+f1(proj)+' man days ('+f1(proj-r.md)+' over).':'')});return}
     if(d==null&&u>=80){r.alert='behind';out.push({lvl:'behind',tc:E.tc,t:nm+': '+Math.round(u)+'% of the man days used'+tg+'.'})}});
   return out}
+/* ===== All jobs at a glance (office only): one row per job with % complete, % billed, % man days used, contract $ and flags ===== */
+const DASH_UNDERBILL=10,DASH_AHEAD=15;
+const dashOk=()=>!!(S.isAdmin&&!S.asUser&&!isPractice()&&!S.viewAs);
+/* last confirmed billing month: $ billed to date (sum of line $ x confirmed %) over the contract (sum of the pay app lines) */
+function dashBill(L){const B=(L&&L.billing)||{};const lines=Array.isArray(B.lines)?B.lines:[];const contract=lines.reduce((a,l)=>a+num(l.v),0);
+  const last=(Array.isArray(B.history)?B.history:[]).filter(h=>h&&h.period&&Array.isArray(h.pcts)).sort((a,b)=>a.period<b.period?-1:1).pop()||null;
+  if(!last||!contract)return {contract,billed:null,pct:null,period:last?last.period:null};
+  const billed=lines.reduce((a,l,i)=>a+num(l.v)*clamp(num(last.pcts[i]),0,100)/100,0);return {contract,billed,pct:billed/contract*100,period:last.period}}
+/* one job's row, using the same math as the Progress tab (overallPct) and the Labor tab (laborCalc/laborAlerts) by pointing them at this job's data for a moment */
+function dashCalc(j,L,areas,hasProg,logs,nudge){const sv=[S.labor,S.laborLogs,S.laborTc,S.areas,PHASES];
+  try{S.labor=L||{};S.laborLogs=logs||[];S.laborTc=null;S.areas=areas||[];PHASES=normScope(j.scope);
+    const done=hasProg&&S.areas.length?overallPct():null;const C=laborCalc();const AL=C.t.md?laborAlerts(C):[];
+    const used=C.t.md?C.t.used/C.t.md*100:null;const b=dashBill(L);
+    const r={id:j.id,done,used,usedMd:C.t.used,md:C.t.md,cost:!!C.cost,contract:b.contract,billed:b.pct,billed$:b.billed,period:b.period,
+      over:AL.filter(a=>a.lvl==='over').length,behind:AL.filter(a=>a.lvl==='behind').length,nudge:nudge||null};
+    r.under=done!=null&&b.contract>0&&done-num(b.pct)>=DASH_UNDERBILL?Math.round(done-num(b.pct)):0;
+    r.ahead=done!=null&&used!=null&&used-done>=DASH_AHEAD?Math.round(used-done):0;
+    r.flags=r.over+r.behind+(r.nudge?1:0)+(r.under?1:0)+(r.ahead?1:0);
+    r.tab=r.over||r.behind||r.ahead?'labor':'progress';return r}
+  finally{[S.labor,S.laborLogs,S.laborTc,S.areas,PHASES]=sv}}
+/* batch loads: one query per table for every job (logs only for jobs without a job cost sheet, which is all the Labor tab uses them for) */
+async function loadDash(){if(!dashOk()||S.dashLoading)return;S.dashLoading=true;S.dashErr='';render();
+  try{const [bud,areas,ps]=await Promise.all([q(sb.from('job_budget').select('job_id,labor')),q(sb.from('areas').select('*')).catch(()=>[]),q(sb.from('sheets').select('job_id').eq('on_progress',true).eq('is_current',true)).catch(()=>[])]);
+    const L={};(bud||[]).forEach(r=>{L[r.job_id]=r.labor||{}});const A={};(areas||[]).forEach(a=>{(A[a.job_id]=A[a.job_id]||[]).push(a)});
+    const need=(S.jobs||[]).filter(j=>!laborCost(L[j.id])).map(j=>j.id);const G={};
+    if(need.length){const lg=await q(sb.from('logs').select('job_id,date,hours,hours_by_code').in('job_id',need).order('date')).catch(()=>[]);(lg||[]).forEach(l=>{(G[l.job_id]=G[l.job_id]||[]).push(l)})}
+    await loadNudges();
+    const Z={};Object.keys(L).forEach(id=>{const t=dashBill(L[id]).contract;if(t>0)Z[id]=t});S.jobSize=Z;
+    S.dash={L,A,G,prog:new Set((ps||[]).map(x=>x.job_id)),at:Date.now()}}
+  catch(e){S.dashErr=errMsg(e)}finally{S.dashLoading=false}
+  if(S.view==='dash')render()}
+function openDash(){if(!dashOk())return;S.view='dash';window.scrollTo(0,0);render();if(!S.dash)loadDash()}
+const dashMon=p=>{const [y,m]=String(p||'').split('-').map(Number);if(!y||!m)return '';const d=new Date(y,m-1,1);return d.toLocaleDateString(undefined,{month:'short'})+(y!==new Date().getFullYear()?' ’'+String(y).slice(2):'')};
+const dashP=v=>v==null?'–':Math.round(v)+'%';
+function dashFlagsHtml(r){const f=[];
+  if(r.over)f.push(['',r.over+' over budget']);if(r.behind)f.push(['w',r.behind+' labor behind']);
+  if(r.ahead)f.push(['w','Hours ahead '+r.ahead+' pts']);if(r.under)f.push(['','Under-billed '+r.under+' pts']);
+  if(r.nudge)f.push(['w','Progress not marked']);
+  return f.map(x=>'<span class="dflag'+(x[0]?' '+x[0]:'')+'">'+esc(x[1])+'</span>').join('')}
+function renderDash(){
+  let h='<div class="top"><button id="dBack" aria-label="Back" style="grid-column:1">‹</button><h1><div class="ttl" style="text-transform:none;letter-spacing:0">All jobs at a glance</div></h1><button id="dRef" aria-label="Refresh"'+(S.dashLoading?' disabled':'')+'>↻</button></div><main class="dmain">';
+  if(!dashOk())return h+'<div class="empty">Office only.</div></main>';
+  if(!S.dash)return h+'<div class="empty">'+(S.dashErr?'Couldn’t load: '+esc(S.dashErr):'Loading every job…')+'</div></main>';
+  const D=S.dash;const mode=lsGet('crewplans.jobView')||'mine';const sm=lsGet('crewplans.dashSort')||'att';
+  let jobs=(S.jobs||[]).slice();if(mode==='mine')jobs=jobs.filter(j=>j.pm&&j.pm===S.myOfficeId);
+  const R={};jobs.forEach(j=>{R[j.id]=dashCalc(j,D.L[j.id],D.A[j.id],D.prog.has(j.id),D.G[j.id],(S.nudges||{})[j.id])});
+  jobs=sm==='att'?sortJobs(jobs,'num').sort((x,y)=>R[y.id].flags-R[x.id].flags||R[y.id].over-R[x.id].over):sortJobs(jobs,sm);
+  const att=jobs.filter(j=>R[j.id].flags).length;
+  h+='<div class="chips"><button class="chip'+(mode==='mine'?' on':'')+'" data-dview="mine">My jobs</button><button class="chip'+(mode==='all'?' on':'')+'" data-dview="all">All jobs</button></div>';
+  h+='<div class="row" style="gap:6px;margin:0 2px 8px;flex-wrap:wrap"><span class="grow small"><b>'+jobs.length+' job'+(jobs.length===1?'':'s')+'</b>'+(att?' · <span style="color:#b42318;font-weight:700">'+att+' need'+(att===1?'s':'')+' attention</span>':'')+'</span><span class="muted small">Sort</span><select id="dSort" style="border:1px solid var(--line);border-radius:8px;padding:5px 8px;font:inherit;font-size:14px;background:#fff">'+[['att','Needs attention']].concat(JOB_SORTS).map(o=>'<option value="'+o[0]+'"'+(o[0]===sm?' selected':'')+'>'+o[1]+'</option>').join('')+'</select></div>';
+  if(S.dashErr)h+='<div class="card small" style="background:#fff4f2">Couldn’t refresh: '+esc(S.dashErr)+'</div>';
+  if(!jobs.length)return h+'<div class="empty"><b>No jobs'+(mode==='mine'?' with you as PM':'')+'</b>'+(mode==='mine'?'Tap All jobs to see everyone’s.':'')+'</div></main>';
+  h+='<div class="card lscroll" style="padding:8px"><table class="ltab dtab"><thead><tr><th>Job</th><th>Done</th><th>Billed</th><th>Man days used</th><th class="dcon">Contract</th></tr></thead><tbody>'+
+    jobs.map(j=>{const r=R[j.id];const pm=pmName(j.pm);
+      return '<tr class="drow'+(r.flags?' dhot':'')+'" data-dj="'+esc(j.id)+'" data-dt="'+r.tab+'"><td><div class="dnm">'+esc(j.name||'Untitled job')+'</div><div class="muted small">'+(pm?'PM '+esc(pm):'No PM')+'<span class="dcon2">'+(r.contract?' · '+money(r.contract):'')+'</span></div>'+(r.flags?'<div>'+dashFlagsHtml(r)+'</div>':'')+'</td>'+
+        '<td>'+dashP(r.done)+'</td>'+
+        '<td'+(r.under?' class="over"':'')+'>'+dashP(r.billed)+(r.period?'<div class="muted small">'+esc(dashMon(r.period))+'</div>':'')+'</td>'+
+        '<td'+(r.used!=null&&(r.used>100||r.ahead)?' class="over"':'')+'>'+dashP(r.used)+(r.md?'<div class="muted small">'+f0(r.usedMd)+' of '+f0(r.md)+'</div>':'')+'</td>'+
+        '<td class="dcon">'+(r.contract?money(r.contract):'–')+'</td></tr>'}).join('')+'</tbody></table></div>';
+  h+='<details class="card small"><summary><b>What the columns mean</b></summary><div style="margin-top:6px;display:grid;gap:4px">'+
+    '<div><b>Done</b> = crew progress over the job’s scope items (weighted by SOV $ when set), same as the Progress tab. – = no progress sheets or nothing marked.</div>'+
+    '<div><b>Billed</b> = $ billed to date on the last confirmed billing month ÷ contract (pay app lines). Month shown below.</div>'+
+    '<div><b>Man days used</b> = used ÷ budget man days from the job cost sheet, same as the Labor tab.</div>'+
+    '<div><b>Under-billed</b> = Done is '+DASH_UNDERBILL+'+ points ahead of Billed. <b>Hours ahead</b> = Man days used is '+DASH_AHEAD+'+ points ahead of Done. <b>Over budget / labor behind</b> = the Labor tab alerts. <b>Progress not marked</b> = '+NUDGE_DAYS+'+ days of crew hours since the last progress markup.</div>'+
+    '<div>Tap a job to open it (Labor tab for labor flags, Progress tab otherwise).</div></div></details>'+
+    '<div class="muted small" style="text-align:center">Loaded '+esc(fmtWhen(D.at))+(S.dashLoading?' · refreshing…':'')+'</div>';
+  return h+'</main>'}
+function bindDash(){
+  $('#dBack').onclick=()=>{S.view='jobs';render()};
+  const rf=$('#dRef');if(rf)rf.onclick=()=>{S.nudgeT=Date.now();loadDash()};
+  $$('[data-dview]').forEach(b=>b.onclick=()=>{lsSet('crewplans.jobView',b.dataset.dview);render()});
+  const ds=$('#dSort');if(ds)ds.onchange=()=>{lsSet('crewplans.dashSort',ds.value);render()};
+  $$('[data-dj]').forEach(el=>el.onclick=()=>{S.tab=el.dataset.dt;S.fromDash=true;openJob(el.dataset.dj)})}
 function renderLabor(){
   if(!S.loaded.labor)return '<div class="empty">Loading labor…</div>';
   const C=laborCalc();const noBudget=!C.t.bh;const AL=laborAlerts(C);
@@ -1822,6 +1900,7 @@ function bindTc(){
 function renderJobs(){
   let h='<div class="top"><h1><div class="ttl"><span class="brand"></span>Alpha Operations</div></h1><button id="acct" aria-label="Account">☰</button></div><main>';
   if(S.isAdmin)h+='<button class="btn primary block" id="newJob" style="margin-bottom:10px">+ New job</button>';
+  if(dashOk())h+='<button class="btn block" id="dashOpen" style="margin-bottom:10px">\ud83d\udcca All jobs at a glance</button>';
   if(canSeeTc())h+='<button class="btn block" id="tcOpen" style="margin-bottom:14px">⏱ Time cards</button>';
   if(!S.jobsLoaded)h+='<div class="empty">Loading jobs…</div>';
   else if(!S.jobs.length)h+='<div class="empty"><b>No jobs yet</b>'+(S.asUser?esc(S.asUser.name)+' isn’t on any jobs right now.':S.isAdmin?'Add a job, upload its plan PDF, then invite your foreman from the job\'s ⋯ menu.':'Open the invite link the office texted you to get access to a job.')+'</div>';
@@ -1846,6 +1925,7 @@ function bindJobs(){
   };
   $$('.job').forEach(el=>el.onclick=()=>openJob(el.dataset.id));
   if($('#tcOpen'))$('#tcOpen').onclick=openTimecards;
+  if($('#dashOpen'))$('#dashOpen').onclick=openDash;
   $$('[data-view]').forEach(b=>b.onclick=()=>{lsSet('crewplans.jobView',b.dataset.view);render()});
   const js=$('#jobSort');if(js)js.onchange=()=>{lsSet('crewplans.jobSort',js.value);if(js.value==='size'&&!S.jobSize)loadJobSizes();render()};
   if(S.isAdmin&&!S.jobSize&&(lsGet('crewplans.jobSort')||'')==='size'&&!S.jobSizeT){S.jobSizeT=1;loadJobSizes()}
