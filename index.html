@@ -2766,16 +2766,17 @@ const EST_COL=['#257de0','#f47230','#00b894','#f2a600','#ee7fac','#008a17','#6a4
 function estColor(name){const ns=[...new Set((S.office||[]).map(o=>o.name))].sort((a,b)=>a.localeCompare(b));const i=ns.indexOf(name);return i>=0&&i<EST_COL.length?EST_COL[i]:'#9aa3ad'}
 /* list phase of a bid: 0 coming up (bid date today or later, no result), 1 waiting on results, 2 no bid date, 3 results */
 const bidPh=(j,td)=>bidRes(bidStat(j,td))?3:!j.bid_date?2:String(j.bid_date).slice(0,10)>=td?0:1;
-/* Coming up split by urgency: Due today, This week (next 7 days), Later. Each sorted by bid date, then name. Empty groups dropped. */
+/* Coming up split by calendar work week (Mon-Sun, not the pay period): Due today, This week (rest of this week), Next week, Later. Each sorted by bid date, then name. Empty groups dropped. */
 function bidComingGroups(list,td){
-  const g=[['today','Due today',[]],['week','This week',[]],['later','Later',[]]];
-  (list||[]).filter(j=>bidPh(j,td)===0).sort((a,b)=>String(a.bid_date).localeCompare(String(b.bid_date))||String(a.name||'').localeCompare(String(b.name||''))).forEach(j=>{const n=dayDiff(td,String(j.bid_date).slice(0,10));g[n<=0?0:n<=7?1:2][2].push(j)});
+  const g=[['today','Due today',[]],['week','This week',[]],['next','Next week',[]],['later','Later',[]]];
+  const [y,m,d]=String(td).split('-').map(Number),eow=6-(new Date(Date.UTC(y,m-1,d)).getUTCDay()+6)%7;
+  (list||[]).filter(j=>bidPh(j,td)===0).sort((a,b)=>String(a.bid_date).localeCompare(String(b.bid_date))||String(a.name||'').localeCompare(String(b.name||''))).forEach(j=>{const n=dayDiff(td,String(j.bid_date).slice(0,10));g[n<=0?0:n<=eow?1:n<=eow+7?2:3][2].push(j)});
   return g.filter(x=>x[2].length)}
 /* estimator groups A-Z, No estimator last */
 const bidEstSort=(a,b)=>a==='No estimator'?1:b==='No estimator'?-1:a.localeCompare(b);
 /* estimators that have bids (for the chips), A-Z */
 const bidEstNames=(list,nm)=>[...new Set((list||[]).map(nm).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
-/* bid list sections: Coming up (split Due today / This week / Later), Waiting on results, No bid date, Results (newest first).
+/* bid list sections: Coming up (split Due today / This week / Next week / Later), Waiting on results, No bid date, Results (newest first).
    byEst (All bids): Waiting on results and Results are grouped by estimator. nm(j) -> estimator name. */
 function bidSecs(list,td,nm,byEst){
   const L=[['up','Coming up'],['wait','Waiting on results'],['nodate','No bid date'],['res','Results']],b=[[],[],[],[]];
