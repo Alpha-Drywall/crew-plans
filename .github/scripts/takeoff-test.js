@@ -13,7 +13,7 @@ function grab(name) {
   return lines.slice(i, j).join('\n');
 }
 const names = ['TK_SECS', 'TK_PAPER', 'TK_SCALES', 'tkFeet', 'tkFtIn', 'tkLenPx', 'tkAreaPx', 'tkShapeQty', 'tkPresetFpp', 'tkGuessPaper', 'tkEvenUp', 'tkCodeHeight', 'tkCodeWidth', 'tkItemWidthIn', 'tkInches', 'tkInStr', 'tkParseScales',
-  'tkApply', 'tkTotals', 'tkRows', 'tkCopyShapes'];
+  'tkApply', 'tkTotals', 'tkHeightSplits', 'tkRows', 'tkCopyShapes', 'tkSplitLine', 'tkInsertCorner', 'tkMoveCorner', 'tkDeleteCorner', 'tkOffsetShapes'];
 const T = vm.runInNewContext(names.map(grab).join('\n') + '\n;({' + names.join(',') + '})', { Math, Date, String, Number, Set, Object, Array, JSON, isFinite, parseFloat, NaN });
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok - ' + name); };
 const plain = x => JSON.parse(JSON.stringify(x));
@@ -288,6 +288,83 @@ t('tkApply: new items number after the highest n, inputs untouched', () => {
   assert.strictEqual(op.v.n, undefined, 'op not changed');
   const E = T.tkApply({ items: [{ id: 'x' }] }, []);
   assert.strictEqual(E.items[0].n, 1);
+});
+
+t('tkSplitLine: cut a run at a point on one leg into two marks', () => {
+  const p = [0, 0, 0.5, 0, 0.5, 0.5, 1, 0.5];
+  assert.deepStrictEqual(plain(T.tkSplitLine(p, 1, 0.5, 0.2)), [[0, 0, 0.5, 0, 0.5, 0.2], [0.5, 0.2, 0.5, 0.5, 1, 0.5]]);
+  assert.deepStrictEqual(plain(T.tkSplitLine([0, 0, 1, 0], 0, 0.25, 0)), [[0, 0, 0.25, 0], [0.25, 0, 1, 0]]);
+  const W = 3600, H = 2400, A = T.tkSplitLine(p, 0, 0.2, 0);
+  near(T.tkLenPx(A[0], W, H) + T.tkLenPx(A[1], W, H), T.tkLenPx(p, W, H), 'the two halves add up to the whole');
+  assert.strictEqual(T.tkSplitLine(p, 3, 0, 0), null, 'no leg 3 on a 4-point run');
+  assert.strictEqual(T.tkSplitLine(p, -1, 0, 0), null);
+  assert.strictEqual(T.tkSplitLine([0, 0], 0, 0, 0), null);
+  assert.deepStrictEqual(p, [0, 0, 0.5, 0, 0.5, 0.5, 1, 0.5], 'input untouched');
+});
+
+t('tkInsertCorner / tkMoveCorner / tkDeleteCorner: editing corners', () => {
+  const p = [0, 0, 1, 0, 1, 1];
+  assert.deepStrictEqual(plain(T.tkInsertCorner(p, 0, 0.5, 0)), [0, 0, 0.5, 0, 1, 0, 1, 1]);
+  assert.deepStrictEqual(plain(T.tkInsertCorner(p, 2, 0.5, 0.5)), [0, 0, 1, 0, 1, 1, 0.5, 0.5], 'closing edge of an area adds at the end');
+  assert.deepStrictEqual(plain(T.tkInsertCorner(p, 5, 9, 9)), p, 'bad edge: unchanged copy');
+  assert.deepStrictEqual(plain(T.tkMoveCorner(p, 1, 0.8, 0.1)), [0, 0, 0.8, 0.1, 1, 1]);
+  assert.deepStrictEqual(plain(T.tkMoveCorner(p, 7, 0.8, 0.1)), p, 'no corner 7');
+  assert.deepStrictEqual(plain(T.tkDeleteCorner(p, 1, 2)), [0, 0, 1, 1]);
+  assert.strictEqual(T.tkDeleteCorner(p, 1, 3), null, 'an area keeps 3 corners');
+  assert.strictEqual(T.tkDeleteCorner([0, 0, 1, 1], 0, 2), null, 'a line keeps 2 ends');
+  assert.deepStrictEqual(p, [0, 0, 1, 0, 1, 1], 'input untouched');
+  const W = 1000, H = 1000;
+  near(T.tkLenPx(T.tkInsertCorner([0, 0, 1, 0], 0, 0.3, 0), W, H), 1000, 'a corner on the line keeps the length');
+});
+
+t('tkOffsetShapes: pasted copies move together with new ids', () => {
+  let k = 0; const mk = () => 'p' + (++k);
+  const src = [{ id: 'a', item: 'w', sheet: 's1', k: 'line', p: [0.1, 0.2, 0.3, 0.2], h: 12, note: 'x' }, { id: 'b', item: 'd', sheet: 's1', k: 'count', p: [0.5, 0.5] }];
+  const C = plain(T.tkOffsetShapes(src, 0.1, -0.05, mk));
+  assert.deepStrictEqual(C.map(s => s.id), ['p1', 'p2']);
+  assert.deepStrictEqual(C[0].p, [0.2, 0.15, 0.4, 0.15]);
+  assert.deepStrictEqual(C[1].p, [0.6, 0.45]);
+  assert.strictEqual(C[0].h, 12); assert.strictEqual(C[0].note, 'x'); assert.strictEqual(C[0].item, 'w');
+  assert.deepStrictEqual(src[0].p, [0.1, 0.2, 0.3, 0.2], 'originals untouched');
+  assert.deepStrictEqual(plain(T.tkOffsetShapes([], 1, 1, mk)), []);
+});
+
+t('tkApply: a shape update can leave out the item; a bad item is still refused', () => {
+  const D = T.tkApply({ items: [{ id: 'w', unit: 'LF' }], shapes: [{ id: 'a', item: 'w', sheet: 's1', k: 'line', p: [0, 0, 1, 0] }] }, [
+    { t: 'shape', v: { id: 'a', p: [0, 0, 0.5, 0], h: 12 } }, { t: 'shape', v: { id: 'a', item: 'nope' } }, { t: 'shape', v: { id: 'new', sheet: 's1', k: 'line', p: [0, 0, 1, 1] } }]);
+  assert.deepStrictEqual(plain(D.shapes), [{ id: 'a', item: 'w', sheet: 's1', k: 'line', p: [0, 0, 0.5, 0], h: 12 }]);
+  const E = T.tkApply(D, [{ t: 'shape', v: { id: 'a', h: null, note: 'soffit' } }]);
+  assert.strictEqual(E.shapes[0].h, null); assert.strictEqual(E.shapes[0].note, 'soffit');
+});
+
+t('tkRows: a mark with its own height gets its own row (same code, "@ h" in the description)', () => {
+  const sh = [{ id: 's1', w: 1000, h: 1000 }];
+  const D = T.tkApply({}, [
+    { t: 'item', v: { id: 'w', n: 1, code: 'H GYP10', desc: 'Partition', sec: 'INTERIOR', unit: 'LF', h: 10 } },
+    { t: 'scale', sheet: 's1', v: { fpp: 0.1 } },
+    { t: 'shape', v: { id: 'a', item: 'w', sheet: 's1', k: 'line', p: [0, 0, 1, 0] } },
+    { t: 'shape', v: { id: 'b', item: 'w', sheet: 's1', k: 'line', p: [0, 0.1, 0.5, 0.1], h: 12 } },
+    { t: 'shape', v: { id: 'c', item: 'w', sheet: 's1', k: 'line', p: [0, 0.2, 0.25, 0.2], h: 11.5 } },
+    { t: 'shape', v: { id: 'e', item: 'w', sheet: 's1', k: 'line', p: [0, 0.3, 0.2, 0.3], h: 9.5 } },
+    { t: 'shape', v: { id: 'f', item: 'w', sheet: 's1', k: 'line', p: [0, 0.4, 0.3, 0.4], h: 16 } },
+  ]);
+  const tot = T.tkTotals(D, sh);
+  near(tot.w.qty, 100 + 50 + 25 + 20 + 30, 'LF stays LF: every mark counts on the item');
+  near(tot.w.wallSf, 100 * 10 + 50 * 12 + 25 * 12 + 20 * 10 + 30 * 16, 'wall SF uses each mark\'s height');
+  const R = plain(T.tkRows(D, sh));
+  assert.deepStrictEqual(R.map(r => [r.id, r.code, r.desc, r.qty, r.h]), [
+    ['w', 'H GYP10', 'Partition', 120, 10],
+    ['w@12', 'H GYP10', 'Partition @12\'', 75, 12],
+    ['w@16', 'H GYP10', 'Partition @16\'', 30, 16]], '9.5 evens up to the item\'s 10, 11.5 and 12 share the 12 row; codes never rewritten');
+  assert.strictEqual(R[1].note, '2 marks at 12\' (item 10\')');
+  assert.strictEqual(R[0].note, undefined, 'plain rows unchanged');
+  const only = T.tkApply(D, [{ t: 'del_shape', id: 'a' }, { t: 'del_shape', id: 'e' }]);
+  assert.deepStrictEqual(plain(T.tkRows(only, sh)).map(r => r.id), ['w@12', 'w@16'], 'no base row when every mark has its own height');
+  const noH = T.tkApply(D, [{ t: 'item', v: { id: 'w', h: null, desc: '' } }]);
+  const R2 = plain(T.tkRows(noH, sh));
+  assert.strictEqual(R2.find(r => r.id === 'w@12').desc, '@12\'');
+  const ea = T.tkApply({}, [{ t: 'item', v: { id: 'd', unit: 'EA', code: 'DOOR' } }, { t: 'shape', v: { id: 'x', item: 'd', sheet: 's1', k: 'count', p: [0.1, 0.1], h: 12 } }]);
+  assert.deepStrictEqual(plain(T.tkRows(ea, sh)).map(r => r.id), ['d'], 'height on a count is ignored');
 });
 
 console.log(n + ' takeoff tests passed.');
