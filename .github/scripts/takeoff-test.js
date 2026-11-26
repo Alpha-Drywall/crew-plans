@@ -12,7 +12,7 @@ function grab(name) {
   if (!lines[i].startsWith('const ')) while (j < lines.length && /^(\s|\})/.test(lines[j])) j++;
   return lines.slice(i, j).join('\n');
 }
-const names = ['TK_SECS', 'TK_PAPER', 'TK_SCALES', 'tkFeet', 'tkFtIn', 'tkLenPx', 'tkAreaPx', 'tkShapeQty', 'tkPresetFpp', 'tkGuessPaper', 'tkEvenUp', 'tkCodeHeight', 'tkCodeWidth', 'tkItemWidthIn', 'tkInches', 'tkInStr',
+const names = ['TK_SECS', 'TK_PAPER', 'TK_SCALES', 'tkFeet', 'tkFtIn', 'tkLenPx', 'tkAreaPx', 'tkShapeQty', 'tkPresetFpp', 'tkGuessPaper', 'tkEvenUp', 'tkCodeHeight', 'tkCodeWidth', 'tkItemWidthIn', 'tkInches', 'tkInStr', 'tkParseScales',
   'tkApply', 'tkTotals', 'tkRows', 'tkCopyShapes'];
 const T = vm.runInNewContext(names.map(grab).join('\n') + '\n;({' + names.join(',') + '})', { Math, Date, String, Number, Set, Object, Array, JSON, isFinite, parseFloat, NaN });
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok - ' + name); };
@@ -96,6 +96,27 @@ t('tkShapeQty: counts never need a scale; lines and areas do', () => {
   assert.strictEqual(T.tkShapeQty({ k: 'poly', p: [0, 0, 1, 0, 1, 1] }, sheet, { fpp: 0 }), null);
   assert.strictEqual(T.tkShapeQty({ k: 'line', p: [0, 0, 1, 0] }, { id: 's1' }, { fpp: 0.08 }), null, 'sheet size unknown');
   assert.strictEqual(T.tkShapeQty(null, sheet, { fpp: 1 }), 0);
+  const sq = { k: 'poly', p: [0.1, 0.1, 0.2, 0.1, 0.2, 0.2, 0.1, 0.2] };
+  near(T.tkShapeQty(sq, sheet, { fpp: 0.08 }), 360 * 240 * 0.0064, 'area');
+  near(T.tkShapeQty({ ...sq, deduct: true }, sheet, { fpp: 0.08 }), -360 * 240 * 0.0064, 'deduct area is negative');
+  assert.strictEqual(T.tkShapeQty({ ...sq, deduct: true }, sheet, null), null, 'deduct with no scale');
+});
+
+t('tkTotals / tkRows: a deduct (cut-out) subtracts from its SF item', () => {
+  const sh = [{ id: 's1', w: 3600, h: 2400 }];
+  const D = T.tkApply({}, [
+    { t: 'item', v: { id: 'clg', code: 'GYP CLG', sec: 'CEILINGS', unit: 'SF' } },
+    { t: 'scale', sheet: 's1', v: { fpp: 0.08 } },
+    { t: 'shape', v: { id: 'a', item: 'clg', sheet: 's1', k: 'poly', p: [0.1, 0.1, 0.3, 0.1, 0.3, 0.3, 0.1, 0.3] } },
+    { t: 'shape', v: { id: 'h', item: 'clg', sheet: 's1', k: 'poly', deduct: true, p: [0.15, 0.15, 0.2, 0.15, 0.2, 0.2, 0.15, 0.2] } },
+  ]);
+  const full = 720 * 480 * 0.0064, hole = 180 * 120 * 0.0064;
+  near(T.tkTotals(D, sh).clg.qty, full - hole);
+  assert.strictEqual(T.tkTotals(D, sh).clg.shapes, 2);
+  assert.strictEqual(T.tkRows(D, sh)[0].qty, Math.ceil(full - hole));
+  assert.strictEqual(D.shapes[1].deduct, true, 'deduct flag saved');
+  const only = T.tkApply(D, [{ t: 'del_shape', id: 'a' }]);
+  assert.deepStrictEqual(plain(T.tkRows(only, sh)), [], 'a deduct alone gives no row');
 });
 
 t('tkApply: items, shapes, moves, deletes, scales; input is not changed', () => {
@@ -189,21 +210,51 @@ t('tkCopyShapes: one sheet\'s shapes onto another with new ids, originals untouc
   assert.strictEqual(D.shapes.length, DOC.shapes.length + 6, 'copied shapes save through tkApply');
 });
 
-t('tkCodeWidth / tkItemWidthIn: line width in inches from the stud size, item override wins', () => {
+t('tkCodeWidth / tkItemWidthIn: full wall thickness (stud + 5/8" per board layer), item override wins', () => {
   const close = (a, b, m) => assert.ok(Math.abs(a - b) <= 0.01, (m || '') + ' expected ' + b + ', got ' + a);
-  close(T.tkCodeWidth('362S162-25 FF14 G28 FR4'), 3.625);
-  close(T.tkCodeWidth('600S162-33 PH8'), 6);
-  close(T.tkCodeWidth('162S125-18 FF10'), 1.625);
-  close(T.tkCodeWidth('250S125-18'), 2.5);
-  close(T.tkCodeWidth('9A4 362S125-18 BR12 GYP24 FR3'), 3.625, 'stud part not first');
-  close(T.tkCodeWidth('800S200-54'), 8);
-  close(T.tkCodeWidth('550S162-43 SW12'), 5.5);
-  close(T.tkCodeWidth('GYP CLG'), 4.5, 'no stud part');
-  close(T.tkCodeWidth(''), 4.5);
-  close(T.tkItemWidthIn({ code: 'GYP CLG', unit: 'LF' }), 4.5);
+  close(T.tkCodeWidth('362S162-25 FF14 G28 FR4'), 3.625 + 1.25, 'G28 on a 14 ft wall = 2 layers (one each side)');
+  close(T.tkCodeWidth('362S162-25 FF14 G2'), 3.625 + 1.25, 'G2 = 2 layers');
+  close(T.tkCodeWidth('362S162-25 FF14 G4'), 3.625 + 2.5, 'G4 = 4 layers (two each side)');
+  close(T.tkCodeWidth('P 250CH-25 FH12 GYP12 LINER12'), 2.5 + 0.625 + 1, 'shaft wall: CH stud, one layer, 1" liner');
+  close(T.tkCodeWidth('M GYP30'), 5.5 + 1.25, 'board only: 2x6 wood + one layer each side');
+  close(T.tkCodeWidth('600S162-33 PH8'), 6 + 1.25, 'no board code: one layer each side');
+  close(T.tkCodeWidth('9A4 362S125-18 BR12 GYP24 FR3'), 3.625 + 1.25, 'stud part not first');
+  close(T.tkCodeWidth('9A4 362S125-18 BR12 GYP48 FR3'), 3.625 + 2.5, 'GYP48 on 12 ft = 4 layers');
+  close(T.tkCodeWidth('362S162-33 GYP32'), 3.625 + 1.25, 'GYP with no height: one layer each side');
+  close(T.tkCodeWidth('362S162-33 FH12 GYP24 RC'), 3.625 + 1.25 + 0.5, 'RC one side');
+  close(T.tkCodeWidth('362S162-33 FH12 GYP24 RC2'), 3.625 + 1.25 + 1, 'RC both sides');
+  close(T.tkCodeWidth('2X4 GYP16 PH8'), 3.5 + 1.25, 'wood 2x4');
+  close(T.tkCodeWidth('162S125-18 FF10 G10'), 1.625 + 0.625, 'furring, one face');
+  close(T.tkCodeWidth(''), 6.75);
+  close(T.tkCodeWidth('362S162-33 GYP24', 12), 3.625 + 1.25, 'height from the item');
+  close(T.tkItemWidthIn({ code: 'M GYP30', unit: 'LF' }), 6.75);
   close(T.tkItemWidthIn({ code: '362S162-25 FF14', unit: 'LF', w: 8 }), 8, 'override');
-  close(T.tkItemWidthIn({ code: '362S162-25 FF14', unit: 'LF', w: null }), 3.625, 'blank override');
-  close(T.tkItemWidthIn({ code: '362S162-25 FF14', unit: 'LF', w: 0 }), 3.625, 'zero override');
+  close(T.tkItemWidthIn({ code: '362S162-25 FF14 G28', unit: 'LF', w: null }), 4.875, 'blank override');
+  close(T.tkItemWidthIn({ code: '362S162-25 FF14 G28', unit: 'LF', w: 0 }), 4.875, 'zero override');
+  close(T.tkItemWidthIn({ code: '362S162-25 GYP56', unit: 'LF', h: 14 }), 3.625 + 2.5, 'item height used for GYP layers');
+});
+
+t('tkParseScales: printed plan scales from sheet text', () => {
+  const one = (txt, f, label) => { const r = T.tkParseScales(txt); assert.ok(r.length >= 1, 'nothing found in ' + txt); assert.ok(Math.abs(r[0].ftPerIn - f) < 1e-3, txt + ' -> ' + r[0].ftPerIn); if (label) assert.strictEqual(r[0].label, label); };
+  one('SCALE: 3/32" = 1\'-0"', 32 / 3, '3/32" = 1\'-0"');
+  one('1/8"=1\'-0"', 8, '1/8" = 1\'-0"');
+  one('1 1/2" = 1\'-0"', 2 / 3, '1 1/2" = 1\'-0"');
+  one('1-1/2" = 1\'-0"', 2 / 3);
+  one('1" = 20\'-0"', 20, '1" = 20\'-0"');
+  one('1" = 20\'', 20);
+  one('SCALE: 1/4” = 1’-0”', 4, '1/4" = 1\'-0"');
+  one('1⁄8″ = 1′-0″', 8);
+  one('1/8 = 1\'-0"', 8); // OCR dropped the inch mark
+  one('A-101 FLOOR PLAN 1/8" = 1\'-0"', 8);
+  const many = T.tkParseScales('1 ENLARGED PLAN SCALE: 1/4" = 1\'-0"  2 FLOOR PLAN 3/32" = 1\'-0"  3 FLOOR PLAN 3/32" = 1\'-0"  4 DETAIL 1 1/2" = 1\'-0"');
+  assert.deepStrictEqual(plain(many.map(x => [x.label, x.count])), [['3/32" = 1\'-0"', 2], ['1/4" = 1\'-0"', 1], ['1 1/2" = 1\'-0"', 1]], 'most frequent first, then labeled SCALE');
+  assert.deepStrictEqual(plain(T.tkParseScales('NOT TO SCALE')), []);
+  assert.deepStrictEqual(plain(T.tkParseScales('DETAIL A  NTS')), []);
+  assert.deepStrictEqual(plain(T.tkParseScales('')), []);
+  assert.deepStrictEqual(plain(T.tkParseScales(null)), []);
+  const stored = T.tkParseScales('3/32" = 1\'-0"; 1/4" = 1\'-0"');
+  assert.deepStrictEqual(plain(stored.map(x => x.label)), ['3/32" = 1\'-0"', '1/4" = 1\'-0"'], 'stored scale_text keeps its order');
+  for (const s of T.TK_SCALES) { const r = T.tkParseScales(s[0]); assert.ok(r.length && Math.abs(r[0].ftPerIn - s[1]) < 1e-6, 'preset ' + s[0]); }
 });
 
 t('tkInches / tkInStr: inches typed and shown as fractions', () => {
