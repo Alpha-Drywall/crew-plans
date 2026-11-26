@@ -14,11 +14,27 @@ function grab(name) {
   return lines.slice(i, j).join('\n');
 }
 const names = ['tcKey', 'TC_ANCHOR', 'isoAddD', 'tcPeriodOf', 'tcJobNo', 'tcJobShort', 'tcHrs', 'tcDayIdx', 'tcLineNo', 'tcJobKey', 'tcIsJob',
-  'lookDow', 'lookMonday', 'lookDays', 'lookWeekRest', 'lookByPerson', 'lookSet', 'lookDrop', 'lookCopyWeek', 'lookLastWorked', 'lookPrefill', 'lookActual', 'lookWarn', 'lookGroups', 'lookDiff', 'lookClean', 'tcFmt', 'lookRanges'];
-const code = names.map(grab).join('\n') + '\n;({' + names.filter(n => n !== 'TC_ANCHOR').concat(['TC_OFF']).join(',') + '})';
+  'LK_SKIP', 'lookAuto', 'lookNames', 'lookDow', 'lookMonday', 'lookDays', 'lookWeekRest', 'lookByPerson', 'lookSet', 'lookDrop', 'lookCopyWeek', 'lookLastWorked', 'lookPrefill', 'lookActual', 'lookWarn', 'lookGroups', 'lookDiff', 'lookClean', 'tcFmt', 'lookRanges'];
+const code = names.map(grab).join('\n') + '\n;({' + names.filter(n => n !== 'TC_ANCHOR' && n !== 'LK_SKIP').concat(['TC_OFF']).join(',') + '})';
 const T = vm.runInNewContext(code, { Math, Date, String, Number, Set, Object, Array, JSON, isFinite, parseFloat });
 const J = x => JSON.parse(JSON.stringify(x));
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok - ' + name); };
+
+t('board cells show a short job name made from the job name', () => {
+  const a = T.lookAuto;
+  assert.strictEqual(a('330 - U OF U OR5 HYBRID ROOM UPGRADE'), 'OR5');
+  assert.strictEqual(a('331 - NORDIC VALLEY WWTP'), 'Nordic');
+  assert.strictEqual(a('320 - IFA ELKO'), 'IFA Elko');
+  assert.strictEqual(a('321-TRONA VALLEY FEDERAL CREDIT UNION'), 'Trona');
+  assert.strictEqual(a('329 - SILOS PARK EAST RETAIL'), 'Silos');
+  assert.strictEqual(a('325 - GRANARY SQUARE'), 'Granary');
+  assert.strictEqual(a('328 - DALLING HANGAR'), 'Dalling');
+  assert.strictEqual(a('Smith Remodel'), 'Smith');
+  assert.ok(a('999 - SUPERCALIFRAGILISTIC CENTER').length <= 8);
+  const m = T.lookNames([{ id: 'a', name: '340 - SILOS PARK WEST' }, { id: 'b', name: '329 - SILOS PARK EAST RETAIL' }, { id: 'c', name: '328 - DALLING HANGAR' }]);
+  assert.strictEqual(m.a, 'Silo 340'); assert.strictEqual(m.b, 'Silo 329'); assert.strictEqual(m.c, 'Dalling');
+  assert.ok(Object.values(m).every(x => x.length <= 8));
+});
 
 const JOBS = [{ id: 'j330', name: '330-U OF U OR5 HYBRID ROOM UPGRADE' }, { id: 'j331', name: '331-Nordic Valley WWTP' }, { id: 'jx', name: 'Smith Remodel' }];
 
