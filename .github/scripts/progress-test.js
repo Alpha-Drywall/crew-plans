@@ -100,7 +100,7 @@ t('billing card: "Billing" title, "% from hours" column, help line, never below 
   assert.ok(h.includes('% from hours')); assert.ok(!h.includes('% complete (office)')); assert.ok(!h.includes('Crew progress'));
   assert.ok(h.includes('% from hours = time card hours on each cost code vs. the job’s budgeted hours, for reference (labor lines only; type the material %s yourself). Type this month’s % for each line, then Confirm.'));
   assert.ok(h.includes('>Billing · ')); assert.ok(!/suggest/i.test(h), 'no “suggestion” wording on the card');
-  assert.ok(h.includes('112: 600 of 1,000 hrs (job cost)')); assert.ok(h.includes('122: 125 of 500 hrs (job cost)')); assert.ok(h.includes('id="billCard"'));
+  assert.ok(h.includes('600 of 1,000 hrs (job cost)')); assert.ok(h.includes('125 of 500 hrs (job cost)')); assert.ok(h.includes('id="billCard"'));
   const vals = [...h.matchAll(/data-bp="(\d+)"[^>]*value="(\d+)"/g)].map(x => +x[2]);
   deq(vals, [100, 100, 70, 70, 25, 10, 0, 0, 30, 30]); // Framing 60 < last 70 -> stays 70; Hanging Material has no % from hours -> keeps last 10; Insulation no budget -> keeps 30
   assert.ok(h.includes('(below last)'));
@@ -133,7 +133,7 @@ t('hours rule: used = max(job cost to its date, time cards to that date) + time 
   deq(T.billHoursByCode(C(dalLabor({})), sp)['112'], { pct: 21, used: 54, bh: 262, cost: 0, tcAll: true, tc: 54 });
   // job cost ahead of the time cards up to its date: job cost + time cards after
   deq(T.billHoursByCode(C(dalLabor({ '112': 100 })), sp)['112'], { pct: 45, used: 118, bh: 262, cost: 100, tcAll: false, tc: 18 });
-  assert.strictEqual(T.billHrsNote('112', T.billHoursByCode(C(dalLabor({ '112': 100 })), sp)['112']), '112: 118 of 262 hrs (100 job cost + 18 time cards)');
+  assert.strictEqual(T.billHrsNote('112', T.billHoursByCode(C(dalLabor({ '112': 100 })), sp)['112']), '118 of 262 hrs (100 job cost + 18 time cards)');
   // no time cards read: job cost only; no job cost sheet: daily reports as before
   deq(T.billHoursByCode(C(dalLabor({})), null)['112'], { pct: 0, used: 0, bh: 262 });
   S.labor = { hpd: 10, hours: { '112': 400 } }; S.laborLogs = [{ date: '2026-11-02', hours: 40, hours_by_code: { '112': 40 } }];
@@ -147,8 +147,8 @@ t('billing card on Dalling: 112 shows 54 of 262 hrs (54 time cards), not 0', () 
   S.labor = dalLabor({}); S.billTc = T.tcJobSplit(DAL, ...T.tcJobKey(dalJob), T.billCut(S.labor.cost));
   S.billing = { lines: [{ n: 'Mobilization', v: 2013 }, { n: 'Framing Labor', v: 14781 }, { n: 'Framing Material', v: 17252 }, { n: 'Hanging Labor', v: 20958 }], history: [] };
   const h = T.billingCard();
-  assert.ok(h.includes('112: 54 of 262 hrs (54 time cards)'), h.slice(0, 200)); assert.ok(!h.includes('112: 0 of 262'));
-  assert.ok(h.includes('122: 0 of 300 hrs (job cost)'));
+  assert.ok(h.includes('54 of 262 hrs (54 time cards)'), h.slice(0, 200)); assert.ok(!h.includes('0 of 262'));
+  assert.ok(h.includes('0 of 300 hrs (job cost)'));
   deq([...h.matchAll(/data-bp="(\d+)"[^>]*value="([\d.]+)"/g)].map(x => +x[2]), [100, 21, 0, 0]);
   S.billTc = null;
 });
