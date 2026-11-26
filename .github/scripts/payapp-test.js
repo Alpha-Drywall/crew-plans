@@ -131,7 +131,7 @@ t('ExcelJS cells -> cached values (formula results, shared formulas, rich text, 
 });
 
 t('Billing tab, button and automation hook are in the app', () => {
-  for (const s of ['data-tab="billing"', 'id="payAppFile"', 'Load pay app (.xlsx)', 'window.billLoadPayApp=billLoadPayApp', 'billTabOk()'])
+  for (const s of ['data-tab="money"', 'data-money="billing"', 'data-money="labor"', 'id="payAppFile"', 'Load pay app (.xlsx)', 'window.billLoadPayApp=billLoadPayApp', 'billTabOk()'])
     assert.ok(html.includes(s), 'missing: ' + s);
   assert.ok(!/Billing suggestion/.test(html), 'still says Billing suggestion');
 });
