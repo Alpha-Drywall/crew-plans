@@ -15,7 +15,8 @@ function grab(name) {
 const names = ['TK_SECS', 'TK_PAPER', 'TK_SCALES', 'tkFeet', 'tkFtIn', 'tkLenPx', 'tkAreaPx', 'tkShapeQty', 'tkPresetFpp', 'tkGuessPaper', 'tkEvenUp', 'tkCodeHeight', 'tkCodeWidth', 'tkItemWidthIn', 'tkInches', 'tkInStr', 'tkParseScales',
   'tkApply', 'tkTotals', 'tkHeightSplits', 'tkRows', 'tkCopyShapes', 'tkSplitLine', 'tkInsertCorner', 'tkMoveCorner', 'tkDeleteCorner', 'tkOffsetShapes',
   'tkSnapVerts', 'tkNearVertex', 'tkOrtho', 'tkSnapPick', 'tkEnds', 'tkEndMark', 'tkReadout',
-  'TK_FR_DEF', 'tkFrRot', 'tkFrUn', 'tkFrIv', 'tkFrUnion', 'tkFrClip', 'tkFrSwap', 'tkFrExt', 'tkFrAuto', 'tkFrAngle', 'tkFrPc', 'tkFrame', 'tkFrSum', 'tkFrameOf', 'tkFrRows', 'tkFrItem'];
+  'TK_FR_DEF', 'tkFrRot', 'tkFrUn', 'tkFrIv', 'tkFrUnion', 'tkFrClip', 'tkFrSwap', 'tkFrExt', 'tkFrAuto', 'tkFrAngle', 'tkFrPc', 'tkFrame', 'tkFrSum', 'tkFrameOf', 'tkFrRows', 'tkFrItem',
+  'TK_LAY_DEF', 'TK_LAY_NAME', 'tkLayPre', 'tkLayF', 'tkLayArea', 'tkLayPos', 'tkLayCut', 'tkLayWires', 'tkLayAct', 'tkLayCrc'];
 const T = vm.runInNewContext(names.map(grab).join('\n') + '\n;({' + names.join(',') + '})', { Math, Date, String, Number, Set, Object, Array, JSON, isFinite, parseFloat, NaN, Infinity });
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok - ' + name); };
 const plain = x => JSON.parse(JSON.stringify(x));
@@ -451,7 +452,7 @@ t('tkReadout: leg and run in feet-inches, SF for areas, px while setting the sca
   const W = 3600, H = 2400, fpp = 0.08;
   assert.strictEqual(T.tkReadout('line', [{ x: 0, y: 0 }], W, H, fpp), null, 'one point: nothing yet');
   assert.deepStrictEqual(plain(T.tkReadout('line', [{ x: 600, y: 600 }, { x: 2400, y: 600 }], W, H, fpp)), { main: '144\'-0"', sub: '' });
-  assert.deepStrictEqual(plain(T.tkReadout('line', [{ x: 600, y: 600 }, { x: 2400, y: 600 }, { x: 2400, y: 1500 }], W, H, fpp)), { main: '72\'-0"', sub: 'run 216\'-0"' }, 'this leg, then the run so far');
+  assert.deepStrictEqual(plain(T.tkReadout('line', [{ x: 600, y: 600 }, { x: 2400, y: 600 }, { x: 2400, y: 1500 }], W, H, fpp)), { main: '72\'-0"', sub: 'linear 216\'-0"' }, 'this leg, then the run so far');
   assert.deepStrictEqual(plain(T.tkReadout('line', [{ x: 0, y: 0 }, { x: 100, y: 0 }], W, H, 0)), { main: 'No scale yet', sub: 'set the scale to see feet' });
   const sq = [{ x: 1000, y: 1000 }, { x: 2000, y: 1000 }, { x: 2000, y: 1800 }, { x: 1000, y: 1800 }];
   assert.deepStrictEqual(plain(T.tkReadout('area', sq, W, H, fpp)), { main: '5,120 SF', sub: 'side 80\'-0"' });
@@ -554,6 +555,58 @@ t('framing: frame marks on a sheet -> totals and one bid row per member (joists,
   assert.strictEqual(T.tkFrItem(T.tkApply(data, [{ t: 'scale', sheet: 's1', v: null }]), [sheet], data.items[0]).un, 1);
   const d3 = T.tkApply(data, [{ t: 'item', v: { id: 'f', fr: { ...fr, sp: 24 } } }]);
   assert.strictEqual(T.tkRows(d3, [sheet])[0].qty, 320, 'changing the spacing recalculates');
+});
+const laySum = (L, waste) => { const s = T.tkFrSum(L.segs, waste); const r = {}; for (const k in s) r[k] = { n: s[k].n, lf: Math.round(s[k].lf * 1000) / 1000, st: s[k].st || 0 }; return r; };
+t('layout: grid positions (balanced ACT borders, centered CRC / furring)', () => {
+  assert.deepStrictEqual(plain(T.tkLayPos(0, 30, 4, 1)), [3, 7, 11, 15, 19, 23, 27], '2\' left over -> 3\' borders');
+  assert.deepStrictEqual(plain(T.tkLayPos(0, 20, 2, 1)), [2, 4, 6, 8, 10, 12, 14, 16, 18], 'fits: full border modules');
+  assert.deepStrictEqual(plain(T.tkLayPos(0, 30, 4, 0)), [1, 5, 9, 13, 17, 21, 25, 29]);
+  assert.strictEqual(T.tkLayPos(0, 20, 16 / 12, 0).length, 15);
+  assert.strictEqual(T.tkLayWires(20, 4), 6); assert.strictEqual(T.tkLayWires(30, 4), 9); assert.strictEqual(T.tkLayWires(2, 4), 2);
+  near(T.tkLayArea(RECT, [[0, 0, 2, 0, 2, 4, 0, 4]]), 592);
+  assert.strictEqual(T.tkLayPos(0, 20.02, 2, 1).length, 9, 'a hair over still fits'); assert.strictEqual(T.tkLayPos(0, 19.98, 2, 1).length, 9);
+  assert.strictEqual(T.tkLayPos(0, 20.02, 16 / 12, 0).length, 15); assert.strictEqual(T.tkLayWires(20.02, 4), 6);
+  const big = T.tkLayAct([0, 0, 30.02, 0, 30.02, 20.02, 0, 20.02], [], { ang: Math.PI / 2 }); assert.strictEqual(T.tkFrSum(big.segs).t4.n, 72); assert.strictEqual(big.cnt.wire, 42);
+});
+t('layout ACT 2x4: 20\' x 30\' room -> mains, 4\' tees, wire, wall angle, tiles', () => {
+  const L = T.tkLayAct(RECT, [], { tile: '2x4', ang: T.tkFrAuto(RECT), mainLen: 12, waLen: 12, wireSp: 4 }), r = laySum(L);
+  assert.deepStrictEqual(r.main, { n: 7, lf: 140, st: 14 }, 'mains run the 20\' way, 4\' OC');
+  assert.strictEqual(r.t4.n, 72, '9 tee lines x 8 bays'); assert.strictEqual(r.t2, undefined);
+  assert.deepStrictEqual(r.wa, { n: 4, lf: 100, st: 10 }, 'wall angle = full perimeter');
+  assert.strictEqual(L.cnt.wire, 42, '6 wires on each 20\' main');
+  const F = T.tkLayF({ preset: 'act', tile: '2x4' });
+  const rows = T.tkFrRows({ id: 'a', code: 'ACT', sec: 'CEILINGS', fr: F }, T.tkFrSum(L.segs), 0, { ...L.cnt, area: 600 });
+  assert.deepStrictEqual(plain(rows.map(x => [x.id, x.qty, x.unit, x.pcs])), [['a:m', 140, 'LF', 14], ['a:t4', 72, 'EA', null], ['a:wa', 100, 'LF', 10], ['a:w', 42, 'EA', null], ['a:tile', 600, 'SF', null]]);
+  assert.ok(/75 tiles/.test(rows[4].desc), rows[4].desc);
+});
+t('layout ACT 2x2: adds 2\' cross tees halfway between mains, twice the tiles', () => {
+  const L = T.tkLayAct(RECT, [], { tile: '2x2', ang: T.tkFrAuto(RECT) }), r = laySum(L);
+  assert.deepStrictEqual(r.main, { n: 7, lf: 140, st: 14 }); assert.strictEqual(r.t4.n, 72); assert.strictEqual(r.t2.n, 70, '7 lines x 10 pieces'); near(r.t2.lf, 140);
+  assert.strictEqual(L.cnt.wire, 42); assert.strictEqual(r.wa.lf, 100);
+  const rows = T.tkFrRows({ id: 'a', code: 'ACT', fr: { preset: 'act', tile: '2x2', waste: 10 } }, T.tkFrSum(L.segs, 10), 0, { ...L.cnt, area: 600 });
+  const by = {}; rows.forEach(x => by[x.id] = x);
+  assert.strictEqual(by['a:t2'].qty, 77, '+10% waste'); assert.strictEqual(by['a:tile'].qty, 660); assert.ok(/165 tiles/.test(by['a:tile'].desc), by['a:tile'].desc);
+});
+t('layout CRC & furring: 20\' x 30\' @4\' with FC @16" -> LF, pieces, wires, clips, perimeter', () => {
+  const L = T.tkLayCrc(RECT, [], { ang: T.tkFrAuto(RECT), crcSp: 4, fcSp: 16, crcLen: 16, fcLen: 12, perLen: 10, wireSp: 4 }), r = laySum(L);
+  assert.deepStrictEqual(r.crc, { n: 8, lf: 160, st: 16 }); assert.deepStrictEqual(r.fc, { n: 15, lf: 450, st: 45 }); assert.deepStrictEqual(r.per, { n: 4, lf: 100, st: 10 });
+  assert.strictEqual(L.cnt.wire, 48); assert.strictEqual(L.cnt.clip, 120); assert.strictEqual(r.per2, undefined);
+  const F = { preset: 'crc', clip: 'Clip', per2: 'Wall angle' }, L2 = T.tkLayCrc(RECT, [], { ...T.tkLayF(F), ang: T.tkFrAuto(RECT), per2: true });
+  const rows = T.tkFrRows({ id: 'c', code: 'CRC', fr: F }, T.tkFrSum(L2.segs), 0, { ...L2.cnt, area: 600 });
+  assert.deepStrictEqual(plain(rows.map(x => [x.id, x.code, x.qty, x.unit])), [['c:c', '150U50-54 CRC', 160, 'LF'], ['c:fc', '7/8" FC 25ga', 450, 'LF'], ['c:p', '200T125-20', 100, 'LF'], ['c:p2', 'Wall angle', 100, 'LF'], ['c:w', 'Hanger wire 12ga', 48, 'EA'], ['c:cl', 'Clip', 120, 'EA']]);
+  const H = T.tkLayCrc(RECT, [[10, 8, 14, 8, 14, 12, 10, 12]], { ang: T.tkFrAuto(RECT) }), h = laySum(H);
+  near(h.trim.lf, 16, 'furring trim = opening perimeter'); assert.ok(h.crc.lf < 160 && h.fc.lf < 450, 'members cut at the opening');
+});
+t('layout: preset marks on a sheet -> rows; older framing items (no preset) stay joists', () => {
+  const sheet = { id: 's1', w: 3000, h: 2000 };
+  const mk = fr => T.tkApply({}, [{ t: 'item', v: { id: 'f', code: 'L', sec: 'CEILINGS', unit: 'LF', fr } }, { t: 'scale', sheet: 's1', v: { fpp: 0.05 } },
+    { t: 'shape', v: { id: 'a', item: 'f', sheet: 's1', k: 'frame', p: [0.1, 0.1, 0.3, 0.1, 0.3, 0.3, 0.1, 0.3], dir: 'auto' } }]);
+  const old = T.tkRows(mk({ mem: '600S162-43', sp: 16, trk: '600T150-43', brc: '150U50-54 CRC', brMax: 4 }), [sheet]);
+  assert.deepStrictEqual(plain(old.map(x => x.qty)), [480, 60, 120]); assert.strictEqual(T.tkLayPre({ mem: 'x' }), 'joists');
+  const j2 = T.tkRows(mk({ preset: 'joists', sfc: '5/8 X GWB' }), [sheet]); assert.deepStrictEqual(plain(j2.map(x => [x.id, x.qty, x.unit])), [['f:j', 480, 'LF'], ['f:t', 60, 'LF'], ['f:b', 120, 'LF'], ['f:sf', 600, 'SF']]);
+  const act = T.tkRows(mk({ preset: 'act' }), [sheet]); assert.deepStrictEqual(plain(act.map(x => x.qty)), [140, 72, 100, 42, 600]);
+  const crc = T.tkRows(mk({ preset: 'crc' }), [sheet]); assert.deepStrictEqual(plain(crc.map(x => x.qty)), [160, 450, 100, 48]);
+  const it = T.tkFrItem(mk({ preset: 'crc' }), [sheet], { id: 'f', fr: { preset: 'crc' } }); assert.strictEqual(it.cnt.clip, 120); near(it.cnt.area, 600);
 });
 t('framing: copy / offset carry the openings with the area', () => {
   const s = [{ id: 'a', item: 'f', sheet: 's1', k: 'frame', p: [0.1, 0.1, 0.3, 0.1, 0.3, 0.2], o: [[0.15, 0.15, 0.16, 0.15, 0.16, 0.16]] }];

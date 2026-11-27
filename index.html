@@ -4688,7 +4688,7 @@ function renderLogList(){
 /* ===== Takeoff (office only): measure walls (LF), ceilings/soffits (SF) and counts (EA) on plan sheets, send rows to the bid sheet's TAKEOFF tab.
    Stored in table takeoffs (one row per job, office-only RLS): data = {v,items[],shapes[],scales{},sent{}}.
    item  = {id,n,code,desc,sec,unit:'LF'|'SF'|'EA',h,w (line width in inches, optional; blank = full wall thickness from the code: framing + 5/8" per board layer),color,
-           fr: framing item (unit LF) = {mem,sp,trk,trkAll,brc,brMax,endJ,king,waste}, see Framing layout below; its rows are one per member, not one per item}
+           fr: layout item (unit LF) = {preset:'joists'|'act'|'crc' (none = joists),...}: joists {mem,sp,trk,trkAll,brc,brMax,endJ,king,sfc,waste}, see Framing layout and Layout presets below; its rows are one per member, not one per item}
    shape = {id,item,sheet,k:'line'|'poly'|'count'|'frame' (framing area: o = openings [[x,y,...],...], dir 'auto'|'edge'|'ang', edge, ang),p:[x0,y0,x1,y1,...] (0-1 of the sheet image),by,at, deduct:true on a poly = cut-out that subtracts its area,
            h: this line's own wall height in feet (optional; LF the same, but its own bid row "@ h"), note: short label shown on the sheet and in the markup PDF}
    sheets.scale_text = the printed scale(s) read at upload (PDF text) or later by OCR, best first, '; ' between; '' = looked, none found
@@ -4825,7 +4825,7 @@ function tkHeightSplits(data,sheets){
 function tkRows(data,sheets){
   const tot=tkTotals(data,sheets);const items=(data.items||[]).slice().sort((a,b)=>TK_SECS.indexOf(a.sec)-TK_SECS.indexOf(b.sec)||(a.n||0)-(b.n||0));
   const sp=tkHeightSplits(data,sheets);const out=[];
-  items.forEach(it=>{const t=tot[it.id];if(!t)return;if(it.fr){const f=tkFrItem(data,sheets,it);out.push(...tkFrRows(it,f.sum,f.un));return}const sec=TK_SECS.includes(it.sec)?it.sec:'INTERIOR',code=String(it.code||'').trim(),desc=String(it.desc||'').trim(),l=sp[it.id]||[];
+  items.forEach(it=>{const t=tot[it.id];if(!t)return;if(it.fr){const f=tkFrItem(data,sheets,it);out.push(...tkFrRows(it,f.sum,f.un,f.cnt));return}const sec=TK_SECS.includes(it.sec)?it.sec:'INTERIOR',code=String(it.code||'').trim(),desc=String(it.desc||'').trim(),l=sp[it.id]||[];
     const qty=t.qty-l.reduce((a,g)=>a+g.qty,0),un=t.unscaled-l.reduce((a,g)=>a+g.unscaled,0);
     if(qty>1e-9)out.push({id:it.id,sec,code,desc,qty:Math.ceil(qty-1e-9),unit:it.unit||'LF',h:it.unit==='EA'?null:(+it.h>0?tkEvenUp(it.h):null),unscaled:un});
     l.forEach(g=>{if(g.qty>1e-9)out.push({id:it.id+'@'+g.h,sec,code,desc:(desc?desc+' ':'')+'@'+g.h+"'",qty:Math.ceil(g.qty-1e-9),unit:'LF',h:g.h,unscaled:g.unscaled,note:g.marks+' mark'+(g.marks===1?'':'s')+' at '+g.h+"' (item "+(+it.h>0?tkEvenUp(it.h)+"'":'no height')+')'})})});
@@ -4838,6 +4838,60 @@ function tkRows(data,sheets){
    All math here is in feet with u along the joists and v across them. ===== */
 const TK_FR_DEF={mem:'600S162-43',sp:16,trk:'600T150-43',trkAll:false,brc:'150U50-54 CRC',brMax:4,endJ:false,king:true,waste:0};
 const TK_FR_ROLES={joist:'Joists',king:'King joists',track:'Track',hdr:'Headers',br:'Bridging'};
+/* ===== Layout presets (pure). A layout item's fr.preset: 'joists' (default; also every older framing item without one) | 'act' | 'crc'.
+   act (lay-in ceiling grid) = {tile:'2x4'|'2x2',main,mainLen (ft stock),t4,t2,wa (wall angle),waLen,wire,wireSp (ft along mains),tileCode,waste}:
+     main tees 4' OC running like joists (dir), 4' cross tees 2' OC between mains, with 2x2 also 2' cross tees halfway between mains; grid centered
+     so border tiles are at least half a module; wall angle on every edge; hanger wires along each main every wireSp plus one at each end;
+     tiles = net SF (openings = lights / diffusers come off) / tile SF. Openings don't cut the grid.
+   crc (suspended drywall ceiling) = {crc,crcSp (ft),crcLen,fc,fcSp (in),fcLen,per (perimeter track / angle),per2 (optional 2nd),perLen,wire,wireSp,clip,sfc,waste}:
+     CRC every crcSp running like joists, furring across them every fcSp, both centered (end gaps under half a space) and cut at openings;
+     furring trim around each opening; clips = CRC x furring crossings; hanger wires along each CRC run every wireSp plus one at each end. ===== */
+const TK_LAY_DEF={act:{tile:'2x4',main:"ACT main tee 12'",mainLen:12,t4:"ACT 4' cross tee",t2:"ACT 2' cross tee",wa:'ACT wall angle',waLen:12,wire:'Hanger wire 12ga',wireSp:4,tileCode:'ACT tile 2x4',waste:0},crc:{crc:'150U50-54 CRC',crcSp:4,crcLen:16,fc:'7/8" FC 25ga',fcSp:16,fcLen:12,per:'200T125-20',per2:'',perLen:10,wire:'Hanger wire 12ga',wireSp:4,clip:'',sfc:'',waste:0}};
+const TK_LAY_NAME={joists:'Joists',act:'ACT grid',crc:'CRC & furring'};
+/* a layout item's preset ('joists' when none) */
+function tkLayPre(fr){const p=fr&&fr.preset;return p==='act'||p==='crc'?p:'joists'}
+/* a layout item's settings with the preset's defaults filled in */
+function tkLayF(fr){const p=tkLayPre(fr);return p==='joists'?{...TK_FR_DEF,...(fr||{}),preset:'joists'}:{...TK_LAY_DEF[p],...(fr||{}),preset:p}}
+/* net area (SF) of an outline less its openings, all in feet */
+function tkLayArea(poly,holes){
+  const A=q=>{let a=0;const n=Math.floor((q||[]).length/2);for(let i=0;i<n;i++){const j=(i+1)%n;a+=q[2*i]*q[2*j+1]-q[2*j]*q[2*i+1]}return Math.abs(a)/2};
+  return Math.max(0,A(poly)-(holes||[]).reduce((t,h)=>t+A(h),0));
+}
+/* grid lines from lo to hi every m: bal = balanced borders (ACT: both border pieces equal and at least half a module; full modules when it fits), else centered (fewest lines so no gap is over m, end gaps equal).
+   A drawing within 1" of fitting counts as fitting, so a slightly-off click never adds a row. */
+function tkLayPos(lo,hi,m,bal){
+  const sp=hi-lo,out=[];if(!(m>0)||!(sp>1e-6))return out;let b;
+  if(bal){const r=sp-Math.floor(sp/m+1e-6)*m;b=r<1/12?m+r/2:(r+m)/2}else{const n=Math.max(1,Math.ceil((sp-1/12)/m-1e-6));b=(sp-(n-1)*m)/2}
+  for(let k=0;lo+b+k*m<=hi-b+1e-6;k++)out.push(lo+b+k*m);return out;
+}
+/* split interval iv at the positions xs strictly inside it, fn(a,b) for each piece */
+function tkLayCut(iv,xs,fn){const k=[iv[0]].concat(xs.filter(x=>x>iv[0]+1e-6&&x<iv[1]-1e-6),[iv[1]]);for(let i=0;i+1<k.length;i++)fn(k[i],k[i+1])}
+/* hanger wires on a run of len feet: every sp plus one at each end (within 1" of a multiple counts as one) */
+function tkLayWires(len,sp){return Math.max(0,Math.ceil((len-1/12)/(sp>0?sp:4)-1e-6))+1}
+/* ACT grid over an area (feet), o = {tile,ang,wireSp,mainLen,waLen}: {segs [{r:'main'|'t4'|'t2'|'wa',a,b,len,st (stock pieces, mains and wall angle)}], cnt {wire}} */
+function tkLayAct(poly,holes,o){
+  o=o||{};const a=+o.ang||0,two=o.tile==='2x2',out=[],cnt={wire:0};if(Math.floor((poly||[]).length/2)<3)return {segs:out,cnt};
+  const R0=tkFrRot(poly,a),R=[R0],SR=[tkFrSwap(R0)],U=tkFrExt(R0,0),V=tkFrExt(R0,1);
+  const add=(r,u0,v0,u1,v1,st)=>{const len=Math.hypot(u1-u0,v1-v0);if(len>1e-6){const g={r,a:tkFrUn(u0,v0,a),b:tkFrUn(u1,v1,a),len};if(st)g.st=Math.max(1,Math.ceil((len-1/24)/st-1e-6));out.push(g)}};
+  const VL=tkLayPos(V[0],V[1],two?2:4,1),mains=VL.filter((v,i)=>!two||i%2===0),half=two?VL.filter((v,i)=>i%2===1):[],UL=tkLayPos(U[0],U[1],2,1);
+  mains.forEach(v=>tkFrClip(R,v).forEach(iv=>{add('main',iv[0],v,iv[1],v,+o.mainLen||12);cnt.wire+=tkLayWires(iv[1]-iv[0],+o.wireSp)}));
+  UL.forEach(u=>tkFrClip(SR,u).forEach(iv=>tkLayCut(iv,mains,(v0,v1)=>add('t4',u,v0,u,v1))));
+  half.forEach(v=>tkFrClip(R,v).forEach(iv=>tkLayCut(iv,UL,(u0,u1)=>add('t2',u0,v,u1,v))));
+  const n=R0.length/2;for(let i=0;i<n;i++){const j=(i+1)%n;add('wa',R0[2*i],R0[2*i+1],R0[2*j],R0[2*j+1],+o.waLen||12)}
+  return {segs:out,cnt};
+}
+/* CRC & furring over an area (feet), o = {ang,crcSp,fcSp,crcLen,fcLen,perLen,wireSp,per2 (bool)}: {segs [{r:'crc'|'fc'|'per'|'per2'|'trim',...,st}], cnt {wire,clip}} */
+function tkLayCrc(poly,holes,o){
+  o=o||{};const a=+o.ang||0,out=[],cnt={wire:0,clip:0};if(Math.floor((poly||[]).length/2)<3)return {segs:out,cnt};
+  const R0=tkFrRot(poly,a),HR=(holes||[]).filter(h=>h&&h.length>=6).map(h=>tkFrRot(h,a)),R=[R0].concat(HR),SR=R.map(tkFrSwap),U=tkFrExt(R0,0),V=tkFrExt(R0,1);
+  const add=(r,u0,v0,u1,v1,st)=>{const len=Math.hypot(u1-u0,v1-v0);if(len>1e-6){const g={r,a:tkFrUn(u0,v0,a),b:tkFrUn(u1,v1,a),len};if(st)g.st=Math.max(1,Math.ceil((len-1/24)/st-1e-6));out.push(g)}};
+  const CV=tkLayPos(V[0],V[1],+o.crcSp||4,0),FU=tkLayPos(U[0],U[1],(+o.fcSp||16)/12,0),fl=+o.fcLen||12;
+  CV.forEach(v=>tkFrClip(R,v).forEach(iv=>{add('crc',iv[0],v,iv[1],v,+o.crcLen||16);cnt.wire+=tkLayWires(iv[1]-iv[0],+o.wireSp)}));
+  FU.forEach(u=>tkFrClip(SR,u).forEach(iv=>{add('fc',u,iv[0],u,iv[1],fl);cnt.clip+=CV.filter(v=>v>iv[0]-1e-9&&v<iv[1]+1e-9).length}));
+  const edges=(r,k,st)=>{const n=r.length/2;for(let i=0;i<n;i++){const j=(i+1)%n;add(k,r[2*i],r[2*i+1],r[2*j],r[2*j+1],st)}};
+  edges(R0,'per',+o.perLen||10);if(o.per2)edges(R0,'per2',+o.perLen||10);HR.forEach(h=>edges(h,'trim',fl));
+  return {segs:out,cnt};
+}
 /* rotate flat points [x,y,...] into (u,v) for joists at angle a (radians) */
 function tkFrRot(p,a){const c=Math.cos(a),s=Math.sin(a),o=[];for(let i=0;i+1<p.length;i+=2)o.push(p[i]*c+p[i+1]*s,-p[i]*s+p[i+1]*c);return o}
 /* back from (u,v) to (x,y) */
@@ -4895,37 +4949,55 @@ function tkFrame(poly,holes,o){
     for(let k=1;k<=nr;k++){const u=U[0]+k*span/(nr+1);tkFrClip(SR,u).forEach(iv=>add('br',u,iv[0],u,iv[1]))}}
   return out;
 }
-/* totals per role: {[role]: {n pieces, lf (each piece rounded up to the inch, + waste %), cuts: [[inches, count],...] longest first}} */
+/* totals per role: {[role]: {n pieces, lf (each piece rounded up to the inch, + waste %), cuts: [[inches, count],...] longest first, st (stock lengths, when the layout gives them)}} */
 function tkFrSum(segs,waste){
   const out={},w=1+(+waste>0?+waste:0)/100;
-  (segs||[]).forEach(g=>{const t=out[g.r]||(out[g.r]={n:0,lf:0,cuts:{}});const pc=tkFrPc(g.len);t.n++;t.lf+=pc*w;const k=Math.round(pc*12);t.cuts[k]=(t.cuts[k]||0)+1});
+  (segs||[]).forEach(g=>{const t=out[g.r]||(out[g.r]={n:0,lf:0,cuts:{}});const pc=tkFrPc(g.len);t.n++;t.lf+=pc*w;if(g.st)t.st=(t.st||0)+g.st;const k=Math.round(pc*12);t.cuts[k]=(t.cuts[k]||0)+1});
   Object.keys(out).forEach(r=>{const c=out[r].cuts;out[r].cuts=Object.keys(c).map(Number).sort((x,y)=>y-x).map(k=>[k,c[k]])});
   return out;
 }
-/* a frame mark's layout on its sheet: {segs (in feet), sum, lf (all members), ang}; null with no scale */
+/* a layout mark's layout on its sheet: {segs (in feet), sum, lf (all members), ang, cnt {wire,clip,area (net SF)}, pre}; null with no scale */
 function tkFrameOf(sh,sheet,scale,fr){
-  const fpp=scale&&+scale.fpp;if(!fpp||!sheet||!sheet.w||!sheet.h||!sh)return null;const f={...TK_FR_DEF,...(fr||{})},kx=sheet.w*fpp,ky=sheet.h*fpp;
-  const ft=q=>(q||[]).map((x,i)=>x*(i%2?ky:kx));const p=ft(sh.p),ang=tkFrAngle(p,sh.dir,+sh.edge,sh.ang);
-  const segs=tkFrame(p,(sh.o||[]).map(ft),{sp:f.sp,ang,brMax:f.brc?f.brMax:0,trkAll:f.trkAll,endJ:f.endJ,king:f.king});
-  const sum=tkFrSum(segs,f.waste);let lf=0;Object.keys(sum).forEach(r=>lf+=sum[r].lf);
-  return {segs,sum,lf,ang,kx,ky};
+  const fpp=scale&&+scale.fpp;if(!fpp||!sheet||!sheet.w||!sheet.h||!sh)return null;const pre=tkLayPre(fr),f=tkLayF(fr),kx=sheet.w*fpp,ky=sheet.h*fpp;
+  const ft=q=>(q||[]).map((x,i)=>x*(i%2?ky:kx));const p=ft(sh.p),ang=tkFrAngle(p,sh.dir,+sh.edge,sh.ang),H=(sh.o||[]).map(ft);
+  const L=pre==='act'?tkLayAct(p,H,{...f,ang}):pre==='crc'?tkLayCrc(p,H,{...f,ang,per2:!!String(f.per2||'').trim()}):{segs:tkFrame(p,H,{sp:f.sp,ang,brMax:f.brc?f.brMax:0,trkAll:f.trkAll,endJ:f.endJ,king:f.king}),cnt:{}};
+  const segs=L.segs,sum=tkFrSum(segs,f.waste);let lf=0;Object.keys(sum).forEach(r=>lf+=sum[r].lf);
+  return {segs,sum,lf,ang,kx,ky,cnt:{...L.cnt,area:tkLayArea(p,H)},pre};
 }
-/* bid rows for a framing item from its summed layout: joists (+ kings), track (+ headers), bridging */
-function tkFrRows(it,sum,un){
-  const f={...TK_FR_DEF,...(it.fr||{})},sec=TK_SECS.includes(it.sec)?it.sec:'CEILINGS',g=r=>sum[r]||{n:0,lf:0},out=[];
-  const row=(k,code,desc,lf,n)=>{if(lf>1e-9&&code)out.push({id:it.id+':'+k,sec,code:String(code).trim(),desc,qty:Math.ceil(lf-1e-9),unit:'LF',h:null,unscaled:un||0,pcs:n})};
-  const j=g('joist'),kg=g('king'),t=g('track'),h=g('hdr'),b=g('br');
-  row('j',f.mem,(String(it.desc||'').trim()||'Ceiling joists')+' '+f.mem+' @'+f.sp+'" OC – '+(j.n+kg.n)+' pcs'+(kg.n?' (incl. '+kg.n+' king)':''),j.lf+kg.lf,j.n+kg.n);
-  row('t',f.trk,'Track '+f.trk+' – '+(t.n+h.n)+' pcs'+(h.n?' (incl. '+h.n+' header'+(h.n===1?'':'s')+')':''),t.lf+h.lf,t.n+h.n);
-  row('b',f.brc,'Bridging '+f.brc+' @'+f.brMax+"' max – "+b.n+' pcs',b.lf,b.n);
+/* bid rows for a layout item from its summed layout (sum by role, cnt = summed counts {wire,clip,area}):
+   joists: joists (+ kings), track (+ headers), bridging; act: main tee, 4' / 2' cross tees, wall angle, hanger wire, tile SF; crc: CRC, furring (+ opening trim), perimeter (1 or 2), hanger wire, clips.
+   Any preset: sfc = code of an extra SF row for the net area (ceiling board, etc.). A blank code leaves its row out. */
+function tkFrRows(it,sum,un,cnt){
+  const pre=tkLayPre(it.fr),f=tkLayF(it.fr),sec=TK_SECS.includes(it.sec)?it.sec:'CEILINGS',g=r=>sum[r]||{n:0,lf:0,st:0},out=[],C=cnt||{},wm=1+(+f.waste>0?+f.waste:0)/100,W=x=>Math.ceil((x||0)*wm-1e-9);
+  const row=(k,code,desc,q,n,unit)=>{if(q>1e-9&&code&&String(code).trim()){const r={id:it.id+':'+k,sec,code:String(code).trim(),desc,qty:Math.ceil(q-1e-9),unit:unit||'LF',h:null,unscaled:un||0};if(n!=null)r.pcs=n;out.push(r)}};
+  const ds=String(it.desc||'').trim();
+  if(pre==='act'){const m=g('main'),wa=g('wa'),t4=g('t4'),t2=g('t2'),ta=f.tile==='2x2'?4:8;
+    row('m',f.main,(ds||'ACT grid')+" – main tee @4' OC – "+W(m.st)+' pcs @'+f.mainLen+"'",m.lf,W(m.st));
+    row('t4',f.t4,"4' cross tee @2' OC – "+W(t4.n)+' pcs',W(t4.n),undefined,'EA');
+    if(f.tile==='2x2')row('t2',f.t2,"2' cross tee – "+W(t2.n)+' pcs',W(t2.n),undefined,'EA');
+    row('wa',f.wa,'Wall angle – '+W(wa.st)+' pcs @'+f.waLen+"'",wa.lf,W(wa.st));
+    row('w',f.wire,'Hanger wire @'+f.wireSp+"' along mains – "+W(C.wire)+' ea',W(C.wire),undefined,'EA');
+    row('tile',f.tileCode,'ACT '+f.tile+' tile – '+W((C.area||0)/ta)+' tiles',(C.area||0)*wm,undefined,'SF');
+  }else if(pre==='crc'){const c=g('crc'),fc=g('fc'),tr=g('trim'),p=g('per'),p2=g('per2');
+    row('c',f.crc,(ds||'Suspended ceiling')+' – CRC '+f.crc+" @"+f.crcSp+"' OC – "+W(c.st)+' pcs @'+f.crcLen+"'",c.lf,W(c.st));
+    row('fc',f.fc,'Furring '+f.fc+' @'+f.fcSp+'" OC – '+W((fc.st||0)+(tr.st||0))+' pcs @'+f.fcLen+"'"+(tr.n?' (incl. '+Math.ceil(tr.lf-1e-9)+' LF trim at openings)':''),fc.lf+tr.lf,W((fc.st||0)+(tr.st||0)));
+    row('p',f.per,'Perimeter '+f.per+' – '+W(p.st)+' pcs @'+f.perLen+"'",p.lf,W(p.st));
+    row('p2',f.per2,'Perimeter (2nd) '+f.per2+' – '+W(p2.st)+' pcs @'+f.perLen+"'",p2.lf,W(p2.st));
+    row('w',f.wire,'Hanger wire @'+f.wireSp+"' along CRC – "+W(C.wire)+' ea',W(C.wire),undefined,'EA');
+    row('cl',f.clip,'Clips / wire ties (CRC x furring) – '+W(C.clip)+' ea',W(C.clip),undefined,'EA');
+  }else{const j=g('joist'),kg=g('king'),t=g('track'),h=g('hdr'),b=g('br');
+    row('j',f.mem,(ds||'Ceiling joists')+' '+f.mem+' @'+f.sp+'" OC – '+(j.n+kg.n)+' pcs'+(kg.n?' (incl. '+kg.n+' king)':''),j.lf+kg.lf,j.n+kg.n);
+    row('t',f.trk,'Track '+f.trk+' – '+(t.n+h.n)+' pcs'+(h.n?' (incl. '+h.n+' header'+(h.n===1?'':'s')+')':''),t.lf+h.lf,t.n+h.n);
+    row('b',f.brc,'Bridging '+f.brc+' @'+f.brMax+"' max – "+b.n+' pcs',b.lf,b.n)}
+  if(pre!=='act')row('sf',f.sfc,(ds||TK_LAY_NAME[pre])+' area',(C.area||0)*wm,undefined,'SF');
   return out;
 }
-/* a framing item's layout summed over all its frame marks: {sum (by role, as tkFrSum), un (marks on sheets with no scale), marks} */
+/* a layout item's layout summed over all its marks: {sum (by role, as tkFrSum), cnt (summed counts), un (marks on sheets with no scale), marks} */
 function tkFrItem(data,sheets,it){
-  const byId={};(sheets||[]).forEach(s=>byId[s.id]=s);const sum={};let un=0,marks=0;
+  const byId={};(sheets||[]).forEach(s=>byId[s.id]=s);const sum={},cnt={};let un=0,marks=0;
   (data.shapes||[]).forEach(sh=>{if(sh.item!==it.id||sh.k!=='frame'||!byId[sh.sheet])return;marks++;const r=tkFrameOf(sh,byId[sh.sheet],(data.scales||{})[sh.sheet],it.fr);if(!r){un++;return}
-    Object.keys(r.sum).forEach(k=>{const a=sum[k]||(sum[k]={n:0,lf:0,cuts:[]}),b=r.sum[k];a.n+=b.n;a.lf+=b.lf;b.cuts.forEach(([l,c])=>{const x=a.cuts.find(y=>y[0]===l);if(x)x[1]+=c;else a.cuts.push([l,c])});a.cuts.sort((x,y)=>y[0]-x[0])})});
-  return {sum,un,marks};
+    Object.keys(r.cnt).forEach(k=>cnt[k]=(cnt[k]||0)+r.cnt[k]);Object.keys(r.sum).forEach(k=>{const a=sum[k]||(sum[k]={n:0,lf:0,cuts:[]}),b=r.sum[k];a.n+=b.n;a.lf+=b.lf;if(b.st)a.st=(a.st||0)+b.st;b.cuts.forEach(([l,c])=>{const x=a.cuts.find(y=>y[0]===l);if(x)x[1]+=c;else a.cuts.push([l,c])});a.cuts.sort((x,y)=>y[0]-x[0])})});
+  return {sum,cnt,un,marks};
 }
 /* split a polyline (normalized points) at a point on segment seg (between point seg and seg+1): [first part, second part], both through (x,y) */
 function tkSplitLine(p,seg,x,y){
@@ -4993,7 +5065,7 @@ function tkReadout(kind,pts,W,H,fpp,o){
   if(kind==='scale')return {main:Math.round(seg).toLocaleString('en-US')+' px',sub:fpp>0?'now '+tkFtIn(seg*fpp)+' · click the other end':'click the other end, then type its length'};
   if(!(fpp>0))return {main:'No scale yet',sub:'set the scale to see feet'};
   if(kind==='area'){if(n<3)return {main:tkFtIn(seg*fpp),sub:o.deduct?'deduct · side':'side'};return {main:(o.deduct?'−':'')+Math.round(tkAreaPx(np,W,H)*fpp*fpp).toLocaleString('en-US')+' SF',sub:'side '+tkFtIn(seg*fpp)}}
-  return {main:tkFtIn(seg*fpp),sub:n>2?'run '+tkFtIn(tkLenPx(np,W,H)*fpp):''};
+  return {main:tkFtIn(seg*fpp),sub:n>2?'linear '+tkFtIn(tkLenPx(np,W,H)*fpp):''};
 }
 const tkOk=()=>!!(isAdminRole()&&S.isAdmin&&!S.asUser&&!S.viewAs&&!isPractice());
 let TK=null;/* {job,data,rev,ops:[],t,saving,loaded} */
@@ -5051,12 +5123,12 @@ function bindTakeoff(){
 function tkRenderBody(){
   const b=$('#tkBody');if(!b||!TK)return;const d=TK.data,sheets=tkSheets(),tot=tkTotals(d,sheets);
   const bySec={};d.items.forEach(it=>{const k=TK_SECS.includes(it.sec)?it.sec:'INTERIOR';(bySec[k]=bySec[k]||[]).push(it)});
-  let h='<div class="card"><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" id="tkAdd">+ Takeoff item</button><button class="btn" id="tkAddFr" title="Metal-stud ceiling joists / framing laid out over an area: LF per member">+ Framing item</button><button class="btn" id="tkSend">Send to bid sheet</button><button class="btn" id="tkPdf">Markup PDF</button><button class="btn" id="tkXls">Download rows (.xlsx)</button></div>'+
+  let h='<div class="card"><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" id="tkAdd">+ Takeoff item</button><button class="btn" id="tkAddFr" title="Lay out joists, an ACT grid or CRC &amp; furring over an area: a row per member">+ Layout item</button><button class="btn" id="tkSend">Send to bid sheet</button><button class="btn" id="tkPdf">Markup PDF</button><button class="btn" id="tkXls">Download rows (.xlsx)</button></div>'+
     '<p class="small muted" style="margin:8px 0 0">Add an item (your code for the TAKEOFF tab, like <b>362S162-25 FF14 G28 FR4</b>), then open a sheet below and click along the walls. '+(d.sent&&d.sent.at?'Last sent to '+esc(d.sent.file||'the bid sheet')+' '+esc(fmtWhen(d.sent.at))+'.':'')+' <span id="tkSaved" class="muted">'+(TK.ops.length?'Saving…':'Saved')+'</span></p></div>';
   if(!d.items.length)h+='<div class="empty"><b>No takeoff items yet</b>Tap + Takeoff item. Walls are LF, ceilings and soffit faces are SF, door frames and other counts are EA.</div>';
   TK_SECS.forEach(sec=>{const its=(bySec[sec]||[]).sort((a,b)=>(a.n||0)-(b.n||0));if(!its.length)return;
     h+=tkGroupHd(sec,sec,its.length+' item'+(its.length===1?'':'s')+' · '+esc(tkSumText(its,tot)));if(tkIsColl(sec))return;
-    h+=its.map(it=>{const t=tot[it.id]||{qty:0,sheets:0,unscaled:0};return '<div class="card job" data-tki="'+esc(it.id)+'" style="padding:10px 12px"><span style="width:16px;height:16px;border-radius:4px;background:'+esc(it.color)+';flex:0 0 auto;margin-right:10px"></span><div class="grow"><div class="name" style="font-size:15px">'+esc(it.code||'(no code)')+'</div><div class="small muted">'+esc(it.desc||'')+(it.fr?' · '+esc(tkFrText(tkFrItem(d,sheets,it).sum,it)||it.fr.mem+' @'+it.fr.sp+'" OC'):'')+(it.h?' · '+esc(tkFtIn(+it.h))+' high':'')+' · '+t.sheets+' sheet'+(t.sheets===1?'':'s')+(t.unscaled?' · <span style="color:#c62828">'+t.unscaled+' on sheets with no scale</span>':'')+'</div></div><div style="text-align:right"><b>'+esc(tkFmtQty(t.qty,it.unit))+'</b>'+(t.wallSf?'<div class="small muted">'+Math.round(t.wallSf).toLocaleString()+' SF wall face</div>':'')+'</div></div>'}).join('');
+    h+=its.map(it=>{const t=tot[it.id]||{qty:0,sheets:0,unscaled:0};return '<div class="card job" data-tki="'+esc(it.id)+'" style="padding:10px 12px"><span style="width:16px;height:16px;border-radius:4px;background:'+esc(it.color)+';flex:0 0 auto;margin-right:10px"></span><div class="grow"><div class="name" style="font-size:15px">'+esc(it.code||'(no code)')+'</div><div class="small muted">'+esc(it.desc||'')+(it.fr?' · '+esc((fi=>tkFrText(fi.sum,it,fi.cnt))(tkFrItem(d,sheets,it))||tkLaySh(it.fr)):'')+(it.h?' · '+esc(tkFtIn(+it.h))+' high':'')+' · '+t.sheets+' sheet'+(t.sheets===1?'':'s')+(t.unscaled?' · <span style="color:#c62828">'+t.unscaled+' on sheets with no scale</span>':'')+'</div></div><div style="text-align:right"><b>'+esc(tkFmtQty(t.qty,it.unit))+'</b>'+(t.wallSf?'<div class="small muted">'+Math.round(t.wallSf).toLocaleString()+' SF wall face</div>':'')+'</div></div>'}).join('');
   });
   const cnt={};d.shapes.forEach(s=>cnt[s.sheet]=(cnt[s.sheet]||0)+1);const noSc=sheets.filter(s=>!d.scales[s.id]).length;
   h+=tkGroupHd('SHEETS','Sheets',sheets.length+' sheet'+(sheets.length===1?'':'s')+(noSc?' · '+noSc+' with no scale':'')+' · tap to take off');
@@ -5092,52 +5164,97 @@ async function tkItemForm(it,pre){
   return nv;
 }
 /* one line about a framing layout: "42 joists · 2 track · 4 bridging · 2 hdr" */
-function tkFrText(sum,it){const g=k=>(sum[k]||{}).n||0,j=g('joist')+g('king'),t=g('track')+g('hdr'),b=g('br');if(!j&&!t)return '';const F={...TK_FR_DEF,...((it&&it.fr)||{})};return '@'+F.sp+'" OC · '+j+' joist'+(j===1?'':'s')+' · '+t+' track'+(b?' · '+b+' bridging':'')}
-/* framing item settings: members, spacing, track, bridging, openings, waste. New items start from the last settings used (kept on this device). */
-async function tkFrameForm(it){
-  const d=TK.data,isNew=!it;let def={};try{def=JSON.parse(lsGet('acv.tkFrDef')||'{}')||{}}catch(e){}
-  const f={...TK_FR_DEF,...def,...((it&&it.fr)||{})},SP=[12,16,19.2,24],BR=[0,4,5,6,8],o=(v,l,cur)=>'<option value="'+esc(v)+'"'+(String(v)===String(cur)?' selected':'')+'>'+esc(l)+'</option>';
-  const cust=SP.indexOf(+f.sp)<0,col=it?it.color:TK_COLORS[d.items.length%TK_COLORS.length],brc=BR.indexOf(+f.brMax)<0;
+/* one-line summary of a layout's totals (one mark or a whole item): "@16" OC · 24 joists · 2 track", "ACT 2x4 · 75 tiles · 7 mains", "CRC @4' · FC @16" · 48 wires" */
+function tkFrText(sum,it,cnt){const g=k=>(sum[k]||{}).n||0,F=tkLayF(it&&it.fr),pre=F.preset,C=cnt||{};
+  if(pre==='act'){if(!g('main')&&!g('t4'))return '';const t=Math.ceil((C.area||0)/(F.tile==='2x2'?4:8)*(1+(+F.waste||0)/100)-1e-9);return 'ACT '+F.tile+' · '+t+' tile'+(t===1?'':'s')+' · '+g('main')+' main'+(g('main')===1?'':'s')+' · '+(g('t4')+g('t2'))+' tees'}
+  if(pre==='crc'){if(!g('crc')&&!g('fc'))return '';return "CRC @"+F.crcSp+"' · FC @"+F.fcSp+'" · '+(C.wire||0)+' wires'+(C.clip?' · '+C.clip+' clips':'')}
+  const j=g('joist')+g('king'),t=g('track')+g('hdr'),b=g('br');if(!j&&!t)return '';return '@'+F.sp+'" OC · '+j+' joist'+(j===1?'':'s')+' · '+t+' track'+(b?' · '+b+' bridging':'')}
+/* tag on the sheet / in the PDF for one layout mark: "600S162-43 @16" OC · 24 pcs", "ACT 2x4 · 75 tiles", "CRC @4' · FC @16"" */
+function tkLayTag(it,r){const F=tkLayF(it&&it.fr);if(!r)return 'Set the scale to lay out the '+TK_LAY_NAME[F.preset];
+  if(F.preset==='act'){const t=Math.ceil((r.cnt.area||0)/(F.tile==='2x2'?4:8)*(1+(+F.waste||0)/100)-1e-9);return 'ACT '+F.tile+' · '+t+' tiles'}
+  if(F.preset==='crc')return "CRC @"+F.crcSp+"' · FC @"+F.fcSp+'"';
+  return F.mem+' @'+F.sp+'" OC · '+(((r.sum.joist||{}).n||0)+((r.sum.king||{}).n||0))+' pcs'}
+/* short name of a layout item's setup for pickers and the PDF legend */
+function tkLaySh(fr){const F=tkLayF(fr);return F.preset==='act'?'ACT grid '+F.tile:F.preset==='crc'?"CRC @"+F.crcSp+"' · FC @"+F.fcSp+'"':'Joists '+F.mem+' @'+F.sp+'" OC'}
+/* what the "turn" actions call the main members of a preset */
+const TK_LAY_RUN={joists:'joists',act:'mains',crc:'CRC'};
+/* line styles of each preset's members, drawn in this order: [role, width, opacity, dash (0 solid, 1 long, 2 short), highlight (amber halo)] */
+const TK_LAY_ST={joists:[['hdr',7,.6,0,1],['king',7,.6,0,1],['joist',1.1,.9],['br',1.4,1,1],['track',3.2,1],['king',2.2,1],['hdr',2.6,1]],act:[['t2',.6,.75,2],['t4',.8,.85],['main',1.8,1],['wa',3.4,1]],crc:[['fc',.7,.85],['trim',1.6,1],['per2',2.4,.8,2],['per',3.2,1],['crc',2.6,1,1]]};
+/* bid row key -> member role (for the line sample in the PDF legend) */
+const TK_LAY_ROWR={j:'joist',t:'track',b:'br',m:'main',t4:'t4',t2:'t2',wa:'wa',c:'crc',fc:'fc',p:'per',p2:'per2'};
+/* pick a layout preset (for + Layout item) */
+async function tkLayAsk(){const v=await formBox('New layout item',[{k:'p',label:'Layout',type:'select',value:lsGet('acv.tkLayPre')||'joists',options:[['joists','Joists (metal-stud ceiling framing)'],['act','ACT grid (lay-in ceiling)'],['crc','CRC & furring (suspended drywall ceiling)']]}],'Next');return v?v.p:null}
+/* layout item settings for its preset (joists / ACT grid / CRC & furring). New items start from the last settings used for that preset (kept on this device). */
+async function tkFrameForm(it,pre){
+  if(!it&&!pre){pre=await tkLayAsk();if(!pre)return null}
+  pre=it?tkLayPre(it.fr):pre;lsSet('acv.tkLayPre',pre);const d=TK.data,isNew=!it,dk=pre==='joists'?'acv.tkFrDef':'acv.tkLayDef.'+pre;let def={};try{def=JSON.parse(lsGet(dk)||'{}')||{}}catch(e){}
+  const f=tkLayF({...def,...((it&&it.fr)||{}),preset:pre}),o=(v,l,cur)=>'<option value="'+esc(v)+'"'+(String(v)===String(cur)?' selected':'')+'>'+esc(l)+'</option>';
+  const col=it?it.color:TK_COLORS[d.items.length%TK_COLORS.length],NM=TK_LAY_NAME[pre];
   const fld=(k,l,v,ph,x)=>'<label class="field'+(x?' full':'')+'"><span>'+esc(l)+'</span><input name="'+k+'" value="'+esc(v==null?'':v)+'" placeholder="'+esc(ph||'')+'"></label>';
   const sel=(k,l,opts,x)=>'<label class="field'+(x?' full':'')+'"><span>'+esc(l)+'</span><select name="'+k+'">'+opts+'</select></label>';
-  return new Promise(res=>{let done=false;
-    const m=modal('<h2>'+(isNew?'New framing item':'Framing: '+esc(it.code))+'</h2><p class="small muted" style="margin:-4px 0 6px">Draw an area and it lays out the joists at this spacing, track where they bear, bridging rows and framing around openings. Each member goes to the TAKEOFF tab as its own LF row (pieces rounded up to the inch).</p><form class="tkfrf">'+
-      '<div class="tkfrh">Item</div>'+fld('code','Name in the list','Ceiling framing','CJ-1 ceiling joists')+sel('sec','Section',TK_SECS.map(x=>o(x,x.charAt(0)+x.slice(1).toLowerCase(),it?it.sec:'CEILINGS')).join(''))+
-      fld('desc','Joist row description (column B)',it?it.desc:'Ceiling joists','Ceiling joists',1)+
-      '<div class="tkfrh">Joists</div>'+fld('mem','Joist member',f.mem,'600S162-43')+
+  const num=(k,l,L,cur,u)=>sel(k,l,(L.indexOf(+cur)<0?L.concat([+cur]):L).map(x=>o(x,x+u,cur)).join(''));
+  const SP=[12,16,19.2,24],BR=[0,4,5,6,8],cust=SP.indexOf(+f.sp)<0,brc=BR.indexOf(+f.brMax)<0;
+  const intro={joists:'Draw an area and it lays out the joists at this spacing, track where they bear, bridging rows and framing around openings. Each member goes to the TAKEOFF tab as its own LF row (pieces rounded up to the inch).',
+    act:'Draw a room and it lays out the lay-in grid: main tees 4\' OC, cross tees, wall angle all around and hanger wires along the mains. Openings (lights, diffusers) take tiles off. Each part goes to the TAKEOFF tab as its own row; a blank code leaves that row out.',
+    crc:'Draw a ceiling and it lays out the CRC, the furring channel across it, the perimeter member and hanger wires; openings cut the members and get furring trim around them. Each part goes to the TAKEOFF tab as its own row; a blank code leaves that row out.'}[pre];
+  let body='<div class="tkfrh">Item</div>'+fld('code','Name in the list',isNew?NM:it.code,pre==='act'?'ACT-1 2x4 grid':pre==='crc'?'GWB ceiling on CRC':'CJ-1 ceiling joists')+sel('sec','Section',TK_SECS.map(x=>o(x,x.charAt(0)+x.slice(1).toLowerCase(),it?it.sec:'CEILINGS')).join(''))+
+    fld('desc','Row description (column B)',it?it.desc:{joists:'Ceiling joists',act:'ACT grid',crc:'Suspended ceiling'}[pre],'',1);
+  if(pre==='joists')body+='<div class="tkfrh">Joists</div>'+fld('mem','Joist member',f.mem,'600S162-43')+
       '<label class="field"><span>Spacing</span><span class="tkfrsp"><select name="sp">'+SP.map(x=>o(x,x+'" OC',cust?'':f.sp)).join('')+o('c','Custom…',cust?'c':'')+'</select><input name="spc" inputmode="decimal" value="'+(cust?esc(f.sp):'')+'" placeholder="in"'+(cust?'':' hidden')+'></span></label>'+
       sel('endJ','Extra joist at each end',o('','No',f.endJ?'1':'')+o('1','Yes (double end joists)',f.endJ?'1':''))+sel('king','At openings',o('1','Headers + king joists each side',f.king?'1':'')+o('','Headers only',f.king?'1':''))+
       '<div class="tkfrh">Track</div>'+fld('trk','Track member',f.trk,'600T150-43')+sel('trkAll','Track on',o('','Bearing ends (where joists land)',f.trkAll?'1':'')+o('1','All sides',f.trkAll?'1':''))+
       '<div class="tkfrh">Bridging / bracing</div>'+fld('brc','Bridging member (blank = none)',f.brc,'150U50-54 CRC or 362S125 blocking')+
-      '<label class="field"><span>Rows no more than</span><span class="tkfrsp"><select name="brMax">'+BR.map(x=>o(x,x?x+"' apart":'No bridging',brc?'':f.brMax)).join('')+o('c','Custom…',brc?'c':'')+'</select><input name="brx" inputmode="decimal" value="'+(brc?esc(f.brMax):'')+'" placeholder="ft"'+(brc?'':' hidden')+'></span></label>'+
-      '<div class="tkfrh">Totals</div>'+fld('waste','Waste %',f.waste||'','0')+sel('color','Color',TK_COLORS.map((c,i)=>o(c,['Red','Blue','Green','Orange','Purple','Teal','Pink','Brown','Indigo','Lime','Deep orange','Sea green','Violet','Olive','Sky','Slate'][i],col)).join(''))+
+      '<label class="field"><span>Rows no more than</span><span class="tkfrsp"><select name="brMax">'+BR.map(x=>o(x,x?x+"' apart":'No bridging',brc?'':f.brMax)).join('')+o('c','Custom…',brc?'c':'')+'</select><input name="brx" inputmode="decimal" value="'+(brc?esc(f.brMax):'')+'" placeholder="ft"'+(brc?'':' hidden')+'></span></label>';
+  if(pre==='act')body+='<div class="tkfrh">Grid</div>'+sel('tile','Tile',o('2x4','2x4 (4\' tees 2\' OC)',f.tile)+o('2x2','2x2 (+ 2\' tees between)',f.tile))+fld('main','Main tee (code)',f.main,"Main tee 12'")+num('mainLen','Main tee length',[12],f.mainLen,"'")+
+      fld('t4',"4' cross tee (code)",f.t4,"4' cross tee")+fld('t2',"2' cross tee (code, 2x2)",f.t2,"2' cross tee")+
+      '<div class="tkfrh">Perimeter and wires</div>'+fld('wa','Wall angle (code)',f.wa,'Wall angle')+num('waLen','Wall angle sticks',[10,12],f.waLen,"'")+fld('wire','Hanger wire (code)',f.wire,'Hanger wire 12ga')+num('wireSp','Wire along mains every',[3,4,5],f.wireSp,"'")+
+      '<div class="tkfrh">Tile</div>'+fld('tileCode','Tile row code (SF)',f.tileCode,'ACT tile 2x4',1);
+  if(pre==='crc')body+='<div class="tkfrh">CRC</div>'+fld('crc','CRC (code)',f.crc,'150U50-54 CRC')+num('crcSp','CRC spacing',[2,3,4],f.crcSp,"' OC")+num('crcLen','CRC length',[12,16,20],f.crcLen,"'")+num('wireSp','Hanger wire along CRC every',[3,4,5],f.wireSp,"'")+fld('wire','Hanger wire (code)',f.wire,'Hanger wire 12ga')+
+      '<div class="tkfrh">Furring</div>'+fld('fc','Furring channel / hat (code)',f.fc,'7/8" FC 25ga')+num('fcSp','Furring spacing',[12,16,24],f.fcSp,'" OC')+num('fcLen','Furring length',[12,16,20],f.fcLen,"'")+fld('clip','Clips / wire ties (code, blank = none)',f.clip,'FC clip')+
+      '<div class="tkfrh">Perimeter</div>'+fld('per','Perimeter member (code)',f.per,'200T125-20 or wall angle')+fld('per2','2nd perimeter member (blank = none)',f.per2,'Wall angle')+num('perLen','Perimeter sticks',[10,12],f.perLen,"'");
+  if(pre!=='act')body+='<div class="tkfrh">Area</div>'+fld('sfc','Area SF row code (blank = none)',f.sfc||'','5/8 X GWB ceiling',1);
+  body+='<div class="tkfrh">Totals</div>'+fld('waste','Waste %',f.waste||'','0')+sel('color','Color',TK_COLORS.map((c,i)=>o(c,['Red','Blue','Green','Orange','Purple','Teal','Pink','Brown','Indigo','Lime','Deep orange','Sea green','Violet','Olive','Sky','Slate'][i],col)).join(''));
+  return new Promise(res=>{let done=false;
+    const m=modal('<h2>'+(isNew?'New layout: '+NM:'Layout ('+NM+'): '+esc(it.code))+'</h2><p class="small muted" style="margin:-4px 0 6px">'+intro+'</p><form class="tkfrf" data-pre="'+pre+'">'+body+
       '<div class="mbtns"><button type="button" class="btn" data-x>Cancel</button><button class="btn primary" type="submit">'+(isNew?'Add':'Save')+'</button></div></form>',()=>{if(!done)res(null)});
-    const q=k=>$('[name="'+k+'"]',m);q('sp').onchange=()=>{q('spc').hidden=q('sp').value!=='c';if(!q('spc').hidden)q('spc').focus()};q('brMax').onchange=()=>{q('brx').hidden=q('brMax').value!=='c';if(!q('brx').hidden)q('brx').focus()};
-    $('[data-x]',m).onclick=()=>m.close();setTimeout(()=>{const i=q('mem');i&&i.focus()},50);
-    $('form',m).onsubmit=e=>{e.preventDefault();const v=k=>String(q(k).value||'').trim();
-      const sp=v('sp')==='c'?parseFloat(v('spc')):+v('sp'),bm=v('brMax')==='c'?tkFeet(v('brx')):+v('brMax'),w=v('waste')?parseFloat(v('waste')):0;
-      if(!v('code')||!v('mem')){toast('Give it a name and a joist member.');return}
-      if(!(sp>=4&&sp<=96)){toast('Spacing should be 4 to 96 inches.');return}if(!(bm>=0)||bm>100){toast('Check the bridging spacing (feet).');return}if(!(w>=0&&w<=100)){toast('Waste % should be 0 to 100.');return}
-      const fr={mem:v('mem').slice(0,80),sp:Math.round(sp*1000)/1000,trk:v('trk').slice(0,80),trkAll:v('trkAll')==='1',brc:v('brc').slice(0,80),brMax:v('brc')?Math.round(bm*1000)/1000:0,endJ:v('endJ')==='1',king:v('king')==='1',waste:Math.round(w*100)/100};
+    const q=k=>$('[name="'+k+'"]',m);
+    if(pre==='joists'){q('sp').onchange=()=>{q('spc').hidden=q('sp').value!=='c';if(!q('spc').hidden)q('spc').focus()};q('brMax').onchange=()=>{q('brx').hidden=q('brMax').value!=='c';if(!q('brx').hidden)q('brx').focus()}}
+    $('[data-x]',m).onclick=()=>m.close();setTimeout(()=>{const i=q('code');i&&i.focus()},50);
+    $('form',m).onsubmit=e=>{e.preventDefault();const v=k=>String((q(k)||{}).value||'').trim(),c80=k=>v(k).slice(0,80),w=v('waste')?parseFloat(v('waste')):0;
+      if(!v('code')){toast('Give it a name.');return}if(!(w>=0&&w<=100)){toast('Waste % should be 0 to 100.');return}let fr;
+      if(pre==='joists'){const sp=v('sp')==='c'?parseFloat(v('spc')):+v('sp'),bm=v('brMax')==='c'?tkFeet(v('brx')):+v('brMax');
+        if(!v('mem')){toast('Give it a joist member.');return}
+        if(!(sp>=4&&sp<=96)){toast('Spacing should be 4 to 96 inches.');return}if(!(bm>=0)||bm>100){toast('Check the bridging spacing (feet).');return}
+        fr={preset:'joists',mem:c80('mem'),sp:Math.round(sp*1000)/1000,trk:c80('trk'),trkAll:v('trkAll')==='1',brc:c80('brc'),brMax:v('brc')?Math.round(bm*1000)/1000:0,endJ:v('endJ')==='1',king:v('king')==='1',sfc:c80('sfc'),waste:Math.round(w*100)/100}}
+      else if(pre==='act'){if(!v('main')){toast('Give it a main tee.');return}
+        fr={preset:'act',tile:v('tile')==='2x2'?'2x2':'2x4',main:c80('main'),mainLen:+v('mainLen')||12,t4:c80('t4'),t2:c80('t2'),wa:c80('wa'),waLen:+v('waLen')||12,wire:c80('wire'),wireSp:+v('wireSp')||4,tileCode:c80('tileCode'),waste:Math.round(w*100)/100}}
+      else{if(!v('crc')||!v('fc')){toast('Give it a CRC and a furring member.');return}
+        fr={preset:'crc',crc:c80('crc'),crcSp:+v('crcSp')||4,crcLen:+v('crcLen')||16,fc:c80('fc'),fcSp:+v('fcSp')||16,fcLen:+v('fcLen')||12,per:c80('per'),per2:c80('per2'),perLen:+v('perLen')||10,wire:c80('wire'),wireSp:+v('wireSp')||4,clip:c80('clip'),sfc:c80('sfc'),waste:Math.round(w*100)/100}}
       const nv={id:it?it.id:uuid(),n:it?it.n:(Math.max(0,...d.items.map(x=>x.n||0))+1),code:v('code').slice(0,200),desc:v('desc').slice(0,200),sec:v('sec'),unit:'LF',h:null,w:null,color:v('color'),fr};
-      lsSet('acv.tkFrDef',JSON.stringify(fr));done=true;m.close();tkDo({t:'item',v:nv});
+      lsSet(dk,JSON.stringify(fr));done=true;m.close();tkDo({t:'item',v:nv});
       if(!TKV)tkRenderBody();else{TKV.item=nv.id;TKV.lm='frame';TKV.mode='draw';tkvPaint()}res(nv)};
   });
 }
-/* right-click actions on a framing area (fr...) and Frame this area on an SF area */
-async function tkvFrameAct(c,s,p0){
-  if(!TKV||!s)return;const it=tkItem(s.item);
+/* right-click actions on a layout area (fr...), Add layout on an SF area (frthis + preset) */
+async function tkvFrameAct(c,s,p0,pre){
+  if(!TKV||!s)return;const it=tkItem(s.item),P=tkLayPre(it&&it.fr),RN=TK_LAY_RUN[P];
   if(c==='frset'){const v=await tkFrameForm(it);if(v&&TKV){TKV.sel=s.id;tkvPaint()}return}
   if(c==='froff'){TKV.frOff=!TKV.frOff;lsSet('acv.tkFrOff',TKV.frOff?'1':null);tkvPaint();return}
   if(c==='frauto'){tkDo({t:'shape',v:{id:s.id,dir:'auto',edge:null,ang:null}});tkvPaint();return}
   if(c==='frrot'){const sc=tkScaleOf(TKV.id),r=sc&&tkFrameOf(s,TKV.sh,sc,it&&it.fr);const a=r?r.ang*180/Math.PI:+s.ang||0;tkDo({t:'shape',v:{id:s.id,dir:'ang',edge:null,ang:Math.round(((a+90)%180)*1000)/1000}});tkvPaint();return}
   if(c==='fredge'){const es=tkvNearSeg(s,p0);if(es){tkDo({t:'shape',v:{id:s.id,dir:'edge',edge:es.seg,ang:null}});tkvPaint()}return}
-  if(c==='fropen'){if(TKV.draft.length)tkvFinish();tkvUseItem(s.item);TKV.mode='draw';TKV.dNext=true;tkvPaint();toast('Click the opening\'s corners inside the framing area (or drag a rectangle).');return}
+  if(c==='fropen'){if(TKV.draft.length)tkvFinish();tkvUseItem(s.item);TKV.mode='draw';TKV.dNext=true;tkvPaint();toast('Click the opening\'s corners inside the layout area (or drag a rectangle).');return}
   if(c==='frdelo'){const o=(s.o||[]).filter(q=>!tkInPoly(p0,q,TKV.W,TKV.H));tkDo({t:'shape',v:{id:s.id,o}});tkvPaint();return}
-  if(c==='frthis'){const x=await tkvPickFrame();if(!x||!TKV)return;const W=TKV.W,H=TKV.H;
+  if(c==='frrm'){const W=TKV.W,H=TKV.H,same=(a,b)=>a&&b&&a.length===b.length&&a.every((x,i)=>Math.abs(x-b[i])<1e-6);
+    const has=TK.data.shapes.some(d=>d.sheet===TKV.id&&d.k==='poly'&&!d.deduct&&same(d.p,s.p)&&tkItem(d.item)&&tkItem(d.item).unit==='SF');
+    if(has){tkDo({t:'del_shape',id:s.id});TKV.sel=null;tkvPaint();toast('Layout removed. The SF area under it stays.');return}
+    const x=await tkvPickUnit('SF');if(!x||!TKV)return;const v={id:uuid(),item:x.id,sheet:TKV.id,k:'poly',p:(s.p||[]).slice(),by:'office',at:new Date().toISOString()};
+    const ops=[{t:'del_shape',id:s.id},{t:'shape',v}].concat((s.o||[]).map(q=>({t:'shape',v:{id:uuid(),item:x.id,sheet:TKV.id,k:'poly',p:q.slice(),deduct:true,by:'office',at:v.at}})));
+    tkDo(ops);TKV.mine.push(v.id);TKV.sel=v.id;tkvPaint();toast('Layout removed; the area is on '+x.code+' now'+((s.o||[]).length?' (openings as cut-outs)':'')+'.');return}
+  if(c==='frthis'){const x=await tkvPickFrame(pre);if(!x||!TKV)return;const W=TKV.W,H=TKV.H;
     const o=TK.data.shapes.filter(d=>d.sheet===TKV.id&&d.k==='poly'&&d.deduct&&d.item===s.item).map(d=>d.p||[]).filter(q=>{let cx=0,cy=0;const n=q.length/2;for(let i=0;i<n;i++){cx+=q[2*i]*W;cy+=q[2*i+1]*H}return n>=3&&tkInPoly({x:cx/n,y:cy/n},s.p||[],W,H)}).map(q=>q.slice());
     const v={id:uuid(),item:x.id,sheet:TKV.id,k:'frame',p:(s.p||[]).slice(),o,dir:'auto',by:'office',at:new Date().toISOString()};tkDo({t:'shape',v});TKV.mine.push(v.id);tkvUseItem(x.id);TKV.sel=v.id;tkvPaint();
-    toast('Framed '+x.code+(o.length?' with '+o.length+' opening'+(o.length===1?'':'s'):'')+'. Right-click it to turn the joists.')}
+    toast(TK_LAY_NAME[tkLayPre(x.fr)]+' layout added ('+x.code+')'+(o.length?' with '+o.length+' opening'+(o.length===1?'':'s'):'')+'. Right-click it to turn the '+TK_LAY_RUN[tkLayPre(x.fr)]+'.')}
 }
 async function tkItemMenu(it){
   if(!it)return;const shs=tkItemSheets(it.id);const m=modal('<h2>'+esc(it.code)+'</h2><div style="display:grid;gap:10px">'+(shs.length&&!TKV?'<button class="btn primary" data-a="show">Show on sheets ('+shs.length+' sheet'+(shs.length===1?'':'s')+')</button>':'')+'<button class="btn" data-a="edit">Edit</button><button class="btn danger" data-a="del">Delete item and its marks</button><button class="btn" data-a="x">Close</button></div>');
@@ -5173,14 +5290,14 @@ async function tkOpen(sid){
   el.innerHTML='<div class="vbar"><button id="tkBack">‹ Takeoff</button><div class="vt">'+esc(sh.name||'Sheet')+(ni>=0&&list.length>1?' <span style="font-weight:400;opacity:.7">('+(ni+1)+'/'+list.length+')</span>':'')+'</div><button id="tkPrev"'+(ni<=0?' disabled':'')+'>‹</button><button id="tkNext"'+(ni<0||ni>=list.length-1?' disabled':'')+'>›</button></div>'+
     '<div class="tkwrap"><div id="tkStage"><div id="tkBoard"><img id="tkImg" alt="" draggable="false"><svg id="tkInk" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="tkHatch" patternUnits="userSpaceOnUse" width="24" height="24" patternTransform="rotate(45)"><rect width="24" height="24" fill="#fff" fill-opacity=".55"/><line x1="0" y1="0" x2="0" y2="24" stroke="#c62828" stroke-width="5" stroke-opacity=".6"/></pattern></defs><g id="tkShapes"></g><g id="tkLive"></g></svg></div><canvas id="tkOv" class="tkov" aria-hidden="true"></canvas><canvas id="tkMag" class="tkmag" aria-hidden="true"></canvas><div class="tkcr" id="tkCr" aria-live="off"></div><div class="hint" id="tkHint">Loading sheet…</div><div class="tkread" id="tkRead"></div><div class="tkhl" id="tkHl"></div></div>'+
     '<div class="tkside" id="tkSide"></div></div>'+
-    '<div class="vtools"><div class="trow"><button class="tb" data-tm="draw">✏ Take off</button><button class="tb" data-tm="pan">✋ Move</button><button class="tb" data-tm="select">☝ Select</button><button class="tb" data-tm="scale">📐 Scale</button><button class="tb" data-tm="measure">📏 Measure</button><button class="tb" id="tkDone">✓ Finish</button><button class="tb" id="tkUndo">↶ Undo point</button><button class="tb" id="tkSnap">Snap: on</button><button class="tb" id="tkOrtho" title="Lock lines level / plumb (or hold Shift)" aria-pressed="false">⊥ Ortho</button><span class="tkseg" title="Run: each click adds a corner until ✓ Finish. Segments: every 2 clicks make one straight piece. Area: click the corners, or drag a rectangle."><button class="tb" data-lm="run">Run</button><button class="tb" data-lm="seg">Segments</button><button class="tb" data-lm="area">Area</button><button class="tb" data-lm="frame" title="Framing: draw an area (or right-click an area → Frame this area) and it lays out joists, track, bridging and opening framing, LF per member">▦ Framing</button></span><button class="tb" id="tkWm" title="Draw takeoff lines thinner or thicker">Line: 1x</button><button class="tb" id="tkCopy">⧉ Copy to sheet…</button><button class="tb" id="tkFit">⤢ Fit</button></div></div>';
+    '<div class="vtools"><div class="trow"><button class="tb" data-tm="draw">✏ Take off</button><button class="tb" data-tm="pan">✋ Move</button><button class="tb" data-tm="select">☝ Select</button><button class="tb" data-tm="scale">📐 Scale</button><button class="tb" data-tm="measure">📏 Measure</button><button class="tb" id="tkDone">✓ Finish</button><button class="tb" id="tkUndo">↶ Undo point</button><button class="tb" id="tkSnap">Snap: on</button><button class="tb" id="tkOrtho" title="Lock lines level / plumb (or hold Shift)" aria-pressed="false">⊥ Ortho</button><span class="tkseg" title="Area: click the corners, or drag a rectangle (+ Layout lays out joists / ACT grid / CRC &amp; furring). Linear: each click adds a corner until ✓ Finish. Segments: every 2 clicks make one straight piece. Count: each click counts one."><button class="tb" data-lm="area">Area</button><select class="tb tklay" id="tkLay" title="+ Layout: draw the area as a joist / ACT grid / CRC & furring layout (or right-click an area → Add layout)" aria-label="Layout"><option value="">+ Layout: Off</option><option value="joists">Layout: Joists</option><option value="act">Layout: ACT</option><option value="crc">Layout: CRC</option></select><button class="tb" data-lm="run">Linear</button><button class="tb" data-lm="seg">Segments</button><button class="tb" data-lm="count">Count</button></span><button class="tb" id="tkWm" title="Draw takeoff lines thinner or thicker">Line: 1x</button><button class="tb" id="tkCopy">⧉ Copy to sheet…</button><button class="tb" id="tkFit">⤢ Fit</button></div></div>';
   $('#tkBack').onclick=tkClose;$('#tkFit').onclick=tkvFit;
   $('#tkPrev').onclick=()=>tkStep(-1);$('#tkNext').onclick=()=>tkStep(1);
   $$('[data-tm]',el).forEach(b=>b.onclick=()=>tkvMode(b.dataset.tm));
   $('#tkDone').onclick=tkvFinish;$('#tkUndo').onclick=tkvUndoPt;$('#tkCopy').onclick=tkvCopy;
   TKV.snap=lsGet('acv.tkSnap')!=='off';$('#tkSnap').onclick=()=>{TKV.snap=!TKV.snap;lsSet('acv.tkSnap',TKV.snap?null:'off');tkvTools()};
   TKV.ortho=tkdrGet().ortho;TKV.mods={};$('#tkOrtho').onclick=()=>{TKV.ortho=!TKV.ortho;tkvTools();tkvHover()};
-  $$('[data-lm]',el).forEach(b=>b.onclick=()=>tkvSetLm(b.dataset.lm));
+  $$('[data-lm]',el).forEach(b=>b.onclick=()=>tkvSetLm(b.dataset.lm));$('#tkLay').onchange=e=>tkvSetLay(e.target.value);
   $('#tkWm').onclick=()=>{const i=TK_WMULS.indexOf(TKV.wmul);TKV.wmul=TK_WMULS[(i+1)%TK_WMULS.length];lsSet('acv.tkWmul',TKV.wmul===1?null:String(TKV.wmul));tkvPaint()};
   TKV.stage=$('#tkStage');TKV.board=$('#tkBoard');TKV.img=$('#tkImg');
   TKV.img.onload=()=>{if(!TKV)return;TKV.W=TKV.img.naturalWidth;TKV.H=TKV.img.naturalHeight;TKV.board.style.width=TKV.W+'px';TKV.board.style.height=TKV.H+'px';$('#tkInk').setAttribute('viewBox','0 0 '+TKV.W+' '+TKV.H);tkvFit();tkvPaint();if(!tkScaleOf(sid))setTimeout(()=>{if(TKV&&TKV.id===sid&&!tkScaleOf(sid))tkScaleBox()},300)};
@@ -5199,10 +5316,11 @@ function tkGo(n){if(!TKV||!n)return;tkCtxClose();const it=TKV.item,hl=TKV.hl,las
 function tkHlStep(d){if(!TKV||!TKV.hl)return;const l=tkItemSheets(TKV.hl);const i=l.findIndex(s=>s.id===TKV.id);let n;
   if(i>=0)n=l[i+d];else{const pos=TKV.ni;n=d>0?l.find(s=>TKV.list.indexOf(s)>pos):l.filter(s=>TKV.list.indexOf(s)<pos).pop()}
   if(n)tkGo(n)}
-/* drawing mode: Run / Segments (LF items) or Area (SF items); switching to the other kind picks the last item of that kind, or asks */
+/* drawing mode: Linear ('run') / Segments (LF items), Area (SF items) or Count (EA items) (SF items); switching to the other kind picks the last item of that kind, or asks */
 async function tkvSetLm(m){
   if(!TKV)return;tkCtxClose();if(TKV.draft.length&&TKV.mode==='draw')tkvFinish();const it=tkItem(TKV.item),u=m==='area'?'SF':'LF';
-  if(m==='frame'){if(!it||!it.fr){const x=await tkvPickFrame();if(!x||!TKV)return;TKV.item=x.id}TKV.lm='frame';TKV.dNext=false;TKV.mode='draw';tkvPaint();return}
+  if(m==='count'){if(!it||it.unit!=='EA'){const x=await tkvPickUnit('EA');if(!x||!TKV)return;TKV.item=x.id}TKV.dNext=false;TKV.mode='draw';tkvPaint();return}
+  if(m==='frame'||m.startsWith('frame:')){const pr=m.split(':')[1]||'';if(pr){await tkvSetLay(pr);return}if(!it||!it.fr){const x=await tkvPickFrame();if(!x||!TKV)return;TKV.item=x.id}TKV.lm='frame';TKV.dNext=false;TKV.mode='draw';tkvPaint();return}
   if(!it||it.unit!==u||it.fr){const x=await tkvPickUnit(u);if(!x||!TKV)return;TKV.item=x.id}
   TKV.lm=m;TKV.dNext=false;lsSet('acv.tkLineMode',m==='run'?null:m);if(m!=='area')lsSet('acv.tkLineMode2',m==='seg'?'seg':null);TKV.mode='draw';tkvPaint();
 }
@@ -5210,20 +5328,27 @@ async function tkvSetLm(m){
 async function tkvPickUnit(u){
   const last=TKV.last&&tkItem(TKV.last[u]);if(last&&last.unit===u&&!last.fr)return last;
   const c=TK.data.items.filter(x=>x.unit===u&&!x.fr).sort((a,b)=>TK_SECS.indexOf(a.sec)-TK_SECS.indexOf(b.sec)||(a.n||0)-(b.n||0));if(c.length===1)return c[0];
-  if(c.length){const v=await formBox(u==='SF'?'Pick an area (SF) item':'Pick a wall (LF) item',[{k:'it',label:u==='SF'?'Area marks go on ceiling / SF items':'Lines go on wall / LF items',type:'select',value:c[0].id,options:c.map(x=>[x.id,x.code+(x.desc?' — '+x.desc:'')]).concat([['__new','+ New '+u+' item…']])}],'Use');
+  if(c.length){const v=await formBox(u==='SF'?'Pick an area (SF) item':u==='EA'?'Pick a count (EA) item':'Pick a wall (LF) item',[{k:'it',label:u==='SF'?'Area marks go on ceiling / SF items':u==='EA'?'Counts go on EA items (doors, frames…)':'Lines go on wall / LF items',type:'select',value:c[0].id,options:c.map(x=>[x.id,x.code+(x.desc?' — '+x.desc:'')]).concat([['__new','+ New '+u+' item…']])}],'Use');
     if(!v)return null;if(v.it!=='__new')return tkItem(v.it)}
-  else toast(u==='SF'?'Add an area (SF) item first, like a ceiling.':'Add a wall (LF) item first.');
-  return await tkItemForm(null,{unit:u,sec:u==='SF'?'CEILINGS':'INTERIOR'});
+  else toast(u==='SF'?'Add an area (SF) item first, like a ceiling.':u==='EA'?'Add a count (EA) item first, like door frames.':'Add a wall (LF) item first.');
+  return await tkItemForm(null,{unit:u,sec:u==='SF'?'CEILINGS':u==='EA'?'HMDFS':'INTERIOR'});
 }
-/* the framing item to draw with: the last one used, the only one, or ask (with + New) */
-async function tkvPickFrame(){
-  const last=TKV.last&&tkItem(TKV.last.FR);if(last&&last.fr)return last;
-  const c=TK.data.items.filter(x=>x.fr).sort((a,b)=>(a.n||0)-(b.n||0));if(c.length===1)return c[0];
-  if(c.length){const v=await formBox('Pick a framing item',[{k:'it',label:'Framing areas go on framing items',type:'select',value:c[0].id,options:c.map(x=>[x.id,x.code+' — '+x.fr.mem+' @'+x.fr.sp+'" OC']).concat([['__new','+ New framing item…']])}],'Use');
+/* the layout item to draw with (of preset pre, any when none): the last one used, the only one, or ask (with + New) */
+async function tkvPickFrame(pre){
+  const ok=x=>!!x&&!!x.fr&&(!pre||tkLayPre(x.fr)===pre),last=TKV.last&&tkItem(TKV.last['FR:'+(pre||'')]||TKV.last.FR);if(ok(last))return last;
+  const c=TK.data.items.filter(ok).sort((a,b)=>(a.n||0)-(b.n||0));if(c.length===1)return c[0];
+  if(c.length){const v=await formBox('Pick a layout item'+(pre?' ('+TK_LAY_NAME[pre]+')':''),[{k:'it',label:'Layout areas go on layout items',type:'select',value:c[0].id,options:c.map(x=>[x.id,x.code+' — '+tkLaySh(x.fr)]).concat([['__new','+ New layout item…']])}],'Use');
     if(!v)return null;if(v.it!=='__new')return tkItem(v.it)}
-  return await tkFrameForm(null);
+  return await tkFrameForm(null,pre);
 }
-/* make an item the active one; Area goes with SF items, Framing with framing items, Run/Segments with LF items */
+/* Area mode's "+ Layout" choice: '' = plain SF area, else draw layout areas of that preset */
+async function tkvSetLay(pre){
+  if(!TKV)return;if(!pre){await tkvSetLm('area');tkvPaint();return}
+  if(TKV.draft.length&&TKV.mode==='draw')tkvFinish();const it=tkItem(TKV.item);
+  if(!(it&&it.fr&&tkLayPre(it.fr)===pre)){const x=await tkvPickFrame(pre);if(!x||!TKV){if(TKV)tkvPaint();return}TKV.item=x.id}
+  TKV.lm='frame';TKV.dNext=false;TKV.mode='draw';tkvPaint();
+}
+/* make an item the active one; Area goes with SF and layout items, Linear/Segments with LF items */
 function tkvUseItem(id){const it=tkItem(id);if(!it)return;TKV.item=id;if(it.fr){TKV.lm='frame';TKV.dNext=false;return}if(it.unit==='SF')TKV.lm='area';else if(it.unit==='LF'&&(TKV.lm==='area'||TKV.lm==='frame'))TKV.lm=lsGet('acv.tkLineMode2')==='seg'?'seg':'run';if(it.unit!=='EA')lsSet('acv.tkLineMode',TKV.lm==='run'?null:TKV.lm);TKV.dNext=false}
 /* highlight one item's marks (others dim); the bar shows Show all and ‹ › to other sheets with this item */
 function tkvHlBar(){
@@ -5253,18 +5378,19 @@ function tkvTools(){
   const wm=$('#tkWm');if(wm)wm.textContent='Line: '+(TKV.wmul||1)+'x';
   const ob=$('#tkOrtho');if(ob){ob.classList.toggle('on',!!TKV.ortho);ob.setAttribute('aria-pressed',String(!!TKV.ortho))}
   if(TKV.stage){const cs=tkdrGet().cur;TKV.stage.classList.toggle('tkxh',draw&&cs!=='arrow');TKV.stage.classList.toggle('tkar',draw&&cs==='arrow')}
-  $$('#tkv [data-lm]').forEach(b=>b.classList.toggle('on',TKV.mode==='draw'&&!!it&&it.unit!=='EA'&&b.dataset.lm===(it.fr?'frame':it.unit==='SF'?'area':TKV.lm==='seg'?'seg':'run')));
+  $$('#tkv [data-lm]').forEach(b=>b.classList.toggle('on',TKV.mode==='draw'&&!!it&&b.dataset.lm===(it.unit==='EA'?'count':it.fr||it.unit==='SF'?'area':TKV.lm==='seg'?'seg':'run')));
+  {const ls=$('#tkLay');if(ls){const on=TKV.mode==='draw'&&!!it&&(!!it.fr||it.unit==='SF');ls.hidden=!on;ls.value=it&&it.fr?tkLayPre(it.fr):'';ls.classList.toggle('on',!!(it&&it.fr))}}
   const h=$('#tkHint');if(!h||!TKV.W)return;
   const sc=tkScaleOf(TKV.id);
   h.textContent=!sc&&TKV.mode!=='scale'?'No scale on this sheet yet: tap 📐 Scale':
-    TKV.mode==='draw'&&TKV.cont?'Continuing the run: click each next corner · Enter or right-click ■ Stop to finish · Esc cancels (the mark stays as it was)':
-    TKV.mode==='draw'?(it?(it.fr?(TKV.dNext||TKV.dDraft?'Opening: click its corners inside a framing area (or drag a rectangle) · ✓ Finish':'Framing: click the area\'s corners (click the first one or ✓ Finish to close) or drag a rectangle · Alt+drag = opening · right-click a framing area to turn the joists or edit'):it.unit==='LF'?(TKV.lm==='seg'?'Segments: click both ends of each wall piece · right-click for more · drag to move':'Click each corner along the wall · double-click or ✓ Finish to end the run · Shift = level/plumb · right-click for more · drag to move'):it.unit==='SF'?(TKV.dNext?'Deduct: click the corners of the cut-out (or drag a rectangle) · ✓ Finish':'Area: click the corners (click the first one or ✓ Finish to close) or drag a rectangle · Alt+drag/click = deduct · space+drag to move'):'Click each item to count it · drag to move'):'Pick a takeoff item on the right'):
+    TKV.mode==='draw'&&TKV.cont?'Continuing the linear: click each next corner · Enter or right-click ■ Stop to finish · Esc cancels (the mark stays as it was)':
+    TKV.mode==='draw'?(it?(it.fr?(TKV.dNext||TKV.dDraft?'Opening: click its corners inside a layout area (or drag a rectangle) · ✓ Finish':'Layout ('+TK_LAY_NAME[tkLayPre(it.fr)]+'): click the area\'s corners (click the first one or ✓ Finish to close) or drag a rectangle · Alt+drag = opening · right-click a layout area to turn the '+TK_LAY_RUN[tkLayPre(it.fr)]+' or edit'):it.unit==='LF'?(TKV.lm==='seg'?'Segments: click both ends of each wall piece · right-click for more · drag to move':'Click each corner along the wall · double-click or ✓ Finish to end the linear · Shift = level/plumb · right-click for more · drag to move'):it.unit==='SF'?(TKV.dNext?'Deduct: click the corners of the cut-out (or drag a rectangle) · ✓ Finish':'Area: click the corners (click the first one or ✓ Finish to close) or drag a rectangle · Alt+drag/click = deduct · space+drag to move'):'Click each item to count it · drag to move'):'Pick a takeoff item on the right'):
     TKV.mode==='pan'?'Drag to move · wheel or pinch to zoom':TKV.mode==='select'?'Click a mark to select it · drag to move the sheet · drag a selected mark\'s corners to reshape · shift-click to pick several, shift+drag a box to pick an area · right-click (long-press) for more':TKV.mode==='scale'?'Click both ends of a dimension you know (they snap to line ends) · Shift = level/plumb':'Click points to measure (not saved) · ✓ Finish · Shift = level/plumb';
   h.style.display='block';
 }
 function tkvSide(){
   tkvViewInit();const el=$('#tkSide');if(!el||!TK)return;const d=TK.data,tot=tkTotals(d,S.sheets.filter(s=>s.id===TKV.id)),all=tkTotals(d,tkSheets());const sc=tkScaleOf(TKV.id);
-  const row=it=>{const t=tot[it.id]||{},a=all[it.id]||{};return '<div class="tkit'+(it.id===TKV.item?' on':'')+(TKV.hl===it.id?' hl':'')+'" data-it="'+esc(it.id)+'"><button class="tkeye'+(TKV.hide[it.id]?' off':'')+'" data-eye="'+esc(it.id)+'" title="Show/hide">'+(TKV.hide[it.id]?'◌':'●')+'</button><span class="sw" style="background:'+esc(it.color)+'"></span><div class="grow"><div class="c" title="'+esc(it.code+(it.desc?' — '+it.desc:''))+'">'+esc(it.code)+'</div>'+(it.desc?'<div class="tkd">'+esc(it.desc)+'</div>':'')+(it.fr?'<div class="tkfrsum">'+esc(tkFrText((tkFrItem(d,S.sheets.filter(s=>s.id===TKV.id),it)).sum,it)||it.fr.mem+' @'+it.fr.sp+'" OC')+'</div>':'<div class="small muted">'+(it.h?esc(tkFtIn(+it.h)):'')+(it.unit==='LF'?(it.h?' · ':'')+esc(tkInStr(tkItemWidthIn(it)))+' wide':'')+'</div>')+'</div><div class="q"><div>'+esc(tkFmtQty(t.qty||0,it.unit))+'</div><div class="small muted">all: '+esc(tkFmtQty(a.qty||0,it.unit))+'</div></div><button class="tkdot" data-ed="'+esc(it.id)+'" title="Edit">⋯</button></div>'};
+  const row=it=>{const t=tot[it.id]||{},a=all[it.id]||{};return '<div class="tkit'+(it.id===TKV.item?' on':'')+(TKV.hl===it.id?' hl':'')+'" data-it="'+esc(it.id)+'"><button class="tkeye'+(TKV.hide[it.id]?' off':'')+'" data-eye="'+esc(it.id)+'" title="Show/hide">'+(TKV.hide[it.id]?'◌':'●')+'</button><span class="sw" style="background:'+esc(it.color)+'"></span><div class="grow"><div class="c" title="'+esc(it.code+(it.desc?' — '+it.desc:''))+'">'+esc(it.code)+'</div>'+(it.desc?'<div class="tkd">'+esc(it.desc)+'</div>':'')+(it.fr?'<div class="tkfrsum">'+esc((fi=>tkFrText(fi.sum,it,fi.cnt))(tkFrItem(d,S.sheets.filter(s=>s.id===TKV.id),it))||tkLaySh(it.fr))+'</div>':'<div class="small muted">'+(it.h?esc(tkFtIn(+it.h)):'')+(it.unit==='LF'?(it.h?' · ':'')+esc(tkInStr(tkItemWidthIn(it)))+' wide':'')+'</div>')+'</div><div class="q"><div>'+esc(tkFmtQty(t.qty||0,it.unit))+'</div><div class="small muted">all: '+esc(tkFmtQty(a.qty||0,it.unit))+'</div></div><button class="tkdot" data-ed="'+esc(it.id)+'" title="Edit">⋯</button></div>'};
   let list='';
   TK_SECS.forEach(sec=>{const its=d.items.filter(it=>(TK_SECS.includes(it.sec)?it.sec:'INTERIOR')===sec).sort((a,b)=>(a.n||0)-(b.n||0));if(!its.length)return;const k='v:'+sec;
     list+=tkGroupHd(k,sec.charAt(0)+sec.slice(1).toLowerCase(),its.length+' · '+esc(tkSumText(its,tot)||'—'),'tksec');
@@ -5297,7 +5423,7 @@ function tkvPaint(fast){
   if(!TKV||!TKV.W||!TK)return;const g=$('#tkShapes');if(!g)return;const W=TKV.W,H=TKV.H,M=Math.max(W,H),sw=M*.004;
   const its={};TK.data.items.forEach(i=>its[i.id]=i);
   const on={};TK.data.shapes.forEach(s=>{if(s.sheet===TKV.id&&its[s.item])on[s.id]=1});TKV.msel=(TKV.msel||[]).filter(id=>on[id]);if(TKV.sel&&!on[TKV.sel])TKV.sel=null;
-  const hl=TKV.hl&&its[TKV.hl]?TKV.hl:null;{const ci=its[TKV.item];if(ci)TKV.last[ci.fr?'FR':ci.unit]=ci.id}
+  const hl=TKV.hl&&its[TKV.hl]?TKV.hl:null;{const ci=its[TKV.item];if(ci){TKV.last[ci.fr?'FR':ci.unit]=ci.id;if(ci.fr)TKV.last['FR:'+tkLayPre(ci.fr)]=ci.id}}
   const tags=[],fs=M*.009,ends=tkdrGet().ends;
   g.innerHTML=TK.data.shapes.filter(s=>s.sheet===TKV.id&&its[s.item]&&!TKV.hide[s.item]&&s.id!==TKV.cont).map(s=>{const it=its[s.item],c=esc(it.color),p=(TKV.drag&&TKV.drag.id===s.id?TKV.drag.p:(s.p||[])).map(Number),sel=TKV.sel===s.id||TKV.msel.includes(s.id);
     const dim=hl&&s.item!==hl&&!sel?' opacity="0.2" data-dim="1"':'';
@@ -5316,20 +5442,18 @@ function tkvPaint(fast){
 }
 /* where a framing area's tag goes (image px): centered just above the area, so it never covers the layout; inside the top edge when that is off the sheet */
 function tkFrLabelAt(p,W,H,fs){let x0=Infinity,x1=-Infinity,y0=Infinity;for(let i=0;i+1<p.length;i+=2){x0=Math.min(x0,p[i]*W);x1=Math.max(x1,p[i]*W);y0=Math.min(y0,p[i+1]*H)}const y=y0-fs*1.2;return [(x0+x1)/2,y-fs*.8<0?y0+fs*1.2:y]}
-/* a framing area on the sheet: outline, hatched openings, then joists (thin), bridging (dashed), track (heavy), opening framing (highlighted); tag "600S162-43 @16" OC · 42 pcs" */
+/* a layout area on the sheet: outline, hatched openings, then the preset's members in TK_LAY_ST order (joists: joists thin, bridging dashed, track heavy, opening framing highlighted;
+   ACT: tees thin, mains solid, wall angle heavy; CRC: furring thin, CRC dashed heavy, perimeter heavy); tag "600S162-43 @16" OC · 42 pcs" / "ACT 2x4 · 75 tiles" / "CRC @4' · FC @16"" */
 function tkvFrameSvg(s,it,p,sel,dim,op,sw,tags){
   const W=TKV.W,H=TKV.H,M=Math.max(W,H),c=esc(it.color),hc=document.documentElement.classList.contains('hc')?1.5:1,f=v=>v.toFixed(1),f2=v=>v.toFixed(2);
   const pts=q=>{const a=[];for(let i=0;i+1<q.length;i+=2)a.push(f(q[i]*W)+','+f(q[i+1]*H));return a.join(' ')};
-  let h='<g'+dim+' data-frame="'+esc(s.id)+'"><polygon points="'+pts(p)+'" fill="'+c+'" fill-opacity="'+f2(op*.14)+'" stroke="'+(sel?'#000':c)+'" stroke-width="'+f(sw*(sel?.6:.3))+'" stroke-linejoin="round"/>';
+  let h='<g'+dim+' data-frame="'+esc(s.id)+'" data-pre="'+tkLayPre(it.fr)+'"><polygon points="'+pts(p)+'" fill="'+c+'" fill-opacity="'+f2(op*.14)+'" stroke="'+(sel?'#000':c)+'" stroke-width="'+f(sw*(sel?.6:.3))+'" stroke-linejoin="round"/>';
   (s.o||[]).forEach(o=>{h+='<polygon data-open="1" points="'+pts(o)+'" fill="url(#tkHatch)" stroke="'+c+'" stroke-width="'+f(sw*.3)+'" stroke-dasharray="'+f(sw*2)+' '+f(sw*1.2)+'"/>'});
   const sc=tkScaleOf(TKV.id),r=tkFrameOf({...s,p},TKV.sh,sc,it.fr);
   if(r&&!TKV.frOff){const fpp=+sc.fpp,d={};r.segs.forEach(g=>{d[g.r]=(d[g.r]||'')+'M'+f(g.a[0]/fpp)+' '+f(g.a[1]/fpp)+'L'+f(g.b[0]/fpp)+' '+f(g.b[1]/fpp)});
-    const L=(k,w,x)=>d[k]?'<path data-fr="'+k+'" d="'+d[k]+'" fill="none" stroke-linecap="butt" vector-effect="non-scaling-stroke" stroke-width="'+f2(w*hc)+'" '+x+'/>':'';
-    h+=L('hdr',7,'stroke="#ffab00" stroke-opacity=".6"')+L('king',7,'stroke="#ffab00" stroke-opacity=".6"')+L('joist',1.1,'stroke="'+c+'" stroke-opacity=".9"')+L('br',1.4,'stroke="'+c+'" stroke-dasharray="7 4"')+L('track',3.2,'stroke="'+c+'"')+L('king',2.2,'stroke="'+c+'"')+L('hdr',2.6,'stroke="'+c+'"')}
+    TK_LAY_ST[r.pre].forEach(([k,w,a,ds,hi])=>{if(d[k])h+='<path data-fr="'+k+'" d="'+d[k]+'" fill="none" stroke-linecap="butt" vector-effect="non-scaling-stroke" stroke-width="'+f2(w*hc)+'" stroke="'+(hi?'#ffab00':c)+'"'+(a<1?' stroke-opacity="'+a+'"':'')+(ds===1?' stroke-dasharray="7 4"':ds===2?' stroke-dasharray="2 2"':'')+'/>'})}
   h+='</g>';
-  const F={...TK_FR_DEF,...(it.fr||{})},lp=tkFrLabelAt(p,W,H,M*.009),x=lp[0],y=lp[1];
-  const n=r?((r.sum.joist||{}).n||0)+((r.sum.king||{}).n||0):0;
-  tags.push([r?F.mem+' @'+F.sp+'" OC · '+n+' pcs':'Set the scale to lay out the framing',x,y,c,dim]);
+  const lp=tkFrLabelAt(p,W,H,M*.009);tags.push([tkLayTag(it,r),lp[0],lp[1],c,dim]);
   return h;
 }
 /* live drawing, rubber band to the cursor and the running length/area; corner handles of the selected mark; the selection box */
@@ -5605,7 +5729,7 @@ async function tkvSetNote(id){
   if(!v||!TKV)return;tkDo({t:'shape',v:{id,note:v.n.slice(0,80)||null}});tkvPaint();
 }
 function tkMac(){return /Mac|iP(hone|ad|od)/.test(navigator.platform||'')}
-function tkvQtyText(s){const it=tkItem(s.item),q=tkShapeQty(s,TKV.sh,tkScaleOf(TKV.id),it);if(s.k==='frame'){const r=q==null?null:tkFrameOf(s,TKV.sh,tkScaleOf(TKV.id),it&&it.fr);return r?tkFrText(r.sum,it)+' · '+Math.ceil(r.lf).toLocaleString()+' LF':'no scale on this sheet'}return s.k==='count'?'1 EA':q==null?'no scale on this sheet':s.k==='poly'?(s.deduct?'deduct ':'')+Math.round(q).toLocaleString()+' SF':tkFtIn(q)+' ('+(Math.round(q*10)/10)+' LF)'}
+function tkvQtyText(s){const it=tkItem(s.item),q=tkShapeQty(s,TKV.sh,tkScaleOf(TKV.id),it);if(s.k==='frame'){const r=q==null?null:tkFrameOf(s,TKV.sh,tkScaleOf(TKV.id),it&&it.fr);return r?tkFrText(r.sum,it,r.cnt)+' · '+Math.ceil(r.lf).toLocaleString()+' LF':'no scale on this sheet'}return s.k==='count'?'1 EA':q==null?'no scale on this sheet':s.k==='poly'?(s.deduct?'deduct ':'')+Math.round(q).toLocaleString()+' SF':tkFtIn(q)+' ('+(Math.round(q*10)/10)+' LF)'}
 function tkvUndoPt(){if(!TKV||!TKV.draft.length||(TKV.cont&&TKV.draft.length<=TKV.contN))return;TKV.draft.pop();tkvLive();tkvTools()}
 /* right-click (or long-press on a tablet) menu on the sheet, at the cursor. Never adds a point. Only shows what applies here; sub = a list of items to pick from. */
 function tkCtxClose(){const m=$('#tkCtx');if(m)m.remove();document.removeEventListener('pointerdown',tkCtxOut,true)}
@@ -5618,19 +5742,20 @@ function tkCtx(cx,cy,sub){
   const G=[];let A=[];const sep=()=>{if(A.length)G.push(A.join(''));A=[]};
   const add=(k,t,on,kb)=>{if(on===undefined||on)A.push('<button data-c="'+k+'"><span>'+t+'</span>'+(kb?'<span class="kb">'+esc(kb)+'</span>':'')+'</button>')};
   if(sub){const pick=sub==='count'?eas:sub==='run'?TK.data.items.filter(x=>tkSameKind(x,it)):sub==='mark'?TK.data.items.filter(x=>tkSameKind(x,hit_it)):TK.data.items;const cur=sub==='mark'?hs&&hs.item:sub==='count'?null:TKV.item;
-    A.push('<div class="tkctxh">'+{items:'Switch item',run:'Change item for this run',mark:'Change item for this mark',count:'Count here: which item?'}[sub]+'</div>');
-    srt(pick).forEach(x=>A.push('<button data-si="'+esc(x.id)+'"'+(x.id===cur?' class="on"':'')+'><span class="sw" style="background:'+esc(x.color)+'"></span>'+esc(x.code)+' <span class="muted">'+esc(x.unit)+'</span></button>'));add('back','‹ Back');sep()}
+    if(sub!=='lay')A.push('<div class="tkctxh">'+{items:'Switch item',run:'Change item for this linear',mark:'Change item for this mark',count:'Count here: which item?'}[sub]+'</div>');
+    if(sub==='lay'){A.push('<div class="tkctxh">Add layout to this area</div>');add('frthis:joists','Joists');add('frthis:act','ACT grid');add('frthis:crc','CRC & furring');add('back','‹ Back');sep()}
+    else srt(pick).forEach(x=>A.push('<button data-si="'+esc(x.id)+'"'+(x.id===cur?' class="on"':'')+'><span class="sw" style="background:'+esc(x.color)+'"></span>'+esc(x.code)+' <span class="muted">'+esc(x.unit)+'</span></button>'));if(sub!=='lay'){add('back','‹ Back');sep()}}
   else{
     if(hs&&hit_it&&!dr)A.push('<div class="tkctxh tkctxi"><span class="sw" style="background:'+esc(hit_it.color)+'"></span><span>'+esc(hit_it.code)+' · '+esc(tkvQtyText(hs))+(hs.k==='line'&&+hs.h>0?' · @'+esc(tkFtIn(+hs.h)):'')+(hs.note?' · “'+esc(hs.note)+'”':'')+'</span></div>');
     add('undo','↶ Undo last point',dr>(TKV.cont?TKV.contN:0),'Backspace');
     add('fin','■ Stop',dr>=2&&(!draw||!it||(it.unit==='LF'&&!it.fr)),'Enter');
     add('close','Close area',draw&&tkPolyIt(it)&&dr>=3,'Enter');
     add('cancel','✕ Cancel drawing',dr>0,'Esc');
-    add('runit','Change item for this run ▸',draw&&dr>0&&!!it&&it.unit!=='EA'&&TK.data.items.some(x=>x.id!==it.id&&tkSameKind(x,it)));
+    add('runit','Change item for this linear ▸',draw&&dr>0&&!!it&&it.unit!=='EA'&&TK.data.items.some(x=>x.id!==it.id&&tkSameKind(x,it)));
     sep();
     add('newm','New measurement here',draw&&!!it&&it.unit!=='EA');
     const cl=!dr?(hs&&hs.k==='line'?hs:tkvLastLine()):null;
-    add('cont',hs&&hs.k==='line'?'Continue this run':'Continue last run',!!cl);
+    add('cont',hs&&hs.k==='line'?'Continue this linear':'Continue last linear',!!cl);
     add('deduct',it&&it.fr?(TKV.dNext?'Opening: on (next area is an opening) → off':'Draw an opening (cut-out)'):TKV.dNext?'Deduct: on (next area is a cut-out) → off':'Deduct area (cut-out)',draw&&tkPolyIt(it)&&!dr);
     add('count',eas.length===1?'Count here: '+esc(eas[0].code):'Count here ▸',eas.length>0);
     sep();
@@ -5640,9 +5765,10 @@ function tkCtx(cx,cy,sub){
       add('acorner','Add corner here',!!ns&&ns.d<14/TKV.t.s);
       add('split','✂ Split here',hs.k==='line'&&!!tkvSplitAt(hs,p0));
       if(hs.k==='frame'){const es=tkvNearSeg(hs,p0),oi=(hs.o||[]).findIndex(o=>tkInPoly(p0,o,TKV.W,TKV.H));
-        add('frset','▦ Framing settings…');add('frrot','⟳ Turn joists 90°');add('fredge','Joists parallel to this edge',!!es&&es.d<14/TKV.t.s);add('frauto','Joists: auto (span the short way)',!!hs.dir&&hs.dir!=='auto');
-        add('fropen','Add an opening…');add('frdelo','Delete this opening',oi>=0);add('froff',TKV.frOff?'Show framing layout':'Hide framing layout (outline only)')}
-      if(hs.k==='poly'&&!hs.deduct&&hit_it.unit==='SF')add('frthis','▦ Frame this area…');
+        const RN=TK_LAY_RUN[tkLayPre(hit_it.fr)],RU=RN.charAt(0).toUpperCase()+RN.slice(1);
+        add('frset','▦ Layout settings ('+TK_LAY_NAME[tkLayPre(hit_it.fr)]+')…');add('frrot','⟳ Turn '+RN+' 90°');add('fredge',RU+' parallel to this edge',!!es&&es.d<14/TKV.t.s);add('frauto',RU+': auto (span the short way)',!!hs.dir&&hs.dir!=='auto');
+        add('fropen','Add an opening…');add('frdelo','Delete this opening',oi>=0);add('froff',TKV.frOff?'Show layouts':'Hide layouts (outline only)');add('frrm','Remove layout (keep area)')}
+      if(hs.k==='poly'&&!hs.deduct&&hit_it.unit==='SF')add('lay','▦ Add layout ▸');
       add('mitem','Change item for this mark ▸',TK.data.items.some(x=>x.id!==hs.item&&tkSameKind(x,hit_it)));
       add('mh','Height for this mark…'+(+hs.h>0?' ('+esc(tkFtIn(+hs.h))+')':''),hs.k==='line');
       add('mnote',hs.note?'Edit note…':'Add note / label…');
@@ -5659,8 +5785,8 @@ function tkCtx(cx,cy,sub){
     add('snap','Snap: '+(TKV.snap?'on → off':'off → on'));
     add('ortho','⊥ Ortho (level / plumb): '+(TKV.ortho?'on → off':'off → on'),!sel,'Shift');
     sep();
-    const cur=it&&it.fr?'frame':it&&it.unit==='SF'?'area':TKV.lm==='seg'?'seg':'run';
-    A.push('<div class="tkctxrow">'+[['run','Run'],['seg','Segments'],['area','Area'],['frame','Framing']].map(([k,t])=>'<button data-lm2="'+k+'"'+(k===cur&&draw?' class="on"':'')+'>'+t+'</button>').join('')+'</div>');
+    const cur=it&&it.unit==='EA'?'count':it&&(it.fr||it.unit==='SF')?'area':TKV.lm==='seg'?'seg':'run';
+    A.push('<div class="tkctxrow">'+[['area','Area'],['run','Linear'],['seg','Segments'],['count','Count']].map(([k,t])=>'<button data-lm2="'+k+'"'+(k===cur&&draw?' class="on"':'')+'>'+t+'</button>').join('')+'</div>');
     add('meas','📏 Measure from here');
     sep();
     add('zin','Zoom here (2x)');add('zfit','⤢ Zoom to fit');
@@ -5677,7 +5803,7 @@ function tkCtx(cx,cy,sub){
     if(sub==='run'){tkvUseItem(id);tkvPaint();return}
     if(TKV.draft.length&&TKV.mode==='draw')tkvFinish();tkvUseItem(id);TKV.mode='draw';tkvPaint()});
   $$('[data-c]',m).forEach(b=>b.onclick=()=>{const c=b.dataset.c;
-    const subs={items:'items',runit:'run',mitem:'mark'};if(subs[c]||(c==='count'&&eas.length>1)){tkCtx(cx,cy,subs[c]||'count');return}
+    const subs={items:'items',runit:'run',mitem:'mark',lay:'lay'};if(subs[c]||(c==='count'&&eas.length>1)){tkCtx(cx,cy,subs[c]||'count');return}
     if(c==='back'){tkCtx(cx,cy);return}
     tkCtxClose();
     if(c==='undo')tkvUndoPt();
@@ -5690,7 +5816,7 @@ function tkCtx(cx,cy,sub){
     else if(c==='dcorner')tkvDelCorner(hit,tkvNearCorner(hs,p0,12));
     else if(c==='acorner')tkvAddCorner(hit,p0);
     else if(c==='split')tkvSplit(hit,p0);
-    else if(c.startsWith('fr'))tkvFrameAct(c,hs,p0);
+    else if(c.startsWith('fr'))tkvFrameAct(c.split(':')[0],hs,p0,c.split(':')[1]);
     else if(c==='mh')tkvSetH(hit);
     else if(c==='mnote')tkvSetNote(hit);
     else if(c==='msel'){const l=ids.slice(),i=l.indexOf(hit);if(i>=0)l.splice(i,1);else l.push(hit);TKV.msel=l;TKV.sel=l.length===1?l[0]:null;tkvPaint()}
@@ -5720,28 +5846,29 @@ async function tkvFinish(){
   if(it.unit==='LF'&&!it.fr&&d.length<2)return;if(tkPolyIt(it)&&d.length<3){if(d.length)toast('An area needs at least 3 corners.');return}
   if(it.fr&&TKV.dDraft){TKV.dDraft=false;TKV.dNext=false;let cx=0,cy=0;d.forEach(p=>{cx+=p.x;cy+=p.y});const c={x:cx/d.length,y:cy/d.length};
     const host=TK.data.shapes.find(s=>s.sheet===TKV.id&&s.k==='frame'&&tkItem(s.item)&&tkInPoly(c,s.p||[],TKV.W,TKV.H));
-    if(!host){toast('Draw the opening inside a framing area.');tkvPaint();return}
-    tkDo({t:'shape',v:{id:host.id,o:(host.o||[]).concat([np])}});toast('Opening added: joists cut, headers'+(({...TK_FR_DEF,...(tkItem(host.item).fr||{})}).king?' and king joists':'')+' added.');tkvPaint();return}
+    if(!host){toast('Draw the opening inside a layout area.');tkvPaint();return}
+    tkDo({t:'shape',v:{id:host.id,o:(host.o||[]).concat([np])}});{const F=tkLayF(tkItem(host.item).fr);toast(F.preset==='act'?'Opening added: tiles taken off.':F.preset==='crc'?'Opening added: CRC and furring cut, furring trim around it.':'Opening added: joists cut, headers'+(F.king?' and king joists':'')+' added.')}tkvPaint();return}
   const v={id:uuid(),item:it.id,sheet:TKV.id,k:it.fr?'frame':it.unit==='SF'?'poly':'line',p:np,by:'office',at:new Date().toISOString()};if(it.fr)v.dir='auto';
   if(it.unit==='SF'&&TKV.dDraft){v.deduct=true;let cx=0,cy=0;d.forEach(p=>{cx+=p.x;cy+=p.y});const c={x:cx/d.length,y:cy/d.length};
     const host=TK.data.shapes.find(s=>s.sheet===TKV.id&&s.k==='poly'&&!s.deduct&&tkItem(s.item)&&tkItem(s.item).unit==='SF'&&tkInPoly(c,s.p||[],TKV.W,TKV.H));if(host)v.item=host.item;
     TKV.dNext=false;toast('Deducted '+(tkScaleOf(TKV.id)?Math.round(tkAreaPx(np,TKV.W,TKV.H)*tkScaleOf(TKV.id).fpp**2).toLocaleString()+' SF ':'')+'from '+(tkItem(v.item)||it).code)}
   TKV.dDraft=false;tkDo({t:'shape',v});TKV.mine.push(v.id);tkvPaint();
 }
+/* the mark at image point p: nearest edge / count within reach, else the area it is inside (a layout area over a plain area wins) */
 function tkvHit(p){
-  const W=TKV.W,H=TKV.H,tol=14/TKV.t.s;let best=null,bd=tol;
+  const W=TKV.W,H=TKV.H,tol=14/TKV.t.s;let best=null,bd=tol,ins=null;
   TK.data.shapes.forEach(s=>{if(s.sheet!==TKV.id||TKV.hide[s.item]||s.id===TKV.cont)return;const q=s.p||[];
     if(s.k==='count'){const d=Math.hypot(q[0]*W-p.x,q[1]*H-p.y);if(d<bd){bd=d;best=s.id}return}
-    const n=q.length/2;for(let i=1;i<n+(s.k==='poly'||s.k==='frame'?1:0);i++){const a={x:q[2*(i-1)]*W,y:q[2*(i-1)+1]*H},b={x:q[2*(i%n)]*W,y:q[2*(i%n)+1]*H};const d=segDist(p.x,p.y,a.x,a.y,b.x,b.y);if(d<bd){bd=d;best=s.id}}
-    if((s.k==='poly'||s.k==='frame')&&!best&&tkInPoly(p,q,W,H))best=s.id;
+    const n=q.length/2;for(let i=1;i<n+(s.k==='poly'||s.k==='frame'?1:0);i++){const a={x:q[2*(i-1)]*W,y:q[2*(i-1)+1]*H},b={x:q[2*(i%n)]*W,y:q[2*(i%n)+1]*H};const d=segDist(p.x,p.y,a.x,a.y,b.x,b.y);if(d<bd||(s.k==='frame'&&d<=bd+1e-6&&d<tol)){bd=d;best=s.id}}
+    if((s.k==='poly'||s.k==='frame')&&tkInPoly(p,q,W,H)&&(!ins||(s.k==='frame'&&ins.k!=='frame')))ins=s;
   });
-  return best;
+  return best||(ins&&ins.id);
 }
 function tkInPoly(p,q,W,H){let inside=false;const n=q.length/2;for(let i=0,j=n-1;i<n;j=i++){const xi=q[2*i]*W,yi=q[2*i+1]*H,xj=q[2*j]*W,yj=q[2*j+1]*H;if(((yi>p.y)!==(yj>p.y))&&(p.x<(xj-xi)*(p.y-yi)/(yj-yi)+xi))inside=!inside}return inside}
 function tkvShapeMenu(id){
   const s=TK.data.shapes.find(x=>x.id===id);if(!s)return;const it=tkItem(s.item);
   const others=TK.data.items.filter(x=>x.id!==s.item&&tkSameKind(x,it));
-  const m=modal('<h2>'+esc(it?it.code:'Mark')+'</h2><p class="muted">'+esc(tkvQtyText(s))+(s.k==='line'&&+s.h>0?' · @'+esc(tkFtIn(+s.h))+' high':'')+(s.by&&s.by!=='office'?' · drawn by '+esc(s.by):'')+(s.note?'<br>Note: '+esc(s.note):'')+'</p><div style="display:grid;gap:10px">'+(others.length?'<label class="field"><span>Move to item</span><select data-mv><option value="">—</option>'+others.map(o=>'<option value="'+esc(o.id)+'">'+esc(o.code)+'</option>').join('')+'</select></label>':'')+(s.k==='line'?'<button class="btn" data-a="h">Height for this mark…</button>':'')+(s.k==='frame'?'<button class="btn" data-a="fr">▦ Framing settings…</button>':'')+'<button class="btn" data-a="note">'+(s.note?'Edit note…':'Add note / label…')+'</button><button class="btn danger" data-a="del">Delete this mark</button><button class="btn" data-a="x">Close</button></div>');
+  const m=modal('<h2>'+esc(it?it.code:'Mark')+'</h2><p class="muted">'+esc(tkvQtyText(s))+(s.k==='line'&&+s.h>0?' · @'+esc(tkFtIn(+s.h))+' high':'')+(s.by&&s.by!=='office'?' · drawn by '+esc(s.by):'')+(s.note?'<br>Note: '+esc(s.note):'')+'</p><div style="display:grid;gap:10px">'+(others.length?'<label class="field"><span>Move to item</span><select data-mv><option value="">—</option>'+others.map(o=>'<option value="'+esc(o.id)+'">'+esc(o.code)+'</option>').join('')+'</select></label>':'')+(s.k==='line'?'<button class="btn" data-a="h">Height for this mark…</button>':'')+(s.k==='frame'?'<button class="btn" data-a="fr">▦ Layout settings…</button>':'')+'<button class="btn" data-a="note">'+(s.note?'Edit note…':'Add note / label…')+'</button><button class="btn danger" data-a="del">Delete this mark</button><button class="btn" data-a="x">Close</button></div>');
   $('[data-a=x]',m).onclick=()=>m.close();
   $('[data-a=del]',m).onclick=()=>{m.close();tkDo({t:'del_shape',id});if(TKV){TKV.sel=null;tkvPaint()}};
   const hb=$('[data-a=h]',m);if(hb)hb.onclick=()=>{m.close();tkvSetH(id)};const fb=$('[data-a=fr]',m);if(fb)fb.onclick=()=>{m.close();tkvFrameAct('frset',s)};$('[data-a=note]',m).onclick=()=>{m.close();tkvSetNote(id)};
@@ -5839,16 +5966,16 @@ async function tkSendBid(){
     modal('<h2>Sent to the bid sheet</h2><p><b>'+esc(data.file||'')+'</b>, tab '+esc(data.tab||'TAKEOFF')+': '+(data.written||0)+' new row'+(data.written===1?'':'s')+(data.updated?', '+data.updated+' updated':'')+(data.cleared?', '+data.cleared+' cleared (items you deleted)':'')+'.</p>'+((data.warnings||[]).length?'<ul class="small">'+data.warnings.map(w=>'<li>'+esc(w)+'</li>').join('')+'</ul>':'')+'<div class="mbtns">'+(data.url?'<a class="btn" target="_blank" rel="noopener" href="'+esc(data.url)+'">Open in Excel</a>':'')+'<button class="btn primary" onclick="this.closest(\'.mwrap\').close()">OK</button></div>');
   }catch(e){pb.close();toast(errMsg(e))}
 }
-/* a framing area in the markup PDF: outline, openings, then the layout like on screen; label "n 600S162-43 @16" OC · 42 pcs" */
+/* a layout area in the markup PDF: outline, openings, then the layout like on screen; label "n 600S162-43 @16" OC · 42 pcs" / "n ACT 2x4 · 75 tiles" */
 function tkPdfFrame(g,s,it,sh,scl,W,H,M,labels,lab){
   const p=s.p||[],poly=q=>{g.beginPath();for(let i=0;i+1<q.length;i+=2){if(i)g.lineTo(q[i]*W,q[i+1]*H);else g.moveTo(q[i]*W,q[i+1]*H)}g.closePath()};
   g.strokeStyle=g.fillStyle=it.color;poly(p);g.globalAlpha=.12;g.fill();g.globalAlpha=.7;g.lineWidth=M*.0012;g.stroke();
   (s.o||[]).forEach(o=>{poly(o);g.globalAlpha=.85;g.fillStyle='#fff';g.fill();g.setLineDash([M*.003,M*.002]);g.globalAlpha=.8;g.stroke();g.setLineDash([]);g.fillStyle=it.color});
   const r=tkFrameOf(s,sh,scl,it.fr);let lx=0,ly=0;{const n=p.length/2;for(let i=0;i<n;i++){lx+=p[2*i]*W;ly+=p[2*i+1]*H}lx/=n;ly/=n}
-  if(r){const fpp=+scl.fpp,u=M*.0006,dr=(k,w,c,a,dash)=>{const l=r.segs.filter(x=>x.r===k);if(!l.length)return;g.beginPath();l.forEach(x=>{g.moveTo(x.a[0]/fpp,x.a[1]/fpp);g.lineTo(x.b[0]/fpp,x.b[1]/fpp)});g.strokeStyle=c;g.globalAlpha=a;g.lineWidth=Math.max(w*u,1);g.setLineDash(dash||[]);g.stroke();g.setLineDash([])};
-    g.lineCap='butt';dr('hdr',7,'#ffab00',.6);dr('king',7,'#ffab00',.6);dr('joist',1.3,it.color,.9);dr('br',1.6,it.color,.9,[M*.004,M*.0025]);dr('track',3.5,it.color,.95);dr('king',2.4,it.color,.95);dr('hdr',2.8,it.color,.95);g.lineCap='round';
-    {const lp=tkFrLabelAt(p,W,H,Math.round(M*.011));lx=lp[0];ly=lp[1]}
-    const F={...TK_FR_DEF,...(it.fr||{})},n=((r.sum.joist||{}).n||0)+((r.sum.king||{}).n||0);lab+=' '+F.mem+' @'+F.sp+'" OC · '+n+' pcs'}
+  if(r){const fpp=+scl.fpp,u=M*.0006;g.lineCap='butt';
+    TK_LAY_ST[r.pre].forEach(([k,w,a,ds,hi])=>{const l=r.segs.filter(x=>x.r===k);if(!l.length)return;g.beginPath();l.forEach(x=>{g.moveTo(x.a[0]/fpp,x.a[1]/fpp);g.lineTo(x.b[0]/fpp,x.b[1]/fpp)});
+      g.strokeStyle=hi?'#ffab00':it.color;g.globalAlpha=hi?.6:Math.min(.95,a);g.lineWidth=Math.max(w*1.1*u,1);g.setLineDash(ds===1?[M*.004,M*.0025]:ds===2?[M*.0015,M*.0015]:[]);g.stroke();g.setLineDash([])});
+    g.lineCap='round';{const lp=tkFrLabelAt(p,W,H,Math.round(M*.011));lx=lp[0];ly=lp[1]}lab+=' '+tkLayTag(it,r)}
   g.strokeStyle=g.fillStyle=it.color;g.globalAlpha=1;labels.push([lab,lx,ly]);
 }
 /* markup PDF: a legend page, then every sheet that has takeoff marks, colored and labeled with the item number */
@@ -5860,8 +5987,10 @@ async function tkMarkupPdf(){
     const pdf=new jsPDF({orientation:'landscape',unit:'pt',format:[1224,792]});
     pdf.setFontSize(20);pdf.text((S.job.name||'Job')+' — Takeoff legend',40,50);pdf.setFontSize(10);pdf.text(new Date().toLocaleDateString(),40,68);
     let y=96;const col=[40,80,160,560,960,1060];pdf.setFont(undefined,'bold');['#','Section','Code (TAKEOFF col A)','Description','Qty','Height / width'].forEach((t,i)=>pdf.text(t,col[i],y));pdf.setFont(undefined,'normal');
-    its.forEach(it=>{y+=20;if(y>760){pdf.addPage([1224,792],'landscape');y=50}const t=tot[it.id]||{qty:0};pdf.setFillColor(it.color);pdf.rect(col[0],y-9,12,12,'F');pdf.text(String(num[it.id]),col[0]+16,y);pdf.text(it.sec,col[1],y);pdf.text(String(it.code).slice(0,70),col[2],y);pdf.text(String(it.desc||'').slice(0,70),col[3],y);pdf.text(tkFmtQty(t.qty,it.unit),col[4],y);pdf.text(it.fr?(it.fr.mem+' @'+it.fr.sp+'" OC').slice(0,40):[it.h?tkFtIn(+it.h):'',it.unit==='LF'?tkInStr(tkItemWidthIn(it))+' wide':''].filter(Boolean).join(' · '),col[5],y);
-      if(it.fr){tkFrRows(it,tkFrItem(d,tkSheets(),it).sum).forEach(r=>{y+=15;if(y>760){pdf.addPage([1224,792],'landscape');y=50}pdf.setFontSize(9);pdf.text('· '+r.code,col[2]+10,y);pdf.text(r.desc.slice(0,80),col[3],y);pdf.text(r.qty.toLocaleString()+' LF',col[4],y);pdf.setFontSize(10)})}});
+    its.forEach(it=>{y+=20;if(y>760){pdf.addPage([1224,792],'landscape');y=50}const t=tot[it.id]||{qty:0};pdf.setFillColor(it.color);pdf.rect(col[0],y-9,12,12,'F');pdf.text(String(num[it.id]),col[0]+16,y);pdf.text(it.sec,col[1],y);pdf.text(String(it.code).slice(0,70),col[2],y);pdf.text(String(it.desc||'').slice(0,70),col[3],y);pdf.text(tkFmtQty(t.qty,it.unit),col[4],y);pdf.text(it.fr?tkLaySh(it.fr).slice(0,40):[it.h?tkFtIn(+it.h):'',it.unit==='LF'?tkInStr(tkItemWidthIn(it))+' wide':''].filter(Boolean).join(' · '),col[5],y);
+      if(it.fr){const fi=tkFrItem(d,tkSheets(),it),ST=TK_LAY_ST[tkLayPre(it.fr)];tkFrRows(it,fi.sum,fi.un,fi.cnt).forEach(r=>{y+=15;if(y>760){pdf.addPage([1224,792],'landscape');y=50}pdf.setFontSize(9);
+        const st=ST.filter(x=>x[0]===TK_LAY_ROWR[r.id.split(':').pop()]&&!x[4]).pop();if(st){pdf.setDrawColor(it.color);pdf.setLineWidth(Math.max(.5,st[1]*.9));pdf.setLineDashPattern(st[3]===1?[6,3]:st[3]===2?[2,2]:[],0);pdf.line(col[1]+20,y-3,col[2]-12,y-3);pdf.setLineDashPattern([],0);pdf.setLineWidth(.5);pdf.setDrawColor(0)}
+        pdf.text('· '+r.code,col[2]+10,y);pdf.text(r.desc.slice(0,80),col[3],y);pdf.text(r.qty.toLocaleString()+' '+r.unit,col[4],y);pdf.setFontSize(10)})}});
     let k=0;for(const sh of sheets){pb.set('Sheet '+(++k)+' of '+sheets.length+'…');
       let img;try{img=await sheetImage(sh)}catch(e){continue}
       const c=document.createElement('canvas');c.width=img.naturalWidth;c.height=img.naturalHeight;const g=c.getContext('2d');g.drawImage(img,0,0);
@@ -5888,7 +6017,12 @@ async function tkMarkupPdf(){
    await alphaTakeoff.apply(jobId,[ops]) with ops like {t:'item',v:{id,code,desc,sec,unit,h,w,color}}, {t:'shape',v:{id,item,sheet,k:'line'|'poly'|'count',p:[...0-1],by:'Claude',deduct?:true}},
    framing: {t:'item',v:{id,code:'Ceiling framing',desc:'Ceiling joists',sec:'CEILINGS',unit:'LF',color,fr:{mem:'600S162-43',sp:16,trk:'600T150-43',trkAll:false,brc:'150U50-54 CRC',brMax:4,endJ:false,king:true,waste:0}}}
      then {t:'shape',v:{id,item,sheet,k:'frame',p:[area corners 0-1],o:[[opening corners 0-1],...],dir:'auto'|'edge'|'ang',edge:cornerIndex,ang:degrees,by:'Claude'}}
-     (rows: joists + kings, track + headers, bridging, each LF; alphaTakeoff.frame(jobId,shapeId) -> {segs (feet),sum by role,lf}),
+     (rows: joists + kings, track + headers, bridging, each LF; alphaTakeoff.frame(jobId,shapeId) -> {segs (feet),sum by role,lf,cnt {wire,clip,area},pre}),
+   layout presets (same k:'frame' shapes; fr.preset, none = 'joists'; blank code = no row; add sfc:'code' for an SF row of the net area on joists / crc):
+     ACT grid: fr:{preset:'act',tile:'2x4'|'2x2',main,mainLen:12,t4,t2,wa,waLen:12,wire,wireSp:4,tileCode,waste}
+       (rows: main tee LF (+pcs), 4' cross tee EA, 2' cross tee EA (2x2), wall angle LF (+pcs), hanger wire EA, tiles SF; openings = lights, take tiles off)
+     CRC & furring: fr:{preset:'crc',crc:'150U50-54 CRC',crcSp:4,crcLen:16,fc:'7/8" FC 25ga',fcSp:16,fcLen:12,per:'200T125-20',per2:'',perLen:10,wire,wireSp:4,clip:'',sfc:'',waste}
+       (rows: CRC LF, furring LF (+ trim around openings), perimeter LF, 2nd perimeter LF, hanger wire EA, clips EA),
    {t:'scale',sheet,v:{fpp,label,how}}, {t:'del_shape',id}, {t:'del_item',id}; alphaTakeoff.rows(jobId) -> bid sheet rows; alphaTakeoff.fpp(ftPerIn,paperWidthIn,imageW). */
 window.alphaTakeoff={
   load:async jid=>{const r=await q(sb.from('takeoffs').select('data,rev').eq('job_id',jid).maybeSingle());return tkApply(r?r.data:{},[])},
