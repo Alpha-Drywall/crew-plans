@@ -416,6 +416,7 @@ html.hc .best,html.hc .bwk-s,html.hc .bwk-l,html.hc .bwk-c,html.hc .bwsh .bwrow{
 .photos .ph{width:78px;height:78px;border-radius:8px;object-fit:cover;border:1px solid var(--line);cursor:pointer;background:#eee}
 .addph{width:78px;height:78px;border:2px dashed #b9c0c8;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-direction:column;font-size:12px;color:var(--muted);cursor:pointer;text-align:center}
 .addph b{font-size:22px;line-height:1}
+.tkwp{margin:-4px 0 10px;gap:6px}.tkwp .chip{padding:4px 10px}
 .ihelp{margin:8px 0 10px;padding-left:22px;line-height:1.55}.ihelp li{margin:4px 0}
 .photoview{position:fixed;inset:0;z-index:400;background:#000e;display:flex;align-items:center;justify-content:center}
 .photoview img{max-width:100%;max-height:100%;user-select:none;-webkit-user-drag:none}
@@ -5070,7 +5071,14 @@ function tkReadout(kind,pts,W,H,fpp,o){
 const tkOk=()=>!!(isAdminRole()&&S.isAdmin&&!S.asUser&&!S.viewAs&&!isPractice());
 let TK=null;/* {job,data,rev,ops:[],t,saving,loaded} */
 function tkNew(jid){return {job:jid,data:tkApply({},[]),rev:-1,ops:[],t:0,saving:false,loaded:false,fail:0}}
-function tkFor(jid){if(!TK||TK.job!==jid){if(TK&&TK.ops.length){clearTimeout(TK.t);tkFlush(TK)}TK=tkNew(jid)}return TK}
+/* live sync: every open copy of a job's takeoff (another window, another PC, Claude) hears "saved rev N" on a broadcast channel and pulls the new version, keeping its own unsaved marks */
+let TK_CH=null;
+function tkSync(T){if(TK_CH&&TK_CH.job===T.job)return;if(TK_CH){try{sb.removeChannel(TK_CH.ch)}catch(e){}TK_CH=null}
+  try{const ch=sb.channel('tk-'+T.job,{config:{broadcast:{self:false}}});ch.on('broadcast',{event:'saved'},m=>{const r=m&&m.payload&&+m.payload.rev;if(TK===T&&r>T.rev)debounce('tk-sync',()=>tkPull(T),250)}).subscribe();TK_CH={job:T.job,ch}}catch(e){}}
+async function tkPull(T){if(TK!==T||T.saving)return;try{const row=await q(sb.from('takeoffs').select('data,rev').eq('job_id',T.job).maybeSingle());if(!row||TK!==T||T.saving||row.rev<=T.rev)return;
+    T.base=row.data;T.rev=row.rev;T.data=tkApply(row.data,T.ops);if(TKV)tkvPaint();else if(S.tab==='takeoff'&&jobId()===T.job)tkRenderBody()}catch(e){}}
+function tkSaidSaved(T){const msg={type:'broadcast',event:'saved',payload:{rev:T.rev}};try{if(TK_CH&&TK_CH.job===T.job){TK_CH.ch.send(msg);return}const ch=sb.channel('tk-'+T.job);ch.subscribe(st=>{if(st==='SUBSCRIBED'){ch.send(msg);setTimeout(()=>{try{sb.removeChannel(ch)}catch(e){}},1500)}})}catch(e){}}
+function tkFor(jid){if(!TK||TK.job!==jid){if(TK&&TK.ops.length){clearTimeout(TK.t);tkFlush(TK)}TK=tkNew(jid)}tkSync(TK);return TK}
 async function tkLoad(jid,quiet){
   const T=tkFor(jid);
   try{const row=await q(sb.from('takeoffs').select('data,rev').eq('job_id',jid).maybeSingle());if(TK!==T||T.saving||(row&&row.rev<T.rev)||(!row&&T.rev>0))return T;
@@ -5096,7 +5104,7 @@ async function tkFlush(T){
     if(!ok)throw new Error('Someone else is saving this takeoff. Try again in a moment.');
   }catch(e){T.ops.unshift(...ops);T.fail=(T.fail||0)+1;if(T.fail===1||T.fail%10===0)toast('Takeoff not saved yet: '+errMsg(e)+' (still trying)');clearTimeout(T.t);T.t=setTimeout(()=>tkFlush(T),Math.min(60000,5000*2**Math.min(T.fail-1,4)))}
   finally{T.saving=false;if(T.ops.length&&ok){clearTimeout(T.t);T.t=setTimeout(()=>tkFlush(T),300)}if(TK===T)tkDirty(!!T.ops.length)}
-  if(ok&&TK===T){if(TKV)tkvPaint();else if(S.tab==='takeoff'&&jobId()===T.job)tkRenderBody()}
+  if(ok){tkSaidSaved(T);if(TK===T){if(TKV)tkvPaint();else if(S.tab==='takeoff'&&jobId()===T.job)tkRenderBody()}}
 }
 window.addEventListener('beforeunload',e=>{if(TK&&TK.ops.length){tkFlush(TK);e.preventDefault();e.returnValue=''}});
 function tkItem(id){return TK&&TK.data.items.find(x=>x.id===id)}
@@ -5149,11 +5157,14 @@ async function tkItemForm(it,pre){
     {k:'sec',label:'Section',type:'select',value:it?it.sec:pre.sec||'INTERIOR',options:TK_SECS.map(s=>[s,s.charAt(0)+s.slice(1).toLowerCase()])},
     {k:'unit',label:'Measure',type:'select',value:it?it.unit:pre.unit||'LF',options:[['LF','Walls, soffits, lines (LF)'],['SF','Ceilings, areas (SF)'],['EA','Counts, door frames (EA)']]},
     {k:'h',label:'Height for wall SF (blank = from the code\'s height tag, like FF14)',value:it&&it.h&&Math.abs(+it.h-tkCodeHeight(it.code))>1e-6?tkFtIn(+it.h):'',ph:'from the code'},
-    {k:'w',label:'Line width (inches, blank = full wall thickness from the code: stud + 5/8" per board layer)',value:it&&+it.w>0?tkInStr(+it.w):'',ph:'auto: '+tkInStr(tkCodeWidth(it?it.code:'',it&&it.h))},
+    {k:'w',label:'Line width in inches: tap a size, type one, or Auto (full wall thickness from the code)',value:it&&+it.w>0?tkInStr(+it.w):'',ph:'auto: '+tkInStr(tkCodeWidth(it?it.code:'',it&&it.h))},
     {k:'color',label:'Color',type:'select',value:it?it.color:TK_COLORS[d.items.length%TK_COLORS.length],options:TK_COLORS.map((c,i)=>[c,['Red','Blue','Green','Orange','Purple','Teal','Pink','Brown','Indigo','Lime','Deep orange','Sea green','Violet','Olive','Sky','Slate'][i]])}
   ],isNew?'Add':'Save');
   {const ws=$$('.mwrap'),m=ws[ws.length-1],ci=m&&$('[name=code]',m),hi=m&&$('[name=h]',m),wi=m&&$('[name=w]',m);
-    if(ci&&wi){const upd=()=>{const hv=hi&&hi.value?tkFeet(hi.value):0;wi.placeholder='auto: '+tkInStr(tkCodeWidth(ci.value,hv>0?hv:0))};ci.addEventListener('input',upd);if(hi)hi.addEventListener('input',upd);upd()}}
+    if(ci&&wi){const upd=()=>{const hv=hi&&hi.value?tkFeet(hi.value):0;wi.placeholder='auto: '+tkInStr(tkCodeWidth(ci.value,hv>0?hv:0))};ci.addEventListener('input',upd);if(hi)hi.addEventListener('input',upd);upd()}
+    if(wi){const row=document.createElement('div');row.className='chips tkwp';row.innerHTML=[['','Auto'],['5/8','5/8"'],['1','1"'],['2-1/2','2-1/2"'],['3-5/8','3-5/8"'],['6','6"'],['8','8"']].map(x=>'<button type="button" class="chip" data-wp="'+x[0]+'">'+x[1]+'</button>').join('');
+      const mark=()=>$$('[data-wp]',row).forEach(b=>b.classList.toggle('on',b.dataset.wp===''?!wi.value.trim():Math.abs(tkInches(b.dataset.wp)-tkInches(wi.value||'0'))<1e-6));
+      $$('[data-wp]',row).forEach(b=>b.onclick=()=>{wi.value=b.dataset.wp;mark()});wi.addEventListener('input',mark);(wi.closest('label')||wi).after(row);mark()}}
   const v=await fp;
   if(!v)return null;
   const h=v.h?tkFeet(v.h):tkCodeHeight(v.code);if(v.h&&!(h>0)){toast('Check the height: '+v.h);return null}
@@ -5375,7 +5386,7 @@ function tkvTools(){
   const dn=$('#tkDone');if(dn)dn.style.display=draw&&(!it||it.unit!=='EA'||TKV.mode!=='draw')?'':'none';
   const un=$('#tkUndo');if(un)un.disabled=!TKV.draft.length;
   const sn=$('#tkSnap');if(sn)sn.textContent='Snap: '+(TKV.snap?'on':'off');
-  const wm=$('#tkWm');if(wm)wm.textContent='Line: '+(TKV.wmul||1)+'x';
+  const wm=$('#tkWm');if(wm){wm.textContent='Lines '+(TKV.wmul||1)+'x';wm.title='Screen only: draws every line '+(TKV.wmul||1)+' times its real width so thin lines are easier to see. Each item\'s real width is set on the item (tap the item, Line width).'}
   const ob=$('#tkOrtho');if(ob){ob.classList.toggle('on',!!TKV.ortho);ob.setAttribute('aria-pressed',String(!!TKV.ortho))}
   if(TKV.stage){const cs=tkdrGet().cur;TKV.stage.classList.toggle('tkxh',draw&&cs!=='arrow');TKV.stage.classList.toggle('tkar',draw&&cs==='arrow')}
   $$('#tkv [data-lm]').forEach(b=>b.classList.toggle('on',TKV.mode==='draw'&&!!it&&b.dataset.lm===(it.unit==='EA'?'count':it.fr||it.unit==='SF'?'area':TKV.lm==='seg'?'seg':'run')));
