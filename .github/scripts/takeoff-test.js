@@ -16,7 +16,8 @@ const names = ['TK_SECS', 'TK_PAPER', 'TK_SCALES', 'tkFeet', 'tkFtIn', 'tkLenPx'
   'tkApply', 'tkTotals', 'tkSheetQty', 'tkHeightSplits', 'tkRows', 'tkCopyShapes', 'tkSplitLine', 'tkInsertCorner', 'tkMoveCorner', 'tkDeleteCorner', 'tkOffsetShapes',
   'tkSnapVerts', 'tkNearVertex', 'tkOrtho', 'tkSnapPick', 'tkEnds', 'tkEndMark', 'tkReadout',
   'TK_FR_DEF', 'tkFrRot', 'tkFrUn', 'tkFrIv', 'tkFrUnion', 'tkFrClip', 'tkFrSwap', 'tkFrExt', 'tkFrAuto', 'tkFrAngle', 'tkFrPc', 'tkFrame', 'tkFrSum', 'tkFrameOf', 'tkFrRows', 'tkFrItem',
-  'TK_LAY_DEF', 'TK_LAY_NAME', 'tkLayPre', 'tkLayF', 'tkLayArea', 'tkLayPos', 'tkLayCut', 'tkLayWires', 'tkLayAct', 'tkLayCrc', 'tkLayAt', 'tkLayOrg', 'tkEdNear', 'tkEdRuns', 'tkEdAt'];
+  'TK_LAY_DEF', 'TK_LAY_NAME', 'tkLayPre', 'tkLayF', 'tkLayArea', 'tkLayPos', 'tkLayCut', 'tkLayWires', 'tkLayAct', 'tkLayCrc', 'tkLayAt', 'tkLayOrg', 'tkEdNear', 'tkEdRuns', 'tkEdAt',
+  'tkTabOpen', 'tkTabClose', 'tkTabMove', 'tkTabStep', 'tkTabsClean', 'tkHideBulk', 'tkHideAnyOn'];
 const T = vm.runInNewContext(names.map(grab).join('\n') + '\n;({' + names.join(',') + '})', { Math, Date, String, Number, Set, Object, Array, JSON, isFinite, parseFloat, NaN, Infinity });
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok - ' + name); };
 const plain = x => JSON.parse(JSON.stringify(x));
@@ -699,6 +700,50 @@ t('tkFrRows: beam on the track row (or its own code), blocking on bridging; ACT 
   const C = T.tkLayCrc([0, 0, 20, 0, 20, 12, 0, 12], [], {}), C1 = T.tkLayCrc([0, 0, 20, 0, 20, 12, 0, 12], [], { ed: { add: [1] } });
   assert.strictEqual(C1.segs.filter(g => g.r === 'crc').length, C.segs.filter(g => g.r === 'crc').length + 1, 'add CRC');
   assert.ok(C1.cnt.clip > C.cnt.clip, 'added CRC gets clips');
+});
+
+t('sheet tabs: open adds once, focus keeps order', () => {
+  assert.deepStrictEqual(plain(T.tkTabOpen([], 'a')), ['a']);
+  assert.deepStrictEqual(plain(T.tkTabOpen(['a', 'b'], 'c')), ['a', 'b', 'c']);
+  assert.deepStrictEqual(plain(T.tkTabOpen(['a', 'b', 'c'], 'b')), ['a', 'b', 'c'], 'existing tab is focused, not added');
+  assert.deepStrictEqual(plain(T.tkTabOpen(null, 'a')), ['a']);
+});
+t('sheet tabs: close middle / active / last', () => {
+  assert.deepStrictEqual(plain(T.tkTabClose(['a', 'b', 'c'], 'b', 'a')), { ids: ['a', 'c'], act: 'a' }, 'closing another tab keeps the active one');
+  assert.deepStrictEqual(plain(T.tkTabClose(['a', 'b', 'c'], 'b', 'b')), { ids: ['a', 'c'], act: 'c' }, 'closing the active one goes to the right neighbor');
+  assert.deepStrictEqual(plain(T.tkTabClose(['a', 'b', 'c'], 'c', 'c')), { ids: ['a', 'b'], act: 'b' }, 'last in the row goes left');
+  assert.deepStrictEqual(plain(T.tkTabClose(['a'], 'a', 'a')), { ids: [], act: null }, 'closing the only tab closes the viewer');
+  assert.deepStrictEqual(plain(T.tkTabClose(['a'], 'x', 'a')), { ids: ['a'], act: 'a' });
+});
+t('sheet tabs: reorder and cycle', () => {
+  assert.deepStrictEqual(plain(T.tkTabMove(['a', 'b', 'c'], 'a', 2)), ['b', 'c', 'a']);
+  assert.deepStrictEqual(plain(T.tkTabMove(['a', 'b', 'c'], 'c', 0)), ['c', 'a', 'b']);
+  assert.deepStrictEqual(plain(T.tkTabMove(['a', 'b', 'c'], 'b', 9)), ['a', 'c', 'b']);
+  assert.deepStrictEqual(plain(T.tkTabMove(['a', 'b'], 'x', 0)), ['a', 'b']);
+  assert.strictEqual(T.tkTabStep(['a', 'b', 'c'], 'c', 1), 'a', 'wraps forward');
+  assert.strictEqual(T.tkTabStep(['a', 'b', 'c'], 'a', -1), 'c', 'wraps back');
+  assert.strictEqual(T.tkTabStep(['a', 'b', 'c'], 'b', 1), 'c');
+  assert.strictEqual(T.tkTabStep([], 'a', 1), null);
+});
+t('sheet tabs: restore drops sheets no longer there, duplicates and junk', () => {
+  const v = new Set(['a', 'b', 'c']);
+  assert.deepStrictEqual(plain(T.tkTabsClean({ ids: ['a', 'gone', 'c', 'a', 5], act: 'c' }, v)), { ids: ['a', 'c'], act: 'c' });
+  assert.deepStrictEqual(plain(T.tkTabsClean({ ids: ['a', 'gone'], act: 'gone' }, v)), { ids: ['a'], act: 'a' }, 'active sheet deleted: first tab');
+  assert.deepStrictEqual(plain(T.tkTabsClean({}, v)), { ids: [], act: null });
+  assert.deepStrictEqual(plain(T.tkTabsClean(null, ['b'])), { ids: [], act: null });
+  assert.deepStrictEqual(plain(T.tkTabsClean({ ids: ['b'], act: 'b' }, ['b'])), { ids: ['b'], act: 'b' }, 'array of ids works too');
+});
+
+t('light bulbs in bulk: all off / all on / some', () => {
+  assert.deepStrictEqual(plain(T.tkHideBulk({}, ['a', 'b'], false)), { a: true, b: true });
+  assert.deepStrictEqual(plain(T.tkHideBulk({ a: true, c: true }, ['a', 'b'], true)), { c: true }, 'on only touches the given ids');
+  assert.deepStrictEqual(plain(T.tkHideBulk({ a: false }, [], true)), {}, 'drops false entries');
+  const h = { a: true };
+  T.tkHideBulk(h, ['b'], false); assert.deepStrictEqual(h, { a: true }, 'does not change the input');
+  assert.strictEqual(T.tkHideAnyOn({ a: true }, ['a', 'b']), true);
+  assert.strictEqual(T.tkHideAnyOn({ a: true, b: true }, ['a', 'b']), false);
+  assert.strictEqual(T.tkHideAnyOn(null, ['a']), true);
+  assert.strictEqual(T.tkHideAnyOn({}, []), false);
 });
 
 console.log(n + ' takeoff tests passed.');
