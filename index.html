@@ -552,6 +552,7 @@ html.hc .tkcr{background:#000;border:1px solid #fff}
 .tkit .c{font-weight:700;font-size:13px;word-break:break-word}
 .tkit .q{text-align:right;font-size:13px;font-weight:700;white-space:nowrap}
 .tkeye,.tkdot{border:0;background:none;font-size:14px;padding:2px 4px;color:var(--muted)}
+.tkeye{cursor:pointer;line-height:1}.tkeye.off{filter:grayscale(1);opacity:.35}.tkeye:hover{opacity:1}.tkit:has(.tkeye.off) .c{opacity:.55}
 .tkgh{cursor:pointer;user-select:none;-webkit-user-select:none}
 .tkchev{display:inline-block;width:1.2em;color:var(--muted)}
 .tksec{display:flex;justify-content:space-between;align-items:center;gap:6px;font-weight:700;font-size:12px;letter-spacing:.03em;text-transform:uppercase;margin:10px 0 4px;padding:6px 4px;border-radius:6px;background:#f1f3f5}
@@ -645,7 +646,7 @@ body.tkpbody{overflow:hidden}
 @media(max-width:560px){.tkfrf{grid-template-columns:1fr}}
 .tkit .tkd{font-size:12px;color:var(--muted);line-height:1.25;margin-top:1px;overflow-wrap:anywhere}
 .tkv.tvc .tkit{padding:3px 4px;gap:5px}
-.tkv.tvc .tkit .small,.tkv.tvc .tkit .tkd,.tkv.tvc .tkeye:not(.off){display:none}
+.tkv.tvc .tkit .small,.tkv.tvc .tkit .tkd{display:none}
 .tkv.tvc .tkit .c{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tkv.tvc .tksec{margin:6px 0 2px;padding:4px}
 .tkv[data-tt=S] .tkside>*{zoom:.88}.tkv[data-tt=L] .tkside>*{zoom:1.2}
@@ -5490,11 +5491,11 @@ function tkpShKey(c,sid){return (sid===c.sid?'vs:':'vo:')+sid}
 function tkpMatch(it,q){return !q||(it.code+' '+(it.desc||'')).toLowerCase().includes(q)}
 /* one item row: c = panel context {d,sheets,sid,item,hl,hide,pop}; o = {t (this sheet totals), a (all sheets), qs (per sheet), sheet (row under a sheet in By sheet)} */
 function tkpRow(c,it,o){
-  const t=o.t||{},cur=!o.sheet||o.sheet===c.sid,eye=cur&&c.sid,x=!o.sheet&&tkIsColl('xi:'+it.id),qs=o.qs||[];
+  const t=o.t||{},cur=!o.sheet||o.sheet===c.sid,eye=!!c.sid,x=!o.sheet&&tkIsColl('xi:'+it.id),qs=o.qs||[];
   const sub=it.fr&&!o.sheet?'<div class="tkfrsum">'+esc((fi=>tkFrText(fi.sum,it,fi.cnt))(tkFrItem(c.d,c.sheets.filter(s=>s.id===c.sid),it))||tkLaySh(it.fr))+'</div>':'<div class="small muted">'+(it.h?esc(tkFtIn(+it.h)):'')+(it.unit==='LF'&&!it.fr?(it.h?' · ':'')+esc(tkInStr(tkItemWidthIn(it)))+' wide':'')+'</div>';
   let h='<div class="tkit'+(o.sheet?' tkit2':'')+(cur&&it.id===c.item?' on':'')+(cur&&c.hl===it.id?' hl':'')+'" data-it="'+esc(it.id)+'"'+(o.sheet?' data-its="'+esc(o.sheet)+'"':'')+'>'+
     (o.sheet?'':'<button class="tkxb" data-xi="'+esc(it.id)+'" title="Sheets this item is on" aria-expanded="'+x+'">'+(x?'▾':'▸')+'</button>')+
-    (eye?'<button class="tkeye'+(c.hide[it.id]?' off':'')+'" data-eye="'+esc(it.id)+'" title="Show/hide on this sheet">'+(c.hide[it.id]?'◌':'●')+'</button>':o.sheet?'<span class="tkeye ph"></span>':'')+
+    (eye?'<button class="tkeye'+(c.hide[it.id]?' off':'')+'" data-eye="'+esc(it.id)+'" title="'+(c.hide[it.id]?'Off: hidden on the plans. Click to show':'On: showing on the plans. Click to hide')+' (Shift+click = show only this item)" aria-pressed="'+(c.hide[it.id]?'false':'true')+'" aria-label="Show '+esc(it.code||'item')+' on the plans">💡</button>':o.sheet?'<span class="tkeye ph"></span>':'')+
     '<span class="sw" style="background:'+esc(it.color)+'"></span><div class="grow"><div class="c" title="'+esc(it.code+(it.desc?' — '+it.desc:''))+'">'+esc(it.code)+'</div>'+(it.desc?'<div class="tkd">'+esc(it.desc)+'</div>':'')+sub+'</div>'+
     '<div class="q"><div>'+esc(tkFmtQty(t.qty||0,it.unit))+(t.unscaled?' <span class="tkns" title="'+t.unscaled+' mark(s) on a sheet with no scale">!</span>':'')+'</div>'+(o.sheet?'<div class="small muted">'+t.marks+' mark'+(t.marks===1?'':'s')+'</div>':'<div class="small muted">all: '+esc(tkFmtQty((o.a||{}).qty||0,it.unit))+'</div>')+'</div>'+
     (o.sheet?'':'<button class="tkdot" data-ed="'+esc(it.id)+'" title="Edit">⋯</button>')+'</div>';
@@ -5548,7 +5549,7 @@ function tkpRender(root,c,act){
 function tkpBindList(el,c,act,redraw){
   $$('[data-it]',el).forEach(r=>r.onclick=e=>{if(e.target.closest('[data-ed],[data-eye],[data-xi]'))return;act({t:'pick',id:r.dataset.it,sheet:r.dataset.its||null})});
   $$('[data-ed]',el).forEach(b=>b.onclick=()=>act({t:'edit',id:b.dataset.ed}));
-  $$('[data-eye]',el).forEach(b=>b.onclick=()=>act({t:'eye',id:b.dataset.eye}));
+  $$('[data-eye]',el).forEach(b=>b.onclick=e=>{e.stopPropagation();act({t:'eye',id:b.dataset.eye,solo:e.shiftKey})});
   $$('[data-xi]',el).forEach(b=>b.onclick=()=>{tkToggleColl('xi:'+b.dataset.xi);redraw()});
   $$('[data-go]',el).forEach(b=>b.onclick=()=>act({t:'pick',id:b.dataset.gi,sheet:b.dataset.go,on:1}));
   $$('[data-open]',el).forEach(b=>b.onclick=e=>{e.stopPropagation();act({t:'open',sid:b.dataset.open})});
@@ -5571,7 +5572,7 @@ function tkpDo(a){
   if(!TKV){if(a.t==='pick'&&it){if(a.sheet&&tkSheets().some(s=>s.id===a.sheet)){TKV={item:it.id,hl:it.id};tkOpen(a.sheet)}else tkShowItem(it.id)}return}
   if(a.t==='scale'){tkScaleBox();return}
   if(a.t==='all'){TKV.hl=null;tkvPaint();return}
-  if(a.t==='eye'){TKV.hide[a.id]=!TKV.hide[a.id];tkvSide();tkvPaint();return}
+  if(a.t==='eye'){if(a.solo){const all=(TK.data.items||[]).map(x=>x.id),only=all.every(id=>id===a.id||TKV.hide[id])&&!TKV.hide[a.id];TKV.hide={};if(!only)all.forEach(id=>{if(id!==a.id)TKV.hide[id]=true})}else TKV.hide[a.id]=!TKV.hide[a.id];tkHideSave();tkvSide();tkvPaint();return}
   if(a.t==='pick'&&it){if(TKV.draft.length)tkvFinish();
     if(a.sheet&&a.sheet!==TKV.id){const s=TKV.list.find(x=>x.id===a.sheet)||tkSheets().find(x=>x.id===a.sheet);if(!s)return;TKV.item=it.id;TKV.hl=it.id;tkvUseItem(it.id);tkGo(s);return}
     TKV.hl=a.on?it.id:TKV.hl===it.id&&TKV.item===it.id?null:it.id;tkvUseItem(it.id);if(TKV.mode!=='draw')TKV.mode='draw';tkvPaint()}
@@ -5590,7 +5591,7 @@ function tkpLive(on){if(!TKP||TKP.live===on)return;TKP.live=on;if(!on){clearInte
 const tkpPopped=()=>!!(TKP&&TKP.live&&TK&&TKP.job===TK.job);
 /* the plan window tells the pop-out what it shows: sheet, active item, highlight, hidden items, and the takeoff data when it changed */
 function tkpState(full){const T=TKP;if(!T||!TK||TK.job!==T.job)return;const sh=tkSheets();
-  const m={t:'state',sid:TKV&&TKV.id||null,item:TKV&&TKV.item||null,hl:TKV&&TKV.hl||null,hide:TKV&&TKV.hide||{},rev:TK.rev,job:S.job&&S.job.name||''};
+  const m={t:'state',sid:TKV&&TKV.id||null,item:TKV&&TKV.item||null,hl:TKV&&TKV.hl||null,hide:TKV&&TKV.hide&&TKV.hj===(TK&&TK.job)?TKV.hide:tkHideGet(TK&&TK.job),hj:TK&&TK.job,rev:TK.rev,job:S.job&&S.job.name||''};
   if(full||T.sent!==TK.data){m.data=TK.data;T.sent=TK.data}if(full||T.sentSh!==sh){m.sheets=sh;T.sentSh=sh}
   try{T.ch.postMessage(m)}catch(e){}}
 function tkpPush(){if(TK)tkpChan(TK.job);if(TKP)debounce('tkp',()=>tkpState(),40)}
@@ -5935,6 +5936,9 @@ function tkvBoxSel(b,add){
   const l=add?tkvSelIds().slice():[];got.forEach(id=>{if(!l.includes(id))l.push(id)});TKV.msel=l;TKV.sel=l.length===1?l[0]:null;tkvPaint();
   if(l.length>1)toast(l.length+' marks selected · right-click to copy or delete');
 }
+/* light bulbs: items turned off stay hidden on every sheet; remembered per job on this device */
+function tkHideGet(j){try{return j&&JSON.parse(lsGet('acv.tkHide.'+j)||'{}')||{}}catch(e){return {}}}
+function tkHideSave(){if(TKV&&TK){const o={};Object.keys(TKV.hide||{}).forEach(k=>{if(TKV.hide[k])o[k]=true});lsSet('acv.tkHide.'+TK.job,Object.keys(o).length?JSON.stringify(o):null)}}
 function tkvSelIds(){if(!TKV)return [];const l=(TKV.msel||[]).slice();if(TKV.sel&&!l.includes(TKV.sel))l.push(TKV.sel);return l}
 function tkvShape(id){return TK&&id?TK.data.shapes.find(x=>x.id===id)||null:null}
 /* nearest edge of a mark to image point p: {seg,x,y,d,t} in image px (an area includes its closing edge) */
