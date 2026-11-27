@@ -4745,7 +4745,7 @@ function renderLogList(){
    Stored in table takeoffs (one row per job, office-only RLS): data = {v,items[],shapes[],scales{},sent{}}.
    item  = {id,n,code,desc,sec,unit:'LF'|'SF'|'EA',h,w (line width in inches, optional; blank = full wall thickness from the code: framing + 5/8" per board layer),color,
            fr: layout item (unit LF) = {preset:'joists'|'act'|'crc' (none = joists),...}: joists {mem,sp,trk,trkAll,brc,brMax,endJ,king,sfc,waste}, see Framing layout and Layout presets below; its rows are one per member, not one per item}
-   shape = {id,item,sheet,k:'line'|'poly'|'count'|'frame' (framing area: o = openings [[x,y,...],...], dir 'auto'|'edge'|'ang', edge, ang),p:[x0,y0,x1,y1,...] (0-1 of the sheet image),by,at, deduct:true on a poly = cut-out that subtracts its area,
+   shape = {id,item,sheet,k:'line'|'poly'|'count'|'frame' (framing area: o = openings [[x,y,...],...], dir 'auto'|'edge'|'ang', edge, ang, org, ed = manual edits {add,rm,dbl,beam,blk} in feet from the layout's start point, see tkFrame),p:[x0,y0,x1,y1,...] (0-1 of the sheet image),by,at, deduct:true on a poly = cut-out that subtracts its area,
            h: this line's own wall height in feet (optional; LF the same, but its own bid row "@ h"), note: short label shown on the sheet and in the markup PDF}
    sheets.scale_text = the printed scale(s) read at upload (PDF text) or later by OCR, best first, '; ' between; '' = looked, none found
    scales[sheetId] = {fpp:feet per image pixel,label,how:'cal'|'preset'}
@@ -4892,7 +4892,7 @@ function tkRows(data,sheets){
    brc (bridging code),brMax (ft between bridging rows, 0 = none),endJ (double joist at each end),king (king joist each side of an opening),waste (%)}.
    Its marks are shapes k:'frame', p = the area's corners, o = [[opening corners],...], dir = 'auto' (span the short way) | 'edge' (joists parallel to corner edge..edge+1) | 'ang' (ang = degrees on the sheet, 0 = level).
    All math here is in feet with u along the joists and v across them. ===== */
-const TK_FR_DEF={mem:'600S162-43',sp:16,trk:'600T150-43',trkAll:false,brc:'150U50-54 CRC',brMax:4,endJ:false,king:true,waste:0};
+const TK_FR_DEF={mem:'600S162-43',sp:16,trk:'600T150-43',beam:'',trkAll:false,brc:'150U50-54 CRC',brMax:4,endJ:false,king:true,waste:0};
 const TK_FR_ROLES={joist:'Joists',king:'King joists',track:'Track',hdr:'Headers',br:'Bridging'};
 /* ===== Layout presets (pure). A layout item's fr.preset: 'joists' (default; also every older framing item without one) | 'act' | 'crc'.
    act (lay-in ceiling grid) = {tile:'2x4'|'2x2',main,mainLen (ft stock),t4,t2,wa (wall angle),waLen,wire,wireSp (ft along mains),tileCode,waste}:
@@ -4939,30 +4939,37 @@ function tkLayOrg(pre,f,p,a,org){
 function tkLayCut(iv,xs,fn){const k=[iv[0]].concat(xs.filter(x=>x>iv[0]+1e-6&&x<iv[1]-1e-6),[iv[1]]);for(let i=0;i+1<k.length;i++)fn(k[i],k[i+1])}
 /* hanger wires on a run of len feet: every sp plus one at each end (within 1" of a multiple counts as one) */
 function tkLayWires(len,sp){return Math.max(0,Math.ceil((len-1/12)/(sp>0?sp:4)-1e-6))+1}
+/* manual edits on a layout (shape.ed): offsets in feet from the layout's start point (ref), across the runs (add, rm, dbl keys) or along them (beam, blk).
+   nearest of the positions L to x within half a space m: its index, or -1 */
+function tkEdNear(L,x,m){let b=-1,d=m/2+1e-6;(L||[]).forEach((v,i)=>{const e=Math.abs(v-x);if(e<d){d=e;b=i}});return b}
+/* run positions P with ed's removed (nearest within half a space, generated ones only) and added runs: sorted */
+function tkEdRuns(P,ref,m,ed){const E=ed||{},out=P.slice();(E.rm||[]).forEach(x=>{const i=tkEdNear(out,ref+(+x),m);if(i>=0)out.splice(i,1)});(E.add||[]).forEach(x=>{if(isFinite(+x))out.push(ref+(+x))});return out.sort((a,b)=>a-b)}
+/* the ed list (beam / blk) as positions along the runs */
+function tkEdAt(ed,k,ref){return ((ed||{})[k]||[]).filter(x=>isFinite(+x)).map(x=>ref+(+x)).sort((a,b)=>a-b)}
 /* ACT grid over an area (feet), o = {tile,ang,wireSp,mainLen,waLen,org ([x,y] feet: a main and a cross tee pass through it; none = centered)}: {segs [{r:'main'|'t4'|'t2'|'wa',a,b,len,st (stock pieces, mains and wall angle)}], cnt {wire}} */
 function tkLayAct(poly,holes,o){
   o=o||{};const a=+o.ang||0,two=o.tile==='2x2',out=[],cnt={wire:0};if(Math.floor((poly||[]).length/2)<3)return {segs:out,cnt};
   const R0=tkFrRot(poly,a),R=[R0],SR=[tkFrSwap(R0)],U=tkFrExt(R0,0),V=tkFrExt(R0,1);
   const add=(r,u0,v0,u1,v1,st)=>{const len=Math.hypot(u1-u0,v1-v0);if(len>1e-6){const g={r,a:tkFrUn(u0,v0,a),b:tkFrUn(u1,v1,a),len};if(st)g.st=Math.max(1,Math.ceil((len-1/24)/st-1e-6));out.push(g)}};
   const G=o.org?tkFrRot(o.org,a):null,par=v=>Math.round((v-G[1])/2)%2===0;
-  const VL=G?tkLayAt(V[0],V[1],two?2:4,G[1]):tkLayPos(V[0],V[1],two?2:4,1),mains=VL.filter((v,i)=>!two||(G?par(v):i%2===0)),half=two?VL.filter(v=>!mains.includes(v)):[],UL=G?tkLayAt(U[0],U[1],2,G[0]):tkLayPos(U[0],U[1],2,1);
+  const VL=G?tkLayAt(V[0],V[1],two?2:4,G[1]):tkLayPos(V[0],V[1],two?2:4,1),ref={u:G?G[0]:(U[0]+U[1])/2,v:G?G[1]:VL.length?VL[0]:V[0]},mains=tkEdRuns(VL.filter((v,i)=>!two||(G?par(v):i%2===0)),ref.v,4,o.ed),half=two?VL.filter(v=>!mains.includes(v)):[],UL=G?tkLayAt(U[0],U[1],2,G[0]):tkLayPos(U[0],U[1],2,1);
   mains.forEach(v=>tkFrClip(R,v).forEach(iv=>{add('main',iv[0],v,iv[1],v,+o.mainLen||12);cnt.wire+=tkLayWires(iv[1]-iv[0],+o.wireSp)}));
   UL.forEach(u=>tkFrClip(SR,u).forEach(iv=>tkLayCut(iv,mains,(v0,v1)=>add('t4',u,v0,u,v1))));
   half.forEach(v=>tkFrClip(R,v).forEach(iv=>tkLayCut(iv,UL,(u0,u1)=>add('t2',u0,v,u1,v))));
   const n=R0.length/2;for(let i=0;i<n;i++){const j=(i+1)%n;add('wa',R0[2*i],R0[2*i+1],R0[2*j],R0[2*j+1],+o.waLen||12)}
-  return {segs:out,cnt};
+  return {segs:out,cnt,ref,jv:mains,sp:4};
 }
 /* CRC & furring over an area (feet), o = {ang,crcSp,fcSp,crcLen,fcLen,perLen,wireSp,per2 (bool),org ([x,y] feet: a CRC and a furring line pass through it; none = centered)}: {segs [{r:'crc'|'fc'|'per'|'per2'|'trim',...,st}], cnt {wire,clip}} */
 function tkLayCrc(poly,holes,o){
   o=o||{};const a=+o.ang||0,out=[],cnt={wire:0,clip:0};if(Math.floor((poly||[]).length/2)<3)return {segs:out,cnt};
   const R0=tkFrRot(poly,a),HR=(holes||[]).filter(h=>h&&h.length>=6).map(h=>tkFrRot(h,a)),R=[R0].concat(HR),SR=R.map(tkFrSwap),U=tkFrExt(R0,0),V=tkFrExt(R0,1);
   const add=(r,u0,v0,u1,v1,st)=>{const len=Math.hypot(u1-u0,v1-v0);if(len>1e-6){const g={r,a:tkFrUn(u0,v0,a),b:tkFrUn(u1,v1,a),len};if(st)g.st=Math.max(1,Math.ceil((len-1/24)/st-1e-6));out.push(g)}};
-  const G=o.org?tkFrRot(o.org,a):null,CV=G?tkLayAt(V[0],V[1],+o.crcSp||4,G[1]):tkLayPos(V[0],V[1],+o.crcSp||4,0),FU=G?tkLayAt(U[0],U[1],(+o.fcSp||16)/12,G[0]):tkLayPos(U[0],U[1],(+o.fcSp||16)/12,0),fl=+o.fcLen||12;
+  const G=o.org?tkFrRot(o.org,a):null,CV0=G?tkLayAt(V[0],V[1],+o.crcSp||4,G[1]):tkLayPos(V[0],V[1],+o.crcSp||4,0),FU=G?tkLayAt(U[0],U[1],(+o.fcSp||16)/12,G[0]):tkLayPos(U[0],U[1],(+o.fcSp||16)/12,0),fl=+o.fcLen||12,ref={u:G?G[0]:(U[0]+U[1])/2,v:G?G[1]:CV0.length?CV0[0]:V[0]},CV=tkEdRuns(CV0,ref.v,+o.crcSp||4,o.ed);
   CV.forEach(v=>tkFrClip(R,v).forEach(iv=>{add('crc',iv[0],v,iv[1],v,+o.crcLen||16);cnt.wire+=tkLayWires(iv[1]-iv[0],+o.wireSp)}));
   FU.forEach(u=>tkFrClip(SR,u).forEach(iv=>{add('fc',u,iv[0],u,iv[1],fl);cnt.clip+=CV.filter(v=>v>iv[0]-1e-9&&v<iv[1]+1e-9).length}));
   const edges=(r,k,st)=>{const n=r.length/2;for(let i=0;i<n;i++){const j=(i+1)%n;add(k,r[2*i],r[2*i+1],r[2*j],r[2*j+1],st)}};
   edges(R0,'per',+o.perLen||10);if(o.per2)edges(R0,'per2',+o.perLen||10);HR.forEach(h=>edges(h,'trim',fl));
-  return {segs:out,cnt};
+  return {segs:out,cnt,ref,jv:CV,sp:+o.crcSp||4};
 }
 /* rotate flat points [x,y,...] into (u,v) for joists at angle a (radians) */
 function tkFrRot(p,a){const c=Math.cos(a),s=Math.sin(a),o=[];for(let i=0;i+1<p.length;i+=2)o.push(p[i]*c+p[i+1]*s,-p[i]*s+p[i+1]*c);return o}
@@ -5003,16 +5010,20 @@ function tkFrPc(len){return Math.ceil(len*12-.125)/12}
    track along the edges the joists bear on (all edges with trkAll); a header (track) across the cut joists on both sides of each opening, between the
    joists that flank it, and king joists along each side of it (full span) with king; bridging rows across the joists, evenly spaced, no more than brMax apart.
    o.org ([x,y] feet) = a start point a joist passes through (the layout runs from it both ways, with a joist at each bearing edge); none = from the first edge.
-   Returns [{r:'joist'|'king'|'track'|'hdr'|'br', a:[x,y], b:[x,y], len (feet, exact)}] in feet on the sheet. */
+   o.ed = manual edits {add:[ft],rm:[ft],dbl:{ft:n},beam:[ft],blk:[ft]}, offsets from ref (the start point, else the first edge / mid-span): extra joists, removed joists,
+   doubled / tripled joists (extra members 1-1/2" beside it, same pieces), beams / headers across the joists (role 'beam'; joists end at them) and blocking rows ('br').
+   The array also carries ref {u,v}, jv (joist positions) and sp (feet). Returns [{r:'joist'|'king'|'track'|'hdr'|'br', a:[x,y], b:[x,y], len (feet, exact)}] in feet on the sheet. */
 function tkFrame(poly,holes,o){
   o=o||{};const a=+o.ang||0,s=(+o.sp||16)/12,out=[];if(Math.floor((poly||[]).length/2)<3||!(s>0))return out;
   const R0=tkFrRot(poly,a),HR=(holes||[]).filter(h=>h&&h.length>=6).map(h=>tkFrRot(h,a)),R=[R0].concat(HR);const V=tkFrExt(R0,1),U=tkFrExt(R0,0);
   const add=(r,u0,v0,u1,v1)=>{const len=Math.hypot(u1-u0,v1-v0);if(len>1e-6)out.push({r,a:tkFrUn(u0,v0,a),b:tkFrUn(u1,v1,a),len})};
-  const line=(r,v)=>tkFrClip(R,v).forEach(iv=>add(r,iv[0],v,iv[1],v));
-  const P=[];if(o.org){P.push(V[0]);tkLayAt(V[0],V[1],s,tkFrRot(o.org,a)[1]).forEach(v=>P.push(v));if(V[1]-P[P.length-1]>1/24)P.push(V[1])}
+  const G=o.org?tkFrRot(o.org,a):null,ref={u:G?G[0]:(U[0]+U[1])/2,v:G?G[1]:V[0]},ed=o.ed||{},BU=tkEdAt(ed,'beam',ref.u);
+  const line=(r,v,dv)=>tkFrClip(R,v).forEach(iv=>tkLayCut(iv,BU,(u0,u1)=>add(r,u0,v+(dv||0),u1,v+(dv||0))));
+  let P=[];if(o.org){P.push(V[0]);tkLayAt(V[0],V[1],s,tkFrRot(o.org,a)[1]).forEach(v=>P.push(v));if(V[1]-P[P.length-1]>1/24)P.push(V[1])}
   else{const nk=Math.floor((V[1]-V[0])/s+1e-6);for(let k=0;k<=nk;k++)P.push(V[0]+k*s);if(V[1]-P[P.length-1]>1/24)P.push(V[1])}
   const n=R0.length/2;for(let i=0;i<n;i++){const j=(i+1)%n,v=R0[2*i+1];if(Math.abs(R0[2*j+1]-v)<1e-6&&!P.some(x=>Math.abs(x-v)<1/12))P.push(v)}
-  P.sort((x,y)=>x-y);P.forEach(v=>line('joist',v));
+  P=tkEdRuns(P,ref.v,s,ed);P.forEach(v=>line('joist',v));
+  const dbl=ed.dbl||{};Object.keys(dbl).forEach(k=>{const i=tkEdNear(P,ref.v+(+k),s),m=Math.min(4,Math.round(+dbl[k]||1));if(i<0)return;const v=P[i],sg=v>(V[0]+V[1])/2?-1:1;for(let x=1;x<m;x++)line('joist',v,sg*x*.125)});
   if(o.endJ){line('joist',V[0]);line('joist',V[1])}
   for(let i=0;i<n;i++){const j=(i+1)%n,du=R0[2*j]-R0[2*i],dv=R0[2*j+1]-R0[2*i+1];if(o.trkAll||Math.abs(dv)>Math.abs(du)*Math.tan(Math.PI/36))add('track',R0[2*i],R0[2*i+1],R0[2*j],R0[2*j+1])}
   HR.forEach(h=>{const hv=tkFrExt(h,1),hu=tkFrExt(h,0);if(hv[1]-hv[0]<1e-6||hu[1]-hu[0]<1e-6)return;
@@ -5021,7 +5032,8 @@ function tkFrame(poly,holes,o){
     add('hdr',hu[0],lo,hu[0],hi);add('hdr',hu[1],lo,hu[1],hi)});
   const br=+o.brMax||0;if(br>0){const span=U[1]-U[0],nr=Math.ceil((span-1/96)/br)-1,SR=R.map(tkFrSwap);
     for(let k=1;k<=nr;k++){const u=U[0]+k*span/(nr+1);tkFrClip(SR,u).forEach(iv=>add('br',u,iv[0],u,iv[1]))}}
-  return out;
+  if(BU.length||(ed.blk||[]).length){const SR=R.map(tkFrSwap);BU.forEach(u=>tkFrClip(SR,u).forEach(iv=>add('beam',u,iv[0],u,iv[1])));tkEdAt(ed,'blk',ref.u).forEach(u=>tkFrClip(SR,u).forEach(iv=>add('br',u,iv[0],u,iv[1])))}
+  out.ref=ref;out.jv=P;out.sp=s;return out;
 }
 /* totals per role: {[role]: {n pieces, lf (each piece rounded up to the inch, + waste %), cuts: [[inches, count],...] longest first, st (stock lengths, when the layout gives them)}} */
 function tkFrSum(segs,waste){
@@ -5034,9 +5046,10 @@ function tkFrSum(segs,waste){
 function tkFrameOf(sh,sheet,scale,fr){
   const fpp=scale&&+scale.fpp;if(!fpp||!sheet||!sheet.w||!sheet.h||!sh)return null;const pre=tkLayPre(fr),f=tkLayF(fr),kx=sheet.w*fpp,ky=sheet.h*fpp;
   const ft=q=>(q||[]).map((x,i)=>x*(i%2?ky:kx));const p=ft(sh.p),ang=tkFrAngle(p,sh.dir,+sh.edge,sh.ang),H=(sh.o||[]).map(ft),org=Array.isArray(sh.org)&&sh.org.length===2&&isFinite(+sh.org[0])&&isFinite(+sh.org[1])?ft(sh.org):null;
-  const L=pre==='act'?tkLayAct(p,H,{...f,ang,org}):pre==='crc'?tkLayCrc(p,H,{...f,ang,org,per2:!!String(f.per2||'').trim()}):{segs:tkFrame(p,H,{sp:f.sp,ang,org,brMax:f.brc?f.brMax:0,trkAll:f.trkAll,endJ:f.endJ,king:f.king}),cnt:{}};
+  const ed=sh.ed&&typeof sh.ed==='object'?sh.ed:null,J=pre==='joists'?tkFrame(p,H,{sp:f.sp,ang,org,ed,brMax:f.brc?f.brMax:0,trkAll:f.trkAll,endJ:f.endJ,king:f.king}):null;
+  const L=pre==='act'?tkLayAct(p,H,{...f,ang,org,ed}):pre==='crc'?tkLayCrc(p,H,{...f,ang,org,ed,per2:!!String(f.per2||'').trim()}):{segs:J,cnt:{},ref:J.ref,jv:J.jv,sp:J.sp};
   const segs=L.segs,sum=tkFrSum(segs,f.waste);let lf=0;Object.keys(sum).forEach(r=>lf+=sum[r].lf);
-  return {segs,sum,lf,ang,kx,ky,org,cnt:{...L.cnt,area:tkLayArea(p,H)},pre};
+  return {segs,sum,lf,ang,kx,ky,org,cnt:{...L.cnt,area:tkLayArea(p,H)},pre,ref:L.ref,jv:L.jv||[],sp:L.sp};
 }
 /* bid rows for a layout item from its summed layout (sum by role, cnt = summed counts {wire,clip,area}):
    joists: joists (+ kings), track (+ headers), bridging; act: main tee, 4' / 2' cross tees, wall angle, hanger wire, tile SF; crc: CRC, furring (+ opening trim), perimeter (1 or 2), hanger wire, clips.
@@ -5059,10 +5072,11 @@ function tkFrRows(it,sum,un,cnt){
     row('p2',f.per2,'Perimeter (2nd) '+f.per2+' – '+W(p2.st)+' pcs @'+f.perLen+"'",p2.lf,W(p2.st));
     row('w',f.wire,'Hanger wire @'+f.wireSp+"' along CRC – "+W(C.wire)+' ea',W(C.wire),undefined,'EA');
     row('cl',f.clip,'Clips / wire ties (CRC x furring) – '+W(C.clip)+' ea',W(C.clip),undefined,'EA');
-  }else{const j=g('joist'),kg=g('king'),t=g('track'),h=g('hdr'),b=g('br');
+  }else{const j=g('joist'),kg=g('king'),t=g('track'),h=g('hdr'),b=g('br'),bm=g('beam'),own=!!String(f.beam||'').trim(),bt=own?{n:0,lf:0}:bm;
     row('j',f.mem,(ds||'Ceiling joists')+' '+f.mem+' @'+f.sp+'" OC – '+(j.n+kg.n)+' pcs'+(kg.n?' (incl. '+kg.n+' king)':''),j.lf+kg.lf,j.n+kg.n);
-    row('t',f.trk,'Track '+f.trk+' – '+(t.n+h.n)+' pcs'+(h.n?' (incl. '+h.n+' header'+(h.n===1?'':'s')+')':''),t.lf+h.lf,t.n+h.n);
-    row('b',f.brc,'Bridging '+f.brc+' @'+f.brMax+"' max – "+b.n+' pcs',b.lf,b.n)}
+    row('t',f.trk,'Track '+f.trk+' – '+(t.n+h.n+bt.n)+' pcs'+(h.n?' (incl. '+h.n+' header'+(h.n===1?'':'s')+')':'')+(bt.n?' (incl. '+bt.n+' beam / header line'+(bt.n===1?'':'s')+')':''),t.lf+h.lf+bt.lf,t.n+h.n+bt.n);
+    if(own)row('bm',f.beam,'Beam / header '+f.beam+' – '+bm.n+' pcs',bm.lf,bm.n);
+    row('b',f.brc||(b.n?f.trk:''),'Bridging '+(f.brc||f.trk)+(f.brc&&+f.brMax?' @'+f.brMax+"' max":'')+' – '+b.n+' pcs',b.lf,b.n)}
   if(pre!=='act')row('sf',f.sfc,(ds||TK_LAY_NAME[pre])+' area',(C.area||0)*wm,undefined,'SF');
   return out;
 }
@@ -5252,7 +5266,7 @@ async function tkItemForm(it,pre){
 function tkFrText(sum,it,cnt){const g=k=>(sum[k]||{}).n||0,F=tkLayF(it&&it.fr),pre=F.preset,C=cnt||{};
   if(pre==='act'){if(!g('main')&&!g('t4'))return '';const t=Math.ceil((C.area||0)/(F.tile==='2x2'?4:8)*(1+(+F.waste||0)/100)-1e-9);return 'ACT '+F.tile+' · '+t+' tile'+(t===1?'':'s')+' · '+g('main')+' main'+(g('main')===1?'':'s')+' · '+(g('t4')+g('t2'))+' tees'}
   if(pre==='crc'){if(!g('crc')&&!g('fc'))return '';return "CRC @"+F.crcSp+"' · FC @"+F.fcSp+'" · '+(C.wire||0)+' wires'+(C.clip?' · '+C.clip+' clips':'')}
-  const j=g('joist')+g('king'),t=g('track')+g('hdr'),b=g('br');if(!j&&!t)return '';return '@'+F.sp+'" OC · '+j+' joist'+(j===1?'':'s')+' · '+t+' track'+(b?' · '+b+' bridging':'')}
+  const j=g('joist')+g('king'),t=g('track')+g('hdr'),b=g('br'),bm=g('beam');if(!j&&!t)return '';return '@'+F.sp+'" OC · '+j+' joist'+(j===1?'':'s')+' · '+t+' track'+(bm?' · '+bm+' beam':'')+(b?' · '+b+' bridging':'')}
 /* tag on the sheet / in the PDF for one layout mark: "600S162-43 @16" OC · 24 pcs", "ACT 2x4 · 75 tiles", "CRC @4' · FC @16"" */
 function tkLayTag(it,r){const F=tkLayF(it&&it.fr);if(!r)return 'Set the scale to lay out the '+TK_LAY_NAME[F.preset];
   if(F.preset==='act'){const t=Math.ceil((r.cnt.area||0)/(F.tile==='2x2'?4:8)*(1+(+F.waste||0)/100)-1e-9);return 'ACT '+F.tile+' · '+t+' tiles'}
@@ -5263,9 +5277,9 @@ function tkLaySh(fr){const F=tkLayF(fr);return F.preset==='act'?'ACT grid '+F.ti
 /* what the "turn" actions call the main members of a preset */
 const TK_LAY_RUN={joists:'joists',act:'mains',crc:'CRC'};
 /* line styles of each preset's members, drawn in this order: [role, width, opacity, dash (0 solid, 1 long, 2 short), highlight (amber halo)] */
-const TK_LAY_ST={joists:[['hdr',7,.6,0,1],['king',7,.6,0,1],['joist',1.1,.9],['br',1.4,1,1],['track',3.2,1],['king',2.2,1],['hdr',2.6,1]],act:[['t2',.6,.75,2],['t4',.8,.85],['main',1.8,1],['wa',3.4,1]],crc:[['fc',.7,.85],['trim',1.6,1],['per2',2.4,.8,2],['per',3.2,1],['crc',2.6,1,1]]};
+const TK_LAY_ST={joists:[['hdr',7,.6,0,1],['king',7,.6,0,1],['beam',8,.55,0,1],['joist',1.1,.9],['br',1.4,1,1],['track',3.2,1],['king',2.2,1],['hdr',2.6,1],['beam',3.6,1]],act:[['t2',.6,.75,2],['t4',.8,.85],['main',1.8,1],['wa',3.4,1]],crc:[['fc',.7,.85],['trim',1.6,1],['per2',2.4,.8,2],['per',3.2,1],['crc',2.6,1,1]]};
 /* bid row key -> member role (for the line sample in the PDF legend) */
-const TK_LAY_ROWR={j:'joist',t:'track',b:'br',m:'main',t4:'t4',t2:'t2',wa:'wa',c:'crc',fc:'fc',p:'per',p2:'per2'};
+const TK_LAY_ROWR={j:'joist',t:'track',b:'br',bm:'beam',m:'main',t4:'t4',t2:'t2',wa:'wa',c:'crc',fc:'fc',p:'per',p2:'per2'};
 /* pick a layout preset (for + Layout item) */
 async function tkLayAsk(){const v=await formBox('New layout item',[{k:'p',label:'Layout',type:'select',value:lsGet('acv.tkLayPre')||'joists',options:[['joists','Joists (metal-stud ceiling framing)'],['act','ACT grid (lay-in ceiling)'],['crc','CRC & furring (suspended drywall ceiling)']]}],'Next');return v?v.p:null}
 /* layout item settings for its preset (joists / ACT grid / CRC & furring). New items start from the last settings used for that preset (kept on this device). */
@@ -5287,6 +5301,7 @@ async function tkFrameForm(it,pre){
       '<label class="field"><span>Spacing</span><span class="tkfrsp"><select name="sp">'+SP.map(x=>o(x,x+'" OC',cust?'':f.sp)).join('')+o('c','Custom…',cust?'c':'')+'</select><input name="spc" inputmode="decimal" value="'+(cust?esc(f.sp):'')+'" placeholder="in"'+(cust?'':' hidden')+'></span></label>'+
       sel('endJ','Extra joist at each end',o('','No',f.endJ?'1':'')+o('1','Yes (double end joists)',f.endJ?'1':''))+sel('king','At openings',o('1','Headers + king joists each side',f.king?'1':'')+o('','Headers only',f.king?'1':''))+
       '<div class="tkfrh">Track</div>'+fld('trk','Track member',f.trk,'600T150-43')+sel('trkAll','Track on',o('','Bearing ends (where joists land)',f.trkAll?'1':'')+o('1','All sides',f.trkAll?'1':''))+
+      fld('beam','Beam / header line member (blank = track)',f.beam||'','e.g. 800S200-54 box beam')+
       '<div class="tkfrh">Bridging / bracing</div>'+fld('brc','Bridging member (blank = none)',f.brc,'150U50-54 CRC or 362S125 blocking')+
       '<label class="field"><span>Rows no more than</span><span class="tkfrsp"><select name="brMax">'+BR.map(x=>o(x,x?x+"' apart":'No bridging',brc?'':f.brMax)).join('')+o('c','Custom…',brc?'c':'')+'</select><input name="brx" inputmode="decimal" value="'+(brc?esc(f.brMax):'')+'" placeholder="ft"'+(brc?'':' hidden')+'></span></label>';
   if(pre==='act')body+='<div class="tkfrh">Grid</div>'+sel('tile','Tile',o('2x4','2x4 (4\' tees 2\' OC)',f.tile)+o('2x2','2x2 (+ 2\' tees between)',f.tile))+fld('main','Main tee (code)',f.main,"Main tee 12'")+num('mainLen','Main tee length',[12],f.mainLen,"'")+
@@ -5309,7 +5324,7 @@ async function tkFrameForm(it,pre){
       if(pre==='joists'){const sp=v('sp')==='c'?parseFloat(v('spc')):+v('sp'),bm=v('brMax')==='c'?tkFeet(v('brx')):+v('brMax');
         if(!v('mem')){toast('Give it a joist member.');return}
         if(!(sp>=4&&sp<=96)){toast('Spacing should be 4 to 96 inches.');return}if(!(bm>=0)||bm>100){toast('Check the bridging spacing (feet).');return}
-        fr={preset:'joists',mem:c80('mem'),sp:Math.round(sp*1000)/1000,trk:c80('trk'),trkAll:v('trkAll')==='1',brc:c80('brc'),brMax:v('brc')?Math.round(bm*1000)/1000:0,endJ:v('endJ')==='1',king:v('king')==='1',sfc:c80('sfc'),waste:Math.round(w*100)/100}}
+        fr={preset:'joists',mem:c80('mem'),sp:Math.round(sp*1000)/1000,trk:c80('trk'),beam:c80('beam'),trkAll:v('trkAll')==='1',brc:c80('brc'),brMax:v('brc')?Math.round(bm*1000)/1000:0,endJ:v('endJ')==='1',king:v('king')==='1',sfc:c80('sfc'),waste:Math.round(w*100)/100}}
       else if(pre==='act'){if(!v('main')){toast('Give it a main tee.');return}
         fr={preset:'act',tile:v('tile')==='2x2'?'2x2':'2x4',main:c80('main'),mainLen:+v('mainLen')||12,t4:c80('t4'),t2:c80('t2'),wa:c80('wa'),waLen:+v('waLen')||12,wire:c80('wire'),wireSp:+v('wireSp')||4,tileCode:c80('tileCode'),waste:Math.round(w*100)/100}}
       else{if(!v('crc')||!v('fc')){toast('Give it a CRC and a furring member.');return}
@@ -5319,9 +5334,33 @@ async function tkFrameForm(it,pre){
       if(!TKV)tkRenderBody();else{TKV.item=nv.id;TKV.lm='frame';TKV.mode='draw';tkvPaint()}res(nv)};
   });
 }
+/* where a right-click falls on a layout area: {r (tkFrameOf), du, dv (feet from its ref along / across the runs), jo (offset of the nearest run within half a space, or null),
+   dk (dbl key on that run), bk ([list, index] of the nearest beam / blocking row within 2'), ed (a copy of the edits)}; null with no scale */
+function tkvFrEdAt(s,p0){
+  const sc=tkScaleOf(TKV.id),it=tkItem(s.item),r=sc&&tkFrameOf(s,TKV.sh,sc,it&&it.fr);if(!r||!r.ref)return null;
+  const fpp=+sc.fpp,q=tkFrRot([p0.x*fpp,p0.y*fpp],r.ang),R3=x=>Math.round(x*1000)/1000,ed=JSON.parse(JSON.stringify(s.ed||{})),i=tkEdNear(r.jv,q[1],r.sp),jo=i>=0?R3(r.jv[i]-r.ref.v):null;
+  const dk=jo==null?null:Object.keys(ed.dbl||{}).find(k=>Math.abs(+k-jo)<r.sp/2)||null,du=R3(q[0]-r.ref.u);let bk=null,bd=2;
+  ['beam','blk'].forEach(k=>(ed[k]||[]).forEach((x,j)=>{const d=Math.abs(+x-du);if(d<bd){bd=d;bk=[k,j]}}));
+  return {r,du,dv:R3(q[1]-r.ref.v),jo,dk,bk,ed};
+}
+/* manual edits on a layout area at the clicked point: add / double / triple / undo double / remove / restore runs, add / remove beam lines and blocking rows */
+function tkvFrEd(c,s,p0){
+  if(!tkScaleOf(TKV.id)){tkScaleBox();return}const E=tkvFrEdAt(s,p0);if(!E)return;const ed=E.ed,L=k=>ed[k]||(ed[k]=[]),it=tkItem(s.item),one=TK_LAY_RUN[tkLayPre(it&&it.fr)];let msg='';
+  if(c==='frjadd'){L('add').push(E.dv);msg='Added one here.'}
+  else if(c==='frjdbl'||c==='frjtri'){if(E.jo==null)return;ed.dbl=ed.dbl||{};if(E.dk!=null)delete ed.dbl[E.dk];ed.dbl[E.jo]=c==='frjtri'?3:2;msg=c==='frjtri'?'Joist tripled.':'Joist doubled.'}
+  else if(c==='frjund'){if(E.dk!=null&&ed.dbl)delete ed.dbl[E.dk];msg='Back to a single joist.'}
+  else if(c==='frjrm'){if(E.jo==null)return;const a=L('add'),ai=a.findIndex(x=>Math.abs(+x-E.jo)<1e-3);if(ai>=0)a.splice(ai,1);else L('rm').push(E.jo);if(E.dk!=null&&ed.dbl)delete ed.dbl[E.dk];msg='Removed. Right-click → Restore removed '+one+' to bring it back.'}
+  else if(c==='frjres'){ed.rm=[];msg='Removed '+one+' restored.'}
+  else if(c==='frbeam'){L('beam').push(E.du);msg='Beam / header line added: the joists end at it.'}
+  else if(c==='frblk'){L('blk').push(E.du);msg='Blocking row added.'}
+  else if(c==='frdelb'){if(!E.bk)return;ed[E.bk[0]].splice(E.bk[1],1);msg=E.bk[0]==='beam'?'Beam line removed.':'Blocking row removed.'}
+  Object.keys(ed).forEach(k=>{const v=ed[k];if(!v||(Array.isArray(v)?!v.length:!Object.keys(v).length))delete ed[k]});
+  tkDo({t:'shape',v:{id:s.id,ed:Object.keys(ed).length?ed:null}});TKV.sel=s.id;tkvPaint();toast(msg);
+}
 /* right-click actions on a layout area (fr...), Add layout on an SF area (frthis + preset) */
 async function tkvFrameAct(c,s,p0,pre){
   if(!TKV||!s)return;const it=tkItem(s.item),P=tkLayPre(it&&it.fr),RN=TK_LAY_RUN[P];
+  if(/^fr(j|beam$|blk$|delb$)/.test(c)){tkvFrEd(c,s,p0);return}
   if(c==='frset'){const v=await tkFrameForm(it);if(v&&TKV){TKV.sel=s.id;tkvPaint()}return}
   if(c==='froff'){TKV.frOff=!TKV.frOff;lsSet('acv.tkFrOff',TKV.frOff?'1':null);tkvPaint();return}
   if(c==='frauto'){tkDo({t:'shape',v:{id:s.id,dir:'auto',edge:null,ang:null}});tkvPaint();return}
@@ -6043,6 +6082,11 @@ function tkCtx(cx,cy,sub){
         const RN=TK_LAY_RUN[tkLayPre(hit_it.fr)],RU=RN.charAt(0).toUpperCase()+RN.slice(1);
         add('frset','▦ Layout settings ('+TK_LAY_NAME[tkLayPre(hit_it.fr)]+')…');add('frrot','⟳ Turn '+RN+' 90°');add('fredge',RU+' parallel to this edge',!!es&&es.d<14/TKV.t.s);add('frauto',RU+': auto (span the short way)',!!hs.dir&&hs.dir!=='auto');
         add('frorg','⌖ Start grid here…');add('frctr',hit_it.fr&&tkLayPre(hit_it.fr)==='joists'?'Joists from the edge (clear start point)':'Center grid',Array.isArray(hs.org));
+        const E=tkvFrEdAt(hs,p0),ed=hs.ed||{},PR=tkLayPre(hit_it.fr),one=PR==='joists'?'joist':PR==='act'?'main':'CRC';
+        if(E){sep();add('frjadd','+ Add '+one+' here');
+          if(PR==='joists'){add('frjdbl','Double this joist',E.jo!=null);add('frjtri','Triple this joist',E.jo!=null);add('frjund','Undo double',E.dk!=null)}
+          add('frjrm','Remove this '+one,E.jo!=null);add('frjres','Restore removed '+TK_LAY_RUN[PR]+' ('+(ed.rm||[]).length+')',(ed.rm||[]).length>0);
+          if(PR==='joists'){add('frbeam','+ Add beam / header line here');add('frblk','+ Add blocking row here');add('frdelb','Remove this beam / blocking row',!!E.bk)}sep()}
         add('fropen','Add an opening…');add('frdelo','Delete this opening',oi>=0);add('froff',TKV.frOff?'Show layouts':'Hide layouts (outline only)');add('frrm','Remove layout (keep area)')}
       if(hs.k==='poly'&&!hs.deduct&&hit_it.unit==='SF')add('lay','▦ Add layout ▸');
       add('mitem','Change item for this mark ▸',TK.data.items.some(x=>x.id!==hs.item&&tkSameKind(x,hit_it)));
