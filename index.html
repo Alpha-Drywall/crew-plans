@@ -528,7 +528,16 @@ body:has(#fvPill) .mcard{padding-bottom:72px}#tmLog{scroll-margin-top:140px}
 #tkInk{position:absolute;left:0;top:0;width:100%;height:100%;mix-blend-mode:multiply;pointer-events:none}
 .tkread{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);background:#1d232b;color:#fff;font-weight:700;font-size:16px;padding:6px 14px;border-radius:999px;pointer-events:none;display:none}
 #tkStage.tkxh{cursor:none}
-#tkStage.tkar{cursor:default}
+#tkStage.tkar{cursor:crosshair}
+#tkStage[data-m=pan]{cursor:grab}
+#tkStage[data-m=select]{cursor:default}
+#tkStage[data-m=select][data-h=mark]{cursor:pointer}
+#tkStage[data-m=select][data-h=sel]{cursor:move}
+#tkStage[data-m=select][data-h=corner]{cursor:crosshair}
+#tkStage[data-m=gpick]{cursor:crosshair}
+#tkStage[data-g=box]{cursor:crosshair!important}
+#tkStage[data-g=corner]{cursor:crosshair!important}
+#tkStage[data-g=grab]:not(.tkxh){cursor:grabbing!important}
 #tkStage .hint,#tkStage .tkread{z-index:3}
 .tkov{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:2}
 .tkcr{position:absolute;left:0;top:0;z-index:4;display:none;pointer-events:none;background:rgba(22,25,29,.9);color:#fff;border-radius:8px;padding:4px 9px 5px;font:700 14px/1.2 system-ui,-apple-system,'Segoe UI',sans-serif;white-space:nowrap;box-shadow:0 2px 10px #0004;font-variant-numeric:tabular-nums;will-change:transform}
@@ -2745,19 +2754,20 @@ function tkvGripBind(g){
     const d=e.key==='ArrowLeft'?(o.side==='left'?-20:20):e.key==='ArrowRight'?(o.side==='left'?20:-20):0;if(!d)return;e.preventDefault();tkvwSet({width:clamp(Math.min(o.width,tkvwMaxW())+d,200,tkvwMaxW())})});
 }
 /* ---- takeoff drawing: cursor, end marks, magnifier, snapping, readout (localStorage 'acv.view.tkdraw'; snap on/off stays in 'acv.tkSnap') ---- */
-const TKDR_DEF={cur:'gap',ends:'ticks',mag:'auto',zoom:3,snapD:'M',ortho:false,diag:false,read:true,xc:'auto',endSz:'M',xSz:'M',xW:'M'};
+const TKDR_DEF={cur:'gap',ends:'ticks',mag:'auto',zoom:3,snapD:'M',ortho:false,diag:false,read:true,xc:'auto',endSz:'M',xSz:'M',xW:'M',ol:'M'};
 /* size steps for line-end marks, crosshair arm length / center gap, and crosshair line weight */
 const TK_ENDSZ={S:.6,M:1,L:1.6,XL:2.4},TK_XSZ={S:[12,4],M:[20,5],L:[34,7],XL:[56,9]},TK_XW={S:.75,M:1,L:2};
 const TK_SNAPPX={S:6,M:10,L:16};
-function tkdrGet(){const o=viewGet('tkdraw',TKDR_DEF);return {cur:vpick(o.cur,['gap','full','arrow'],'gap'),ends:vpick(o.ends,['ticks','dots','arrows'],'ticks'),mag:vpick(o.mag,['auto','always','off'],'auto'),zoom:vpick(+o.zoom,[2,3,4],3),snapD:vpick(o.snapD,['S','M','L'],'M'),ortho:o.ortho===true,diag:o.diag===true,read:o.read!==false,xc:vpick(o.xc,['auto','red','blue','black'],'auto'),endSz:vpick(o.endSz,['S','M','L','XL'],'M'),xSz:vpick(o.xSz,['S','M','L','XL'],'M'),xW:vpick(o.xW,['S','M','L'],'M')}}
+function tkdrGet(){const o=viewGet('tkdraw',TKDR_DEF);return {cur:vpick(o.cur,['gap','full','arrow'],'gap'),ends:vpick(o.ends,['ticks','dots','arrows'],'ticks'),mag:vpick(o.mag,['auto','always','off'],'auto'),zoom:vpick(+o.zoom,[2,3,4],3),snapD:vpick(o.snapD,['S','M','L'],'M'),ortho:o.ortho===true,diag:o.diag===true,read:o.read!==false,xc:vpick(o.xc,['auto','red','blue','black'],'auto'),endSz:vpick(o.endSz,['S','M','L','XL'],'M'),xSz:vpick(o.xSz,['S','M','L','XL'],'M'),xW:vpick(o.xW,['S','M','L'],'M'),ol:vpick(o.ol,['S','M','L'],'M')}}
 function tkdrSet(p){viewSet('tkdraw',p,TKDR_DEF);if(typeof TKV!=='undefined'&&TKV&&TKV.W){if('ortho' in p)TKV.ortho=!!p.ortho;tkvPaint();tkvOverlay()}}
 function tkdrRows(){const d=tkdrGet(),sn=lsGet('acv.tkSnap')!=='off';return [{head:'Drawing'},
-  {label:'Cursor',v:d.cur,opts:[['gap','┼ Crosshair','Thin crosshair with an open center so the plan line shows'],['full','Full lines','Crosshair lines across the whole sheet'],['arrow','Arrow','Normal mouse pointer']],set:v=>tkdrSet({cur:v})},
+  {label:'Cursor',v:d.cur,opts:[['gap','┼ Crosshair','Thin crosshair with an open center so the plan line shows'],['full','Full lines','Crosshair lines across the whole sheet'],['arrow','Small + (system)','The system\'s small crosshair cursor, no overlay lines']],set:v=>tkdrSet({cur:v})},
   {label:'Crosshair color',v:d.xc,opts:[['auto','Auto'],['red','Red'],['blue','Blue'],['black','Black']],set:v=>tkdrSet({xc:v}),note:'Auto = dark with a white edge, shows on black and white'},
   {label:'Line ends',v:d.ends,opts:[['ticks','├┤ Ticks'],['dots','• Dots'],['arrows','◄► Arrows']],set:v=>tkdrSet({ends:v}),note:'Also used in the markup PDF'},
   {label:'Line end size',v:d.endSz,opts:[['S','Small'],['M','Medium'],['L','Large'],['XL','X-large']],set:v=>tkdrSet({endSz:v}),note:'Ticks, dots and arrows, on screen and in the PDF'},
   {label:'Crosshair size',v:d.xSz,opts:[['S','Small'],['M','Medium'],['L','Large'],['XL','X-large']],set:v=>tkdrSet({xSz:v})},
   {label:'Crosshair weight',v:d.xW,opts:[['S','Thin'],['M','Normal'],['L','Bold']],set:v=>tkdrSet({xW:v})},
+  {label:'Drawing outline',v:d.ol,opts:[['S','Thin'],['M','Normal'],['L','Bold']],set:v=>tkdrSet({ol:v}),note:'Dashed outline while drawing an area or rectangle, and the select box / lasso'},
   {label:'Magnifier',v:d.mag,opts:[['auto','Auto'],['always','Always'],['off','Off']],set:v=>tkdrSet({mag:v}),note:'Auto = on iPad / phone while your finger is down (hold, slide, lift to place)'},
   d.mag==='off'?null:{label:'Magnifier zoom',v:d.zoom,opts:[[2,'2x'],[3,'3x'],[4,'4x']],set:v=>tkdrSet({zoom:+v})},
   {label:'Snap to corners and ends',v:sn?'on':'off',opts:[['on','On'],['off','Off']],set:v=>{lsSet('acv.tkSnap',v==='on'?null:'off');if(typeof TKV!=='undefined'&&TKV){TKV.snap=v==='on';tkvTools();tkvOverlay()}},note:'Hold '+(typeof tkMac==='function'&&tkMac()?'⌘':'Ctrl')+' to place a point without snapping'},
@@ -4909,28 +4919,44 @@ function tkLayPos(lo,hi,m,bal){
   if(bal){const r=sp-Math.floor(sp/m+1e-6)*m;b=r<1/12?m+r/2:(r+m)/2}else{const n=Math.max(1,Math.ceil((sp-1/12)/m-1e-6));b=(sp-(n-1)*m)/2}
   for(let k=0;lo+b+k*m<=hi-b+1e-6;k++)out.push(lo+b+k*m);return out;
 }
+/* grid lines from lo to hi every m through org (a start point set on the plan): org + k*m, leaving out any within 1/2" of an edge */
+function tkLayAt(lo,hi,m,org){
+  const out=[];if(!(m>0)||!(hi-lo>1e-6)||!isFinite(org))return out;
+  for(let k=Math.ceil((lo-org)/m-1e-9);org+k*m<hi-1/24;k++){const x=org+k*m;if(x>lo+1/24)out.push(x)}return out;
+}
+/* a layout's current grid start point in feet (where a main / CRC / joist line crosses a cross tee / furring line; joists: first joist at the middle of the span):
+   pre, f = settings (tkLayF), p = corners in feet, a = angle (radians), org = start point in feet or null (auto) */
+function tkLayOrg(pre,f,p,a,org){
+  if(org&&isFinite(org[0])&&isFinite(org[1]))return [+org[0],+org[1]];
+  const R0=tkFrRot(p||[],a),U=tkFrExt(R0,0),V=tkFrExt(R0,1);if(!(U[1]>U[0]))return null;
+  let u=(U[0]+U[1])/2,v=V[0];
+  if(pre==='act'){const two=f.tile==='2x2',VL=tkLayPos(V[0],V[1],two?2:4,1),UL=tkLayPos(U[0],U[1],2,1);if(VL.length)v=VL[0];if(UL.length)u=UL[0]}
+  else if(pre==='crc'){const CV=tkLayPos(V[0],V[1],+f.crcSp||4,0),FU=tkLayPos(U[0],U[1],(+f.fcSp||16)/12,0);if(CV.length)v=CV[0];if(FU.length)u=FU[0]}
+  return tkFrUn(u,v,a);
+}
 /* split interval iv at the positions xs strictly inside it, fn(a,b) for each piece */
 function tkLayCut(iv,xs,fn){const k=[iv[0]].concat(xs.filter(x=>x>iv[0]+1e-6&&x<iv[1]-1e-6),[iv[1]]);for(let i=0;i+1<k.length;i++)fn(k[i],k[i+1])}
 /* hanger wires on a run of len feet: every sp plus one at each end (within 1" of a multiple counts as one) */
 function tkLayWires(len,sp){return Math.max(0,Math.ceil((len-1/12)/(sp>0?sp:4)-1e-6))+1}
-/* ACT grid over an area (feet), o = {tile,ang,wireSp,mainLen,waLen}: {segs [{r:'main'|'t4'|'t2'|'wa',a,b,len,st (stock pieces, mains and wall angle)}], cnt {wire}} */
+/* ACT grid over an area (feet), o = {tile,ang,wireSp,mainLen,waLen,org ([x,y] feet: a main and a cross tee pass through it; none = centered)}: {segs [{r:'main'|'t4'|'t2'|'wa',a,b,len,st (stock pieces, mains and wall angle)}], cnt {wire}} */
 function tkLayAct(poly,holes,o){
   o=o||{};const a=+o.ang||0,two=o.tile==='2x2',out=[],cnt={wire:0};if(Math.floor((poly||[]).length/2)<3)return {segs:out,cnt};
   const R0=tkFrRot(poly,a),R=[R0],SR=[tkFrSwap(R0)],U=tkFrExt(R0,0),V=tkFrExt(R0,1);
   const add=(r,u0,v0,u1,v1,st)=>{const len=Math.hypot(u1-u0,v1-v0);if(len>1e-6){const g={r,a:tkFrUn(u0,v0,a),b:tkFrUn(u1,v1,a),len};if(st)g.st=Math.max(1,Math.ceil((len-1/24)/st-1e-6));out.push(g)}};
-  const VL=tkLayPos(V[0],V[1],two?2:4,1),mains=VL.filter((v,i)=>!two||i%2===0),half=two?VL.filter((v,i)=>i%2===1):[],UL=tkLayPos(U[0],U[1],2,1);
+  const G=o.org?tkFrRot(o.org,a):null,par=v=>Math.round((v-G[1])/2)%2===0;
+  const VL=G?tkLayAt(V[0],V[1],two?2:4,G[1]):tkLayPos(V[0],V[1],two?2:4,1),mains=VL.filter((v,i)=>!two||(G?par(v):i%2===0)),half=two?VL.filter(v=>!mains.includes(v)):[],UL=G?tkLayAt(U[0],U[1],2,G[0]):tkLayPos(U[0],U[1],2,1);
   mains.forEach(v=>tkFrClip(R,v).forEach(iv=>{add('main',iv[0],v,iv[1],v,+o.mainLen||12);cnt.wire+=tkLayWires(iv[1]-iv[0],+o.wireSp)}));
   UL.forEach(u=>tkFrClip(SR,u).forEach(iv=>tkLayCut(iv,mains,(v0,v1)=>add('t4',u,v0,u,v1))));
   half.forEach(v=>tkFrClip(R,v).forEach(iv=>tkLayCut(iv,UL,(u0,u1)=>add('t2',u0,v,u1,v))));
   const n=R0.length/2;for(let i=0;i<n;i++){const j=(i+1)%n;add('wa',R0[2*i],R0[2*i+1],R0[2*j],R0[2*j+1],+o.waLen||12)}
   return {segs:out,cnt};
 }
-/* CRC & furring over an area (feet), o = {ang,crcSp,fcSp,crcLen,fcLen,perLen,wireSp,per2 (bool)}: {segs [{r:'crc'|'fc'|'per'|'per2'|'trim',...,st}], cnt {wire,clip}} */
+/* CRC & furring over an area (feet), o = {ang,crcSp,fcSp,crcLen,fcLen,perLen,wireSp,per2 (bool),org ([x,y] feet: a CRC and a furring line pass through it; none = centered)}: {segs [{r:'crc'|'fc'|'per'|'per2'|'trim',...,st}], cnt {wire,clip}} */
 function tkLayCrc(poly,holes,o){
   o=o||{};const a=+o.ang||0,out=[],cnt={wire:0,clip:0};if(Math.floor((poly||[]).length/2)<3)return {segs:out,cnt};
   const R0=tkFrRot(poly,a),HR=(holes||[]).filter(h=>h&&h.length>=6).map(h=>tkFrRot(h,a)),R=[R0].concat(HR),SR=R.map(tkFrSwap),U=tkFrExt(R0,0),V=tkFrExt(R0,1);
   const add=(r,u0,v0,u1,v1,st)=>{const len=Math.hypot(u1-u0,v1-v0);if(len>1e-6){const g={r,a:tkFrUn(u0,v0,a),b:tkFrUn(u1,v1,a),len};if(st)g.st=Math.max(1,Math.ceil((len-1/24)/st-1e-6));out.push(g)}};
-  const CV=tkLayPos(V[0],V[1],+o.crcSp||4,0),FU=tkLayPos(U[0],U[1],(+o.fcSp||16)/12,0),fl=+o.fcLen||12;
+  const G=o.org?tkFrRot(o.org,a):null,CV=G?tkLayAt(V[0],V[1],+o.crcSp||4,G[1]):tkLayPos(V[0],V[1],+o.crcSp||4,0),FU=G?tkLayAt(U[0],U[1],(+o.fcSp||16)/12,G[0]):tkLayPos(U[0],U[1],(+o.fcSp||16)/12,0),fl=+o.fcLen||12;
   CV.forEach(v=>tkFrClip(R,v).forEach(iv=>{add('crc',iv[0],v,iv[1],v,+o.crcLen||16);cnt.wire+=tkLayWires(iv[1]-iv[0],+o.wireSp)}));
   FU.forEach(u=>tkFrClip(SR,u).forEach(iv=>{add('fc',u,iv[0],u,iv[1],fl);cnt.clip+=CV.filter(v=>v>iv[0]-1e-9&&v<iv[1]+1e-9).length}));
   const edges=(r,k,st)=>{const n=r.length/2;for(let i=0;i<n;i++){const j=(i+1)%n;add(k,r[2*i],r[2*i+1],r[2*j],r[2*j+1],st)}};
@@ -4975,13 +5001,15 @@ function tkFrPc(len){return Math.ceil(len*12-.125)/12}
    Joists every sp from one bearing edge to the other (plus one at the far edge and at every edge parallel to the joists), cut at openings;
    track along the edges the joists bear on (all edges with trkAll); a header (track) across the cut joists on both sides of each opening, between the
    joists that flank it, and king joists along each side of it (full span) with king; bridging rows across the joists, evenly spaced, no more than brMax apart.
+   o.org ([x,y] feet) = a start point a joist passes through (the layout runs from it both ways, with a joist at each bearing edge); none = from the first edge.
    Returns [{r:'joist'|'king'|'track'|'hdr'|'br', a:[x,y], b:[x,y], len (feet, exact)}] in feet on the sheet. */
 function tkFrame(poly,holes,o){
   o=o||{};const a=+o.ang||0,s=(+o.sp||16)/12,out=[];if(Math.floor((poly||[]).length/2)<3||!(s>0))return out;
   const R0=tkFrRot(poly,a),HR=(holes||[]).filter(h=>h&&h.length>=6).map(h=>tkFrRot(h,a)),R=[R0].concat(HR);const V=tkFrExt(R0,1),U=tkFrExt(R0,0);
   const add=(r,u0,v0,u1,v1)=>{const len=Math.hypot(u1-u0,v1-v0);if(len>1e-6)out.push({r,a:tkFrUn(u0,v0,a),b:tkFrUn(u1,v1,a),len})};
   const line=(r,v)=>tkFrClip(R,v).forEach(iv=>add(r,iv[0],v,iv[1],v));
-  const P=[];const nk=Math.floor((V[1]-V[0])/s+1e-6);for(let k=0;k<=nk;k++)P.push(V[0]+k*s);if(V[1]-P[P.length-1]>1/24)P.push(V[1]);
+  const P=[];if(o.org){P.push(V[0]);tkLayAt(V[0],V[1],s,tkFrRot(o.org,a)[1]).forEach(v=>P.push(v));if(V[1]-P[P.length-1]>1/24)P.push(V[1])}
+  else{const nk=Math.floor((V[1]-V[0])/s+1e-6);for(let k=0;k<=nk;k++)P.push(V[0]+k*s);if(V[1]-P[P.length-1]>1/24)P.push(V[1])}
   const n=R0.length/2;for(let i=0;i<n;i++){const j=(i+1)%n,v=R0[2*i+1];if(Math.abs(R0[2*j+1]-v)<1e-6&&!P.some(x=>Math.abs(x-v)<1/12))P.push(v)}
   P.sort((x,y)=>x-y);P.forEach(v=>line('joist',v));
   if(o.endJ){line('joist',V[0]);line('joist',V[1])}
@@ -5004,10 +5032,10 @@ function tkFrSum(segs,waste){
 /* a layout mark's layout on its sheet: {segs (in feet), sum, lf (all members), ang, cnt {wire,clip,area (net SF)}, pre}; null with no scale */
 function tkFrameOf(sh,sheet,scale,fr){
   const fpp=scale&&+scale.fpp;if(!fpp||!sheet||!sheet.w||!sheet.h||!sh)return null;const pre=tkLayPre(fr),f=tkLayF(fr),kx=sheet.w*fpp,ky=sheet.h*fpp;
-  const ft=q=>(q||[]).map((x,i)=>x*(i%2?ky:kx));const p=ft(sh.p),ang=tkFrAngle(p,sh.dir,+sh.edge,sh.ang),H=(sh.o||[]).map(ft);
-  const L=pre==='act'?tkLayAct(p,H,{...f,ang}):pre==='crc'?tkLayCrc(p,H,{...f,ang,per2:!!String(f.per2||'').trim()}):{segs:tkFrame(p,H,{sp:f.sp,ang,brMax:f.brc?f.brMax:0,trkAll:f.trkAll,endJ:f.endJ,king:f.king}),cnt:{}};
+  const ft=q=>(q||[]).map((x,i)=>x*(i%2?ky:kx));const p=ft(sh.p),ang=tkFrAngle(p,sh.dir,+sh.edge,sh.ang),H=(sh.o||[]).map(ft),org=Array.isArray(sh.org)&&sh.org.length===2&&isFinite(+sh.org[0])&&isFinite(+sh.org[1])?ft(sh.org):null;
+  const L=pre==='act'?tkLayAct(p,H,{...f,ang,org}):pre==='crc'?tkLayCrc(p,H,{...f,ang,org,per2:!!String(f.per2||'').trim()}):{segs:tkFrame(p,H,{sp:f.sp,ang,org,brMax:f.brc?f.brMax:0,trkAll:f.trkAll,endJ:f.endJ,king:f.king}),cnt:{}};
   const segs=L.segs,sum=tkFrSum(segs,f.waste);let lf=0;Object.keys(sum).forEach(r=>lf+=sum[r].lf);
-  return {segs,sum,lf,ang,kx,ky,cnt:{...L.cnt,area:tkLayArea(p,H)},pre};
+  return {segs,sum,lf,ang,kx,ky,org,cnt:{...L.cnt,area:tkLayArea(p,H)},pre};
 }
 /* bid rows for a layout item from its summed layout (sum by role, cnt = summed counts {wire,clip,area}):
    joists: joists (+ kings), track (+ headers), bridging; act: main tee, 4' / 2' cross tees, wall angle, hanger wire, tile SF; crc: CRC, furring (+ opening trim), perimeter (1 or 2), hanger wire, clips.
@@ -5058,7 +5086,7 @@ function tkDeleteCorner(p,i,min){const q=(p||[]).slice();const n=Math.floor(q.le
 /* copies of shapes moved by (dx,dy) (0-1 of the sheet) with new ids, points rounded like drawn ones */
 function tkOffsetShapes(shapes,dx,dy,mkId){
   const off=q=>(q||[]).map((v,i)=>Math.round((+v+(i%2?dy:dx))*10000)/10000);
-  return (shapes||[]).map(s=>({...s,id:mkId(),p:off(s.p),...(Array.isArray(s.o)?{o:s.o.map(off)}:{})}));
+  return (shapes||[]).map(s=>({...s,id:mkId(),p:off(s.p),...(Array.isArray(s.o)?{o:s.o.map(off)}:{}),...(Array.isArray(s.org)?{org:off(s.org)}:{})}));
 }
 /* copy one sheet's shapes onto another sheet (same spots), for typical floors */
 function tkCopyShapes(data,fromSheet,toSheet,mkId,itemIds){
@@ -5299,6 +5327,8 @@ async function tkvFrameAct(c,s,p0,pre){
   if(c==='frrot'){const sc=tkScaleOf(TKV.id),r=sc&&tkFrameOf(s,TKV.sh,sc,it&&it.fr);const a=r?r.ang*180/Math.PI:+s.ang||0;tkDo({t:'shape',v:{id:s.id,dir:'ang',edge:null,ang:Math.round(((a+90)%180)*1000)/1000}});tkvPaint();return}
   if(c==='fredge'){const es=tkvNearSeg(s,p0);if(es){tkDo({t:'shape',v:{id:s.id,dir:'edge',edge:es.seg,ang:null}});tkvPaint()}return}
   if(c==='fropen'){if(TKV.draft.length)tkvFinish();tkvUseItem(s.item);TKV.mode='draw';TKV.dNext=true;tkvPaint();toast('Click the opening\'s corners inside the layout area (or drag a rectangle).');return}
+  if(c==='frorg'){if(!tkScaleOf(TKV.id)){tkScaleBox();return}if(TKV.draft.length)tkvCancel();TKV.gpick={id:s.id,a:null};TKV.sel=s.id;tkvTools();tkvPaint();toast('Click the grid start point (a '+(P==='act'?'main / cross tee crossing':P==='crc'?'CRC / furring crossing':'joist')+' on the plan). Esc cancels.');return}
+  if(c==='frctr'){tkDo({t:'shape',v:{id:s.id,org:null}});tkvPaint();toast(P==='joists'?'Joists laid out from the edge again.':'Grid centered again.');return}
   if(c==='frdelo'){const o=(s.o||[]).filter(q=>!tkInPoly(p0,q,TKV.W,TKV.H));tkDo({t:'shape',v:{id:s.id,o}});tkvPaint();return}
   if(c==='frrm'){const W=TKV.W,H=TKV.H,same=(a,b)=>a&&b&&a.length===b.length&&a.every((x,i)=>Math.abs(x-b[i])<1e-6);
     const has=TK.data.shapes.some(d=>d.sheet===TKV.id&&d.k==='poly'&&!d.deduct&&same(d.p,s.p)&&tkItem(d.item)&&tkItem(d.item).unit==='SF');
@@ -5432,7 +5462,7 @@ function tkvTools(){
   const sn=$('#tkSnap');if(sn)sn.textContent='Snap: '+(TKV.snap?'on':'off');
   const wm=$('#tkWm');if(wm){wm.textContent='Lines '+(TKV.wmul||1)+'x';wm.title='Screen only: draws every line '+(TKV.wmul||1)+' times its real width so thin lines are easier to see. Each item\'s real width is set on the item (tap the item, Line width).'}
   const ob=$('#tkOrtho');if(ob){ob.classList.toggle('on',!!TKV.ortho);ob.setAttribute('aria-pressed',String(!!TKV.ortho))}
-  if(TKV.stage){const cs=tkdrGet().cur;TKV.stage.classList.toggle('tkxh',draw&&cs!=='arrow');TKV.stage.classList.toggle('tkar',draw&&cs==='arrow')}
+  if(TKV.stage){const cs=tkdrGet().cur;TKV.stage.classList.toggle('tkxh',draw&&cs!=='arrow');TKV.stage.classList.toggle('tkar',draw&&cs==='arrow');TKV.stage.dataset.m=TKV.gpick?'gpick':TKV.mode;if(TKV.mode!=='select')TKV.stage.dataset.h=''}
   $$('#tkv [data-lm]').forEach(b=>b.classList.toggle('on',TKV.mode==='draw'&&!!it&&b.dataset.lm===(it.unit==='EA'?'count':it.fr||it.unit==='SF'?'area':TKV.lm==='seg'?'seg':'run')));
   {const ls=$('#tkLay');if(ls){const on=TKV.mode==='draw'&&!!it&&(!!it.fr||it.unit==='SF');ls.hidden=!on;ls.value=it&&it.fr?tkLayPre(it.fr):'';ls.classList.toggle('on',!!(it&&it.fr))}}
   const h=$('#tkHint');if(!h||!TKV.W)return;
@@ -5653,10 +5683,13 @@ function tkvFrameSvg(s,it,p,sel,dim,op,sw,tags){
   const sc=tkScaleOf(TKV.id),r=tkFrameOf({...s,p},TKV.sh,sc,it.fr);
   if(r&&!TKV.frOff){const fpp=+sc.fpp,d={};r.segs.forEach(g=>{d[g.r]=(d[g.r]||'')+'M'+f(g.a[0]/fpp)+' '+f(g.a[1]/fpp)+'L'+f(g.b[0]/fpp)+' '+f(g.b[1]/fpp)});
     TK_LAY_ST[r.pre].forEach(([k,w,a,ds,hi])=>{if(d[k])h+='<path data-fr="'+k+'" d="'+d[k]+'" fill="none" stroke-linecap="butt" vector-effect="non-scaling-stroke" stroke-width="'+f2(w*hc)+'" stroke="'+(hi?'#ffab00':c)+'"'+(a<1?' stroke-opacity="'+a+'"':'')+(ds===1?' stroke-dasharray="7 4"':ds===2?' stroke-dasharray="2 2"':'')+'/>'})}
+  if(r&&r.org&&sel&&!TKV.frOff){const fpp=+sc.fpp,x=r.org[0]/fpp,y=r.org[1]/fpp,k=6/TKV.t.s;h+='<path data-org="1" d="M'+f(x-k)+' '+f(y)+'H'+f(x+k)+'M'+f(x)+' '+f(y-k)+'V'+f(y+k)+'" stroke="#ffab00" stroke-width="'+f2(2*hc)+'" vector-effect="non-scaling-stroke" fill="none"/><circle data-org="1" cx="'+f(x)+'" cy="'+f(y)+'" r="'+f(k*.6)+'" fill="none" stroke="#ffab00" stroke-width="'+f2(1.5*hc)+'" vector-effect="non-scaling-stroke"/>'}
   h+='</g>';
   const lp=tkFrLabelAt(p,W,H,M*.009);tags.push([tkLayTag(it,r),lp[0],lp[1],c,dim]);
   return h;
 }
+/* the dashed outline while drawing an area / rectangle / selection box: screen-constant width (⚙ View → Drawing → Drawing outline), thicker in high contrast; image units */
+function tkvOutline(){const px={S:1,M:2,L:3.5}[tkdrGet().ol]*(document.documentElement.classList.contains('hc')?1.5:1),k=1/TKV.t.s;return {px,w:(px*k).toFixed(3),d:((3*px+3)*k).toFixed(2)+' '+((2*px+2)*k).toFixed(2)}}
 /* live drawing, rubber band to the cursor and the running length/area; corner handles of the selected mark; the selection box */
 function tkvLive(){
   if(!TKV||!TKV.W)return;const g=$('#tkLive');if(!g)return;const W=TKV.W,H=TKV.H,M=Math.max(W,H),sw=M*.003;
@@ -5665,14 +5698,15 @@ function tkvLive(){
   let s='';
   if(pts.length){const ps=pts.map(p=>p.x.toFixed(1)+','+p.y.toFixed(1)).join(' ');
     const poly=TKV.mode==='draw'&&tkPolyIt(it);
-    const lf=TKV.mode==='draw'&&it&&it.unit==='LF',lw=lf?tkvLineW(it,1.5):sw;
-    s+=poly&&pts.length>2&&TKV.dDraft?'<polygon points="'+ps+'" fill="url(#tkHatch)" stroke="#c62828" stroke-width="'+sw+'" stroke-dasharray="'+(sw*3)+' '+(sw*2)+'"/>':poly&&pts.length>2?'<polygon points="'+ps+'" fill="'+c+'" fill-opacity=".18" stroke="'+c+'" stroke-width="'+sw+'" stroke-dasharray="'+(sw*3)+' '+(sw*2)+'"/>':'<polyline points="'+ps+'" fill="none" stroke="'+c+'"'+(lf?' stroke-opacity="'+(TKV.cont?'.85':'.7')+'"':'')+' stroke-width="'+lw.toFixed(2)+'" stroke-linecap="'+(lf?'butt':'round')+'" stroke-linejoin="'+(lf?'miter':'round')+'"/>';
+    const lf=TKV.mode==='draw'&&it&&it.unit==='LF',lw=lf?tkvLineW(it,1.5):sw,ol=tkvOutline();
+    s+=poly&&pts.length>2&&TKV.dDraft?'<polygon data-draft="1" points="'+ps+'" fill="url(#tkHatch)" stroke="#c62828" stroke-width="'+ol.w+'" stroke-dasharray="'+ol.d+'"/>':poly&&pts.length>2?'<polygon data-draft="1" points="'+ps+'" fill="'+c+'" fill-opacity=".18" stroke="'+c+'" stroke-width="'+ol.w+'" stroke-dasharray="'+ol.d+'"/>':'<polyline points="'+ps+'" fill="none" stroke="'+c+'"'+(lf?' stroke-opacity="'+(TKV.cont?'.85':'.7')+'"':'')+' stroke-width="'+(lf?lw.toFixed(2):ol.w)+'" stroke-linecap="'+(lf?'butt':'round')+'" stroke-linejoin="'+(lf?'miter':'round')+'"/>';
     {const k=1/TKV.t.s,a=7*k,w=(1.4*k).toFixed(2);s+=TKV.draft.map((p,i)=>{const b=i===0&&TKV.mode==='draw'&&tkPolyIt(it)&&TKV.draft.length>2?a*1.6:a;return '<rect x="'+(p.x-b/2).toFixed(1)+'" y="'+(p.y-b/2).toFixed(1)+'" width="'+b.toFixed(1)+'" height="'+b.toFixed(1)+'" fill="none" stroke="#1d232b" stroke-width="'+w+'"/>'}).join('')}
   }
   if(TKV.mode==='select'&&TKV.sel&&!TKV.box){const sh=tkvShape(TKV.sel);if(sh&&sh.k!=='count'){const q=TKV.drag&&(TKV.drag.m?TKV.drag.m[sh.id]:TKV.drag.id===sh.id&&TKV.drag.p)||(sh.p||[]);const r=5/TKV.t.s,w=(1.6/TKV.t.s).toFixed(2);
     for(let i=0;i+1<q.length;i+=2){const x=q[i]*W,y=q[i+1]*H;s+='<rect data-hv="'+(i/2)+'" x="'+(x-r).toFixed(1)+'" y="'+(y-r).toFixed(1)+'" width="'+(2*r).toFixed(1)+'" height="'+(2*r).toFixed(1)+'" fill="none" stroke="#1565c0" stroke-width="'+w+'"/><circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="'+(1.3/TKV.t.s).toFixed(2)+'" fill="#1565c0"/>'}}}
-  if(TKV.box&&TKV.box.l){const k=1/TKV.t.s;s+='<polygon data-box="1" points="'+TKV.box.l.map(v=>v.x.toFixed(1)+','+v.y.toFixed(1)).join(' ')+'" fill="#1e88e5" fill-opacity=".08" stroke="#1e88e5" stroke-width="'+(1.2*k).toFixed(2)+'" stroke-dasharray="'+(5*k).toFixed(1)+' '+(3*k).toFixed(1)+'"/>'}
-  else if(TKV.box){const a=TKV.box.a,b=TKV.box.b,k=1/TKV.t.s;s+='<rect data-box="1" x="'+Math.min(a.x,b.x).toFixed(1)+'" y="'+Math.min(a.y,b.y).toFixed(1)+'" width="'+Math.abs(b.x-a.x).toFixed(1)+'" height="'+Math.abs(b.y-a.y).toFixed(1)+'" fill="#1e88e5" fill-opacity=".08" stroke="#1e88e5" stroke-width="'+(1.2*k).toFixed(2)+'" stroke-dasharray="'+(5*k).toFixed(1)+' '+(3*k).toFixed(1)+'"/>'}
+  if(TKV.box&&TKV.box.l){const o=tkvOutline();s+='<polygon data-box="1" points="'+TKV.box.l.map(v=>v.x.toFixed(1)+','+v.y.toFixed(1)).join(' ')+'" fill="#1e88e5" fill-opacity=".08" stroke="#1e88e5" stroke-width="'+o.w+'" stroke-dasharray="'+o.d+'"/>'}
+  else if(TKV.box){const a=TKV.box.a,b=TKV.box.b,o=tkvOutline();s+='<rect data-box="1" x="'+Math.min(a.x,b.x).toFixed(1)+'" y="'+Math.min(a.y,b.y).toFixed(1)+'" width="'+Math.abs(b.x-a.x).toFixed(1)+'" height="'+Math.abs(b.y-a.y).toFixed(1)+'" fill="#1e88e5" fill-opacity=".08" stroke="#1e88e5" stroke-width="'+o.w+'" stroke-dasharray="'+o.d+'"/>'}
+  if(TKV.gpick&&TKV.gpick.a){const k=1/TKV.t.s,a=TKV.gpick.a,w=(1.6*k).toFixed(2);s+='<g data-gpick="1"><circle cx="'+a.x.toFixed(1)+'" cy="'+a.y.toFixed(1)+'" r="'+(7*k).toFixed(1)+'" fill="none" stroke="#ffab00" stroke-width="'+w+'"/>'+(TKV.cur?'<line x1="'+a.x.toFixed(1)+'" y1="'+a.y.toFixed(1)+'" x2="'+TKV.cur.x.toFixed(1)+'" y2="'+TKV.cur.y.toFixed(1)+'" stroke="#ffab00" stroke-width="'+w+'" stroke-dasharray="'+(6*k).toFixed(1)+' '+(4*k).toFixed(1)+'"/>':'')+'</g>'}
   g.innerHTML=s;tkvOverlay();
   const rd=$('#tkRead');if(!rd)return;const sc=tkScaleOf(TKV.id);
   if(!pts.length||(TKV.mode!=='draw'&&TKV.mode!=='measure'&&TKV.mode!=='scale')){rd.style.display='none';return}
@@ -5773,7 +5807,7 @@ function tkvBind(){
       TKV.g={type:'pan',sx:e.clientX,sy:e.clientY,t0:Object.assign({},TKV.t),moved:false,time:Date.now(),btn,alt:e.altKey,shift:e.shiftKey,
       rect:!TKV.space&&e.button===0&&!e.ctrlKey&&TKV.mode==='draw'&&tkPolyIt(it)&&!TKV.draft.length&&!!tkScaleOf(TKV.id),
       corner:ci>=0?{id:cs.id,i:ci,p0:(cs.p||[]).slice()}:null,box:sm&&ci<0&&(e.shiftKey||e.metaKey||e.ctrlKey||e.altKey||!!TKV.boxNext||!!TKV.lassoNext),lasso:sm&&ci<0&&(e.altKey||!!TKV.lassoNext)};
-      if(sm&&ci<0&&!TKV.g.box){const hid=tkvHit(tkvImg(e.clientX,e.clientY)),ids=tkvSelIds();if(hid&&ids.includes(hid)){const m0={};ids.forEach(id=>{const x=tkvShape(id);if(x)m0[id]={p:(x.p||[]).slice(),o:x.o?x.o.map(q=>q.slice()):null}});TKV.g.mv={m0,a:tkvImg(e.clientX,e.clientY)}}}
+      if(sm&&ci<0&&!TKV.g.box){const hid=tkvHit(tkvImg(e.clientX,e.clientY)),ids=tkvSelIds();if(hid&&ids.includes(hid)){const m0={};ids.forEach(id=>{const x=tkvShape(id);if(x)m0[id]={p:(x.p||[]).slice(),o:x.o?x.o.map(q=>q.slice()):null,org:Array.isArray(x.org)?x.org.slice():null}});TKV.g.mv={m0,a:tkvImg(e.clientX,e.clientY)}}}
       TKV.boxNext=false;TKV.lassoNext=false;
       /* touch / pen while drawing: hold still a moment to aim (magnifier, slide to adjust, lift to place); a quick drag still moves the sheet */
       if(e.pointerType!=='mouse'&&tkvDrawing()&&!TKV.space){const g0=TKV.g;g0.aimable=true;tkvAimSet(e,true);TKV.magOn=false;tkvHover();clearTimeout(TKV.aimT);
@@ -5803,7 +5837,7 @@ function tkvBind(){
     if(!TKV||!TKV.pts.has(e.pointerId))return;TKV.pts.delete(e.pointerId);clearTimeout(TKV.lp);clearTimeout(TKV.aimT);if(e.pointerType!=='mouse'){TKV.magOn=false;TKV.aim=null}const g=TKV.g;if(!g){tkvOverlay();return}
     if(g.type==='pinch'){if(TKV.pts.size===1){const [a]=[...TKV.pts.values()];TKV.g={type:'pan',sx:a.x,sy:a.y,t0:Object.assign({},TKV.t),moved:true,time:0}}else if(!TKV.pts.size)TKV.g=null;return}
     TKV.g=null;if(TKV.skipTap){TKV.skipTap=false;TKV.drag=null;TKV.box=null;tkvPaint(true);return}
-    if(g.type==='move'){TKV.drag=null;const mv=g.mv;if(e.type!=='pointercancel'&&(mv.dx||mv.dy)){const r4=v=>Math.round(v*1e4)/1e4,sh=q=>q.map((v,i)=>r4(v+(i%2?mv.dy:mv.dx)));tkDo(Object.keys(mv.m0).map(id=>{const z=mv.m0[id],v={id,p:sh(z.p)};if(z.o)v.o=z.o.map(sh);return {t:'shape',v}}));toast('Moved '+Object.keys(mv.m0).length+' mark'+(Object.keys(mv.m0).length===1?'':'s')+' · drag them back to undo')}tkvPaint();return}
+    if(g.type==='move'){TKV.drag=null;const mv=g.mv;if(e.type!=='pointercancel'&&(mv.dx||mv.dy)){const r4=v=>Math.round(v*1e4)/1e4,sh=q=>q.map((v,i)=>r4(v+(i%2?mv.dy:mv.dx)));tkDo(Object.keys(mv.m0).map(id=>{const z=mv.m0[id],v={id,p:sh(z.p)};if(z.o)v.o=z.o.map(sh);if(z.org)v.org=sh(z.org);return {t:'shape',v}}));toast('Moved '+Object.keys(mv.m0).length+' mark'+(Object.keys(mv.m0).length===1?'':'s')+' · drag them back to undo')}tkvPaint();return}
     if(g.type==='corner'){const dr=TKV.drag;TKV.drag=null;if(dr&&e.type!=='pointercancel')tkDo({t:'shape',v:{id:dr.id,p:dr.p.map(v=>r4(v))}});tkvPaint();return}
     if(g.type==='box'){const b=TKV.box;TKV.box=null;if(b&&e.type!=='pointercancel'){if(b.l)tkvLassoSel(b.l,g.shift||e.shiftKey);else tkvBoxSel(b,g.shift||e.shiftKey)}else tkvLive();return}
     if(g.type==='rect'){const q=TKV.draft;if(e.type==='pointercancel'||q.length!==4||Math.abs(q[2].x-q[0].x)*TKV.t.s<6||Math.abs(q[2].y-q[0].y)*TKV.t.s<6){TKV.draft=[];TKV.dDraft=false;tkvLive();tkvTools()}else tkvFinish();return}
@@ -5816,6 +5850,14 @@ function tkvBind(){
   st.addEventListener('dblclick',e=>{e.preventDefault();if(TKV&&TKV.draft.length&&TKV.mode!=='select')tkvFinish()});
   st.addEventListener('contextmenu',e=>{e.preventDefault();if(!TKV||!TKV.W)return;if($('#tkCtx')&&Date.now()-(TKV.ctxAt||0)<800)return;if(TKV.g)TKV.g.long=true;tkCtx(e.clientX,e.clientY)});
   st.addEventListener('wheel',e=>{if(!TKV||!TKV.W)return;e.preventDefault();tkvZoomAt(e.clientX,e.clientY,Math.exp(-e.deltaY*.0015))},{passive:false});
+  /* cursors (CSS from data-m / data-h / data-g): hover in select mode (rAF-throttled) and the gesture under way */
+  st.addEventListener('pointermove',e=>{if(!TKV||!TKV.W)return;const g=TKV.g;
+    if(TKV.pts.has(e.pointerId)){st.dataset.g=!g?'':g.type==='box'?'box':g.type==='corner'?'corner':g.type==='move'||(g.type==='pan'&&g.moved)?'grab':'';return}
+    if(e.pointerType==='touch'||TKV.mode!=='select'||TKV.gpick||TKV.hovF)return;const cx=e.clientX,cy=e.clientY;
+    TKV.hovF=requestAnimationFrame(()=>{if(!TKV)return;TKV.hovF=0;const p=tkvImg(cx,cy),cs=TKV.sel&&tkvShape(TKV.sel);let h='';
+      if(cs&&cs.k!=='count'&&tkvNearCorner(cs,p,12)>=0)h='corner';else{const id=tkvHit(p);if(id)h=tkvSelIds().includes(id)?'sel':'mark'}
+      if(st.dataset.h!==h)st.dataset.h=h})});
+  const gEnd=()=>{st.dataset.g=''};st.addEventListener('pointerup',gEnd);st.addEventListener('pointercancel',gEnd);
   window.addEventListener('keydown',tkvKey);window.addEventListener('keyup',tkvKeyUp);
 }
 /* zoom by f keeping the screen point (cx,cy) still */
@@ -5828,6 +5870,8 @@ function tkvKey(e){
   if($('#tkCtx')){if(e.key==='Escape'){e.preventDefault();tkCtxClose()}return}
   const mod=e.ctrlKey||e.metaKey,k=String(e.key||'').toLowerCase();
   if(e.key===' '){e.preventDefault();TKV.space=true;return}
+  if(e.key==='Escape'&&TKV.gpick){e.preventDefault();tkvGridEnd(true);return}
+  if(/^Arrow(Left|Right|Up|Down)$/.test(e.key)&&!mod&&!TKV.draft.length&&TKV.sel&&!TKV.msel.length){const sh=tkvShape(TKV.sel);if(sh&&sh.k==='frame'){e.preventDefault();const d=e.shiftKey?6:1;tkvGridNudge(sh,e.key==='ArrowLeft'?-d:e.key==='ArrowRight'?d:0,e.key==='ArrowUp'?-d:e.key==='ArrowDown'?d:0);return}}
   if(e.key==='Escape'&&!TKV.draft.length&&!TKV.sel&&!TKV.msel.length&&TKV.hl){TKV.hl=null;tkvPaint();return}
   if(e.key==='Enter'){e.preventDefault();tkvFinish()}
   else if(e.key==='Escape'){if(TKV.draft.length)tkvCancel();else if(TKV.dNext){TKV.dNext=false;tkvTools()}else if(TKV.sel||TKV.msel.length){TKV.sel=null;TKV.msel=[];tkvPaint()}}
@@ -5836,8 +5880,23 @@ function tkvKey(e){
   else if(k==='c'&&mod){const ids=tkvSelIds();if(ids.length){e.preventDefault();tkvCopyMarks(ids)}}
   else if(k==='v'&&mod){if(TK_CLIP&&TK_CLIP.length){e.preventDefault();const m=TKV.mouse,r=TKV.stage.getBoundingClientRect();tkvPaste(m&&m.x>=r.left&&m.x<=r.right&&m.y>=r.top&&m.y<=r.bottom?tkvImg(m.x,m.y):null)}}
 }
+/* grid start point pick (right-click → Start grid here…): 1st click = start point (snapped), 2nd click along the same main / CRC / joist = its direction */
+function tkvGridPick(p0){
+  const g=TKV.gpick,s=tkvShape(g.id),it=s&&tkItem(s.item);if(!s||!it){tkvGridEnd();return}const p=tkvSnapPt(p0),r6=v=>Math.round(v*1e6)/1e6,RN=TK_LAY_RUN[tkLayPre(it.fr)];
+  if(!g.a){tkDo({t:'shape',v:{id:s.id,org:[r6(p.x/TKV.W),r6(p.y/TKV.H)]}});g.a={x:p.x,y:p.y};tkvPaint();toast('Click a second point along the same '+(RN==='mains'?'main':RN==='joists'?'joist':'CRC')+' to set its direction, or press Esc / right-click → Done to keep the current direction');return}
+  const dx=p.x-g.a.x,dy=p.y-g.a.y;if(Math.hypot(dx,dy)*TKV.t.s<4){toast('Click a point further along the '+RN+'.');return}
+  let a=Math.atan2(dy,dx)*180/Math.PI;a=((a%180)+180)%180;tkDo({t:'shape',v:{id:s.id,dir:'ang',edge:null,ang:Math.round(a*1000)/1000}});TKV.gpick=null;tkvTools();tkvPaint();toast('Grid start point and direction set.');
+}
+function tkvGridEnd(keep){const g=TKV&&TKV.gpick;if(!g)return;TKV.gpick=null;tkvTools();tkvPaint();toast(g.a?'Grid start point set; direction kept.':'Start grid cancelled.')}
+/* arrow keys on a selected layout area: move its grid start point dx / dy inches (screen directions), making one from the current grid when it has none */
+function tkvGridNudge(s,dx,dy){
+  const it=tkItem(s.item),sc=tkScaleOf(TKV.id),r=it&&sc&&tkFrameOf(s,TKV.sh,sc,it.fr);if(!r){toast('Set the scale to move the grid.');return}
+  const p=(s.p||[]).map((x,i)=>x*(i%2?r.ky:r.kx)),o=tkLayOrg(r.pre,tkLayF(it.fr),p,r.ang,r.org);if(!o)return;const r6=v=>Math.round(v*1e6)/1e6;
+  tkDo({t:'shape',v:{id:s.id,org:[r6((o[0]+dx/12)/r.kx),r6((o[1]+dy/12)/r.ky)]}});tkvPaint();
+}
 function tkvTap(cx,cy,alt,shift){
   const p0=tkvImg(cx,cy);if(p0.x<0||p0.y<0||p0.x>TKV.W||p0.y>TKV.H)return;
+  if(TKV.gpick){tkvGridPick(p0);return}
   if(TKV.mode==='pan')return;
   if(TKV.mode==='select'){tkvSelTap(p0,shift);return}
   const it=tkItem(TKV.item);
@@ -5957,6 +6016,7 @@ function tkCtx(cx,cy,sub){
     if(sub==='lay'){A.push('<div class="tkctxh">Add layout to this area</div>');add('frthis:joists','Joists');add('frthis:act','ACT grid');add('frthis:crc','CRC & furring');add('back','‹ Back');sep()}
     else srt(pick).forEach(x=>A.push('<button data-si="'+esc(x.id)+'"'+(x.id===cur?' class="on"':'')+'><span class="sw" style="background:'+esc(x.color)+'"></span>'+esc(x.code)+' <span class="muted">'+esc(x.unit)+'</span></button>'));if(sub!=='lay'){add('back','‹ Back');sep()}}
   else{
+    if(TKV.gpick){add('gdone','✓ Done (keep the current direction)',!!TKV.gpick.a,'Esc');add('gcan','Cancel start grid',!TKV.gpick.a,'Esc');sep()}
     if(hs&&hit_it&&!dr)A.push('<div class="tkctxh tkctxi"><span class="sw" style="background:'+esc(hit_it.color)+'"></span><span>'+esc(hit_it.code)+' · '+esc(tkvQtyText(hs))+(hs.k==='line'&&+hs.h>0?' · @'+esc(tkFtIn(+hs.h)):'')+(hs.note?' · “'+esc(hs.note)+'”':'')+'</span></div>');
     add('undo','↶ Undo last point',dr>(TKV.cont?TKV.contN:0),'Backspace');
     add('fin','■ Stop',dr>=2&&(!draw||!it||(it.unit==='LF'&&!it.fr)),'Enter');
@@ -5978,6 +6038,7 @@ function tkCtx(cx,cy,sub){
       if(hs.k==='frame'){const es=tkvNearSeg(hs,p0),oi=(hs.o||[]).findIndex(o=>tkInPoly(p0,o,TKV.W,TKV.H));
         const RN=TK_LAY_RUN[tkLayPre(hit_it.fr)],RU=RN.charAt(0).toUpperCase()+RN.slice(1);
         add('frset','▦ Layout settings ('+TK_LAY_NAME[tkLayPre(hit_it.fr)]+')…');add('frrot','⟳ Turn '+RN+' 90°');add('fredge',RU+' parallel to this edge',!!es&&es.d<14/TKV.t.s);add('frauto',RU+': auto (span the short way)',!!hs.dir&&hs.dir!=='auto');
+        add('frorg','⌖ Start grid here…');add('frctr',hit_it.fr&&tkLayPre(hit_it.fr)==='joists'?'Joists from the edge (clear start point)':'Center grid',Array.isArray(hs.org));
         add('fropen','Add an opening…');add('frdelo','Delete this opening',oi>=0);add('froff',TKV.frOff?'Show layouts':'Hide layouts (outline only)');add('frrm','Remove layout (keep area)')}
       if(hs.k==='poly'&&!hs.deduct&&hit_it.unit==='SF')add('lay','▦ Add layout ▸');
       add('mitem','Change item for this mark ▸',TK.data.items.some(x=>x.id!==hs.item&&tkSameKind(x,hit_it)));
@@ -6018,6 +6079,7 @@ function tkCtx(cx,cy,sub){
     const subs={items:'items',runit:'run',mitem:'mark',lay:'lay'};if(subs[c]||(c==='count'&&eas.length>1)){tkCtx(cx,cy,subs[c]||'count');return}
     if(c==='back'){tkCtx(cx,cy);return}
     tkCtxClose();
+    if(c==='gdone'||c==='gcan'){tkvGridEnd(c==='gdone');return}
     if(c==='undo')tkvUndoPt();
     else if(c==='fin'||c==='close')tkvFinish();
     else if(c==='cancel')tkvCancel();
