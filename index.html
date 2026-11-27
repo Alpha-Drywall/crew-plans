@@ -571,6 +571,7 @@ html.hc .tkcr{background:#000;border:1px solid #fff}
 .tkit .c{font-weight:700;font-size:13px;word-break:break-word}
 .tkit .q{text-align:right;font-size:13px;font-weight:700;white-space:nowrap}
 .tkeye,.tkdot{border:0;background:none;font-size:14px;padding:2px 4px;color:var(--muted)}
+.tkxa{padding:2px 7px;letter-spacing:-2px}
 .tkeye{cursor:pointer;line-height:1}.tkeye.off{filter:grayscale(1);opacity:.35}.tkeye:hover{opacity:1}.tkit:has(.tkeye.off) .c{opacity:.55}
 .tkgh{cursor:pointer;user-select:none;-webkit-user-select:none}
 .tkchev{display:inline-block;width:1.2em;color:var(--muted)}
@@ -5564,6 +5565,11 @@ function tkSheetQty(data,sheets){
   return {sheets:sh,items};
 }
 let TKQ='';/* search text in the items panel (this window) */
+/* expand / collapse everything in the items panel: By sheet = every sheet; By item = every section and each item's sheet list */
+function tkpCollAll(c,open){const co=tkColl();
+  if(tkpBy()==='sheet')(c.sheets||[]).forEach(s=>{if(s.id===c.sid){if(open)delete co['vs:'+s.id];else co['vs:'+s.id]=1}else{if(open)co['vo:'+s.id]=1;else delete co['vo:'+s.id]}});
+  else{TK_SECS.forEach(k=>{if(open)delete co['v:'+k];else co['v:'+k]=1});((c.d&&c.d.items)||[]).forEach(it=>{if(open)co['xi:'+it.id]=1;else delete co['xi:'+it.id]})}
+  lsSet('acv.tkCollapsed',Object.keys(co).length?JSON.stringify(co):null)}
 const tkpBy=()=>vpick(viewGet('takeoff',TKVW_DEF).by,['item','sheet'],'item');
 /* sheet groups in By sheet: the open sheet starts expanded, the rest collapsed; each remembered on this device */
 function tkpShOpen(c,sid){return sid===c.sid?!tkIsColl('vs:'+sid):tkIsColl('vo:'+sid)}
@@ -5605,7 +5611,7 @@ function tkpFoot(c){const d=c.d,its=d.items;if(!its.length)return '';const cur=t
   return '<div class="tkpfoot">'+(c.sid?'<div><span>This sheet</span><b>'+esc(tkSumText(its,cur)||'—')+'</b></div>':'')+'<div><span>All sheets</span><b>'+esc(tkSumText(its,all)||'—')+'</b></div></div>'}
 function tkpHtml(c){
   const sc=c.sid&&(c.d.scales||{})[c.sid],by=tkpBy();
-  return '<div class="tkhd"><b>Items</b><span class="tkhdb">'+(c.pop?'':'<button class="btn sm tkpob" id="tkPop" title="Open this list in its own window: drag it to a second monitor">⧉ Pop out</button>')+(c.d.items.length?(()=>{const on=tkHideAnyOn(c.hide,c.d.items.map(i=>i.id));return '<button class="btn sm tkalle'+(on?'':' off')+'" id="tkAllEye" data-on="'+(on?0:1)+'" title="'+(on?'Hide every item on the plans':'Show every item on the plans')+'">💡 All '+(on?'off':'on')+'</button>'})():'')+'<button class="btn sm" id="tkNew">+ Item</button></span></div>'+
+  return '<div class="tkhd"><b>Items</b><span class="tkhdb">'+(c.pop?'':'<button class="btn sm tkpob" id="tkPop" title="Open this list in its own window: drag it to a second monitor">⧉ Pop out</button>')+(c.d.items.length?(()=>{const on=tkHideAnyOn(c.hide,c.d.items.map(i=>i.id));return '<button class="btn sm tkalle'+(on?'':' off')+'" id="tkAllEye" data-on="'+(on?0:1)+'" title="'+(on?'Hide every item on the plans':'Show every item on the plans')+'">💡 All '+(on?'off':'on')+'</button>'})():'')+'<button class="btn sm tkxa" id="tkXAll" title="Expand all" aria-label="Expand all">▾▾</button><button class="btn sm tkxa" id="tkCAll" title="Collapse all" aria-label="Collapse all">▸▸</button><button class="btn sm" id="tkNew">+ Item</button></span></div>'+
     (c.sid?'<div class="small muted" style="margin:0 0 8px">'+(sc?'Scale '+esc(sc.label||'set')+' · <a href="#" id="tkSc">change</a>':'<span style="color:#c62828">No scale</span> · <a href="#" id="tkSc">set scale</a>')+'</div>':'<div class="small muted" style="margin:0 0 8px">No sheet open · pick an item or open a sheet</div>')+
     '<div class="hseg sm tkpseg" role="group" aria-label="List items">'+[['item','By item'],['sheet','By sheet']].map(x=>'<button type="button" data-by="'+x[0]+'"'+(by===x[0]?' class="on" aria-pressed="true"':' aria-pressed="false"')+'>'+x[1]+'</button>').join('')+'</div>'+
     '<input class="tkq" id="tkQ" type="search" placeholder="Search items or sheets" aria-label="Search items or sheets" value="'+esc(TKQ)+'" autocomplete="off">'+
@@ -5619,7 +5625,7 @@ function tkpRender(root,c,act){
   const redraw=()=>tkpRender(root,c,act);
   qi.oninput=()=>{TKQ=qi.value;const l=$('#tkpL',root);l.innerHTML=tkpList(c);tkpBindList(l,c,act,redraw)};
   qi.onkeydown=e=>{if(e.key==='Escape'&&qi.value){e.stopPropagation();qi.value='';qi.oninput()}};
-  $('#tkNew',root).onclick=()=>act({t:'new'});const ae=$('#tkAllEye',root);if(ae)ae.onclick=()=>act({t:'eyes',on:ae.dataset.on==='1'});const sc=$('#tkSc',root);if(sc)sc.onclick=e=>{e.preventDefault();act({t:'scale'})};
+  $('#tkNew',root).onclick=()=>act({t:'new'});{const xa=$('#tkXAll',root),ca=$('#tkCAll',root),rd=()=>tkpRender(root,c,act);if(xa)xa.onclick=()=>{tkpCollAll(c,true);rd()};if(ca)ca.onclick=()=>{tkpCollAll(c,false);rd()}}const ae=$('#tkAllEye',root);if(ae)ae.onclick=()=>act({t:'eyes',on:ae.dataset.on==='1'});const sc=$('#tkSc',root);if(sc)sc.onclick=e=>{e.preventDefault();act({t:'scale'})};
   const pb=$('#tkPop',root);if(pb){pb.hidden=!tkpCan();pb.onclick=()=>act({t:'pop'})}
   $$('[data-by]',root).forEach(b=>b.onclick=()=>{viewSet('takeoff',{by:b.dataset.by},TKVW_DEF);act({t:'by',v:b.dataset.by});redraw()});
   tkpBindList($('#tkpL',root),c,act,redraw);
