@@ -209,6 +209,7 @@ input[type=range]{width:100%;height:32px}
 .hsec button.on svg{stroke:var(--accent)}
 .hsec button:focus-visible{outline:2px solid var(--accent);outline-offset:-4px}
 .hsec i{font-style:normal;background:var(--accent);color:var(--accent-ink);border-radius:999px;padding:0 6px;font-size:11px;font-weight:800;line-height:17px}
+.hsec i.cnt{background:none;color:inherit;box-shadow:inset 0 0 0 1.5px currentColor;opacity:.85}.hsec i.tdy{background:#d92d20;color:#fff}
 @media(min-width:700px){.hsec{gap:6px}.hsec button{flex:0 1 auto;max-width:none;flex-direction:row;gap:8px;font-size:15px;padding:9px 16px 8px;min-height:50px}}
 .hm{max-width:900px}
 .hbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 12px}
@@ -2707,8 +2708,9 @@ const homeTabs=()=>!!(S.isAdmin&&!S.asUser&&!isPractice()&&!S.viewAs);
 const homeSecOk=s=>s==='jobs'||s==='bids'||(s==='tc'&&canSeeTc())||(s==='look'&&lookCan())||(s==='dash'&&dashOk());
 function homeSec(){let s=lsGet('crewplans.homeSec');if(!s){s=lsGet('crewplans.jobView')==='bids'?'bids':'jobs';lsSet('crewplans.homeSec',s)}if(lsGet('crewplans.jobView')==='bids')lsSet('crewplans.jobView','mine');return HOME_SECS.some(x=>x[0]===s)?s:'jobs'}
 function homeCur(){if(S.view==='tc'||S.view==='look'||S.view==='dash')return S.view;const s=homeSec();return s==='bids'?'bids':'jobs'}
-function homeBarHtml(){const cur=homeCur(),td=today();const nb=(S.bids||[]).filter(j=>j.bid_date&&j.bid_date>=td&&!['won','lost','nobid'].includes(bidStat(j,td))).length;
-  return '<nav class="hsec" aria-label="Sections">'+HOME_SECS.filter(s=>homeSecOk(s[0])).map(s=>'<button type="button" data-sec="'+s[0]+'"'+(s[0]===cur?' class="on" aria-current="page"':'')+'><svg viewBox="0 0 24 24" aria-hidden="true">'+HS_ICO[s[0]]+'</svg><span>'+s[1]+(s[0]==='bids'&&nb?'<i title="Bids due today or later">'+nb+'</i>':'')+'</span></button>').join('')+'</nav>'}
+/* Bids tab count: YOUR bids due this calendar week (Mon-Sun), not an alert to clear; red only when one is due today */
+function homeBarHtml(){const cur=homeCur(),td=today(),wk=bidComingGroups((S.bids||[]).filter(j=>S.myOfficeId&&j.pm===S.myOfficeId),td).filter(g=>g[0]==='today'||g[0]==='week'),nb=wk.reduce((a,g)=>a+g[2].length,0),due=wk.some(g=>g[0]==='today');
+  return '<nav class="hsec" aria-label="Sections">'+HOME_SECS.filter(s=>homeSecOk(s[0])).map(s=>'<button type="button" data-sec="'+s[0]+'"'+(s[0]===cur?' class="on" aria-current="page"':'')+'><svg viewBox="0 0 24 24" aria-hidden="true">'+HS_ICO[s[0]]+'</svg><span>'+s[1]+(s[0]==='bids'&&nb?'<i class="'+(due?'tdy':'cnt')+'" title="'+(due?'You have a bid due today. ':'')+nb+' of your bids due this week (Mon-Sun). Goes away as they pass." aria-label="'+nb+' of your bids due this week">'+nb+'</i>':'')+'</span></button>').join('')+'</nav>'}
 /* wraps the screen's dark header and the section bar in one sticky block; on Time cards / Lookahead / Dashboard the back arrow hides (the bar is the way back) */
 function homeMount(){if(!homeTabs())return;const app=$('#app');const top=app.querySelector(':scope>.top');if(!top)return;
   const w=document.createElement('div');w.className='jhead hhead';top.replaceWith(w);w.appendChild(top);w.insertAdjacentHTML('beforeend',homeBarHtml());
