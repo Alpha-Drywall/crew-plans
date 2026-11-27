@@ -13,7 +13,7 @@ function grab(name) {
   return lines.slice(i, j).join('\n');
 }
 const names = ['TK_SECS', 'TK_PAPER', 'TK_SCALES', 'tkFeet', 'tkFtIn', 'tkLenPx', 'tkAreaPx', 'tkShapeQty', 'tkPresetFpp', 'tkGuessPaper', 'tkEvenUp', 'tkCodeHeight', 'tkCodeWidth', 'tkItemWidthIn', 'tkInches', 'tkInStr', 'tkParseScales',
-  'tkApply', 'tkTotals', 'tkHeightSplits', 'tkRows', 'tkCopyShapes', 'tkSplitLine', 'tkInsertCorner', 'tkMoveCorner', 'tkDeleteCorner', 'tkOffsetShapes',
+  'tkApply', 'tkTotals', 'tkSheetQty', 'tkHeightSplits', 'tkRows', 'tkCopyShapes', 'tkSplitLine', 'tkInsertCorner', 'tkMoveCorner', 'tkDeleteCorner', 'tkOffsetShapes',
   'tkSnapVerts', 'tkNearVertex', 'tkOrtho', 'tkSnapPick', 'tkEnds', 'tkEndMark', 'tkReadout',
   'TK_FR_DEF', 'tkFrRot', 'tkFrUn', 'tkFrIv', 'tkFrUnion', 'tkFrClip', 'tkFrSwap', 'tkFrExt', 'tkFrAuto', 'tkFrAngle', 'tkFrPc', 'tkFrame', 'tkFrSum', 'tkFrameOf', 'tkFrRows', 'tkFrItem',
   'TK_LAY_DEF', 'TK_LAY_NAME', 'tkLayPre', 'tkLayF', 'tkLayArea', 'tkLayPos', 'tkLayCut', 'tkLayWires', 'tkLayAct', 'tkLayCrc'];
@@ -614,6 +614,35 @@ t('framing: copy / offset carry the openings with the area', () => {
   assert.deepStrictEqual(plain(o[0].o), [[0.25, 0.35, 0.26, 0.35, 0.26, 0.36]]);
   const c = T.tkCopyShapes({ shapes: s }, 's1', 's2', () => 'y');
   assert.deepStrictEqual(plain(c[0].o), plain(s[0].o)); assert.notStrictEqual(c[0].o[0], s[0].o[0]);
+});
+
+t('tkSheetQty: each item\'s quantity per sheet, in plan order, adding up to the job total', () => {
+  const sh = [{ id: 's1', w: 3600, h: 2400 }, { id: 's2', w: 3600, h: 2400 }, { id: 's3', w: 3600, h: 2400 }];
+  const D = T.tkApply({}, [
+    { t: 'item', v: { id: 'w', code: 'WALL', unit: 'LF' } },
+    { t: 'item', v: { id: 'd', code: 'DOOR', unit: 'EA' } },
+    { t: 'item', v: { id: 'z', code: 'UNUSED', unit: 'LF' } },
+    { t: 'scale', sheet: 's1', v: { fpp: 0.05 } },
+    { t: 'scale', sheet: 's2', v: { fpp: 0.1 } },
+    { t: 'shape', v: { id: 'a', item: 'w', sheet: 's2', k: 'line', p: [0, 0, 0.5, 0] } },
+    { t: 'shape', v: { id: 'b', item: 'w', sheet: 's1', k: 'line', p: [0, 0, 0.5, 0] } },
+    { t: 'shape', v: { id: 'c', item: 'w', sheet: 's1', k: 'line', p: [0, 0, 0, 0.5] } },
+    { t: 'shape', v: { id: 'e', item: 'w', sheet: 's3', k: 'line', p: [0, 0, 0.5, 0] } },
+    { t: 'shape', v: { id: 'f', item: 'd', sheet: 's3', k: 'count', p: [0.5, 0.5] } },
+    { t: 'shape', v: { id: 'g', item: 'd', sheet: 's3', k: 'count', p: [0.6, 0.5] } },
+    { t: 'shape', v: { id: 'x', item: 'w', sheet: 'gone', k: 'line', p: [0, 0, 1, 0] } },
+  ]);
+  const Q = T.tkSheetQty(D, sh);
+  near(Q.sheets.s1.w.qty, 1800 * 0.05 + 1200 * 0.05); assert.strictEqual(Q.sheets.s1.w.marks, 2);
+  near(Q.sheets.s2.w.qty, 1800 * 0.1);
+  assert.deepStrictEqual(plain(Q.sheets.s3.w), { qty: 0, marks: 1, unscaled: 1 }, 'no scale: counted as a mark, not a quantity');
+  assert.deepStrictEqual(plain(Q.sheets.s3.d), { qty: 2, marks: 2, unscaled: 0 }, 'counts need no scale');
+  assert.deepStrictEqual(plain(Q.items.w.map(x => x.id)), ['s1', 's2', 's3'], 'plan order, not mark order; sheets not in the list are left out');
+  assert.deepStrictEqual(plain(Q.items.z), [], 'an item with no marks has no sheets');
+  assert.ok(!Q.sheets.s2.d, 'items not on a sheet are not listed under it');
+  const tot = T.tkTotals(D, sh);
+  ['w', 'd'].forEach(k => near(Q.items[k].reduce((a, x) => a + x.qty, 0), tot[k].qty, k + ' sheets add up to the total'));
+  assert.deepStrictEqual(plain(T.tkSheetQty({}, sh)), { sheets: {}, items: {} });
 });
 
 console.log(n + ' takeoff tests passed.');
