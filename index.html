@@ -475,6 +475,14 @@ body:has(#fvPill) .mcard{padding-bottom:72px}#tmLog{scroll-margin-top:140px}
 #tkBoard img{display:block;width:100%;height:100%;pointer-events:none}
 #tkInk{position:absolute;left:0;top:0;width:100%;height:100%;mix-blend-mode:multiply;pointer-events:none}
 .tkread{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);background:#1d232b;color:#fff;font-weight:700;font-size:16px;padding:6px 14px;border-radius:999px;pointer-events:none;display:none}
+#tkStage.tkxh{cursor:none}
+#tkStage.tkar{cursor:default}
+#tkStage .hint,#tkStage .tkread{z-index:3}
+.tkov{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:2}
+.tkcr{position:absolute;left:0;top:0;z-index:4;display:none;pointer-events:none;background:rgba(22,25,29,.9);color:#fff;border-radius:8px;padding:4px 9px 5px;font:700 14px/1.2 system-ui,-apple-system,'Segoe UI',sans-serif;white-space:nowrap;box-shadow:0 2px 10px #0004;font-variant-numeric:tabular-nums;will-change:transform}
+.tkcr small{display:block;font-size:11.5px;font-weight:500;opacity:.78;margin-top:1px}
+.tkmag{position:absolute;left:0;top:0;width:120px;height:120px;border-radius:50%;pointer-events:none;z-index:4;display:none;background:#fff;box-shadow:0 0 0 2px #fff,0 0 0 3.5px #1d232b,0 8px 22px #0006;will-change:transform}
+html.hc .tkcr{background:#000;border:1px solid #fff}
 .tkside{width:290px;flex:0 0 auto;background:#fff;border-left:1px solid var(--line);overflow:auto;padding:10px}
 .tkhd{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
 .tkit{display:flex;align-items:center;gap:6px;padding:7px 4px;border-radius:8px;border:2px solid transparent;cursor:pointer}
@@ -516,6 +524,8 @@ body:has(#fvPill) .mcard{padding-bottom:72px}#tmLog{scroll-margin-top:140px}
 .vplab{font-size:14px;font-weight:700}
 .vplab span{display:block;font-size:12px;font-weight:400;color:var(--muted);margin-top:1px}
 .vprow .hseg{align-self:flex-start;flex-wrap:wrap;max-width:100%}
+.vpsec{margin:12px -12px 0;padding:8px 12px 2px;border-top:6px solid #f1f3f6;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.vpsec+.vprow{border-top:0}
 .vpfoot{display:flex;justify-content:flex-end;padding-top:8px;border-top:1px solid #eef0f3}
 .mcard .vprow .hseg button{min-height:40px}
 /* takeoff viewer: items panel left/right/hidden, resizable, compact, text size, big buttons */
@@ -2513,7 +2523,7 @@ function vpopOpen(anchor,build){
   if(VPOP&&(VPOP.anchor===anchor||VPOP.anchor.id&&VPOP.anchor.id===anchor.id)){vpopClose();return}vpopClose();
   const P={};const el=document.createElement('div');el.className='vpop';el.setAttribute('role','dialog');document.body.appendChild(el);
   const draw=()=>{const b=build();el.setAttribute('aria-label',b.title||'View');
-    el.innerHTML='<div class="vpoph"><b>'+esc(b.title||'View')+'</b><button class="ico" data-vpx aria-label="Close">✕</button></div>'+b.rows.filter(Boolean).map((r,i)=>'<div class="vprow"><div class="vplab">'+esc(r.label)+(r.note?'<span>'+esc(r.note)+'</span>':'')+'</div><div class="hseg sm" role="group" aria-label="'+esc(r.label)+'">'+r.opts.map(o=>'<button type="button" data-r="'+i+'" data-v="'+esc(String(o[0]))+'"'+(String(r.v)===String(o[0])?' class="on" aria-pressed="true"':' aria-pressed="false"')+(o[2]?' title="'+esc(o[2])+'"':'')+'>'+esc(o[1])+'</button>').join('')+'</div></div>').join('')+(b.foot||'');
+    el.innerHTML='<div class="vpoph"><b>'+esc(b.title||'View')+'</b><button class="ico" data-vpx aria-label="Close">✕</button></div>'+b.rows.filter(Boolean).map((r,i)=>r.head?'<div class="vpsec">'+esc(r.head)+'</div>':'<div class="vprow"><div class="vplab">'+esc(r.label)+(r.note?'<span>'+esc(r.note)+'</span>':'')+'</div><div class="hseg sm" role="group" aria-label="'+esc(r.label)+'">'+r.opts.map(o=>'<button type="button" data-r="'+i+'" data-v="'+esc(String(o[0]))+'"'+(String(r.v)===String(o[0])?' class="on" aria-pressed="true"':' aria-pressed="false"')+(o[2]?' title="'+esc(o[2])+'"':'')+'>'+esc(o[1])+'</button>').join('')+'</div></div>').join('')+(b.foot||'');
     const rows=b.rows.filter(Boolean);
     $$('[data-r]',el).forEach(x=>x.onclick=()=>{const r=rows[+x.dataset.r];const o=r.opts.find(o=>String(o[0])===x.dataset.v);r.set(o?o[0]:x.dataset.v);if(VPOP&&VPOP.el===el){draw();place()}});
     $('[data-vpx]',el).onclick=vpopClose;if(b.bind)b.bind(el,()=>{if(VPOP&&VPOP.el===el){draw();place()}})};
@@ -2582,7 +2592,7 @@ function tkvwSet(p,keepStage){const o=viewSet('takeoff',p,TKVW_DEF);tkvViewApply
 /* adds the panel button, ⚙ View and the resize handle to an open takeoff viewer (called from tkvSide, once per viewer) */
 function tkvViewInit(){
   const el=$('#tkv');if(!el||el._vw)return;const side=$('#tkSide',el),bar=$('.vbar',el);if(!side||!bar)return;el._vw=1;
-  const nx=$('#tkPrev',el);const h='<button id="tkPanT" class="tkvb" title="Show or hide the items list ( \\ key)" aria-controls="tkSide">☰<span class="vlbl"> Items</span></button><button id="tkViewB" class="tkvb" title="View settings: items panel side, width, style, text size" aria-haspopup="dialog" aria-expanded="false">⚙<span class="vlbl"> View</span></button>';
+  const nx=$('#tkPrev',el);const h='<button id="tkPanT" class="tkvb" title="Show or hide the items list ( \\ key)" aria-controls="tkSide">☰<span class="vlbl"> Items</span></button><button id="tkViewB" class="tkvb" title="View settings: items panel side, width, style, text size; drawing: cursor, line ends, magnifier, snapping" aria-haspopup="dialog" aria-expanded="false">⚙<span class="vlbl"> View</span></button>';
   if(nx)nx.insertAdjacentHTML('beforebegin',h);else bar.insertAdjacentHTML('beforeend',h);
   side.insertAdjacentHTML('beforebegin','<div class="tkgrip" id="tkGrip" role="separator" aria-orientation="vertical" aria-label="Resize the items list" tabindex="0" title="Drag to resize · double-click to reset"><i></i></div>');
   $('#tkPanT',el).onclick=()=>tkvwSet({hidden:!tkvwGet().hidden});
@@ -2614,6 +2624,22 @@ function tkvGripBind(g){
   g.addEventListener('keydown',e=>{const o=tkvwGet();if(vert()){const d=e.key==='ArrowUp'?24:e.key==='ArrowDown'?-24:0;if(!d)return;e.preventDefault();const cur=$('#tkSide',el).getBoundingClientRect().height;tkvwSet({sheetH:Math.round(clamp(cur+d,110,innerHeight*.75))});return}
     const d=e.key==='ArrowLeft'?(o.side==='left'?-20:20):e.key==='ArrowRight'?(o.side==='left'?20:-20):0;if(!d)return;e.preventDefault();tkvwSet({width:clamp(Math.min(o.width,tkvwMaxW())+d,200,tkvwMaxW())})});
 }
+/* ---- takeoff drawing: cursor, end marks, magnifier, snapping, readout (localStorage 'acv.view.tkdraw'; snap on/off stays in 'acv.tkSnap') ---- */
+const TKDR_DEF={cur:'gap',ends:'ticks',mag:'auto',zoom:3,snapD:'M',ortho:false,diag:false,read:true,xc:'auto'};
+const TK_SNAPPX={S:6,M:10,L:16};
+function tkdrGet(){const o=viewGet('tkdraw',TKDR_DEF);return {cur:vpick(o.cur,['gap','full','arrow'],'gap'),ends:vpick(o.ends,['ticks','dots','arrows'],'ticks'),mag:vpick(o.mag,['auto','always','off'],'auto'),zoom:vpick(+o.zoom,[2,3,4],3),snapD:vpick(o.snapD,['S','M','L'],'M'),ortho:o.ortho===true,diag:o.diag===true,read:o.read!==false,xc:vpick(o.xc,['auto','red','blue','black'],'auto')}}
+function tkdrSet(p){viewSet('tkdraw',p,TKDR_DEF);if(typeof TKV!=='undefined'&&TKV&&TKV.W){if('ortho' in p)TKV.ortho=!!p.ortho;tkvPaint();tkvOverlay()}}
+function tkdrRows(){const d=tkdrGet(),sn=lsGet('acv.tkSnap')!=='off';return [{head:'Drawing'},
+  {label:'Cursor',v:d.cur,opts:[['gap','┼ Crosshair','Thin crosshair with an open center so the plan line shows'],['full','Full lines','Crosshair lines across the whole sheet'],['arrow','Arrow','Normal mouse pointer']],set:v=>tkdrSet({cur:v})},
+  {label:'Crosshair color',v:d.xc,opts:[['auto','Auto'],['red','Red'],['blue','Blue'],['black','Black']],set:v=>tkdrSet({xc:v}),note:'Auto = dark with a white edge, shows on black and white'},
+  {label:'Line ends',v:d.ends,opts:[['ticks','├┤ Ticks'],['dots','• Dots'],['arrows','◄► Arrows']],set:v=>tkdrSet({ends:v}),note:'Also used in the markup PDF'},
+  {label:'Magnifier',v:d.mag,opts:[['auto','Auto'],['always','Always'],['off','Off']],set:v=>tkdrSet({mag:v}),note:'Auto = on iPad / phone while your finger is down (hold, slide, lift to place)'},
+  d.mag==='off'?null:{label:'Magnifier zoom',v:d.zoom,opts:[[2,'2x'],[3,'3x'],[4,'4x']],set:v=>tkdrSet({zoom:+v})},
+  {label:'Snap to corners and ends',v:sn?'on':'off',opts:[['on','On'],['off','Off']],set:v=>{lsSet('acv.tkSnap',v==='on'?null:'off');if(typeof TKV!=='undefined'&&TKV){TKV.snap=v==='on';tkvTools();tkvOverlay()}},note:'Hold '+(typeof tkMac==='function'&&tkMac()?'⌘':'Ctrl')+' to place a point without snapping'},
+  sn?{label:'Snap distance',v:d.snapD,opts:[['S','Small'],['M','Medium'],['L','Large']],set:v=>tkdrSet({snapD:v})}:null,
+  {label:'Ortho lock at start',v:d.ortho?'on':'off',opts:[['off','Off'],['on','On']],set:v=>tkdrSet({ortho:v==='on'}),note:'Level / plumb lines. Shift or ⊥ Ortho turns it on while drawing'},
+  {label:'Ortho angles',v:d.diag?'45':'90',opts:[['90','Level / plumb'],['45','+ 45°']],set:v=>tkdrSet({diag:v==='45'})},
+  {label:'Length next to the cursor',v:d.read?'on':'off',opts:[['on','On'],['off','Off']],set:v=>tkdrSet({read:v==='on'})}]}
 function tkvViewPop(btn){vpopOpen(btn,()=>{const o=tkvwGet(),nw=tkvwNarrow(),cw=Math.min(o.width,tkvwMaxW());
   const wopts=[[240,'Narrow'],[290,'Normal'],[400,'Wide'],[560,'Extra wide']].filter(x=>x[0]<=tkvwMaxW()||x[0]===240);
   return {title:'Takeoff view',rows:[
@@ -2622,9 +2648,9 @@ function tkvViewPop(btn){vpopOpen(btn,()=>{const o=tkvwGet(),nw=tkvwNarrow(),cw=
     {label:'Style',v:o.style,opts:[['detail','Detailed','Code, height, width, totals on this sheet and all sheets'],['compact','Compact','Color, code and this sheet’s total']],set:v=>tkvwSet({style:v})},
     {label:'Text size',v:o.text,opts:[['S','S'],['M','M'],['L','L']],set:v=>tkvwSet({text:v}),note:'Items list and tool buttons'},
     {label:'Big buttons for touch',v:o.big,opts:[['auto','Auto'],['on','On'],['off','Off']],set:v=>tkvwSet({big:v}),note:'Auto = on for iPads and phones'},
-    nw?{label:'On this small screen',v:o.narrow,opts:[['sheet','Bottom sheet'],['drawer','Side drawer']],set:v=>tkvwSet({narrow:v}),note:o.narrow==='sheet'?'Drag the bar above the list to make it taller':'Slides over the sheet from the '+o.side}:null],
+    nw?{label:'On this small screen',v:o.narrow,opts:[['sheet','Bottom sheet'],['drawer','Side drawer']],set:v=>tkvwSet({narrow:v}),note:o.narrow==='sheet'?'Drag the bar above the list to make it taller':'Slides over the sheet from the '+o.side}:null].concat(tkdrRows()),
     foot:'<div class="vpfoot"><button type="button" class="btn sm" data-vreset>Reset to default</button></div>',
-    bind:(el,redraw)=>{$('[data-vreset]',el).onclick=()=>{lsSet('acv.view.takeoff',null);tkvViewApply();redraw()}}}})}
+    bind:(el,redraw)=>{$('[data-vreset]',el).onclick=()=>{lsSet('acv.view.takeoff',null);lsSet('acv.view.tkdraw',null);lsSet('acv.tkSnap',null);if(typeof TKV!=='undefined'&&TKV){TKV.snap=true;TKV.ortho=false}tkvViewApply();tkdrSet({});redraw()}}}})}
 window.addEventListener('keydown',e=>{if(e.key!=='\\'||e.ctrlKey||e.metaKey||e.altKey||!$('#tkv')||$('.mwrap')||/INPUT|TEXTAREA|SELECT/.test((e.target&&e.target.tagName)||'')||(e.target&&e.target.isContentEditable))return;e.preventDefault();tkvwSet({hidden:!tkvwGet().hidden})});
 window.addEventListener('resize',()=>{if($('#tkv'))tkvViewApply(false)});
 dispApply();
@@ -4678,6 +4704,54 @@ function tkOffsetShapes(shapes,dx,dy,mkId){
 function tkCopyShapes(data,fromSheet,toSheet,mkId,itemIds){
   return (data.shapes||[]).filter(s=>s.sheet===fromSheet&&(!itemIds||itemIds.includes(s.item))).map(s=>({...s,id:mkId(),sheet:toSheet,p:(s.p||[]).slice()}));
 }
+/* ---- precise drawing (pure, tested in takeoff-test.js): snapping, ortho lock, end marks, live readout. Points here are image px {x,y}. ---- */
+/* every corner / end of the marks on one sheet: [{x,y,id,i}]; counts are not snap targets; hide = {itemId:true}; skip = {id,i} (the corner being dragged) */
+function tkSnapVerts(shapes,sheet,W,H,hide,skip){
+  const out=[];(shapes||[]).forEach(s=>{if(s.sheet!==sheet||s.k==='count'||(hide&&hide[s.item]))return;const q=s.p||[];for(let i=0;i+1<q.length;i+=2){if(skip&&skip.id===s.id&&skip.i===i/2)continue;out.push({x:+q[i]*W,y:+q[i+1]*H,id:s.id,i:i/2})}});
+  return out;
+}
+/* the point in vs nearest to p, closer than tol, or null */
+function tkNearVertex(vs,p,tol){let best=null,bd=tol;(vs||[]).forEach(v=>{const d=Math.hypot(v.x-p.x,v.y-p.y);if(d<bd){bd=d;best=v}});return best}
+/* ortho lock: b moved onto the level or plumb line through a (diag: also the 45° lines), by projection */
+function tkOrtho(a,b,diag){
+  if(!a||!b)return b;const dx=b.x-a.x,dy=b.y-a.y;if(!dx&&!dy)return {x:b.x,y:b.y};
+  if(!diag)return Math.abs(dx)>=Math.abs(dy)?{x:b.x,y:a.y}:{x:a.x,y:b.y};
+  const ang=Math.round(Math.atan2(dy,dx)/(Math.PI/4))*(Math.PI/4),z=v=>Math.abs(v)<1e-9?0:v,ux=z(Math.cos(ang)),uy=z(Math.sin(ang)),t=dx*ux+dy*uy;
+  return {x:ux?a.x+t*ux:a.x,y:uy?a.y+t*uy:a.y};
+}
+/* where a click lands. a = the previous point (or null); o = {verts,tol,ortho,diag,soft,off}.
+   A corner within tol wins (exact same coordinates), then ortho, then (soft) level/plumb/45° when within 7°. off = snapping off or Ctrl/⌘ held: no corners, no soft snap (ortho still applies).
+   -> {p,hit:corner|null,how:'vertex'|'ortho'|'angle'|''} */
+function tkSnapPick(p,a,o){
+  o=o||{};
+  if(!o.off){const v=tkNearVertex(o.verts,p,o.tol||0);if(v)return {p:{x:v.x,y:v.y},hit:v,how:'vertex'}}
+  if(o.ortho&&a)return {p:tkOrtho(a,p,o.diag),hit:null,how:'ortho'};
+  if(!o.off&&o.soft&&a){const dx=p.x-a.x,dy=p.y-a.y,len=Math.hypot(dx,dy);if(len){const ang=Math.atan2(dy,dx),st=Math.PI/4,nr=Math.round(ang/st)*st;if(Math.abs(ang-nr)<7*Math.PI/180)return {p:{x:a.x+len*Math.cos(nr),y:a.y+len*Math.sin(nr)},hit:null,how:'angle'}}}
+  return {p:{x:p.x,y:p.y},hit:null,how:''};
+}
+/* the two ends of an open line (p = 0-1 pairs): [{x,y,ux,uy}] in image px, u = unit direction pointing out of the line */
+function tkEnds(p,W,H){
+  const q=(p||[]).map(Number),n=Math.floor(q.length/2);if(n<2)return [];
+  const mk=(i,j)=>{const x=q[2*i]*W,y=q[2*i+1]*H,dx=x-q[2*j]*W,dy=y-q[2*j+1]*H,l=Math.hypot(dx,dy);return l?{x,y,ux:dx/l,uy:dy/l}:{x,y,ux:1,uy:0}};
+  return [mk(0,1),mk(n-1,n-2)];
+}
+/* the mark at one end e: 'ticks' = a short line square across the end (half = its half length), 'arrows' = a filled arrowhead pointing out, 'dots' = a small dot */
+function tkEndMark(e,style,half){
+  const px=-e.uy,py=e.ux;
+  if(style==='arrows'){const L=half*1.5,w=half*.75;return {k:'poly',pts:[e.x,e.y,e.x-e.ux*L+px*w,e.y-e.uy*L+py*w,e.x-e.ux*L-px*w,e.y-e.uy*L-py*w]}}
+  if(style==='dots')return {k:'dot',x:e.x,y:e.y,r:half*.4};
+  return {k:'tick',pts:[e.x+px*half,e.y+py*half,e.x-px*half,e.y-py*half]};
+}
+/* live readout while drawing; pts in image px (the last one is the cursor), fpp = feet per image px (0 = no scale yet).
+   kind 'line' | 'area' | 'scale' -> {main,sub} or null (fewer than 2 points) */
+function tkReadout(kind,pts,W,H,fpp,o){
+  o=o||{};const n=(pts||[]).length;if(n<2)return null;
+  const a=pts[n-2],b=pts[n-1],seg=Math.hypot(b.x-a.x,b.y-a.y),np=[];pts.forEach(q=>np.push(q.x/W,q.y/H));
+  if(kind==='scale')return {main:Math.round(seg).toLocaleString('en-US')+' px',sub:fpp>0?'now '+tkFtIn(seg*fpp)+' · click the other end':'click the other end, then type its length'};
+  if(!(fpp>0))return {main:'No scale yet',sub:'set the scale to see feet'};
+  if(kind==='area'){if(n<3)return {main:tkFtIn(seg*fpp),sub:o.deduct?'deduct · side':'side'};return {main:(o.deduct?'−':'')+Math.round(tkAreaPx(np,W,H)*fpp*fpp).toLocaleString('en-US')+' SF',sub:'side '+tkFtIn(seg*fpp)}}
+  return {main:tkFtIn(seg*fpp),sub:n>2?'run '+tkFtIn(tkLenPx(np,W,H)*fpp):''};
+}
 const tkOk=()=>!!(isAdminRole()&&S.isAdmin&&!S.asUser&&!S.viewAs&&!isPractice());
 let TK=null;/* {job,data,rev,ops:[],t,saving,loaded} */
 function tkNew(jid){return {job:jid,data:tkApply({},[]),rev:-1,ops:[],t:0,saving:false,loaded:false,fail:0}}
@@ -4801,14 +4875,15 @@ async function tkOpen(sid){
   {const ci=tkItem(TKV.item);if(ci&&ci.unit==='SF')TKV.lm='area';else if(ci&&ci.unit==='LF'&&TKV.lm==='area')TKV.lm='run'}
   const el=document.createElement('div');el.id='tkv';el.className='tkv';document.body.appendChild(el);document.body.classList.add('noscroll');
   el.innerHTML='<div class="vbar"><button id="tkBack">‹ Takeoff</button><div class="vt">'+esc(sh.name||'Sheet')+(ni>=0&&list.length>1?' <span style="font-weight:400;opacity:.7">('+(ni+1)+'/'+list.length+')</span>':'')+'</div><button id="tkPrev"'+(ni<=0?' disabled':'')+'>‹</button><button id="tkNext"'+(ni<0||ni>=list.length-1?' disabled':'')+'>›</button></div>'+
-    '<div class="tkwrap"><div id="tkStage"><div id="tkBoard"><img id="tkImg" alt="" draggable="false"><svg id="tkInk" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="tkHatch" patternUnits="userSpaceOnUse" width="24" height="24" patternTransform="rotate(45)"><rect width="24" height="24" fill="#fff" fill-opacity=".55"/><line x1="0" y1="0" x2="0" y2="24" stroke="#c62828" stroke-width="5" stroke-opacity=".6"/></pattern></defs><g id="tkShapes"></g><g id="tkLive"></g></svg></div><div class="hint" id="tkHint">Loading sheet…</div><div class="tkread" id="tkRead"></div><div class="tkhl" id="tkHl"></div></div>'+
+    '<div class="tkwrap"><div id="tkStage"><div id="tkBoard"><img id="tkImg" alt="" draggable="false"><svg id="tkInk" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="tkHatch" patternUnits="userSpaceOnUse" width="24" height="24" patternTransform="rotate(45)"><rect width="24" height="24" fill="#fff" fill-opacity=".55"/><line x1="0" y1="0" x2="0" y2="24" stroke="#c62828" stroke-width="5" stroke-opacity=".6"/></pattern></defs><g id="tkShapes"></g><g id="tkLive"></g></svg></div><canvas id="tkOv" class="tkov" aria-hidden="true"></canvas><canvas id="tkMag" class="tkmag" aria-hidden="true"></canvas><div class="tkcr" id="tkCr" aria-live="off"></div><div class="hint" id="tkHint">Loading sheet…</div><div class="tkread" id="tkRead"></div><div class="tkhl" id="tkHl"></div></div>'+
     '<div class="tkside" id="tkSide"></div></div>'+
-    '<div class="vtools"><div class="trow"><button class="tb" data-tm="draw">✏ Take off</button><button class="tb" data-tm="pan">✋ Move</button><button class="tb" data-tm="select">☝ Select</button><button class="tb" data-tm="scale">📐 Scale</button><button class="tb" data-tm="measure">📏 Measure</button><button class="tb" id="tkDone">✓ Finish</button><button class="tb" id="tkUndo">↶ Undo point</button><button class="tb" id="tkSnap">Snap: on</button><span class="tkseg" title="Run: each click adds a corner until ✓ Finish. Segments: every 2 clicks make one straight piece. Area: click the corners, or drag a rectangle."><button class="tb" data-lm="run">Run</button><button class="tb" data-lm="seg">Segments</button><button class="tb" data-lm="area">Area</button></span><button class="tb" id="tkWm" title="Draw takeoff lines thinner or thicker">Line: 1x</button><button class="tb" id="tkCopy">⧉ Copy to sheet…</button><button class="tb" id="tkFit">⤢ Fit</button></div></div>';
+    '<div class="vtools"><div class="trow"><button class="tb" data-tm="draw">✏ Take off</button><button class="tb" data-tm="pan">✋ Move</button><button class="tb" data-tm="select">☝ Select</button><button class="tb" data-tm="scale">📐 Scale</button><button class="tb" data-tm="measure">📏 Measure</button><button class="tb" id="tkDone">✓ Finish</button><button class="tb" id="tkUndo">↶ Undo point</button><button class="tb" id="tkSnap">Snap: on</button><button class="tb" id="tkOrtho" title="Lock lines level / plumb (or hold Shift)" aria-pressed="false">⊥ Ortho</button><span class="tkseg" title="Run: each click adds a corner until ✓ Finish. Segments: every 2 clicks make one straight piece. Area: click the corners, or drag a rectangle."><button class="tb" data-lm="run">Run</button><button class="tb" data-lm="seg">Segments</button><button class="tb" data-lm="area">Area</button></span><button class="tb" id="tkWm" title="Draw takeoff lines thinner or thicker">Line: 1x</button><button class="tb" id="tkCopy">⧉ Copy to sheet…</button><button class="tb" id="tkFit">⤢ Fit</button></div></div>';
   $('#tkBack').onclick=tkClose;$('#tkFit').onclick=tkvFit;
   $('#tkPrev').onclick=()=>tkStep(-1);$('#tkNext').onclick=()=>tkStep(1);
   $$('[data-tm]',el).forEach(b=>b.onclick=()=>tkvMode(b.dataset.tm));
   $('#tkDone').onclick=tkvFinish;$('#tkUndo').onclick=tkvUndoPt;$('#tkCopy').onclick=tkvCopy;
   TKV.snap=lsGet('acv.tkSnap')!=='off';$('#tkSnap').onclick=()=>{TKV.snap=!TKV.snap;lsSet('acv.tkSnap',TKV.snap?null:'off');tkvTools()};
+  TKV.ortho=tkdrGet().ortho;TKV.mods={};$('#tkOrtho').onclick=()=>{TKV.ortho=!TKV.ortho;tkvTools();tkvHover()};
   $$('[data-lm]',el).forEach(b=>b.onclick=()=>tkvSetLm(b.dataset.lm));
   $('#tkWm').onclick=()=>{const i=TK_WMULS.indexOf(TKV.wmul);TKV.wmul=TK_WMULS[(i+1)%TK_WMULS.length];lsSet('acv.tkWmul',TKV.wmul===1?null:String(TKV.wmul));tkvPaint()};
   TKV.stage=$('#tkStage');TKV.board=$('#tkBoard');TKV.img=$('#tkImg');
@@ -4871,13 +4946,15 @@ function tkvTools(){
   const un=$('#tkUndo');if(un)un.disabled=!TKV.draft.length;
   const sn=$('#tkSnap');if(sn)sn.textContent='Snap: '+(TKV.snap?'on':'off');
   const wm=$('#tkWm');if(wm)wm.textContent='Line: '+(TKV.wmul||1)+'x';
+  const ob=$('#tkOrtho');if(ob){ob.classList.toggle('on',!!TKV.ortho);ob.setAttribute('aria-pressed',String(!!TKV.ortho))}
+  if(TKV.stage){const cs=tkdrGet().cur;TKV.stage.classList.toggle('tkxh',draw&&cs!=='arrow');TKV.stage.classList.toggle('tkar',draw&&cs==='arrow')}
   $$('#tkv [data-lm]').forEach(b=>b.classList.toggle('on',TKV.mode==='draw'&&!!it&&it.unit!=='EA'&&b.dataset.lm===(it.unit==='SF'?'area':TKV.lm==='seg'?'seg':'run')));
   const h=$('#tkHint');if(!h||!TKV.W)return;
   const sc=tkScaleOf(TKV.id);
   h.textContent=!sc&&TKV.mode!=='scale'?'No scale on this sheet yet: tap 📐 Scale':
     TKV.mode==='draw'&&TKV.cont?'Continuing the run: click each next corner · Enter or right-click ■ Stop to finish · Esc cancels (the mark stays as it was)':
-    TKV.mode==='draw'?(it?(it.unit==='LF'?(TKV.lm==='seg'?'Segments: click both ends of each wall piece · right-click for more · drag to move':'Click each corner along the wall · double-click or ✓ Finish to end the run · right-click for more · drag to move'):it.unit==='SF'?(TKV.dNext?'Deduct: click the corners of the cut-out (or drag a rectangle) · ✓ Finish':'Area: click the corners (click the first one or ✓ Finish to close) or drag a rectangle · Alt+drag/click = deduct · space+drag to move'):'Click each item to count it · drag to move'):'Pick a takeoff item on the right'):
-    TKV.mode==='pan'?'Drag to move · wheel or pinch to zoom':TKV.mode==='select'?'Click a mark to select it · drag to move the sheet · drag a selected mark\'s corners to reshape · shift-click to pick several, shift+drag a box to pick an area · right-click (long-press) for more':TKV.mode==='scale'?'Click both ends of a dimension you know, then ✓ Finish':'Click points to measure (not saved) · ✓ Finish';
+    TKV.mode==='draw'?(it?(it.unit==='LF'?(TKV.lm==='seg'?'Segments: click both ends of each wall piece · right-click for more · drag to move':'Click each corner along the wall · double-click or ✓ Finish to end the run · Shift = level/plumb · right-click for more · drag to move'):it.unit==='SF'?(TKV.dNext?'Deduct: click the corners of the cut-out (or drag a rectangle) · ✓ Finish':'Area: click the corners (click the first one or ✓ Finish to close) or drag a rectangle · Alt+drag/click = deduct · space+drag to move'):'Click each item to count it · drag to move'):'Pick a takeoff item on the right'):
+    TKV.mode==='pan'?'Drag to move · wheel or pinch to zoom':TKV.mode==='select'?'Click a mark to select it · drag to move the sheet · drag a selected mark\'s corners to reshape · shift-click to pick several, shift+drag a box to pick an area · right-click (long-press) for more':TKV.mode==='scale'?'Click both ends of a dimension you know (they snap to line ends) · Shift = level/plumb':'Click points to measure (not saved) · ✓ Finish · Shift = level/plumb';
   h.style.display='block';
 }
 function tkvSide(){
@@ -4900,12 +4977,23 @@ function tkvSide(){
   $$('[data-eye]',el).forEach(b=>b.onclick=()=>{TKV.hide[b.dataset.eye]=!TKV.hide[b.dataset.eye];tkvSide();tkvPaint()});
   tkBindGroups(el,tkvSide);
 }
+/* a finished line's end marks (ticks / dots / arrows, see tkEndMark) and small hollow squares on its inside corners; widths keep a 1 screen px minimum through data-w */
+function tkvEndsSvg(p,lw,c,style){
+  const W=TKV.W,H=TKV.H,M=Math.max(W,H),n=Math.floor(p.length/2);if(n<2)return '';const half=lw/2+M*.005,tw=M*.0008,f=v=>v.toFixed(1);let s='';
+  tkEnds(p,W,H).forEach(e=>{const m=tkEndMark(e,style,half);
+    if(m.k==='tick')s+='<line x1="'+f(m.pts[0])+'" y1="'+f(m.pts[1])+'" x2="'+f(m.pts[2])+'" y2="'+f(m.pts[3])+'" stroke="'+c+'" data-w="'+tw.toFixed(2)+'" stroke-width="'+Math.max(tw,1.2/TKV.t.s).toFixed(2)+'" stroke-linecap="butt"/>';
+    else if(m.k==='dot')s+='<circle cx="'+f(m.x)+'" cy="'+f(m.y)+'" r="'+f(Math.max(m.r,M*.0012))+'" fill="'+c+'"/>';
+    else s+='<polygon points="'+m.pts.map(f).join(',')+'" fill="'+c+'"/>'});
+  if(n>2){const a=Math.max(Math.min(lw*.7,M*.004),M*.0022),k=a/2,sw=M*.00045;for(let i=1;i<n-1;i++){const x=p[2*i]*W,y=p[2*i+1]*H;
+    s+=style==='dots'?'<circle cx="'+f(x)+'" cy="'+f(y)+'" r="'+f(k*.6)+'" fill="'+c+'"/>':'<rect x="'+f(x-k)+'" y="'+f(y-k)+'" width="'+f(a)+'" height="'+f(a)+'" fill="none" stroke="#1d232b" stroke-opacity=".75" data-w="'+sw.toFixed(2)+'" stroke-width="'+Math.max(sw,1/TKV.t.s).toFixed(2)+'"/>'}}
+  return s;
+}
 function tkvPaint(fast){
   if(!TKV||!TKV.W||!TK)return;const g=$('#tkShapes');if(!g)return;const W=TKV.W,H=TKV.H,M=Math.max(W,H),sw=M*.004;
   const its={};TK.data.items.forEach(i=>its[i.id]=i);
   const on={};TK.data.shapes.forEach(s=>{if(s.sheet===TKV.id&&its[s.item])on[s.id]=1});TKV.msel=(TKV.msel||[]).filter(id=>on[id]);if(TKV.sel&&!on[TKV.sel])TKV.sel=null;
   const hl=TKV.hl&&its[TKV.hl]?TKV.hl:null;{const ci=its[TKV.item];if(ci)TKV.last[ci.unit]=ci.id}
-  const tags=[],fs=M*.009;
+  const tags=[],fs=M*.009,ends=tkdrGet().ends;
   g.innerHTML=TK.data.shapes.filter(s=>s.sheet===TKV.id&&its[s.item]&&!TKV.hide[s.item]&&s.id!==TKV.cont).map(s=>{const it=its[s.item],c=esc(it.color),p=(TKV.drag&&TKV.drag.id===s.id?TKV.drag.p:(s.p||[])).map(Number),sel=TKV.sel===s.id||TKV.msel.includes(s.id);
     const dim=hl&&s.item!==hl&&!sel?' opacity="0.2" data-dim="1"':'';
     const pts=[];for(let i=0;i+1<p.length;i+=2)pts.push((p[i]*W).toFixed(1)+','+(p[i+1]*H).toFixed(1));
@@ -4916,7 +5004,7 @@ function tkvPaint(fast){
     if(s.k==='poly'&&s.deduct)return '<polygon'+dim+' data-deduct="1" points="'+pts.join(' ')+'" fill="url(#tkHatch)" stroke="'+(sel?'#000':c)+'" stroke-width="'+(sw*(sel?.8:.5)).toFixed(1)+'" stroke-dasharray="'+(sw*2.5).toFixed(1)+' '+(sw*1.5).toFixed(1)+'" stroke-linejoin="round"/>';
     if(s.k==='poly')return '<polygon'+dim+' points="'+pts.join(' ')+'" fill="'+c+'" fill-opacity="'+(op*.4).toFixed(2)+'" stroke="'+(sel?'#000':c)+'" stroke-width="'+(sw*(sel?.8:.5)).toFixed(1)+'" stroke-linejoin="round"/>';
     const lw=tkvLineW(it,0)*(sel?1.15:1);
-    return '<polyline'+dim+' points="'+pts.join(' ')+'" fill="none" stroke="'+(sel?'#000':c)+'" stroke-opacity="'+(sel?.85:it.id===TKV.item?.9:.7)+'" data-w="'+lw.toFixed(2)+'" stroke-width="'+Math.max(lw,1.2/TKV.t.s).toFixed(2)+'" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4"/>';
+    return '<g'+dim+'><polyline points="'+pts.join(' ')+'" fill="none" stroke="'+(sel?'#000':c)+'" stroke-opacity="'+(sel?.85:it.id===TKV.item?.9:.7)+'" data-w="'+lw.toFixed(2)+'" stroke-width="'+Math.max(lw,1.2/TKV.t.s).toFixed(2)+'" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4"/>'+tkvEndsSvg(p,lw,sel?'#000':c,ends)+'</g>';
   }).join('')+tags.map(([t,x,y,c,dim])=>{const w=fs*.62*t.length+fs*.8;return '<g data-tag="1"'+dim+'><rect x="'+(x-w/2).toFixed(1)+'" y="'+(y-fs*.75).toFixed(1)+'" width="'+w.toFixed(1)+'" height="'+(fs*1.5).toFixed(1)+'" rx="'+(fs*.3).toFixed(1)+'" fill="#fff" fill-opacity=".9" stroke="'+c+'" stroke-width="'+(fs*.12).toFixed(1)+'"/><text x="'+x.toFixed(1)+'" y="'+(y+fs*.35).toFixed(1)+'" font-size="'+fs.toFixed(1)+'" font-family="sans-serif" font-weight="700" text-anchor="middle" fill="#111">'+esc(t)+'</text></g>'}).join('');
   tkvLive();if(fast===true)return;tkvSide();tkvTools();tkvHlBar();
 }
@@ -4930,12 +5018,12 @@ function tkvLive(){
     const poly=TKV.mode==='draw'&&it&&it.unit==='SF';
     const lf=TKV.mode==='draw'&&it&&it.unit==='LF',lw=lf?tkvLineW(it,1.5):sw;
     s+=poly&&pts.length>2&&TKV.dDraft?'<polygon points="'+ps+'" fill="url(#tkHatch)" stroke="#c62828" stroke-width="'+sw+'" stroke-dasharray="'+(sw*3)+' '+(sw*2)+'"/>':poly&&pts.length>2?'<polygon points="'+ps+'" fill="'+c+'" fill-opacity=".18" stroke="'+c+'" stroke-width="'+sw+'" stroke-dasharray="'+(sw*3)+' '+(sw*2)+'"/>':'<polyline points="'+ps+'" fill="none" stroke="'+c+'"'+(lf?' stroke-opacity="'+(TKV.cont?'.85':'.7')+'"':'')+' stroke-width="'+lw.toFixed(2)+'" stroke-linecap="'+(lf?'butt':'round')+'" stroke-linejoin="'+(lf?'miter':'round')+'"/>';
-    s+=TKV.draft.map(p=>'<circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="'+(M*.0025/Math.max(.2,TKV.t.s*3)+M*.0012).toFixed(1)+'" fill="#fff" stroke="'+c+'" stroke-width="'+(sw*.6)+'"/>').join('');
+    {const k=1/TKV.t.s,a=7*k,w=(1.4*k).toFixed(2);s+=TKV.draft.map((p,i)=>{const b=i===0&&TKV.mode==='draw'&&it&&it.unit==='SF'&&TKV.draft.length>2?a*1.6:a;return '<rect x="'+(p.x-b/2).toFixed(1)+'" y="'+(p.y-b/2).toFixed(1)+'" width="'+b.toFixed(1)+'" height="'+b.toFixed(1)+'" fill="none" stroke="#1d232b" stroke-width="'+w+'"/>'}).join('')}
   }
-  if(TKV.mode==='select'&&TKV.sel&&!TKV.box){const sh=tkvShape(TKV.sel);if(sh&&sh.k!=='count'){const q=TKV.drag&&TKV.drag.id===sh.id?TKV.drag.p:(sh.p||[]);const r=(6/TKV.t.s).toFixed(2),w=(1.6/TKV.t.s).toFixed(2);
-    for(let i=0;i+1<q.length;i+=2)s+='<circle data-hv="'+(i/2)+'" cx="'+(q[i]*W).toFixed(1)+'" cy="'+(q[i+1]*H).toFixed(1)+'" r="'+r+'" fill="#fff" stroke="#1565c0" stroke-width="'+w+'"/>'}}
+  if(TKV.mode==='select'&&TKV.sel&&!TKV.box){const sh=tkvShape(TKV.sel);if(sh&&sh.k!=='count'){const q=TKV.drag&&TKV.drag.id===sh.id?TKV.drag.p:(sh.p||[]);const r=5/TKV.t.s,w=(1.6/TKV.t.s).toFixed(2);
+    for(let i=0;i+1<q.length;i+=2){const x=q[i]*W,y=q[i+1]*H;s+='<rect data-hv="'+(i/2)+'" x="'+(x-r).toFixed(1)+'" y="'+(y-r).toFixed(1)+'" width="'+(2*r).toFixed(1)+'" height="'+(2*r).toFixed(1)+'" fill="none" stroke="#1565c0" stroke-width="'+w+'"/><circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="'+(1.3/TKV.t.s).toFixed(2)+'" fill="#1565c0"/>'}}}
   if(TKV.box){const a=TKV.box.a,b=TKV.box.b,k=1/TKV.t.s;s+='<rect data-box="1" x="'+Math.min(a.x,b.x).toFixed(1)+'" y="'+Math.min(a.y,b.y).toFixed(1)+'" width="'+Math.abs(b.x-a.x).toFixed(1)+'" height="'+Math.abs(b.y-a.y).toFixed(1)+'" fill="#1e88e5" fill-opacity=".08" stroke="#1e88e5" stroke-width="'+(1.2*k).toFixed(2)+'" stroke-dasharray="'+(5*k).toFixed(1)+' '+(3*k).toFixed(1)+'"/>'}
-  g.innerHTML=s;
+  g.innerHTML=s;tkvOverlay();
   const rd=$('#tkRead');if(!rd)return;const sc=tkScaleOf(TKV.id);
   if(!pts.length||(TKV.mode!=='draw'&&TKV.mode!=='measure'&&TKV.mode!=='scale')){rd.style.display='none';return}
   const np=[];pts.forEach(p=>np.push(p.x/W,p.y/H));let txt='';
@@ -4946,52 +5034,130 @@ function tkvLive(){
   else{const L=tkLenPx(np,W,H)*sc.fpp;const last=pts.length>1?Math.hypot(pts[pts.length-1].x-pts[pts.length-2].x,pts[pts.length-1].y-pts[pts.length-2].y)*sc.fpp:0;txt=(TKV.cont?'Continuing: ':'')+tkFtIn(L)+(pts.length>2?'  (this leg '+tkFtIn(last)+')':'')}
   rd.textContent=txt;rd.style.display=txt?'block':'none';
 }
-/* snap: to an existing corner/end on this sheet within 10 screen px (skip = {id,i}: a corner being dragged), else level/plumb/45 from the last point */
+/* snap (tkSnapPick): to a corner/end of a mark on this sheet (or an earlier point of this drawing) within the Snap distance in screen px,
+   ortho (⊥ Ortho or Shift held) level/plumb from the last point, else (not when dragging a corner) a soft level/plumb/45°. skip = {id,i,base}: a corner being dragged, base = its neighbor.
+   Ctrl / ⌘ (or Alt outside Area) held = no snapping. Sets TKV.snapHit / TKV.snapHow for the overlay. */
 function tkvSnapPt(p,skip){
-  if(!TKV.snap)return p;const tol=10/TKV.t.s;let best=null,bd=tol;
-  const W=TKV.W,H=TKV.H;
-  TK.data.shapes.forEach(s=>{if(s.sheet!==TKV.id||s.k==='count'||TKV.hide[s.item])return;const q=s.p||[];for(let i=0;i+1<q.length;i+=2){if(skip&&skip.id===s.id&&skip.i===i/2)continue;const d=Math.hypot(q[i]*W-p.x,q[i+1]*H-p.y);if(d<bd){bd=d;best={x:q[i]*W,y:q[i+1]*H}}}});
-  TKV.draft.forEach((q,i)=>{if(i===TKV.draft.length-1)return;const d=Math.hypot(q.x-p.x,q.y-p.y);if(d<bd){bd=d;best={x:q.x,y:q.y}}});
-  if(best)return best;
-  const a=TKV.draft[TKV.draft.length-1];return a?snapLine(a,p):p;
+  const m=TKV.mods||{},d=tkdrGet(),off=!TKV.snap||!!m.off;
+  const vs=off?[]:tkSnapVerts(TK.data.shapes,TKV.id,TKV.W,TKV.H,TKV.hide,skip).concat(TKV.draft.slice(0,-1));
+  const a=skip?skip.base||null:TKV.draft[TKV.draft.length-1]||null;
+  const r=tkSnapPick(p,a,{verts:vs,tol:(TK_SNAPPX[d.snapD]||10)/TKV.t.s,ortho:!!(TKV.ortho||m.shift),diag:d.diag,soft:TKV.snap&&!skip,off});
+  TKV.snapHit=r.hit;TKV.snapHow=r.how;return r.p;
+}
+/* modifier keys while drawing: Shift = ortho, Ctrl/⌘ (Alt too, except in Area where Alt = deduct) = no snapping */
+function tkvMods(e){const area=TKV.mode==='draw'&&(tkItem(TKV.item)||{}).unit==='SF';TKV.mods={shift:!!e.shiftKey,off:!!(e.ctrlKey||e.metaKey||(e.altKey&&!area))}}
+function tkvDrawing(){return !!TKV&&(TKV.mode==='draw'||TKV.mode==='measure'||TKV.mode==='scale')}
+/* the pointer is over the sheet (TKV.aim, screen px in the stage): snap the point it would place, then redraw the live layer and overlay */
+function tkvHover(){
+  if(!TKV||!TKV.W)return;const A=TKV.aim;
+  if(A&&tkvDrawing()){const p=tkvImg(A.cx,A.cy),it=tkItem(TKV.item);
+    if(TKV.mode==='draw'&&it&&it.unit==='EA'){TKV.cur=null;TKV.snapHit=null;TKV.snapHow='';TKV.aimPt=p}else{TKV.cur=tkvSnapPt(p);TKV.aimPt=TKV.cur}
+    tkvLive();return}
+  TKV.snapHit=null;tkvOverlay();
+}
+function tkvAimSet(e,touch){const r=TKV.stage.getBoundingClientRect();TKV.aim={x:e.clientX-r.left,y:e.clientY-r.top,cx:e.clientX,cy:e.clientY,touch:!!touch}}
+/* overlay canvas over the sheet, in screen px (the plan image and marks are not repainted): crosshair, snap marker, readout by the cursor, magnifier */
+function tkXhair(x,cx,cy,len,gap,col,full){
+  cx=Math.round(cx)+.5;cy=Math.round(cy)+.5;const L=[[cx-gap-len,cy,cx-gap,cy],[cx+gap,cy,cx+gap+len,cy],[cx,cy-gap-len,cx,cy-gap],[cx,cy+gap,cx,cy+gap+len]];
+  x.save();x.lineCap='butt';const go=()=>{x.beginPath();L.forEach(l=>{x.moveTo(l[0],l[1]);x.lineTo(l[2],l[3])});x.stroke()};
+  x.strokeStyle=full?'rgba(255,255,255,.7)':'rgba(255,255,255,.95)';x.lineWidth=3;go();x.strokeStyle=col;x.lineWidth=1;go();x.restore();
+}
+function tkSnapBox(x,cx,cy,k){k=k||6.5;x.save();x.lineWidth=3.2;x.strokeStyle='#fff';x.strokeRect(cx-k,cy-k,2*k,2*k);x.lineWidth=1.6;x.strokeStyle='#00a651';x.strokeRect(cx-k,cy-k,2*k,2*k);x.restore()}
+function tkvOverlay(){
+  if(!TKV||!TKV.stage)return;const cv=$('#tkOv'),cr=$('#tkCr'),mg=$('#tkMag');if(!cv)return;
+  const r=TKV.stage.getBoundingClientRect(),dpr=window.devicePixelRatio||1,cw=Math.round(r.width*dpr),ch=Math.round(r.height*dpr);
+  if(cv.width!==cw||cv.height!==ch){cv.width=cw;cv.height=ch}
+  const x=cv.getContext('2d');x.setTransform(dpr,0,0,dpr,0,0);x.clearRect(0,0,r.width,r.height);
+  const d=tkdrGet(),A=TKV.aim,drawing=tkvDrawing()&&!!TKV.W,corner=!!(TKV.g&&TKV.g.type==='corner');
+  const col=d.xc==='red'?'#e53935':d.xc==='blue'?'#1e88e5':d.xc==='black'?'#000':'#16191d';
+  const scr=p=>({x:TKV.t.x+p.x*TKV.t.s,y:TKV.t.y+p.y*TKV.t.s});
+  if(A&&drawing&&!A.touch&&d.cur!=='arrow')tkXhair(x,A.x,A.y,d.cur==='full'?Math.max(r.width,r.height)*2:20,5,col,d.cur==='full');
+  const hit=A&&(drawing||corner)&&TKV.snapHit?scr(TKV.snapHit):null;
+  if(hit)tkSnapBox(x,hit.x,hit.y);
+  else if(A&&drawing&&TKV.aimPt&&(TKV.snapHow==='ortho'||TKV.snapHow==='angle')){const q=scr(TKV.aimPt);if(Math.hypot(q.x-A.x,q.y-A.y)>2){x.save();x.fillStyle='#fff';x.beginPath();x.arc(q.x,q.y,3.6,0,7);x.fill();x.fillStyle='#1e88e5';x.beginPath();x.arc(q.x,q.y,2.2,0,7);x.fill();x.restore()}}
+  /* readout next to the cursor */
+  let ro=null;
+  if(cr&&A&&drawing&&d.read&&TKV.draft.length&&TKV.cur){const it=tkItem(TKV.item),sc=tkScaleOf(TKV.id);
+    const kind=TKV.mode==='scale'?'scale':TKV.mode==='draw'&&it&&it.unit==='SF'?'area':TKV.mode==='draw'&&it&&it.unit==='EA'?'':'line';
+    if(kind)ro=tkReadout(kind,TKV.draft.concat([TKV.cur]),TKV.W,TKV.H,sc&&+sc.fpp>0?+sc.fpp:0,{deduct:TKV.dDraft})}
+  if(cr){if(!ro){cr.style.display='none'}else{
+    const tag=TKV.snapHow==='vertex'?'on a corner':TKV.snapHow==='ortho'?'⊥ ortho':'';
+    cr.innerHTML='<b>'+esc(ro.main)+'</b>'+(ro.sub||tag?'<small>'+esc([ro.sub,tag].filter(Boolean).join(' · '))+'</small>':'');cr.style.display='block';
+    const w=cr.offsetWidth,h=cr.offsetHeight;let lx=A.touch?A.x+30:A.x+18,ly=A.touch?A.y-h-56:A.y+20;
+    if(lx+w>r.width-4)lx=A.x-18-w;if(ly+h>r.height-4)ly=A.y-20-h;if(ly<4)ly=A.y+(A.touch?40:20);
+    cr.style.transform='translate('+Math.round(Math.max(4,lx))+'px,'+Math.round(Math.max(4,ly))+'px)'}}
+  /* magnifier: touch / pen while placing or dragging a point (or always, with a mouse, if picked) */
+  const P=TKV.aimPt,show=!!(mg&&A&&P&&d.mag!=='off'&&(A.touch?TKV.magOn&&(drawing||corner):d.mag==='always'&&drawing));
+  if(!mg)return;if(!show){if(mg.style.display!=='none')mg.style.display='none';return}
+  tkvMag(mg,A,P,d,r,col);
+}
+function tkvMag(mg,A,P,d,r,col){
+  const S=120,dpr=window.devicePixelRatio||1;if(mg.width!==S*dpr){mg.width=mg.height=S*dpr}
+  let lx=A.x-S-12,ly=A.y-S-36;if(lx<4)lx=A.x+12;if(ly<4)ly=A.y+(A.touch?44:24);if(lx+S>r.width-4)lx=r.width-S-4;if(ly+S>r.height-4)ly=Math.max(4,A.y-S-36);
+  mg.style.transform='translate('+Math.round(lx)+'px,'+Math.round(ly)+'px)';mg.style.display='block';
+  const x=mg.getContext('2d'),k=TKV.t.s*d.zoom,W=TKV.W,H=TKV.H,M=Math.max(W,H),half=S/2/k;
+  x.setTransform(dpr,0,0,dpr,0,0);x.clearRect(0,0,S,S);x.save();x.beginPath();x.arc(S/2,S/2,S/2,0,7);x.clip();x.fillStyle='#fff';x.fillRect(0,0,S,S);
+  x.translate(S/2,S/2);x.scale(k,k);x.translate(-P.x,-P.y);x.imageSmoothingQuality='high';
+  try{x.drawImage(TKV.img,0,0,W,H)}catch(e){}
+  x.globalCompositeOperation='multiply';x.lineCap='butt';x.lineJoin='miter';
+  const near=q=>{let a=1/0,b=-1/0,c=1/0,e=-1/0;for(let i=0;i+1<q.length;i+=2){const u=q[i]*W,v=q[i+1]*H;a=Math.min(a,u);b=Math.max(b,u);c=Math.min(c,v);e=Math.max(e,v)}return b>=P.x-half-M*.01&&a<=P.x+half+M*.01&&e>=P.y-half-M*.01&&c<=P.y+half+M*.01};
+  TK.data.shapes.forEach(sh=>{if(sh.sheet!==TKV.id||TKV.hide[sh.item]||sh.id===TKV.cont)return;const it=tkItem(sh.item);if(!it)return;const q=(TKV.drag&&TKV.drag.id===sh.id?TKV.drag.p:sh.p||[]).map(Number);if(!near(q))return;
+    x.strokeStyle=x.fillStyle=it.color;
+    if(sh.k==='count'){x.globalAlpha=.55;x.beginPath();x.arc(q[0]*W,q[1]*H,M*.007,0,7);x.fill();return}
+    x.beginPath();for(let i=0;i+1<q.length;i+=2){if(i)x.lineTo(q[i]*W,q[i+1]*H);else x.moveTo(q[i]*W,q[i+1]*H)}
+    if(sh.k==='poly'){x.closePath();x.globalAlpha=.16;x.fill();x.globalAlpha=.8;x.lineWidth=1.5/k;x.stroke();return}
+    x.globalAlpha=.45;x.lineWidth=Math.max(tkvLineW(it,0),1.5/k);x.stroke()});
+  if(TKV.draft.length&&(TKV.cur||TKV.draft.length>1)){const it=tkItem(TKV.item),c=TKV.mode==='draw'&&it?it.color:TKV.mode==='scale'?'#c62828':'#1d232b';const pts=TKV.draft.concat(TKV.cur?[TKV.cur]:[]);
+    x.globalAlpha=.9;x.strokeStyle=c;x.lineWidth=1.6/k;x.beginPath();pts.forEach((q,i)=>i?x.lineTo(q.x,q.y):x.moveTo(q.x,q.y));x.stroke()}
+  x.restore();x.globalAlpha=1;x.globalCompositeOperation='source-over';
+  tkXhair(x,S/2,S/2,16,5,col,false);if(TKV.snapHit)tkSnapBox(x,S/2,S/2,8);
 }
 function tkvBind(){
   const st=TKV.stage;
   st.addEventListener('pointerdown',e=>{
     if(!TKV||!TKV.W)return;try{st.setPointerCapture(e.pointerId)}catch(_){}
-    TKV.pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
-    if(TKV.pts.size===2){const [a,b]=[...TKV.pts.values()];TKV.g={type:'pinch',d0:Math.max(1,dist(a,b)),c0:mid(a,b),t0:Object.assign({},TKV.t)};if(TKV.box||TKV.drag){TKV.box=null;TKV.drag=null;tkvPaint(true)}}
-    else if(TKV.pts.size===1){const it=tkItem(TKV.item),btn=TKV.space?1:e.ctrlKey?2:e.button,sm=TKV.mode==='select'&&!TKV.space&&e.button===0;
+    TKV.pts.set(e.pointerId,{x:e.clientX,y:e.clientY});tkvMods(e);
+    if(TKV.pts.size===2){const [a,b]=[...TKV.pts.values()];TKV.g={type:'pinch',d0:Math.max(1,dist(a,b)),c0:mid(a,b),t0:Object.assign({},TKV.t)};clearTimeout(TKV.aimT);TKV.magOn=false;TKV.aim=null;if(TKV.box||TKV.drag){TKV.box=null;TKV.drag=null;tkvPaint(true)}else tkvOverlay()}
+    else if(TKV.pts.size===1){const it=tkItem(TKV.item),btn=TKV.space?1:e.ctrlKey&&tkMac()?2:e.button,sm=TKV.mode==='select'&&!TKV.space&&e.button===0;
       const cs=sm&&TKV.sel&&!e.shiftKey?tkvShape(TKV.sel):null,ci=cs&&cs.k!=='count'?tkvNearCorner(cs,tkvImg(e.clientX,e.clientY),12):-1;
       TKV.g={type:'pan',sx:e.clientX,sy:e.clientY,t0:Object.assign({},TKV.t),moved:false,time:Date.now(),btn,alt:e.altKey,shift:e.shiftKey,
       rect:!TKV.space&&e.button===0&&!e.ctrlKey&&TKV.mode==='draw'&&!!it&&it.unit==='SF'&&!TKV.draft.length&&!!tkScaleOf(TKV.id),
-      corner:ci>=0?{id:cs.id,i:ci,p0:(cs.p||[]).slice()}:null,box:sm&&ci<0&&(e.shiftKey||e.metaKey||e.ctrlKey||!!TKV.boxNext)};TKV.boxNext=false}
+      corner:ci>=0?{id:cs.id,i:ci,p0:(cs.p||[]).slice()}:null,box:sm&&ci<0&&(e.shiftKey||e.metaKey||e.ctrlKey||!!TKV.boxNext)};TKV.boxNext=false;
+      /* touch / pen while drawing: hold still a moment to aim (magnifier, slide to adjust, lift to place); a quick drag still moves the sheet */
+      if(e.pointerType!=='mouse'&&tkvDrawing()&&!TKV.space){const g0=TKV.g;g0.aimable=true;tkvAimSet(e,true);TKV.magOn=false;tkvHover();clearTimeout(TKV.aimT);
+        TKV.aimT=setTimeout(()=>{if(TKV&&TKV.g===g0&&g0.type==='pan'&&!g0.moved&&TKV.pts.size===1){g0.type='aim';TKV.magOn=true;tkvOverlay()}},170)}}
     clearTimeout(TKV.lp);
-    if(e.pointerType!=='mouse'&&TKV.pts.size===1){const g0=TKV.g,x=e.clientX,y=e.clientY;TKV.lp=setTimeout(()=>{if(TKV&&TKV.g===g0&&!g0.moved&&TKV.pts.size===1){g0.long=true;tkCtx(x,y)}},500)}
+    if(e.pointerType!=='mouse'&&TKV.pts.size===1){const g0=TKV.g,x=e.clientX,y=e.clientY;TKV.lp=setTimeout(()=>{if(TKV&&TKV.g===g0&&!g0.moved&&!g0.aimMoved&&TKV.pts.size===1){g0.long=true;TKV.magOn=false;TKV.aim=null;tkvOverlay();tkCtx(x,y)}},g0&&g0.aimable?750:500)}
     const h=$('#tkHint');if(h)h.style.display='none';
   });
   st.addEventListener('pointermove',e=>{
     if(!TKV)return;TKV.mouse={x:e.clientX,y:e.clientY};
-    if(!TKV.pts.has(e.pointerId)){if(e.pointerType==='mouse'&&TKV.draft.length){const p=tkvImg(e.clientX,e.clientY);TKV.cur=tkvSnapPt(p);tkvLive()}return}
+    if(!TKV.pts.has(e.pointerId)){if(!TKV.W||e.pointerType==='touch')return;tkvMods(e);tkvAimSet(e,false);if(tkvDrawing())tkvHover();else if(TKV.snapHit||TKV.aimPt){TKV.snapHit=null;TKV.aimPt=null;tkvOverlay()}return}
+    if(e.pointerType==='mouse'){tkvMods(e);tkvAimSet(e,false)}
     TKV.pts.set(e.pointerId,{x:e.clientX,y:e.clientY});const g=TKV.g;if(!g)return;const far=n=>Math.hypot(e.clientX-g.sx,e.clientY-g.sy)>n;
     if(g.type==='pinch'&&TKV.pts.size>=2){const [a,b]=[...TKV.pts.values()];const c=mid(a,b);const r=st.getBoundingClientRect();const s=clamp(g.t0.s*dist(a,b)/g.d0,TKV.minS,6);const ix=(g.c0.x-r.left-g.t0.x)/g.t0.s,iy=(g.c0.y-r.top-g.t0.y)/g.t0.s;TKV.t={s,x:c.x-r.left-ix*s,y:c.y-r.top-iy*s};tkvT()}
-    else if(g.corner&&(g.type==='corner'||far(4))){clearTimeout(TKV.lp);g.type='corner';g.moved=true;const q=tkvSnapPt(tkvImg(e.clientX,e.clientY),g.corner);
+    else if(g.type==='aim'){tkvAimSet(e,true);if(far(5)&&!g.aimMoved){g.aimMoved=true;clearTimeout(TKV.lp)}tkvHover()}
+    else if(g.corner&&(g.type==='corner'||far(4))){clearTimeout(TKV.lp);g.type='corner';g.moved=true;const cp=g.corner.p0,bj=g.corner.i>0?g.corner.i-1:g.corner.i+1,base=2*bj+1<cp.length?{x:cp[2*bj]*TKV.W,y:cp[2*bj+1]*TKV.H}:null;
+      const q=tkvSnapPt(tkvImg(e.clientX,e.clientY),{id:g.corner.id,i:g.corner.i,base});TKV.aimPt=q;if(e.pointerType!=='mouse'){tkvAimSet(e,true);TKV.magOn=true}
       TKV.drag={id:g.corner.id,p:tkMoveCorner(g.corner.p0,g.corner.i,clamp(q.x,0,TKV.W)/TKV.W,clamp(q.y,0,TKV.H)/TKV.H)};tkvPaint(true)}
     else if(g.box&&(g.type==='box'||far(6))){clearTimeout(TKV.lp);if(g.type!=='box')tkCtxClose();g.type='box';g.moved=true;TKV.box={a:tkvImg(g.sx,g.sy),b:tkvImg(e.clientX,e.clientY)};tkvLive()}
     else if(g.type==='rect'||(g.type==='pan'&&g.rect&&far(10))){
       clearTimeout(TKV.lp);if(g.type!=='rect'){g.type='rect';g.a=tkvSnapPt(tkvImg(g.sx,g.sy));TKV.dDraft=!!(g.alt||e.altKey||TKV.dNext)}
-      const a=g.a,b=tkvImg(e.clientX,e.clientY);b.x=clamp(b.x,0,TKV.W);b.y=clamp(b.y,0,TKV.H);TKV.draft=[a,{x:b.x,y:a.y},b,{x:a.x,y:b.y}];TKV.cur=null;tkvLive()}
-    else if(g.type==='pan'){const dx=e.clientX-g.sx,dy=e.clientY-g.sy;if(Math.hypot(dx,dy)>6){g.moved=true;clearTimeout(TKV.lp)}if(g.moved){TKV.t=Object.assign({},g.t0,{x:g.t0.x+dx,y:g.t0.y+dy});tkvT()}}
+      const a=g.a,b=tkvImg(e.clientX,e.clientY);b.x=clamp(b.x,0,TKV.W);b.y=clamp(b.y,0,TKV.H);TKV.draft=[a,{x:b.x,y:a.y},b,{x:a.x,y:b.y}];TKV.cur=null;TKV.aimPt=b;TKV.snapHit=null;if(e.pointerType!=='mouse'){clearTimeout(TKV.aimT);tkvAimSet(e,true);TKV.magOn=true}tkvLive()}
+    else if(g.type==='pan'){const dx=e.clientX-g.sx,dy=e.clientY-g.sy;if(Math.hypot(dx,dy)>6){if(!g.moved&&g.aimable){clearTimeout(TKV.aimT);TKV.aim=null;TKV.magOn=false;TKV.snapHit=null}g.moved=true;clearTimeout(TKV.lp)}if(g.moved){TKV.t=Object.assign({},g.t0,{x:g.t0.x+dx,y:g.t0.y+dy});tkvT()}}
   });
   const end=e=>{
-    if(!TKV||!TKV.pts.has(e.pointerId))return;TKV.pts.delete(e.pointerId);clearTimeout(TKV.lp);const g=TKV.g;if(!g)return;
+    if(!TKV||!TKV.pts.has(e.pointerId))return;TKV.pts.delete(e.pointerId);clearTimeout(TKV.lp);clearTimeout(TKV.aimT);if(e.pointerType!=='mouse'){TKV.magOn=false;TKV.aim=null}const g=TKV.g;if(!g){tkvOverlay();return}
     if(g.type==='pinch'){if(TKV.pts.size===1){const [a]=[...TKV.pts.values()];TKV.g={type:'pan',sx:a.x,sy:a.y,t0:Object.assign({},TKV.t),moved:true,time:0}}else if(!TKV.pts.size)TKV.g=null;return}
     TKV.g=null;if(TKV.skipTap){TKV.skipTap=false;TKV.drag=null;TKV.box=null;tkvPaint(true);return}
     if(g.type==='corner'){const dr=TKV.drag;TKV.drag=null;if(dr&&e.type!=='pointercancel')tkDo({t:'shape',v:{id:dr.id,p:dr.p.map(v=>r4(v))}});tkvPaint();return}
     if(g.type==='box'){const b=TKV.box;TKV.box=null;if(b&&e.type!=='pointercancel')tkvBoxSel(b,g.shift||e.shiftKey);else tkvLive();return}
     if(g.type==='rect'){const q=TKV.draft;if(e.type==='pointercancel'||q.length!==4||Math.abs(q[2].x-q[0].x)*TKV.t.s<6||Math.abs(q[2].y-q[0].y)*TKV.t.s<6){TKV.draft=[];TKV.dDraft=false;tkvLive();tkvTools()}else tkvFinish();return}
-    if(g.type==='pan'&&!g.moved&&!g.long&&e.type!=='pointercancel'&&g.btn!==2&&g.btn!==1)tkvTap(e.clientX,e.clientY,g.alt||e.altKey,g.shift||e.shiftKey);
+    if(g.type==='aim'){if(!g.long&&e.type!=='pointercancel')tkvTap(e.clientX,e.clientY,false,false);else tkvOverlay();return}
+    if(g.type==='pan'&&!g.moved&&!g.long&&e.type!=='pointercancel'&&g.btn!==2&&g.btn!==1)tkvTap(e.clientX,e.clientY,g.alt||e.altKey,g.shift||e.shiftKey||(TKV.mode==='select'&&!tkMac()&&e.ctrlKey));
+    else tkvOverlay();
   };
+  st.addEventListener('pointerleave',e=>{if(!TKV||e.pointerType==='touch'||TKV.pts.has(e.pointerId))return;TKV.aim=null;TKV.snapHit=null;tkvOverlay()});
   st.addEventListener('pointerup',end);st.addEventListener('pointercancel',end);
   st.addEventListener('dblclick',e=>{e.preventDefault();if(TKV&&TKV.draft.length&&TKV.mode!=='select')tkvFinish()});
   st.addEventListener('contextmenu',e=>{e.preventDefault();if(!TKV||!TKV.W)return;if($('#tkCtx')&&Date.now()-(TKV.ctxAt||0)<800)return;if(TKV.g)TKV.g.long=true;tkCtx(e.clientX,e.clientY)});
@@ -5001,8 +5167,9 @@ function tkvBind(){
 /* zoom by f keeping the screen point (cx,cy) still */
 function tkvZoomAt(cx,cy,f){if(!TKV||!TKV.W)return;const r=TKV.stage.getBoundingClientRect();const s=clamp(TKV.t.s*f,TKV.minS,6);const ix=(cx-r.left-TKV.t.x)/TKV.t.s,iy=(cy-r.top-TKV.t.y)/TKV.t.s;TKV.t={s,x:cx-r.left-ix*s,y:cy-r.top-iy*s};tkvT()}
 /* space held = pan with a drag, in any mode */
-function tkvKeyUp(e){if(TKV&&e.key===' ')TKV.space=false}
+function tkvKeyUp(e){if(TKV&&e.key===' ')TKV.space=false;if(TKV&&/^(Shift|Control|Meta|Alt)$/.test(e.key)){tkvMods(e);tkvHover()}}
 function tkvKey(e){
+  if(TKV&&/^(Shift|Control|Meta|Alt)$/.test(e.key)){tkvMods(e);tkvHover();return}
   if(!TKV||$('.mwrap')||/INPUT|TEXTAREA|SELECT/.test((e.target&&e.target.tagName)||''))return;
   if($('#tkCtx')){if(e.key==='Escape'){e.preventDefault();tkCtxClose()}return}
   const mod=e.ctrlKey||e.metaKey,k=String(e.key||'').toLowerCase();
@@ -5162,6 +5329,7 @@ function tkCtx(cx,cy,sub){
     sep();
     add('items','Switch item ▸',!dr&&TK.data.items.length>0);
     add('snap','Snap: '+(TKV.snap?'on → off':'off → on'));
+    add('ortho','⊥ Ortho (level / plumb): '+(TKV.ortho?'on → off':'off → on'),!sel,'Shift');
     sep();
     const cur=it&&it.unit==='SF'?'area':TKV.lm==='seg'?'seg':'run';
     A.push('<div class="tkctxrow">'+[['run','Run'],['seg','Segments'],['area','Area']].map(([k,t])=>'<button data-lm2="'+k+'"'+(k===cur&&draw?' class="on"':'')+'>'+t+'</button>').join('')+'</div>');
@@ -5206,6 +5374,7 @@ function tkCtx(cx,cy,sub){
     else if(c==='paste')tkvPaste(p0);
     else if(c==='umark'){TKV.mine=TKV.mine.filter(id=>id!==last);tkDo({t:'del_shape',id:last});if(TKV.sel===last)TKV.sel=null;tkvPaint()}
     else if(c==='snap'){TKV.snap=!TKV.snap;lsSet('acv.tkSnap',TKV.snap?null:'off');tkvTools()}
+    else if(c==='ortho'){TKV.ortho=!TKV.ortho;tkvTools()}
     else if(c==='meas'){tkvMode('measure');TKV.draft=[tkvSnapPt(p0)];tkvLive();tkvTools()}
     else if(c==='zin')tkvZoomAt(cx,cy,2);
     else if(c==='zfit')tkvFit();
@@ -5350,13 +5519,16 @@ async function tkMarkupPdf(){
     let k=0;for(const sh of sheets){pb.set('Sheet '+(++k)+' of '+sheets.length+'…');
       let img;try{img=await sheetImage(sh)}catch(e){continue}
       const c=document.createElement('canvas');c.width=img.naturalWidth;c.height=img.naturalHeight;const g=c.getContext('2d');g.drawImage(img,0,0);
-      const W=c.width,H=c.height,M=Math.max(W,H),scl=tkScaleOf(sh.id),wmul=tkWmulGet();g.globalCompositeOperation='multiply';g.lineCap='round';g.lineJoin='round';
+      const W=c.width,H=c.height,M=Math.max(W,H),scl=tkScaleOf(sh.id),wmul=tkWmulGet(),ends=tkdrGet().ends;g.globalCompositeOperation='multiply';g.lineCap='round';g.lineJoin='round';
       const labels=[],lab=(n,s)=>String(n)+(s.k==='line'&&+s.h>0?' @'+tkFtIn(+s.h):'')+(s.note?' '+String(s.note):'');d.shapes.filter(s=>s.sheet===sh.id).forEach(s=>{const it=d.items.find(x=>x.id===s.item);if(!it)return;const p=s.p||[];g.strokeStyle=it.color;g.fillStyle=it.color;
         if(s.k==='count'){g.globalAlpha=.6;g.beginPath();g.arc(p[0]*W,p[1]*H,M*.007,0,7);g.fill();labels.push([lab(num[it.id],s),p[0]*W+M*.009,p[1]*H]);return}
         g.beginPath();for(let i=0;i+1<p.length;i+=2){const x=p[i]*W,yy=p[i+1]*H;if(i)g.lineTo(x,yy);else g.moveTo(x,yy)}
         if(s.k==='poly'&&s.deduct){g.closePath();g.globalAlpha=.85;g.fillStyle='#fff';g.fill();g.setLineDash([M*.004,M*.003]);g.lineWidth=M*.002;g.stroke();g.setLineDash([]);let cx=0,cy=0;const n=p.length/2;for(let i=0;i<n;i++){cx+=p[2*i];cy+=p[2*i+1]}labels.push([lab('-'+num[it.id],s),cx/n*W,cy/n*H])}
         else if(s.k==='poly'){g.closePath();g.globalAlpha=.25;g.fill();g.globalAlpha=.8;g.lineWidth=M*.002;g.stroke();let cx=0,cy=0;const n=p.length/2;for(let i=0;i<n;i++){cx+=p[2*i];cy+=p[2*i+1]}labels.push([lab(num[it.id],s),cx/n*W,cy/n*H])}
-        else{g.globalAlpha=.55;g.lineWidth=scl&&+scl.fpp>0?Math.max(tkItemWidthIn(it)/12/scl.fpp*wmul,M*.0006,1.5):M*.0055*wmul;g.lineCap='butt';g.lineJoin='miter';g.stroke();g.lineCap='round';g.lineJoin='round';const i=Math.floor((p.length/2-1)/2)*2;labels.push([lab(num[it.id],s),(p[i]+p[i+2])/2*W,(p[i+1]+p[i+3])/2*H])}});
+        else{g.globalAlpha=.55;const lw=scl&&+scl.fpp>0?Math.max(tkItemWidthIn(it)/12/scl.fpp*wmul,M*.0006,1.5):M*.0055*wmul;g.lineWidth=lw;g.lineCap='butt';g.lineJoin='miter';g.stroke();
+          /* end marks like on screen (ticks / dots / arrows from ⚙ View → Drawing) */
+          g.globalAlpha=.9;tkEnds(p,W,H).forEach(e=>{const m=tkEndMark(e,ends,lw/2+M*.005);g.beginPath();if(m.k==='tick'){g.lineWidth=Math.max(M*.0006,1.5);g.moveTo(m.pts[0],m.pts[1]);g.lineTo(m.pts[2],m.pts[3]);g.stroke()}else if(m.k==='dot'){g.arc(m.x,m.y,Math.max(m.r,M*.0012),0,7);g.fill()}else{g.moveTo(m.pts[0],m.pts[1]);g.lineTo(m.pts[2],m.pts[3]);g.lineTo(m.pts[4],m.pts[5]);g.closePath();g.fill()}});
+          g.lineCap='round';g.lineJoin='round';const i=Math.floor((p.length/2-1)/2)*2;labels.push([lab(num[it.id],s),(p[i]+p[i+2])/2*W,(p[i+1]+p[i+3])/2*H])}});
       g.globalCompositeOperation='source-over';g.globalAlpha=1;const fs=Math.round(M*.011);g.font='bold '+fs+'px sans-serif';g.textAlign='center';g.textBaseline='middle';
       labels.forEach(([n,x,yy])=>{const t=String(n);const w=g.measureText(t).width+fs*.6;g.fillStyle='#fff';g.strokeStyle='#000';g.lineWidth=Math.max(1,fs*.08);g.beginPath();g.rect(x-w/2,yy-fs*.65,w,fs*1.3);g.fill();g.stroke();g.fillStyle='#000';g.fillText(t,x,yy)});
       const land=W>=H;const pw=land?1224:792,ph=land?792:1224;pdf.addPage([pw,ph],land?'landscape':'portrait');const sc=Math.min((pw-40)/W,(ph-60)/H);

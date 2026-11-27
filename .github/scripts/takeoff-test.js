@@ -13,7 +13,8 @@ function grab(name) {
   return lines.slice(i, j).join('\n');
 }
 const names = ['TK_SECS', 'TK_PAPER', 'TK_SCALES', 'tkFeet', 'tkFtIn', 'tkLenPx', 'tkAreaPx', 'tkShapeQty', 'tkPresetFpp', 'tkGuessPaper', 'tkEvenUp', 'tkCodeHeight', 'tkCodeWidth', 'tkItemWidthIn', 'tkInches', 'tkInStr', 'tkParseScales',
-  'tkApply', 'tkTotals', 'tkHeightSplits', 'tkRows', 'tkCopyShapes', 'tkSplitLine', 'tkInsertCorner', 'tkMoveCorner', 'tkDeleteCorner', 'tkOffsetShapes'];
+  'tkApply', 'tkTotals', 'tkHeightSplits', 'tkRows', 'tkCopyShapes', 'tkSplitLine', 'tkInsertCorner', 'tkMoveCorner', 'tkDeleteCorner', 'tkOffsetShapes',
+  'tkSnapVerts', 'tkNearVertex', 'tkOrtho', 'tkSnapPick', 'tkEnds', 'tkEndMark', 'tkReadout'];
 const T = vm.runInNewContext(names.map(grab).join('\n') + '\n;({' + names.join(',') + '})', { Math, Date, String, Number, Set, Object, Array, JSON, isFinite, parseFloat, NaN });
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok - ' + name); };
 const plain = x => JSON.parse(JSON.stringify(x));
@@ -370,6 +371,94 @@ t('tkRows: a mark with its own height gets its own row (same code, "@ h" in the 
   assert.strictEqual(R2.find(r => r.id === 'w@12').desc, '@12\'');
   const ea = T.tkApply({}, [{ t: 'item', v: { id: 'd', unit: 'EA', code: 'DOOR' } }, { t: 'shape', v: { id: 'x', item: 'd', sheet: 's1', k: 'count', p: [0.1, 0.1], h: 12 } }]);
   assert.deepStrictEqual(plain(T.tkRows(ea, sh)).map(r => r.id), ['d'], 'height on a count is ignored');
+});
+
+t('tkSnapVerts / tkNearVertex: corners of marks on this sheet, nearest within the radius', () => {
+  const W = 3600, H = 2400;
+  const shapes = [
+    { id: 'a', item: 'w', sheet: 's1', k: 'line', p: [0.1, 0.25, 0.5, 0.25, 0.5, 0.75] },
+    { id: 'b', item: 'c', sheet: 's1', k: 'poly', p: [0.6, 0.1, 0.7, 0.1, 0.7, 0.2] },
+    { id: 'c', item: 'd', sheet: 's1', k: 'count', p: [0.3, 0.3] },
+    { id: 'd', item: 'w', sheet: 's2', k: 'line', p: [0.1, 0.1, 0.2, 0.1] },
+    { id: 'e', item: 'h', sheet: 's1', k: 'line', p: [0.9, 0.9, 0.95, 0.9] }];
+  const vs = plain(T.tkSnapVerts(shapes, 's1', W, H, { h: true }, null));
+  assert.deepStrictEqual(vs.map(v => v.id + v.i), ['a0', 'a1', 'a2', 'b0', 'b1', 'b2'], 'other sheets, counts and hidden items are not targets');
+  near(vs[1].x, 1800); near(vs[1].y, 600);
+  const skip = plain(T.tkSnapVerts(shapes, 's1', W, H, null, { id: 'a', i: 1 }));
+  assert.ok(!skip.some(v => v.id === 'a' && v.i === 1), 'the corner being dragged is skipped');
+  assert.ok(skip.some(v => v.id === 'e'), 'no hide list = all items');
+  const v = T.tkNearVertex(vs, { x: 1806, y: 595 }, 10);
+  assert.strictEqual(v.id + v.i, 'a1');
+  assert.strictEqual(T.tkNearVertex(vs, { x: 1815, y: 600 }, 10), null, '15 px away with a 10 px radius');
+  const two = [{ x: 0, y: 0, id: 'p' }, { x: 8, y: 0, id: 'q' }];
+  assert.strictEqual(T.tkNearVertex(two, { x: 5, y: 0 }, 10).id, 'q', 'the nearest one wins');
+  assert.strictEqual(T.tkNearVertex([], { x: 0, y: 0 }, 10), null);
+});
+
+t('tkOrtho: level / plumb by projection, 45° when asked', () => {
+  const a = { x: 100, y: 100 };
+  assert.deepStrictEqual(plain(T.tkOrtho(a, { x: 300, y: 130 })), { x: 300, y: 100 }, 'mostly across = level');
+  assert.deepStrictEqual(plain(T.tkOrtho(a, { x: 120, y: -200 })), { x: 100, y: -200 }, 'mostly up = plumb');
+  assert.deepStrictEqual(plain(T.tkOrtho(a, { x: 300, y: 130 }, true)), { x: 300, y: 100 }, '45 option still levels a nearly level line');
+  const d = T.tkOrtho(a, { x: 200, y: 210 }, true);
+  near(d.x - a.x, d.y - a.y, '45° line'); near(d.x, 100 + 105);
+  const v = T.tkOrtho(a, { x: 104, y: 400 }, true);
+  assert.strictEqual(v.x, 100, 'plumb with the 45 option is exactly plumb'); near(v.y, 400);
+  assert.deepStrictEqual(plain(T.tkOrtho(a, { x: 100, y: 100 })), { x: 100, y: 100 });
+  assert.deepStrictEqual(plain(T.tkOrtho(null, { x: 5, y: 6 })), { x: 5, y: 6 }, 'no previous point = unchanged');
+});
+
+t('tkSnapPick: a snapped point is the existing corner exactly; ortho; soft snap; Ctrl = off', () => {
+  const corner = { x: 1234.5678, y: 987.6543, id: 'a', i: 2 };
+  const o = { verts: [corner], tol: 10, soft: true };
+  const r = T.tkSnapPick({ x: 1230, y: 990 }, null, o);
+  assert.strictEqual(r.how, 'vertex');
+  assert.strictEqual(r.p.x, corner.x); assert.strictEqual(r.p.y, corner.y);
+  const n = 0.3429, W = 3600; assert.strictEqual(Math.round(n * W / W * 10000) / 10000, n, 'stored 0-1 value comes back identical');
+  const a = { x: 0, y: 0 };
+  assert.strictEqual(T.tkSnapPick({ x: 1230, y: 990 }, a, Object.assign({ ortho: true }, o)).how, 'vertex', 'a corner beats ortho');
+  const ort = T.tkSnapPick({ x: 500, y: 60 }, a, { verts: [corner], tol: 10, ortho: true });
+  assert.strictEqual(ort.how, 'ortho'); assert.deepStrictEqual(plain(ort.p), { x: 500, y: 0 });
+  const soft = T.tkSnapPick({ x: 500, y: 30 }, a, { soft: true });
+  assert.strictEqual(soft.how, 'angle'); near(soft.p.y, 0); near(soft.p.x, Math.hypot(500, 30), 'soft snap keeps the length');
+  assert.strictEqual(T.tkSnapPick({ x: 500, y: 100 }, a, { soft: true }).how, '', '11° off: left alone');
+  const off = T.tkSnapPick({ x: 1230, y: 990 }, a, { verts: [corner], tol: 10, soft: true, off: true });
+  assert.strictEqual(off.how, ''); assert.deepStrictEqual(plain(off.p), { x: 1230, y: 990 }, 'Ctrl held: no corner, no soft snap');
+  const offOrtho = T.tkSnapPick({ x: 1230, y: 990 }, a, { verts: [corner], tol: 10, off: true, ortho: true });
+  assert.deepStrictEqual(plain(offOrtho.p), { x: 1230, y: 0 }, 'Ctrl + Shift: ortho still works');
+  assert.strictEqual(T.tkSnapPick({ x: 5, y: 5 }, null, {}).how, '', 'nothing to snap to');
+});
+
+t('tkEnds / tkEndMark: ticks square across the ends, arrows point out', () => {
+  const W = 1000, H = 1000;
+  const e = plain(T.tkEnds([0.1, 0.5, 0.4, 0.5, 0.4, 0.8], W, H));
+  assert.strictEqual(e.length, 2);
+  assert.deepStrictEqual(e[0], { x: 100, y: 500, ux: -1, uy: 0 }, 'start points back along the first leg');
+  near(e[1].x, 400); near(e[1].y, 800); near(e[1].ux, 0); near(e[1].uy, 1);
+  assert.deepStrictEqual(plain(T.tkEnds([0.1, 0.1], W, H)), [], 'one point: no ends');
+  const tk = T.tkEndMark(e[0], 'ticks', 10);
+  assert.strictEqual(tk.k, 'tick'); near(tk.pts[0], 100); near(tk.pts[2], 100); near(Math.abs(tk.pts[1] - tk.pts[3]), 20, 'tick is square across a level line');
+  const tv = T.tkEndMark(e[1], 'ticks', 10);
+  near(tv.pts[1], 800); near(tv.pts[3], 800); near(Math.abs(tv.pts[0] - tv.pts[2]), 20, 'and level across a plumb one');
+  const ar = T.tkEndMark(e[0], 'arrows', 10);
+  assert.strictEqual(ar.k, 'poly'); near(ar.pts[0], 100); near(ar.pts[1], 500); assert.ok(ar.pts[2] > 100 && ar.pts[4] > 100, 'arrowhead sits inside the line, tip on the end');
+  const dt = T.tkEndMark(e[0], 'dots', 10); assert.strictEqual(dt.k, 'dot'); near(dt.x, 100); assert.ok(dt.r > 0 && dt.r < 10);
+  const z = plain(T.tkEnds([0.2, 0.2, 0.2, 0.2], W, H)); assert.deepStrictEqual(z[0], { x: 200, y: 200, ux: 1, uy: 0 }, 'zero length does not divide by zero');
+});
+
+t('tkReadout: leg and run in feet-inches, SF for areas, px while setting the scale', () => {
+  const W = 3600, H = 2400, fpp = 0.08;
+  assert.strictEqual(T.tkReadout('line', [{ x: 0, y: 0 }], W, H, fpp), null, 'one point: nothing yet');
+  assert.deepStrictEqual(plain(T.tkReadout('line', [{ x: 600, y: 600 }, { x: 2400, y: 600 }], W, H, fpp)), { main: '144\'-0"', sub: '' });
+  assert.deepStrictEqual(plain(T.tkReadout('line', [{ x: 600, y: 600 }, { x: 2400, y: 600 }, { x: 2400, y: 1500 }], W, H, fpp)), { main: '72\'-0"', sub: 'run 216\'-0"' }, 'this leg, then the run so far');
+  assert.deepStrictEqual(plain(T.tkReadout('line', [{ x: 0, y: 0 }, { x: 100, y: 0 }], W, H, 0)), { main: 'No scale yet', sub: 'set the scale to see feet' });
+  const sq = [{ x: 1000, y: 1000 }, { x: 2000, y: 1000 }, { x: 2000, y: 1800 }, { x: 1000, y: 1800 }];
+  assert.deepStrictEqual(plain(T.tkReadout('area', sq, W, H, fpp)), { main: '5,120 SF', sub: 'side 80\'-0"' });
+  assert.strictEqual(T.tkReadout('area', sq, W, H, fpp, { deduct: true }).main, '−5,120 SF');
+  assert.deepStrictEqual(plain(T.tkReadout('area', sq.slice(0, 2), W, H, fpp)), { main: '80\'-0"', sub: 'side' });
+  assert.deepStrictEqual(plain(T.tkReadout('scale', [{ x: 0, y: 0 }, { x: 1200, y: 0 }], W, H, 0)), { main: '1,200 px', sub: 'click the other end, then type its length' });
+  assert.strictEqual(T.tkReadout('scale', [{ x: 0, y: 0 }, { x: 1200, y: 0 }], W, H, fpp).sub, 'now 96\'-0" · click the other end');
+  assert.strictEqual(T.tkReadout('line', [{ x: 0, y: 0 }, { x: 77, y: 0 }], W, H, fpp).main, '6\'-2"', 'inches rounded');
 });
 
 console.log(n + ' takeoff tests passed.');
