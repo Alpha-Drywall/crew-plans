@@ -1,8 +1,8 @@
 /* Alpha Crew View service worker: lets the app open with no signal. */
-const CACHE='acv-v2';
+const CACHE='acv-v3';
 const APP='./';
 self.addEventListener('install',e=>{
-  e.waitUntil(caches.open(CACHE).then(c=>c.addAll([APP,'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js'])).catch(()=>{}));
+  e.waitUntil(caches.open(CACHE).then(c=>c.addAll([APP,'manifest.webmanifest','icon-192.png','icon-512.png','icon-maskable-512.png','https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js'])).catch(()=>{}));
   self.skipWaiting();
 });
 self.addEventListener('activate',e=>{
