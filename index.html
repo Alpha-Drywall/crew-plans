@@ -2773,15 +2773,18 @@ function tkvGripBind(g){
     const d=e.key==='ArrowLeft'?(o.side==='left'?-20:20):e.key==='ArrowRight'?(o.side==='left'?20:-20):0;if(!d)return;e.preventDefault();tkvwSet({width:clamp(Math.min(o.width,tkvwMaxW())+d,200,tkvwMaxW())})});
 }
 /* ---- takeoff drawing: cursor, end marks, magnifier, snapping, readout (localStorage 'acv.view.tkdraw'; snap on/off stays in 'acv.tkSnap') ---- */
-const TKDR_DEF={cur:'gap',ends:'ticks',mag:'auto',zoom:3,snapD:'M',ortho:false,diag:false,read:true,xc:'auto',endSz:'M',xSz:'M',xW:'M',ol:'M'};
+const TKDR_DEF={cur:'gap',ends:'ticks',mag:'auto',zoom:3,snapD:'M',ortho:false,diag:false,read:true,xc:'auto',endSz:'M',xSz:'M',xW:'M',op:'def',ol:'M'};
 /* size steps for line-end marks, crosshair arm length / center gap, and crosshair line weight */
 const TK_ENDSZ={S:.6,M:1,L:1.6,XL:2.4},TK_XSZ={S:[12,4],M:[20,5],L:[34,7],XL:[56,9]},TK_XW={S:.75,M:1,L:2};
 const TK_SNAPPX={S:6,M:10,L:16};
-function tkdrGet(){const o=viewGet('tkdraw',TKDR_DEF);return {cur:vpick(o.cur,['gap','full','arrow'],'gap'),ends:vpick(o.ends,['ticks','dots','arrows'],'ticks'),mag:vpick(o.mag,['auto','always','off'],'auto'),zoom:vpick(+o.zoom,[2,3,4],3),snapD:vpick(o.snapD,['S','M','L'],'M'),ortho:o.ortho===true,diag:o.diag===true,read:o.read!==false,xc:vpick(o.xc,['auto','red','blue','black'],'auto'),endSz:vpick(o.endSz,['S','M','L','XL'],'M'),xSz:vpick(o.xSz,['S','M','L','XL'],'M'),xW:vpick(o.xW,['S','M','L'],'M'),ol:vpick(o.ol,['S','M','L'],'M')}}
+function tkdrGet(){const o=viewGet('tkdraw',TKDR_DEF);return {cur:vpick(o.cur,['gap','full','arrow'],'gap'),ends:vpick(o.ends,['ticks','dots','arrows'],'ticks'),mag:vpick(o.mag,['auto','always','off'],'auto'),zoom:vpick(+o.zoom,[2,3,4],3),snapD:vpick(o.snapD,['S','M','L'],'M'),ortho:o.ortho===true,diag:o.diag===true,read:o.read!==false,xc:vpick(o.xc,['auto','red','blue','black'],'auto'),endSz:vpick(o.endSz,['S','M','L','XL'],'M'),xSz:vpick(o.xSz,['S','M','L','XL'],'M'),xW:vpick(o.xW,['S','M','L'],'M'),op:vpick(o.op,['def','60','80','100'],'def'),ol:vpick(o.ol,['S','M','L'],'M')}}
+/* mark opacity: Default = see-through (50%, the item you're drawing 75%) so the plan shows; or a fixed 60 / 80 / 100% for crisper, solid lines */
+function tkMarkOp(cur){const o=tkdrGet().op;return o==='def'?(cur?.75:.5):(+o)/100}
 function tkdrSet(p){viewSet('tkdraw',p,TKDR_DEF);if(typeof TKV!=='undefined'&&TKV&&TKV.W){if('ortho' in p)TKV.ortho=!!p.ortho;tkvPaint();tkvOverlay()}}
 function tkdrRows(){const d=tkdrGet(),sn=lsGet('acv.tkSnap')!=='off';return [{head:'Drawing'},
   {label:'Cursor',v:d.cur,opts:[['gap','┼ Crosshair','Thin crosshair with an open center so the plan line shows'],['full','Full lines','Crosshair lines across the whole sheet'],['arrow','Small + (system)','The system\'s small crosshair cursor, no overlay lines']],set:v=>tkdrSet({cur:v})},
   {label:'Crosshair color',v:d.xc,opts:[['auto','Auto'],['red','Red'],['blue','Blue'],['black','Black']],set:v=>tkdrSet({xc:v}),note:'Auto = dark with a white edge, shows on black and white'},
+  {label:'Mark opacity',v:d.op,opts:[['def','See-through'],['60','60%'],['80','80%'],['100','Solid']],set:v=>tkdrSet({op:v}),note:'Solid = sharpest lines; see-through lets the plan show under them. Also used in the markup PDF'},
   {label:'Line ends',v:d.ends,opts:[['ticks','├┤ Ticks'],['dots','• Dots'],['arrows','◄► Arrows']],set:v=>tkdrSet({ends:v}),note:'Also used in the markup PDF'},
   {label:'Line end size',v:d.endSz,opts:[['S','Small'],['M','Medium'],['L','Large'],['XL','X-large']],set:v=>tkdrSet({endSz:v}),note:'Ticks, dots and arrows, on screen and in the PDF'},
   {label:'Crosshair size',v:d.xSz,opts:[['S','Small'],['M','Medium'],['L','Large'],['XL','X-large']],set:v=>tkdrSet({xSz:v})},
@@ -5741,7 +5744,7 @@ function tkvPaint(fast){
   g.innerHTML=TK.data.shapes.filter(s=>s.sheet===TKV.id&&its[s.item]&&!TKV.hide[s.item]&&s.id!==TKV.cont).map(s=>{const it=its[s.item],c=esc(it.color),p=(TKV.drag&&(TKV.drag.m?TKV.drag.m[s.id]:TKV.drag.id===s.id&&TKV.drag.p)||(s.p||[])).map(Number),sel=TKV.sel===s.id||TKV.msel.includes(s.id);
     const dim='';
     const pts=[];for(let i=0;i+1<p.length;i+=2)pts.push((p[i]*W).toFixed(1)+','+(p[i+1]*H).toFixed(1));
-    const op=it.id===TKV.item?.75:.5;
+    const op=tkMarkOp(it.id===TKV.item);
     const tg=(s.k==='line'&&+s.h>0?'@'+tkFtIn(+s.h):'')+(s.note?(s.k==='line'&&+s.h>0?' ':'')+s.note:'');
     if(tg){let x,y;if(s.k==='count'){x=p[0]*W+M*.009;y=p[1]*H-M*.009}else if(s.k==='poly'){x=0;y=0;const n=p.length/2;for(let i=0;i<n;i++){x+=p[2*i]*W;y+=p[2*i+1]*H}x/=n;y/=n}else{const i=Math.floor((p.length/2-1)/2)*2;x=(p[i]+p[i+2])/2*W;y=(p[i+1]+p[i+3])/2*H-M*.008}tags.push([tg,x,y,c,dim])}
     if(s.k==='count')return '<g'+dim+'><circle cx="'+(p[0]*W).toFixed(1)+'" cy="'+(p[1]*H).toFixed(1)+'" r="'+(M*.007).toFixed(1)+'" fill="'+c+'" fill-opacity="'+op+'" stroke="'+(sel?'#000':c)+'" stroke-width="'+(sw*(sel?.8:.4)).toFixed(1)+'"/></g>';
@@ -5749,7 +5752,7 @@ function tkvPaint(fast){
     if(s.k==='poly'&&s.deduct)return '<polygon'+dim+' data-deduct="1" points="'+pts.join(' ')+'" fill="url(#tkHatch)" stroke="'+(sel?'#000':c)+'" stroke-width="'+(sw*(sel?.8:.5)).toFixed(1)+'" stroke-dasharray="'+(sw*2.5).toFixed(1)+' '+(sw*1.5).toFixed(1)+'" stroke-linejoin="round"/>';
     if(s.k==='poly')return '<polygon'+dim+' points="'+pts.join(' ')+'" fill="'+c+'" fill-opacity="'+(op*.4).toFixed(2)+'" stroke="'+(sel?'#000':c)+'" stroke-width="'+(sw*(sel?.8:.5)).toFixed(1)+'" stroke-linejoin="round"/>';
     const lw=tkvLineW(it,0)*(sel?1.15:1);
-    return '<g'+dim+'><polyline points="'+pts.join(' ')+'" fill="none" stroke="'+(sel?'#000':c)+'" stroke-opacity="'+(sel?.85:it.id===TKV.item?.9:.7)+'" data-w="'+lw.toFixed(2)+'" stroke-width="'+Math.max(lw,1.2/TKV.t.s).toFixed(2)+'" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4"/>'+tkvEndsSvg(p,lw,sel?'#000':c,ends)+'</g>';
+    return '<g'+dim+'><polyline points="'+pts.join(' ')+'" fill="none" stroke="'+(sel?'#000':c)+'" stroke-opacity="'+(tkdrGet().op==='def'?(sel?.85:it.id===TKV.item?.9:.7):tkMarkOp())+'" data-w="'+lw.toFixed(2)+'" stroke-width="'+Math.max(lw,1.2/TKV.t.s).toFixed(2)+'" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4"/>'+tkvEndsSvg(p,lw,sel?'#000':c,ends)+'</g>';
   }).join('')+tags.map(([t,x,y,c,dim])=>{const w=fs*.62*t.length+fs*.8;return '<g data-tag="1"'+dim+'><rect x="'+(x-w/2).toFixed(1)+'" y="'+(y-fs*.75).toFixed(1)+'" width="'+w.toFixed(1)+'" height="'+(fs*1.5).toFixed(1)+'" rx="'+(fs*.3).toFixed(1)+'" fill="#fff" fill-opacity=".9" stroke="'+c+'" stroke-width="'+(fs*.12).toFixed(1)+'"/><text x="'+x.toFixed(1)+'" y="'+(y+fs*.35).toFixed(1)+'" font-size="'+fs.toFixed(1)+'" font-family="sans-serif" font-weight="700" text-anchor="middle" fill="#111">'+esc(t)+'</text></g>'}).join('');
   tkvLive();if(fast===true)return;tkvSide();tkvTools();
 }
@@ -6383,7 +6386,7 @@ async function tkMarkupPdf(){
         g.beginPath();for(let i=0;i+1<p.length;i+=2){const x=p[i]*W,yy=p[i+1]*H;if(i)g.lineTo(x,yy);else g.moveTo(x,yy)}
         if(s.k==='poly'&&s.deduct){g.closePath();g.globalAlpha=.85;g.fillStyle='#fff';g.fill();g.setLineDash([M*.004,M*.003]);g.lineWidth=M*.002;g.stroke();g.setLineDash([]);let cx=0,cy=0;const n=p.length/2;for(let i=0;i<n;i++){cx+=p[2*i];cy+=p[2*i+1]}labels.push([lab('-'+num[it.id],s),cx/n*W,cy/n*H])}
         else if(s.k==='poly'){g.closePath();g.globalAlpha=.25;g.fill();g.globalAlpha=.8;g.lineWidth=M*.002;g.stroke();let cx=0,cy=0;const n=p.length/2;for(let i=0;i<n;i++){cx+=p[2*i];cy+=p[2*i+1]}labels.push([lab(num[it.id],s),cx/n*W,cy/n*H])}
-        else{g.globalAlpha=.55;const lw=scl&&+scl.fpp>0?Math.max(tkItemWidthIn(it)/12/scl.fpp*wmul,M*.0006,1.5):M*.0055*wmul;g.lineWidth=lw;g.lineCap='butt';g.lineJoin='miter';g.stroke();
+        else{g.globalAlpha=tkdrGet().op==='def'?.55:tkMarkOp(false);const lw=scl&&+scl.fpp>0?Math.max(tkItemWidthIn(it)/12/scl.fpp*wmul,M*.0006,1.5):M*.0055*wmul;g.lineWidth=lw;g.lineCap='butt';g.lineJoin='miter';g.stroke();
           /* end marks like on screen (ticks / dots / arrows from ⚙ View → Drawing) */
           g.globalAlpha=.9;tkEnds(p,W,H).forEach(e=>{const m=tkEndMark(e,ends,(lw/2+M*.005)*(TK_ENDSZ[tkdrGet().endSz]||1));g.beginPath();if(m.k==='tick'){g.lineWidth=Math.max(M*.0006,1.5);g.moveTo(m.pts[0],m.pts[1]);g.lineTo(m.pts[2],m.pts[3]);g.stroke()}else if(m.k==='dot'){g.arc(m.x,m.y,Math.max(m.r,M*.0012),0,7);g.fill()}else{g.moveTo(m.pts[0],m.pts[1]);g.lineTo(m.pts[2],m.pts[3]);g.lineTo(m.pts[4],m.pts[5]);g.closePath();g.fill()}});
           g.lineCap='round';g.lineJoin='round';const i=Math.floor((p.length/2-1)/2)*2;labels.push([lab(num[it.id],s),(p[i]+p[i+2])/2*W,(p[i+1]+p[i+3])/2*H])}});
