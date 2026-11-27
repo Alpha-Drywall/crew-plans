@@ -14,8 +14,9 @@ function grab(name) {
 }
 const names = ['TK_SECS', 'TK_PAPER', 'TK_SCALES', 'tkFeet', 'tkFtIn', 'tkLenPx', 'tkAreaPx', 'tkShapeQty', 'tkPresetFpp', 'tkGuessPaper', 'tkEvenUp', 'tkCodeHeight', 'tkCodeWidth', 'tkItemWidthIn', 'tkInches', 'tkInStr', 'tkParseScales',
   'tkApply', 'tkTotals', 'tkHeightSplits', 'tkRows', 'tkCopyShapes', 'tkSplitLine', 'tkInsertCorner', 'tkMoveCorner', 'tkDeleteCorner', 'tkOffsetShapes',
-  'tkSnapVerts', 'tkNearVertex', 'tkOrtho', 'tkSnapPick', 'tkEnds', 'tkEndMark', 'tkReadout'];
-const T = vm.runInNewContext(names.map(grab).join('\n') + '\n;({' + names.join(',') + '})', { Math, Date, String, Number, Set, Object, Array, JSON, isFinite, parseFloat, NaN });
+  'tkSnapVerts', 'tkNearVertex', 'tkOrtho', 'tkSnapPick', 'tkEnds', 'tkEndMark', 'tkReadout',
+  'TK_FR_DEF', 'tkFrRot', 'tkFrUn', 'tkFrIv', 'tkFrUnion', 'tkFrClip', 'tkFrSwap', 'tkFrExt', 'tkFrAuto', 'tkFrAngle', 'tkFrPc', 'tkFrame', 'tkFrSum', 'tkFrameOf', 'tkFrRows', 'tkFrItem'];
+const T = vm.runInNewContext(names.map(grab).join('\n') + '\n;({' + names.join(',') + '})', { Math, Date, String, Number, Set, Object, Array, JSON, isFinite, parseFloat, NaN, Infinity });
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok - ' + name); };
 const plain = x => JSON.parse(JSON.stringify(x));
 const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, (msg || '') + ' expected ' + b + ', got ' + a);
@@ -459,6 +460,107 @@ t('tkReadout: leg and run in feet-inches, SF for areas, px while setting the sca
   assert.deepStrictEqual(plain(T.tkReadout('scale', [{ x: 0, y: 0 }, { x: 1200, y: 0 }], W, H, 0)), { main: '1,200 px', sub: 'click the other end, then type its length' });
   assert.strictEqual(T.tkReadout('scale', [{ x: 0, y: 0 }, { x: 1200, y: 0 }], W, H, fpp).sub, 'now 96\'-0" · click the other end');
   assert.strictEqual(T.tkReadout('line', [{ x: 0, y: 0 }, { x: 77, y: 0 }], W, H, fpp).main, '6\'-2"', 'inches rounded');
+});
+
+// ---- Framing layout ----
+const frSum = (poly, holes, o) => { const s = T.tkFrSum(T.tkFrame(poly, holes, o), o && o.waste); const r = {}; for (const k in s) r[k] = { n: s[k].n, lf: Math.round(s[k].lf * 1000) / 1000, cuts: s[k].cuts }; return plain(r); };
+const RECT = [0, 0, 30, 0, 30, 20, 0, 20]; // 30' x 20'
+t('framing: auto direction spans the short way (20\' joists on a 30x20 room), also when the room is turned', () => {
+  near(T.tkFrAuto(RECT), Math.PI / 2);
+  near(T.tkFrAuto([0, 0, 20, 0, 20, 30, 0, 30]), 0);
+  const c = Math.cos(0.5), s = Math.sin(0.5), rot = [];
+  for (let i = 0; i < 8; i += 2) rot.push(RECT[i] * c - RECT[i + 1] * s + 5, RECT[i] * s + RECT[i + 1] * c + 7);
+  near(T.tkFrAuto(rot), 0.5 + Math.PI / 2);
+});
+t('framing: 20x30 rectangle at 16" OC = 24 joists x 20\' = 480 LF, track on the 2 bearing ends, bridging 4\' max = 4 rows', () => {
+  const r = frSum(RECT, [], { sp: 16, ang: T.tkFrAuto(RECT), brMax: 4 });
+  assert.deepStrictEqual(r.joist, { n: 24, lf: 480, cuts: [[240, 24]] }, '30\' / 16" = 22.5 spaces -> 23 + the far edge');
+  assert.deepStrictEqual(r.track, { n: 2, lf: 60, cuts: [[360, 2]] });
+  assert.deepStrictEqual(r.br, { n: 4, lf: 120, cuts: [[360, 4]] }, '20\' span / 4\' max = 5 bays, 4 rows');
+  assert.ok(!r.king && !r.hdr);
+});
+t('framing: 24" OC, track on all sides, double end joists, no bridging', () => {
+  const a = T.tkFrAuto(RECT);
+  assert.deepStrictEqual(frSum(RECT, [], { sp: 24, ang: a }).joist, { n: 16, lf: 320, cuts: [[240, 16]] }, '30/2 = 15 spaces, 16 joists');
+  const r = frSum(RECT, [], { sp: 24, ang: a, trkAll: true, endJ: true });
+  assert.deepStrictEqual(r.joist, { n: 18, lf: 360, cuts: [[240, 18]] });
+  assert.deepStrictEqual(r.track, { n: 4, lf: 100, cuts: [[360, 2], [240, 2]] });
+  assert.ok(!r.br);
+});
+t('framing: the room turned 30 degrees gives the same counts and LF', () => {
+  const c = Math.cos(Math.PI / 6), s = Math.sin(Math.PI / 6), rot = [];
+  for (let i = 0; i < 8; i += 2) rot.push(RECT[i] * c - RECT[i + 1] * s + 40, RECT[i] * s + RECT[i + 1] * c + 3);
+  const r = frSum(rot, [], { sp: 16, ang: T.tkFrAuto(rot), brMax: 4 });
+  assert.strictEqual(r.joist.n, 24); near(r.joist.lf, 480); near(r.track.lf, 60); assert.strictEqual(r.br.n, 4); near(r.br.lf, 120);
+  const segs = T.tkFrame(rot, [], { sp: 16, ang: T.tkFrAuto(rot) }).filter(g => g.r === 'joist');
+  segs.forEach(g => near(Math.atan2(g.b[1] - g.a[1], g.b[0] - g.a[0]) % Math.PI, (Math.PI / 6 + Math.PI / 2) % Math.PI, 'joists run the short way'));
+});
+t('framing: joists turned the long way (angle 0) on the same room', () => {
+  const r = frSum(RECT, [], { sp: 16, ang: 0, brMax: 4 });
+  assert.deepStrictEqual(r.joist, { n: 16, lf: 480, cuts: [[360, 16]] }, '20/1.333 = 15 spaces');
+  assert.strictEqual(r.br.n, 7, '30\' / 4\' = 7.5 -> 8 bays, 7 rows'); near(r.br.lf, 140);
+});
+t('framing: concave L-shape clips joists at the inside corner and adds an edge joist there', () => {
+  const L = [0, 0, 30, 0, 30, 10, 15, 10, 15, 20, 0, 20];
+  const r = frSum(L, [], { sp: 16, ang: 0 });
+  assert.deepStrictEqual(r.joist, { n: 17, lf: 390, cuts: [[360, 9], [180, 8]] }, '8 full joists + the edge joist at 10\' run 30\', 8 run 15\'');
+  assert.deepStrictEqual(r.track, { n: 3, lf: 40, cuts: [[240, 1], [120, 2]] }, 'track on the 3 edges the joists land on');
+  const segs = T.tkFrame(L, [], { sp: 16, ang: 0 });
+  segs.filter(g => g.r === 'joist').forEach(g => { const mx = (g.a[0] + g.b[0]) / 2, my = (g.a[1] + g.b[1]) / 2; assert.ok(!(mx > 15.01 && my > 10.01), 'nothing in the notch'); });
+});
+t('framing: an opening in the middle cuts the joists, adds headers both sides and king joists', () => {
+  const hole = [12, 8, 18, 8, 18, 12, 12, 12], a = T.tkFrAuto(RECT);
+  const r = frSum(RECT, [hole], { sp: 16, ang: a, king: true });
+  assert.deepStrictEqual(r.joist, { n: 28, lf: 464, cuts: [[240, 20], [96, 8]] }, '4 joists cut into 8\' pieces each side of the 4\' opening');
+  assert.deepStrictEqual(r.king, { n: 2, lf: 40, cuts: [[240, 2]] });
+  assert.deepStrictEqual(r.hdr, { n: 2, lf: 12, cuts: [[72, 2]] });
+  const nk = frSum(RECT, [hole], { sp: 16, ang: a, king: false });
+  assert.ok(!nk.king); assert.deepStrictEqual(nk.hdr.cuts, [[80, 2]], 'without kings the headers run to the next joists: 12\' to 18\'-8"');
+  const segs = T.tkFrame(RECT, [hole], { sp: 16, ang: a, brMax: 4 });
+  segs.filter(g => g.r === 'joist' || g.r === 'br').forEach(g => { const mx = (g.a[0] + g.b[0]) / 2, my = (g.a[1] + g.b[1]) / 2; assert.ok(!(mx > 12.01 && mx < 17.99 && my > 8.01 && my < 11.99), 'nothing runs through the opening'); });
+});
+t('framing: pieces round up to the inch, waste % on top', () => {
+  near(T.tkFrPc(10), 10); near(T.tkFrPc(10.02), 10 + 1 / 12); near(T.tkFrPc(10.005), 10, 'within 1/8" of the inch'); near(T.tkFrPc(10 + 1e-7), 10);
+  const r = T.tkFrSum(T.tkFrame([0, 0, 10.02, 0, 10.02, 4, 0, 4], [], { sp: 24, ang: Math.PI / 2 }), 10);
+  assert.strictEqual(r.track.n, 2); near(r.track.lf, 2 * (10 + 1 / 12) * 1.1); assert.deepStrictEqual(plain(r.track.cuts), [[121, 2]]);
+});
+t('framing: clipping helpers (even-odd with holes, edges count once, union)', () => {
+  assert.deepStrictEqual(plain(T.tkFrIv([[0, 0, 10, 0, 10, 10, 0, 10], [4, 4, 6, 4, 6, 6, 4, 6]], 5)), [[0, 4], [6, 10]]);
+  assert.deepStrictEqual(plain(T.tkFrClip([[0, 0, 10, 0, 10, 10, 0, 10]], 10)), [[0, 10]], 'top edge');
+  assert.deepStrictEqual(plain(T.tkFrUnion([[0, 2], [5, 6]], [[1, 3]])), [[0, 3], [5, 6]]);
+  near(T.tkFrAngle(RECT, 'edge', 1), Math.PI / 2); near(T.tkFrAngle(RECT, 'ang', 0, 45), Math.PI / 4); near(T.tkFrAngle(RECT, 'auto'), Math.PI / 2);
+  assert.deepStrictEqual(plain(T.tkFrame([0, 0, 1, 1], [], { sp: 16 })), [], 'not an area');
+});
+t('framing: frame marks on a sheet -> totals and one bid row per member (joists, track, bridging)', () => {
+  const sheet = { id: 's1', w: 3000, h: 2000 }, fpp = 0.05; // 150' x 100'
+  const fr = { mem: '600S162-43', sp: 16, trk: '600T150-43', brc: '150U50-54 CRC', brMax: 4, king: true };
+  const data = T.tkApply({}, [{ t: 'item', v: { id: 'f', code: 'Ceiling framing', desc: 'Ceiling joists', sec: 'CEILINGS', unit: 'LF', color: '#e53935', fr } },
+    { t: 'item', v: { id: 'w', code: '362S162-25 FF14', sec: 'INTERIOR', unit: 'LF' } },
+    { t: 'scale', sheet: 's1', v: { fpp } },
+    { t: 'shape', v: { id: 'a', item: 'f', sheet: 's1', k: 'frame', p: [0.1, 0.1, 0.3, 0.1, 0.3, 0.3, 0.1, 0.3], dir: 'auto' } }]); // 30' x 20'
+  const r = T.tkFrameOf(data.shapes[0], sheet, data.scales.s1, fr);
+  assert.strictEqual(r.sum.joist.n, 24); near(r.lf, 480 + 60 + 120);
+  const tot = T.tkTotals(data, [sheet]); near(tot.f.qty, 660); assert.strictEqual(tot.f.wallSf, 0);
+  const rows = T.tkRows(data, [sheet]);
+  assert.deepStrictEqual(plain(rows.map(x => [x.id, x.sec, x.code, x.desc, x.qty, x.unit])), [
+    ['f:j', 'CEILINGS', '600S162-43', 'Ceiling joists 600S162-43 @16" OC – 24 pcs', 480, 'LF'],
+    ['f:t', 'CEILINGS', '600T150-43', 'Track 600T150-43 – 2 pcs', 60, 'LF'],
+    ['f:b', 'CEILINGS', '150U50-54 CRC', 'Bridging 150U50-54 CRC @4\' max – 4 pcs', 120, 'LF']]);
+  const d2 = T.tkApply(data, [{ t: 'shape', v: { id: 'a', o: [[0.18, 0.18, 0.22, 0.18, 0.22, 0.22, 0.18, 0.22]], dir: 'ang', ang: 0 } }]);
+  const rows2 = T.tkRows(d2, [sheet]);
+  assert.ok(/incl\. 2 king/.test(rows2[0].desc) && /incl\. 2 headers/.test(rows2[1].desc), rows2.map(x => x.desc).join(' | '));
+  const un = T.tkRows(T.tkApply(data, [{ t: 'scale', sheet: 's1', v: null }]), [sheet]);
+  assert.deepStrictEqual(plain(un), [], 'no scale, no rows');
+  assert.strictEqual(T.tkFrItem(T.tkApply(data, [{ t: 'scale', sheet: 's1', v: null }]), [sheet], data.items[0]).un, 1);
+  const d3 = T.tkApply(data, [{ t: 'item', v: { id: 'f', fr: { ...fr, sp: 24 } } }]);
+  assert.strictEqual(T.tkRows(d3, [sheet])[0].qty, 320, 'changing the spacing recalculates');
+});
+t('framing: copy / offset carry the openings with the area', () => {
+  const s = [{ id: 'a', item: 'f', sheet: 's1', k: 'frame', p: [0.1, 0.1, 0.3, 0.1, 0.3, 0.2], o: [[0.15, 0.15, 0.16, 0.15, 0.16, 0.16]] }];
+  const o = T.tkOffsetShapes(s, 0.1, 0.2, () => 'x');
+  assert.deepStrictEqual(plain(o[0].o), [[0.25, 0.35, 0.26, 0.35, 0.26, 0.36]]);
+  const c = T.tkCopyShapes({ shapes: s }, 's1', 's2', () => 'y');
+  assert.deepStrictEqual(plain(c[0].o), plain(s[0].o)); assert.notStrictEqual(c[0].o[0], s[0].o[0]);
 });
 
 console.log(n + ' takeoff tests passed.');
