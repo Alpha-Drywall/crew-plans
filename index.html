@@ -416,6 +416,7 @@ html.hc .best,html.hc .bwk-s,html.hc .bwk-l,html.hc .bwk-c,html.hc .bwsh .bwrow{
 .photos .ph{width:78px;height:78px;border-radius:8px;object-fit:cover;border:1px solid var(--line);cursor:pointer;background:#eee}
 .addph{width:78px;height:78px;border:2px dashed #b9c0c8;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-direction:column;font-size:12px;color:var(--muted);cursor:pointer;text-align:center}
 .addph b{font-size:22px;line-height:1}
+.tkwp{margin:-4px 0 10px;gap:6px}.tkwp .chip{padding:4px 10px}
 .ihelp{margin:8px 0 10px;padding-left:22px;line-height:1.55}.ihelp li{margin:4px 0}
 .photoview{position:fixed;inset:0;z-index:400;background:#000e;display:flex;align-items:center;justify-content:center}
 .photoview img{max-width:100%;max-height:100%;user-select:none;-webkit-user-drag:none}
@@ -2705,14 +2706,19 @@ function tkvGripBind(g){
     const d=e.key==='ArrowLeft'?(o.side==='left'?-20:20):e.key==='ArrowRight'?(o.side==='left'?20:-20):0;if(!d)return;e.preventDefault();tkvwSet({width:clamp(Math.min(o.width,tkvwMaxW())+d,200,tkvwMaxW())})});
 }
 /* ---- takeoff drawing: cursor, end marks, magnifier, snapping, readout (localStorage 'acv.view.tkdraw'; snap on/off stays in 'acv.tkSnap') ---- */
-const TKDR_DEF={cur:'gap',ends:'ticks',mag:'auto',zoom:3,snapD:'M',ortho:false,diag:false,read:true,xc:'auto'};
+const TKDR_DEF={cur:'gap',ends:'ticks',mag:'auto',zoom:3,snapD:'M',ortho:false,diag:false,read:true,xc:'auto',endSz:'M',xSz:'M',xW:'M'};
+/* size steps for line-end marks, crosshair arm length / center gap, and crosshair line weight */
+const TK_ENDSZ={S:.6,M:1,L:1.6,XL:2.4},TK_XSZ={S:[12,4],M:[20,5],L:[34,7],XL:[56,9]},TK_XW={S:.75,M:1,L:2};
 const TK_SNAPPX={S:6,M:10,L:16};
-function tkdrGet(){const o=viewGet('tkdraw',TKDR_DEF);return {cur:vpick(o.cur,['gap','full','arrow'],'gap'),ends:vpick(o.ends,['ticks','dots','arrows'],'ticks'),mag:vpick(o.mag,['auto','always','off'],'auto'),zoom:vpick(+o.zoom,[2,3,4],3),snapD:vpick(o.snapD,['S','M','L'],'M'),ortho:o.ortho===true,diag:o.diag===true,read:o.read!==false,xc:vpick(o.xc,['auto','red','blue','black'],'auto')}}
+function tkdrGet(){const o=viewGet('tkdraw',TKDR_DEF);return {cur:vpick(o.cur,['gap','full','arrow'],'gap'),ends:vpick(o.ends,['ticks','dots','arrows'],'ticks'),mag:vpick(o.mag,['auto','always','off'],'auto'),zoom:vpick(+o.zoom,[2,3,4],3),snapD:vpick(o.snapD,['S','M','L'],'M'),ortho:o.ortho===true,diag:o.diag===true,read:o.read!==false,xc:vpick(o.xc,['auto','red','blue','black'],'auto'),endSz:vpick(o.endSz,['S','M','L','XL'],'M'),xSz:vpick(o.xSz,['S','M','L','XL'],'M'),xW:vpick(o.xW,['S','M','L'],'M')}}
 function tkdrSet(p){viewSet('tkdraw',p,TKDR_DEF);if(typeof TKV!=='undefined'&&TKV&&TKV.W){if('ortho' in p)TKV.ortho=!!p.ortho;tkvPaint();tkvOverlay()}}
 function tkdrRows(){const d=tkdrGet(),sn=lsGet('acv.tkSnap')!=='off';return [{head:'Drawing'},
   {label:'Cursor',v:d.cur,opts:[['gap','┼ Crosshair','Thin crosshair with an open center so the plan line shows'],['full','Full lines','Crosshair lines across the whole sheet'],['arrow','Arrow','Normal mouse pointer']],set:v=>tkdrSet({cur:v})},
   {label:'Crosshair color',v:d.xc,opts:[['auto','Auto'],['red','Red'],['blue','Blue'],['black','Black']],set:v=>tkdrSet({xc:v}),note:'Auto = dark with a white edge, shows on black and white'},
   {label:'Line ends',v:d.ends,opts:[['ticks','├┤ Ticks'],['dots','• Dots'],['arrows','◄► Arrows']],set:v=>tkdrSet({ends:v}),note:'Also used in the markup PDF'},
+  {label:'Line end size',v:d.endSz,opts:[['S','Small'],['M','Medium'],['L','Large'],['XL','X-large']],set:v=>tkdrSet({endSz:v}),note:'Ticks, dots and arrows, on screen and in the PDF'},
+  {label:'Crosshair size',v:d.xSz,opts:[['S','Small'],['M','Medium'],['L','Large'],['XL','X-large']],set:v=>tkdrSet({xSz:v})},
+  {label:'Crosshair weight',v:d.xW,opts:[['S','Thin'],['M','Normal'],['L','Bold']],set:v=>tkdrSet({xW:v})},
   {label:'Magnifier',v:d.mag,opts:[['auto','Auto'],['always','Always'],['off','Off']],set:v=>tkdrSet({mag:v}),note:'Auto = on iPad / phone while your finger is down (hold, slide, lift to place)'},
   d.mag==='off'?null:{label:'Magnifier zoom',v:d.zoom,opts:[[2,'2x'],[3,'3x'],[4,'4x']],set:v=>tkdrSet({zoom:+v})},
   {label:'Snap to corners and ends',v:sn?'on':'off',opts:[['on','On'],['off','Off']],set:v=>{lsSet('acv.tkSnap',v==='on'?null:'off');if(typeof TKV!=='undefined'&&TKV){TKV.snap=v==='on';tkvTools();tkvOverlay()}},note:'Hold '+(typeof tkMac==='function'&&tkMac()?'⌘':'Ctrl')+' to place a point without snapping'},
@@ -5070,7 +5076,14 @@ function tkReadout(kind,pts,W,H,fpp,o){
 const tkOk=()=>!!(isAdminRole()&&S.isAdmin&&!S.asUser&&!S.viewAs&&!isPractice());
 let TK=null;/* {job,data,rev,ops:[],t,saving,loaded} */
 function tkNew(jid){return {job:jid,data:tkApply({},[]),rev:-1,ops:[],t:0,saving:false,loaded:false,fail:0}}
-function tkFor(jid){if(!TK||TK.job!==jid){if(TK&&TK.ops.length){clearTimeout(TK.t);tkFlush(TK)}TK=tkNew(jid)}return TK}
+/* live sync: every open copy of a job's takeoff (another window, another PC, Claude) hears "saved rev N" on a broadcast channel and pulls the new version, keeping its own unsaved marks */
+let TK_CH=null;
+function tkSync(T){if(TK_CH&&TK_CH.job===T.job)return;if(TK_CH){try{sb.removeChannel(TK_CH.ch)}catch(e){}TK_CH=null}
+  try{const ch=sb.channel('tk-'+T.job,{config:{broadcast:{self:false}}});ch.on('broadcast',{event:'saved'},m=>{const r=m&&m.payload&&+m.payload.rev;if(TK===T&&r>T.rev)debounce('tk-sync',()=>tkPull(T),250)}).subscribe();TK_CH={job:T.job,ch}}catch(e){}}
+async function tkPull(T){if(TK!==T||T.saving)return;try{const row=await q(sb.from('takeoffs').select('data,rev').eq('job_id',T.job).maybeSingle());if(!row||TK!==T||T.saving||row.rev<=T.rev)return;
+    T.base=row.data;T.rev=row.rev;T.data=tkApply(row.data,T.ops);if(TKV)tkvPaint();else if(S.tab==='takeoff'&&jobId()===T.job)tkRenderBody()}catch(e){}}
+function tkSaidSaved(T){const msg={type:'broadcast',event:'saved',payload:{rev:T.rev}};try{if(TK_CH&&TK_CH.job===T.job){TK_CH.ch.send(msg);return}const ch=sb.channel('tk-'+T.job);ch.subscribe(st=>{if(st==='SUBSCRIBED'){ch.send(msg);setTimeout(()=>{try{sb.removeChannel(ch)}catch(e){}},1500)}})}catch(e){}}
+function tkFor(jid){if(!TK||TK.job!==jid){if(TK&&TK.ops.length){clearTimeout(TK.t);tkFlush(TK)}TK=tkNew(jid)}tkSync(TK);return TK}
 async function tkLoad(jid,quiet){
   const T=tkFor(jid);
   try{const row=await q(sb.from('takeoffs').select('data,rev').eq('job_id',jid).maybeSingle());if(TK!==T||T.saving||(row&&row.rev<T.rev)||(!row&&T.rev>0))return T;
@@ -5096,7 +5109,7 @@ async function tkFlush(T){
     if(!ok)throw new Error('Someone else is saving this takeoff. Try again in a moment.');
   }catch(e){T.ops.unshift(...ops);T.fail=(T.fail||0)+1;if(T.fail===1||T.fail%10===0)toast('Takeoff not saved yet: '+errMsg(e)+' (still trying)');clearTimeout(T.t);T.t=setTimeout(()=>tkFlush(T),Math.min(60000,5000*2**Math.min(T.fail-1,4)))}
   finally{T.saving=false;if(T.ops.length&&ok){clearTimeout(T.t);T.t=setTimeout(()=>tkFlush(T),300)}if(TK===T)tkDirty(!!T.ops.length)}
-  if(ok&&TK===T){if(TKV)tkvPaint();else if(S.tab==='takeoff'&&jobId()===T.job)tkRenderBody()}
+  if(ok){tkSaidSaved(T);if(TK===T){if(TKV)tkvPaint();else if(S.tab==='takeoff'&&jobId()===T.job)tkRenderBody()}}
 }
 window.addEventListener('beforeunload',e=>{if(TK&&TK.ops.length){tkFlush(TK);e.preventDefault();e.returnValue=''}});
 function tkItem(id){return TK&&TK.data.items.find(x=>x.id===id)}
@@ -5149,11 +5162,14 @@ async function tkItemForm(it,pre){
     {k:'sec',label:'Section',type:'select',value:it?it.sec:pre.sec||'INTERIOR',options:TK_SECS.map(s=>[s,s.charAt(0)+s.slice(1).toLowerCase()])},
     {k:'unit',label:'Measure',type:'select',value:it?it.unit:pre.unit||'LF',options:[['LF','Walls, soffits, lines (LF)'],['SF','Ceilings, areas (SF)'],['EA','Counts, door frames (EA)']]},
     {k:'h',label:'Height for wall SF (blank = from the code\'s height tag, like FF14)',value:it&&it.h&&Math.abs(+it.h-tkCodeHeight(it.code))>1e-6?tkFtIn(+it.h):'',ph:'from the code'},
-    {k:'w',label:'Line width (inches, blank = full wall thickness from the code: stud + 5/8" per board layer)',value:it&&+it.w>0?tkInStr(+it.w):'',ph:'auto: '+tkInStr(tkCodeWidth(it?it.code:'',it&&it.h))},
+    {k:'w',label:'Line width in inches: tap a size, type one, or Auto (full wall thickness from the code)',value:it&&+it.w>0?tkInStr(+it.w):'',ph:'auto: '+tkInStr(tkCodeWidth(it?it.code:'',it&&it.h))},
     {k:'color',label:'Color',type:'select',value:it?it.color:TK_COLORS[d.items.length%TK_COLORS.length],options:TK_COLORS.map((c,i)=>[c,['Red','Blue','Green','Orange','Purple','Teal','Pink','Brown','Indigo','Lime','Deep orange','Sea green','Violet','Olive','Sky','Slate'][i]])}
   ],isNew?'Add':'Save');
   {const ws=$$('.mwrap'),m=ws[ws.length-1],ci=m&&$('[name=code]',m),hi=m&&$('[name=h]',m),wi=m&&$('[name=w]',m);
-    if(ci&&wi){const upd=()=>{const hv=hi&&hi.value?tkFeet(hi.value):0;wi.placeholder='auto: '+tkInStr(tkCodeWidth(ci.value,hv>0?hv:0))};ci.addEventListener('input',upd);if(hi)hi.addEventListener('input',upd);upd()}}
+    if(ci&&wi){const upd=()=>{const hv=hi&&hi.value?tkFeet(hi.value):0;wi.placeholder='auto: '+tkInStr(tkCodeWidth(ci.value,hv>0?hv:0))};ci.addEventListener('input',upd);if(hi)hi.addEventListener('input',upd);upd()}
+    if(wi){const row=document.createElement('div');row.className='chips tkwp';row.innerHTML=[['','Auto'],['5/8','5/8"'],['1','1"'],['2-1/2','2-1/2"'],['3-5/8','3-5/8"'],['6','6"'],['8','8"']].map(x=>'<button type="button" class="chip" data-wp="'+x[0]+'">'+x[1]+'</button>').join('');
+      const mark=()=>$$('[data-wp]',row).forEach(b=>b.classList.toggle('on',b.dataset.wp===''?!wi.value.trim():Math.abs(tkInches(b.dataset.wp)-tkInches(wi.value||'0'))<1e-6));
+      $$('[data-wp]',row).forEach(b=>b.onclick=()=>{wi.value=b.dataset.wp;mark()});wi.addEventListener('input',mark);(wi.closest('label')||wi).after(row);mark()}}
   const v=await fp;
   if(!v)return null;
   const h=v.h?tkFeet(v.h):tkCodeHeight(v.code);if(v.h&&!(h>0)){toast('Check the height: '+v.h);return null}
@@ -5375,7 +5391,7 @@ function tkvTools(){
   const dn=$('#tkDone');if(dn)dn.style.display=draw&&(!it||it.unit!=='EA'||TKV.mode!=='draw')?'':'none';
   const un=$('#tkUndo');if(un)un.disabled=!TKV.draft.length;
   const sn=$('#tkSnap');if(sn)sn.textContent='Snap: '+(TKV.snap?'on':'off');
-  const wm=$('#tkWm');if(wm)wm.textContent='Line: '+(TKV.wmul||1)+'x';
+  const wm=$('#tkWm');if(wm){wm.textContent='Lines '+(TKV.wmul||1)+'x';wm.title='Screen only: draws every line '+(TKV.wmul||1)+' times its real width so thin lines are easier to see. Each item\'s real width is set on the item (tap the item, Line width).'}
   const ob=$('#tkOrtho');if(ob){ob.classList.toggle('on',!!TKV.ortho);ob.setAttribute('aria-pressed',String(!!TKV.ortho))}
   if(TKV.stage){const cs=tkdrGet().cur;TKV.stage.classList.toggle('tkxh',draw&&cs!=='arrow');TKV.stage.classList.toggle('tkar',draw&&cs==='arrow')}
   $$('#tkv [data-lm]').forEach(b=>b.classList.toggle('on',TKV.mode==='draw'&&!!it&&b.dataset.lm===(it.unit==='EA'?'count':it.fr||it.unit==='SF'?'area':TKV.lm==='seg'?'seg':'run')));
@@ -5410,7 +5426,7 @@ function tkvSide(){
 }
 /* a finished line's end marks (ticks / dots / arrows, see tkEndMark) and small hollow squares on its inside corners; widths keep a 1 screen px minimum through data-w */
 function tkvEndsSvg(p,lw,c,style){
-  const W=TKV.W,H=TKV.H,M=Math.max(W,H),n=Math.floor(p.length/2);if(n<2)return '';const half=lw/2+M*.005,tw=M*.0008,f=v=>v.toFixed(1);let s='';
+  const W=TKV.W,H=TKV.H,M=Math.max(W,H),n=Math.floor(p.length/2);if(n<2)return '';const ez=TK_ENDSZ[tkdrGet().endSz]||1,half=(lw/2+M*.005)*ez,tw=M*.0008,f=v=>v.toFixed(1);let s='';
   tkEnds(p,W,H).forEach(e=>{const m=tkEndMark(e,style,half);
     if(m.k==='tick')s+='<line x1="'+f(m.pts[0])+'" y1="'+f(m.pts[1])+'" x2="'+f(m.pts[2])+'" y2="'+f(m.pts[3])+'" stroke="'+c+'" data-w="'+tw.toFixed(2)+'" stroke-width="'+Math.max(tw,1.2/TKV.t.s).toFixed(2)+'" stroke-linecap="butt"/>';
     else if(m.k==='dot')s+='<circle cx="'+f(m.x)+'" cy="'+f(m.y)+'" r="'+f(Math.max(m.r,M*.0012))+'" fill="'+c+'"/>';
@@ -5505,10 +5521,10 @@ function tkvHover(){
 }
 function tkvAimSet(e,touch){const r=TKV.stage.getBoundingClientRect();TKV.aim={x:e.clientX-r.left,y:e.clientY-r.top,cx:e.clientX,cy:e.clientY,touch:!!touch}}
 /* overlay canvas over the sheet, in screen px (the plan image and marks are not repainted): crosshair, snap marker, readout by the cursor, magnifier */
-function tkXhair(x,cx,cy,len,gap,col,full){
+function tkXhair(x,cx,cy,len,gap,col,full,wt){wt=wt||1;
   cx=Math.round(cx)+.5;cy=Math.round(cy)+.5;const L=[[cx-gap-len,cy,cx-gap,cy],[cx+gap,cy,cx+gap+len,cy],[cx,cy-gap-len,cx,cy-gap],[cx,cy+gap,cx,cy+gap+len]];
   x.save();x.lineCap='butt';const go=()=>{x.beginPath();L.forEach(l=>{x.moveTo(l[0],l[1]);x.lineTo(l[2],l[3])});x.stroke()};
-  x.strokeStyle=full?'rgba(255,255,255,.7)':'rgba(255,255,255,.95)';x.lineWidth=3;go();x.strokeStyle=col;x.lineWidth=1;go();x.restore();
+  x.strokeStyle=full?'rgba(255,255,255,.7)':'rgba(255,255,255,.95)';x.lineWidth=wt+2;go();x.strokeStyle=col;x.lineWidth=wt;go();x.restore();
 }
 function tkSnapBox(x,cx,cy,k){k=k||6.5;x.save();x.lineWidth=3.2;x.strokeStyle='#fff';x.strokeRect(cx-k,cy-k,2*k,2*k);x.lineWidth=1.6;x.strokeStyle='#00a651';x.strokeRect(cx-k,cy-k,2*k,2*k);x.restore()}
 function tkvOverlay(){
@@ -5519,7 +5535,7 @@ function tkvOverlay(){
   const d=tkdrGet(),A=TKV.aim,drawing=tkvDrawing()&&!!TKV.W,corner=!!(TKV.g&&TKV.g.type==='corner');
   const col=d.xc==='red'?'#e53935':d.xc==='blue'?'#1e88e5':d.xc==='black'?'#000':'#16191d';
   const scr=p=>({x:TKV.t.x+p.x*TKV.t.s,y:TKV.t.y+p.y*TKV.t.s});
-  if(A&&drawing&&!A.touch&&d.cur!=='arrow')tkXhair(x,A.x,A.y,d.cur==='full'?Math.max(r.width,r.height)*2:20,5,col,d.cur==='full');
+  if(A&&drawing&&!A.touch&&d.cur!=='arrow'){const z=TK_XSZ[d.xSz]||TK_XSZ.M;tkXhair(x,A.x,A.y,d.cur==='full'?Math.max(r.width,r.height)*2:z[0],z[1],col,d.cur==='full',TK_XW[d.xW]||1)}
   const hit=A&&(drawing||corner)&&TKV.snapHit?scr(TKV.snapHit):null;
   if(hit)tkSnapBox(x,hit.x,hit.y);
   else if(A&&drawing&&TKV.aimPt&&(TKV.snapHow==='ortho'||TKV.snapHow==='angle')){const q=scr(TKV.aimPt);if(Math.hypot(q.x-A.x,q.y-A.y)>2){x.save();x.fillStyle='#fff';x.beginPath();x.arc(q.x,q.y,3.6,0,7);x.fill();x.fillStyle='#1e88e5';x.beginPath();x.arc(q.x,q.y,2.2,0,7);x.fill();x.restore()}}
@@ -5558,7 +5574,7 @@ function tkvMag(mg,A,P,d,r,col){
   if(TKV.draft.length&&(TKV.cur||TKV.draft.length>1)){const it=tkItem(TKV.item),c=TKV.mode==='draw'&&it?it.color:TKV.mode==='scale'?'#c62828':'#1d232b';const pts=TKV.draft.concat(TKV.cur?[TKV.cur]:[]);
     x.globalAlpha=.9;x.strokeStyle=c;x.lineWidth=1.6/k;x.beginPath();pts.forEach((q,i)=>i?x.lineTo(q.x,q.y):x.moveTo(q.x,q.y));x.stroke()}
   x.restore();x.globalAlpha=1;x.globalCompositeOperation='source-over';
-  tkXhair(x,S/2,S/2,16,5,col,false);if(TKV.snapHit)tkSnapBox(x,S/2,S/2,8);
+  tkXhair(x,S/2,S/2,16,5,col,false,TK_XW[d.xW]||1);if(TKV.snapHit)tkSnapBox(x,S/2,S/2,8);
 }
 function tkvBind(){
   const st=TKV.stage;
@@ -6003,7 +6019,7 @@ async function tkMarkupPdf(){
         else if(s.k==='poly'){g.closePath();g.globalAlpha=.25;g.fill();g.globalAlpha=.8;g.lineWidth=M*.002;g.stroke();let cx=0,cy=0;const n=p.length/2;for(let i=0;i<n;i++){cx+=p[2*i];cy+=p[2*i+1]}labels.push([lab(num[it.id],s),cx/n*W,cy/n*H])}
         else{g.globalAlpha=.55;const lw=scl&&+scl.fpp>0?Math.max(tkItemWidthIn(it)/12/scl.fpp*wmul,M*.0006,1.5):M*.0055*wmul;g.lineWidth=lw;g.lineCap='butt';g.lineJoin='miter';g.stroke();
           /* end marks like on screen (ticks / dots / arrows from ⚙ View → Drawing) */
-          g.globalAlpha=.9;tkEnds(p,W,H).forEach(e=>{const m=tkEndMark(e,ends,lw/2+M*.005);g.beginPath();if(m.k==='tick'){g.lineWidth=Math.max(M*.0006,1.5);g.moveTo(m.pts[0],m.pts[1]);g.lineTo(m.pts[2],m.pts[3]);g.stroke()}else if(m.k==='dot'){g.arc(m.x,m.y,Math.max(m.r,M*.0012),0,7);g.fill()}else{g.moveTo(m.pts[0],m.pts[1]);g.lineTo(m.pts[2],m.pts[3]);g.lineTo(m.pts[4],m.pts[5]);g.closePath();g.fill()}});
+          g.globalAlpha=.9;tkEnds(p,W,H).forEach(e=>{const m=tkEndMark(e,ends,(lw/2+M*.005)*(TK_ENDSZ[tkdrGet().endSz]||1));g.beginPath();if(m.k==='tick'){g.lineWidth=Math.max(M*.0006,1.5);g.moveTo(m.pts[0],m.pts[1]);g.lineTo(m.pts[2],m.pts[3]);g.stroke()}else if(m.k==='dot'){g.arc(m.x,m.y,Math.max(m.r,M*.0012),0,7);g.fill()}else{g.moveTo(m.pts[0],m.pts[1]);g.lineTo(m.pts[2],m.pts[3]);g.lineTo(m.pts[4],m.pts[5]);g.closePath();g.fill()}});
           g.lineCap='round';g.lineJoin='round';const i=Math.floor((p.length/2-1)/2)*2;labels.push([lab(num[it.id],s),(p[i]+p[i+2])/2*W,(p[i+1]+p[i+3])/2*H])}});
       g.globalCompositeOperation='source-over';g.globalAlpha=1;const fs=Math.round(M*.011);g.font='bold '+fs+'px sans-serif';g.textAlign='center';g.textBaseline='middle';
       labels.forEach(([n,x,yy])=>{const t=String(n);const w=g.measureText(t).width+fs*.6;g.fillStyle='#fff';g.strokeStyle='#000';g.lineWidth=Math.max(1,fs*.08);g.beginPath();g.rect(x-w/2,yy-fs*.65,w,fs*1.3);g.fill();g.stroke();g.fillStyle='#000';g.fillText(t,x,yy)});
