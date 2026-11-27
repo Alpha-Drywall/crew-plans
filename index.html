@@ -5441,7 +5441,7 @@ function tkvPaint(fast){
   const on={};TK.data.shapes.forEach(s=>{if(s.sheet===TKV.id&&its[s.item])on[s.id]=1});TKV.msel=(TKV.msel||[]).filter(id=>on[id]);if(TKV.sel&&!on[TKV.sel])TKV.sel=null;
   const hl=TKV.hl&&its[TKV.hl]?TKV.hl:null;{const ci=its[TKV.item];if(ci){TKV.last[ci.fr?'FR':ci.unit]=ci.id;if(ci.fr)TKV.last['FR:'+tkLayPre(ci.fr)]=ci.id}}
   const tags=[],fs=M*.009,ends=tkdrGet().ends;
-  g.innerHTML=TK.data.shapes.filter(s=>s.sheet===TKV.id&&its[s.item]&&!TKV.hide[s.item]&&s.id!==TKV.cont).map(s=>{const it=its[s.item],c=esc(it.color),p=(TKV.drag&&TKV.drag.id===s.id?TKV.drag.p:(s.p||[])).map(Number),sel=TKV.sel===s.id||TKV.msel.includes(s.id);
+  g.innerHTML=TK.data.shapes.filter(s=>s.sheet===TKV.id&&its[s.item]&&!TKV.hide[s.item]&&s.id!==TKV.cont).map(s=>{const it=its[s.item],c=esc(it.color),p=(TKV.drag&&(TKV.drag.m?TKV.drag.m[s.id]:TKV.drag.id===s.id&&TKV.drag.p)||(s.p||[])).map(Number),sel=TKV.sel===s.id||TKV.msel.includes(s.id);
     const dim=hl&&s.item!==hl&&!sel?' opacity="0.2" data-dim="1"':'';
     const pts=[];for(let i=0;i+1<p.length;i+=2)pts.push((p[i]*W).toFixed(1)+','+(p[i+1]*H).toFixed(1));
     const op=it.id===TKV.item?.75:.5;
@@ -5484,9 +5484,10 @@ function tkvLive(){
     s+=poly&&pts.length>2&&TKV.dDraft?'<polygon points="'+ps+'" fill="url(#tkHatch)" stroke="#c62828" stroke-width="'+sw+'" stroke-dasharray="'+(sw*3)+' '+(sw*2)+'"/>':poly&&pts.length>2?'<polygon points="'+ps+'" fill="'+c+'" fill-opacity=".18" stroke="'+c+'" stroke-width="'+sw+'" stroke-dasharray="'+(sw*3)+' '+(sw*2)+'"/>':'<polyline points="'+ps+'" fill="none" stroke="'+c+'"'+(lf?' stroke-opacity="'+(TKV.cont?'.85':'.7')+'"':'')+' stroke-width="'+lw.toFixed(2)+'" stroke-linecap="'+(lf?'butt':'round')+'" stroke-linejoin="'+(lf?'miter':'round')+'"/>';
     {const k=1/TKV.t.s,a=7*k,w=(1.4*k).toFixed(2);s+=TKV.draft.map((p,i)=>{const b=i===0&&TKV.mode==='draw'&&tkPolyIt(it)&&TKV.draft.length>2?a*1.6:a;return '<rect x="'+(p.x-b/2).toFixed(1)+'" y="'+(p.y-b/2).toFixed(1)+'" width="'+b.toFixed(1)+'" height="'+b.toFixed(1)+'" fill="none" stroke="#1d232b" stroke-width="'+w+'"/>'}).join('')}
   }
-  if(TKV.mode==='select'&&TKV.sel&&!TKV.box){const sh=tkvShape(TKV.sel);if(sh&&sh.k!=='count'){const q=TKV.drag&&TKV.drag.id===sh.id?TKV.drag.p:(sh.p||[]);const r=5/TKV.t.s,w=(1.6/TKV.t.s).toFixed(2);
+  if(TKV.mode==='select'&&TKV.sel&&!TKV.box){const sh=tkvShape(TKV.sel);if(sh&&sh.k!=='count'){const q=TKV.drag&&(TKV.drag.m?TKV.drag.m[sh.id]:TKV.drag.id===sh.id&&TKV.drag.p)||(sh.p||[]);const r=5/TKV.t.s,w=(1.6/TKV.t.s).toFixed(2);
     for(let i=0;i+1<q.length;i+=2){const x=q[i]*W,y=q[i+1]*H;s+='<rect data-hv="'+(i/2)+'" x="'+(x-r).toFixed(1)+'" y="'+(y-r).toFixed(1)+'" width="'+(2*r).toFixed(1)+'" height="'+(2*r).toFixed(1)+'" fill="none" stroke="#1565c0" stroke-width="'+w+'"/><circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="'+(1.3/TKV.t.s).toFixed(2)+'" fill="#1565c0"/>'}}}
-  if(TKV.box){const a=TKV.box.a,b=TKV.box.b,k=1/TKV.t.s;s+='<rect data-box="1" x="'+Math.min(a.x,b.x).toFixed(1)+'" y="'+Math.min(a.y,b.y).toFixed(1)+'" width="'+Math.abs(b.x-a.x).toFixed(1)+'" height="'+Math.abs(b.y-a.y).toFixed(1)+'" fill="#1e88e5" fill-opacity=".08" stroke="#1e88e5" stroke-width="'+(1.2*k).toFixed(2)+'" stroke-dasharray="'+(5*k).toFixed(1)+' '+(3*k).toFixed(1)+'"/>'}
+  if(TKV.box&&TKV.box.l){const k=1/TKV.t.s;s+='<polygon data-box="1" points="'+TKV.box.l.map(v=>v.x.toFixed(1)+','+v.y.toFixed(1)).join(' ')+'" fill="#1e88e5" fill-opacity=".08" stroke="#1e88e5" stroke-width="'+(1.2*k).toFixed(2)+'" stroke-dasharray="'+(5*k).toFixed(1)+' '+(3*k).toFixed(1)+'"/>'}
+  else if(TKV.box){const a=TKV.box.a,b=TKV.box.b,k=1/TKV.t.s;s+='<rect data-box="1" x="'+Math.min(a.x,b.x).toFixed(1)+'" y="'+Math.min(a.y,b.y).toFixed(1)+'" width="'+Math.abs(b.x-a.x).toFixed(1)+'" height="'+Math.abs(b.y-a.y).toFixed(1)+'" fill="#1e88e5" fill-opacity=".08" stroke="#1e88e5" stroke-width="'+(1.2*k).toFixed(2)+'" stroke-dasharray="'+(5*k).toFixed(1)+' '+(3*k).toFixed(1)+'"/>'}
   g.innerHTML=s;tkvOverlay();
   const rd=$('#tkRead');if(!rd)return;const sc=tkScaleOf(TKV.id);
   if(!pts.length||(TKV.mode!=='draw'&&TKV.mode!=='measure'&&TKV.mode!=='scale')){rd.style.display='none';return}
@@ -5565,7 +5566,7 @@ function tkvMag(mg,A,P,d,r,col){
   try{x.drawImage(TKV.img,0,0,W,H)}catch(e){}
   x.globalCompositeOperation='multiply';x.lineCap='butt';x.lineJoin='miter';
   const near=q=>{let a=1/0,b=-1/0,c=1/0,e=-1/0;for(let i=0;i+1<q.length;i+=2){const u=q[i]*W,v=q[i+1]*H;a=Math.min(a,u);b=Math.max(b,u);c=Math.min(c,v);e=Math.max(e,v)}return b>=P.x-half-M*.01&&a<=P.x+half+M*.01&&e>=P.y-half-M*.01&&c<=P.y+half+M*.01};
-  TK.data.shapes.forEach(sh=>{if(sh.sheet!==TKV.id||TKV.hide[sh.item]||sh.id===TKV.cont)return;const it=tkItem(sh.item);if(!it)return;const q=(TKV.drag&&TKV.drag.id===sh.id?TKV.drag.p:sh.p||[]).map(Number);if(!near(q))return;
+  TK.data.shapes.forEach(sh=>{if(sh.sheet!==TKV.id||TKV.hide[sh.item]||sh.id===TKV.cont)return;const it=tkItem(sh.item);if(!it)return;const q=(TKV.drag&&(TKV.drag.m?TKV.drag.m[sh.id]:TKV.drag.id===sh.id&&TKV.drag.p)||sh.p||[]).map(Number);if(!near(q))return;
     x.strokeStyle=x.fillStyle=it.color;
     if(sh.k==='count'){x.globalAlpha=.55;x.beginPath();x.arc(q[0]*W,q[1]*H,M*.007,0,7);x.fill();return}
     x.beginPath();for(let i=0;i+1<q.length;i+=2){if(i)x.lineTo(q[i]*W,q[i+1]*H);else x.moveTo(q[i]*W,q[i+1]*H)}
@@ -5586,7 +5587,9 @@ function tkvBind(){
       const cs=sm&&TKV.sel&&!e.shiftKey?tkvShape(TKV.sel):null,ci=cs&&cs.k!=='count'?tkvNearCorner(cs,tkvImg(e.clientX,e.clientY),12):-1;
       TKV.g={type:'pan',sx:e.clientX,sy:e.clientY,t0:Object.assign({},TKV.t),moved:false,time:Date.now(),btn,alt:e.altKey,shift:e.shiftKey,
       rect:!TKV.space&&e.button===0&&!e.ctrlKey&&TKV.mode==='draw'&&tkPolyIt(it)&&!TKV.draft.length&&!!tkScaleOf(TKV.id),
-      corner:ci>=0?{id:cs.id,i:ci,p0:(cs.p||[]).slice()}:null,box:sm&&ci<0&&(e.shiftKey||e.metaKey||e.ctrlKey||!!TKV.boxNext)};TKV.boxNext=false;
+      corner:ci>=0?{id:cs.id,i:ci,p0:(cs.p||[]).slice()}:null,box:sm&&ci<0&&(e.shiftKey||e.metaKey||e.ctrlKey||e.altKey||!!TKV.boxNext||!!TKV.lassoNext),lasso:sm&&ci<0&&(e.altKey||!!TKV.lassoNext)};
+      if(sm&&ci<0&&!TKV.g.box){const hid=tkvHit(tkvImg(e.clientX,e.clientY)),ids=tkvSelIds();if(hid&&ids.includes(hid)){const m0={};ids.forEach(id=>{const x=tkvShape(id);if(x)m0[id]={p:(x.p||[]).slice(),o:x.o?x.o.map(q=>q.slice()):null}});TKV.g.mv={m0,a:tkvImg(e.clientX,e.clientY)}}}
+      TKV.boxNext=false;TKV.lassoNext=false;
       /* touch / pen while drawing: hold still a moment to aim (magnifier, slide to adjust, lift to place); a quick drag still moves the sheet */
       if(e.pointerType!=='mouse'&&tkvDrawing()&&!TKV.space){const g0=TKV.g;g0.aimable=true;tkvAimSet(e,true);TKV.magOn=false;tkvHover();clearTimeout(TKV.aimT);
         TKV.aimT=setTimeout(()=>{if(TKV&&TKV.g===g0&&g0.type==='pan'&&!g0.moved&&TKV.pts.size===1){g0.type='aim';TKV.magOn=true;tkvOverlay()}},170)}}
@@ -5601,10 +5604,11 @@ function tkvBind(){
     TKV.pts.set(e.pointerId,{x:e.clientX,y:e.clientY});const g=TKV.g;if(!g)return;const far=n=>Math.hypot(e.clientX-g.sx,e.clientY-g.sy)>n;
     if(g.type==='pinch'&&TKV.pts.size>=2){const [a,b]=[...TKV.pts.values()];const c=mid(a,b);const r=st.getBoundingClientRect();const s=clamp(g.t0.s*dist(a,b)/g.d0,TKV.minS,6);const ix=(g.c0.x-r.left-g.t0.x)/g.t0.s,iy=(g.c0.y-r.top-g.t0.y)/g.t0.s;TKV.t={s,x:c.x-r.left-ix*s,y:c.y-r.top-iy*s};tkvT()}
     else if(g.type==='aim'){tkvAimSet(e,true);if(far(5)&&!g.aimMoved){g.aimMoved=true;clearTimeout(TKV.lp)}tkvHover()}
+    else if(g.mv&&(g.type==='move'||far(4))){clearTimeout(TKV.lp);g.type='move';g.moved=true;const b=tkvImg(e.clientX,e.clientY),dx=(b.x-g.mv.a.x)/TKV.W,dy=(b.y-g.mv.a.y)/TKV.H,sh=q=>q.map((v,i)=>v+(i%2?dy:dx)),m={};Object.keys(g.mv.m0).forEach(id=>m[id]=sh(g.mv.m0[id].p));g.mv.dx=dx;g.mv.dy=dy;TKV.drag={m};tkvPaint(true)}
     else if(g.corner&&(g.type==='corner'||far(4))){clearTimeout(TKV.lp);g.type='corner';g.moved=true;const cp=g.corner.p0,bj=g.corner.i>0?g.corner.i-1:g.corner.i+1,base=2*bj+1<cp.length?{x:cp[2*bj]*TKV.W,y:cp[2*bj+1]*TKV.H}:null;
       const q=tkvSnapPt(tkvImg(e.clientX,e.clientY),{id:g.corner.id,i:g.corner.i,base});TKV.aimPt=q;if(e.pointerType!=='mouse'){tkvAimSet(e,true);TKV.magOn=true}
       TKV.drag={id:g.corner.id,p:tkMoveCorner(g.corner.p0,g.corner.i,clamp(q.x,0,TKV.W)/TKV.W,clamp(q.y,0,TKV.H)/TKV.H)};tkvPaint(true)}
-    else if(g.box&&(g.type==='box'||far(6))){clearTimeout(TKV.lp);if(g.type!=='box')tkCtxClose();g.type='box';g.moved=true;TKV.box={a:tkvImg(g.sx,g.sy),b:tkvImg(e.clientX,e.clientY)};tkvLive()}
+    else if(g.box&&(g.type==='box'||far(6))){clearTimeout(TKV.lp);if(g.type!=='box')tkCtxClose();g.type='box';g.moved=true;const pb=tkvImg(e.clientX,e.clientY);if(g.lasso){if(!TKV.box||!TKV.box.l)TKV.box={l:[tkvImg(g.sx,g.sy)]};const L=TKV.box.l,q=L[L.length-1];if(Math.hypot(pb.x-q.x,pb.y-q.y)*TKV.t.s>3)L.push(pb)}else TKV.box={a:tkvImg(g.sx,g.sy),b:pb};tkvLive()}
     else if(g.type==='rect'||(g.type==='pan'&&g.rect&&far(10))){
       clearTimeout(TKV.lp);if(g.type!=='rect'){g.type='rect';g.a=tkvSnapPt(tkvImg(g.sx,g.sy));TKV.dDraft=!!(g.alt||e.altKey||TKV.dNext)}
       const a=g.a,b=tkvImg(e.clientX,e.clientY);b.x=clamp(b.x,0,TKV.W);b.y=clamp(b.y,0,TKV.H);TKV.draft=[a,{x:b.x,y:a.y},b,{x:a.x,y:b.y}];TKV.cur=null;TKV.aimPt=b;TKV.snapHit=null;if(e.pointerType!=='mouse'){clearTimeout(TKV.aimT);tkvAimSet(e,true);TKV.magOn=true}tkvLive()}
@@ -5614,8 +5618,9 @@ function tkvBind(){
     if(!TKV||!TKV.pts.has(e.pointerId))return;TKV.pts.delete(e.pointerId);clearTimeout(TKV.lp);clearTimeout(TKV.aimT);if(e.pointerType!=='mouse'){TKV.magOn=false;TKV.aim=null}const g=TKV.g;if(!g){tkvOverlay();return}
     if(g.type==='pinch'){if(TKV.pts.size===1){const [a]=[...TKV.pts.values()];TKV.g={type:'pan',sx:a.x,sy:a.y,t0:Object.assign({},TKV.t),moved:true,time:0}}else if(!TKV.pts.size)TKV.g=null;return}
     TKV.g=null;if(TKV.skipTap){TKV.skipTap=false;TKV.drag=null;TKV.box=null;tkvPaint(true);return}
+    if(g.type==='move'){TKV.drag=null;const mv=g.mv;if(e.type!=='pointercancel'&&(mv.dx||mv.dy)){const r4=v=>Math.round(v*1e4)/1e4,sh=q=>q.map((v,i)=>r4(v+(i%2?mv.dy:mv.dx)));tkDo(Object.keys(mv.m0).map(id=>{const z=mv.m0[id],v={id,p:sh(z.p)};if(z.o)v.o=z.o.map(sh);return {t:'shape',v}}));toast('Moved '+Object.keys(mv.m0).length+' mark'+(Object.keys(mv.m0).length===1?'':'s')+' · drag them back to undo')}tkvPaint();return}
     if(g.type==='corner'){const dr=TKV.drag;TKV.drag=null;if(dr&&e.type!=='pointercancel')tkDo({t:'shape',v:{id:dr.id,p:dr.p.map(v=>r4(v))}});tkvPaint();return}
-    if(g.type==='box'){const b=TKV.box;TKV.box=null;if(b&&e.type!=='pointercancel')tkvBoxSel(b,g.shift||e.shiftKey);else tkvLive();return}
+    if(g.type==='box'){const b=TKV.box;TKV.box=null;if(b&&e.type!=='pointercancel'){if(b.l)tkvLassoSel(b.l,g.shift||e.shiftKey);else tkvBoxSel(b,g.shift||e.shiftKey)}else tkvLive();return}
     if(g.type==='rect'){const q=TKV.draft;if(e.type==='pointercancel'||q.length!==4||Math.abs(q[2].x-q[0].x)*TKV.t.s<6||Math.abs(q[2].y-q[0].y)*TKV.t.s<6){TKV.draft=[];TKV.dDraft=false;tkvLive();tkvTools()}else tkvFinish();return}
     if(g.type==='aim'){if(!g.long&&e.type!=='pointercancel')tkvTap(e.clientX,e.clientY,false,false);else tkvOverlay();return}
     if(g.type==='pan'&&!g.moved&&!g.long&&e.type!=='pointercancel'&&g.btn!==2&&g.btn!==1)tkvTap(e.clientX,e.clientY,g.alt||e.altKey,g.shift||e.shiftKey||(TKV.mode==='select'&&!tkMac()&&e.ctrlKey));
@@ -5675,6 +5680,11 @@ function tkvSelTap(p0,shift){
   const s=h&&tkvShape(h);if(s&&s.k==='count')tkvShapeMenu(h);
 }
 /* marks with a corner (or a count) inside the dragged box; add = keep what was selected */
+/* lasso: selects every mark with a point inside the drawn loop (Alt+drag, or right-click → Lasso select) */
+function tkvLassoSel(L,add){const W=TKV.W,H=TKV.H;if(!L||L.length<3){tkvLive();return}const q=[];L.forEach(v=>q.push(v.x/W,v.y/H));
+  const got=TK.data.shapes.filter(s=>{if(s.sheet!==TKV.id||TKV.hide[s.item]||!tkItem(s.item))return false;const p=s.p||[];for(let i=0;i+1<p.length;i+=2)if(tkInPoly({x:p[i]*W,y:p[i+1]*H},q,W,H))return true;return false}).map(s=>s.id);
+  const l=add?tkvSelIds().slice():[];got.forEach(id=>{if(!l.includes(id))l.push(id)});TKV.msel=l;TKV.sel=l.length===1?l[0]:null;tkvPaint();
+  toast(l.length?l.length+' mark'+(l.length===1?'':'s')+' selected · Delete key or right-click → Delete':'Nothing inside the loop')}
 function tkvBoxSel(b,add){
   const W=TKV.W,H=TKV.H,x0=Math.min(b.a.x,b.b.x),x1=Math.max(b.a.x,b.b.x),y0=Math.min(b.a.y,b.b.y),y1=Math.max(b.a.y,b.b.y);
   const got=TK.data.shapes.filter(s=>{if(s.sheet!==TKV.id||TKV.hide[s.item]||!tkItem(s.item))return false;const q=s.p||[];for(let i=0;i+1<q.length;i+=2){const x=q[i]*W,y=q[i+1]*H;if(x>=x0&&x<=x1&&y>=y0&&y<=y1)return true}return false}).map(s=>s.id);
@@ -5794,6 +5804,7 @@ function tkCtx(cx,cy,sub){
       sep()}
     if(many){add('scopy','⧉ Copy '+ids.length+' marks',true,C+'C');add('sdel','Delete '+ids.length+' marks',true,'Del');add('sclear','Clear selection',true,'Esc');sep()}
     add('boxsel','⬚ Select area…',sel&&!dr);
+    add('lasso','◌ Lasso select…',sel&&!dr,'Alt+drag');
     add('paste','Paste '+(TK_CLIP?TK_CLIP.length:0)+' mark'+(TK_CLIP&&TK_CLIP.length===1?'':'s')+' here',!!(TK_CLIP&&TK_CLIP.length),C+'V');
     add('umark','Undo last mark',!!last);
     sep();
@@ -5842,6 +5853,7 @@ function tkCtx(cx,cy,sub){
     else if(c==='sdel')tkvDelMarks(ids);
     else if(c==='sclear'){TKV.sel=null;TKV.msel=[];tkvPaint()}
     else if(c==='boxsel'){TKV.boxNext=true;toast('Drag a box around the marks to select them.')}
+    else if(c==='lasso'){TKV.lassoNext=true;toast('Draw a loop around the marks to select them.')}
     else if(c==='paste')tkvPaste(p0);
     else if(c==='umark'){TKV.mine=TKV.mine.filter(id=>id!==last);tkDo({t:'del_shape',id:last});if(TKV.sel===last)TKV.sel=null;tkvPaint()}
     else if(c==='snap'){TKV.snap=!TKV.snap;lsSet('acv.tkSnap',TKV.snap?null:'off');tkvTools()}
