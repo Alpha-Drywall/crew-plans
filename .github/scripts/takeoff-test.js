@@ -12,7 +12,7 @@ function grab(name) {
   if (!lines[i].startsWith('const ')) while (j < lines.length && /^(\s|\})/.test(lines[j])) j++;
   return lines.slice(i, j).join('\n');
 }
-const names = ['TK_SECS', 'TK_PAPER', 'TK_SCALES', 'tkFeet', 'tkFtIn', 'tkLenPx', 'tkAreaPx', 'tkShapeQty', 'tkPresetFpp', 'tkGuessPaper', 'tkEvenUp', 'tkCodeHeight', 'tkCodeWidth', 'tkItemWidthIn', 'tkInches', 'tkInStr', 'tkParseScales',
+const names = ['tkOffsetLine', 'tkSideOff', 'TK_SECS', 'TK_PAPER', 'TK_SCALES', 'tkFeet', 'tkFtIn', 'tkLenPx', 'tkAreaPx', 'tkShapeQty', 'tkPresetFpp', 'tkGuessPaper', 'tkEvenUp', 'tkCodeHeight', 'tkCodeWidth', 'tkItemWidthIn', 'tkInches', 'tkInStr', 'tkParseScales',
   'tkApply', 'tkTotals', 'tkSheetQty', 'tkHeightSplits', 'tkRows', 'tkCopyShapes', 'tkSplitLine', 'tkInsertCorner', 'tkMoveCorner', 'tkDeleteCorner', 'tkOffsetShapes',
   'tkSnapVerts', 'tkNearVertex', 'tkOrtho', 'tkSnapPick', 'tkEnds', 'tkEndMark', 'tkReadout',
   'TK_FR_DEF', 'tkFrRot', 'tkFrUn', 'tkFrIv', 'tkFrUnion', 'tkFrClip', 'tkFrSwap', 'tkFrExt', 'tkFrAuto', 'tkFrAngle', 'tkFrPc', 'tkFrame', 'tkFrSum', 'tkFrameOf', 'tkFrRows', 'tkFrItem',
@@ -746,4 +746,13 @@ t('light bulbs in bulk: all off / all on / some', () => {
   assert.strictEqual(T.tkHideAnyOn({}, []), false);
 });
 
+t('wall side: offset line to the right of travel by half the width; corners mitered', () => {
+  const close = (a, b, m) => assert.ok(Math.abs(a - b) < 1e-6, (m || '') + ' expected ' + b + ', got ' + a);
+  const o = T.tkOffsetLine([0, 0, 1, 0], 100, 100, 5);
+  close(o[1] * 100, 5, 'going east, right is +y'); close(o[0], 0); close(o[3] * 100, 5);
+  const l = T.tkOffsetLine([0.1, 0.1, 0.5, 0.1, 0.5, 0.5], 100, 100, 2);
+  close(l[2] * 100, 48, 'corner x pulled in'); close(l[3] * 100, 12, 'corner y pushed down');
+  close(T.tkSideOff('L', 4), 2); close(T.tkSideOff('R', 4), -2); close(T.tkSideOff(undefined, 4), 0);
+  assert.deepStrictEqual(T.tkOffsetLine([0, 0, 1, 1], 10, 10, 0), [0, 0, 1, 1]);
+});
 console.log(n + ' takeoff tests passed.');
