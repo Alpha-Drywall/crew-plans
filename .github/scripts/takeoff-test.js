@@ -16,7 +16,7 @@ const names = ['TK_SECS', 'TK_PAPER', 'TK_SCALES', 'tkFeet', 'tkFtIn', 'tkLenPx'
   'tkApply', 'tkTotals', 'tkSheetQty', 'tkHeightSplits', 'tkRows', 'tkCopyShapes', 'tkSplitLine', 'tkInsertCorner', 'tkMoveCorner', 'tkDeleteCorner', 'tkOffsetShapes',
   'tkSnapVerts', 'tkNearVertex', 'tkOrtho', 'tkSnapPick', 'tkEnds', 'tkEndMark', 'tkReadout',
   'TK_FR_DEF', 'tkFrRot', 'tkFrUn', 'tkFrIv', 'tkFrUnion', 'tkFrClip', 'tkFrSwap', 'tkFrExt', 'tkFrAuto', 'tkFrAngle', 'tkFrPc', 'tkFrame', 'tkFrSum', 'tkFrameOf', 'tkFrRows', 'tkFrItem',
-  'TK_LAY_DEF', 'TK_LAY_NAME', 'tkLayPre', 'tkLayF', 'tkLayArea', 'tkLayPos', 'tkLayCut', 'tkLayWires', 'tkLayAct', 'tkLayCrc', 'tkLayAt', 'tkLayOrg'];
+  'TK_LAY_DEF', 'TK_LAY_NAME', 'tkLayPre', 'tkLayF', 'tkLayArea', 'tkLayPos', 'tkLayCut', 'tkLayWires', 'tkLayAct', 'tkLayCrc', 'tkLayAt', 'tkLayOrg', 'tkEdNear', 'tkEdRuns', 'tkEdAt'];
 const T = vm.runInNewContext(names.map(grab).join('\n') + '\n;({' + names.join(',') + '})', { Math, Date, String, Number, Set, Object, Array, JSON, isFinite, parseFloat, NaN, Infinity });
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok - ' + name); };
 const plain = x => JSON.parse(JSON.stringify(x));
@@ -662,6 +662,43 @@ t('tkSheetQty: each item\'s quantity per sheet, in plan order, adding up to the 
   const tot = T.tkTotals(D, sh);
   ['w', 'd'].forEach(k => near(Q.items[k].reduce((a, x) => a + x.qty, 0), tot[k].qty, k + ' sheets add up to the total'));
   assert.deepStrictEqual(plain(T.tkSheetQty({}, sh)), { sheets: {}, items: {} });
+});
+
+t('tkFrame edits: add / double / remove joists, beam lines, blocking rows (20x30 @16")', () => {
+  const R = [0, 0, 20, 0, 20, 30, 0, 30], o = { sp: 16, ang: 0 }, S = ed => T.tkFrSum(T.tkFrame(R, [], { ...o, ed }), 0);
+  const base = S(), J = base.joist;
+  near(J.lf, J.n * 20, 'joists span 20');
+  assert.deepStrictEqual(plain(S({})), plain(base), 'empty edits change nothing');
+  assert.deepStrictEqual(plain(T.tkFrame(R, [], o)), plain(T.tkFrame(R, [], { ...o, ed: null })), 'old shapes without ed unchanged');
+  const a = S({ add: [0.5] }).joist; assert.strictEqual(a.n, J.n + 1); near(a.lf, J.lf + 20, 'add joist +20 LF');
+  const d = S({ dbl: { '4': 2 } }).joist; assert.strictEqual(d.n, J.n + 1, 'double +1 piece'); near(d.lf, J.lf + 20);
+  assert.strictEqual(S({ dbl: { '4.2': 3 } }).joist.n, J.n + 2, 'triple matches the nearest joist (within half a space)');
+  assert.strictEqual(S({ dbl: { '40': 2 } }).joist.n, J.n, 'no joist within half a space: nothing doubled');
+  const r = S({ rm: [4] }).joist; assert.strictEqual(r.n, J.n - 1, 'remove -1'); near(r.lf, J.lf - 20);
+  const b = S({ beam: [0] }); assert.strictEqual(b.joist.n, J.n * 2, 'beam at mid-span: joist pieces double'); near(b.joist.lf, J.lf, 'same LF');
+  assert.deepStrictEqual(plain(b.joist.cuts), [[120, J.n * 2]], 'each half 10\'');
+  near(b.beam.lf, 30, 'beam LF = width'); assert.strictEqual(b.beam.n, 1);
+  near(b.track.lf, base.track.lf, 'track unchanged');
+  const k = S({ blk: [-5] }); near(k.br.lf, 30, 'blocking row +30 LF'); assert.strictEqual(k.joist.n, J.n, 'blocking does not cut joists');
+  const g = T.tkFrame(R, [], { ...o, ed: { add: [0.5] } }); assert.deepStrictEqual([g.ref.u, g.ref.v], [10, 0], 'ref = mid-span, first edge'); assert.ok(g.jv.some(v => Math.abs(v - 0.5) < 1e-9)); near(g.sp, 16 / 12);
+  const m = T.tkFrame(R.map((x, i) => x + (i % 2 ? 7 : 3)), [], { ...o, ed: { rm: [4], beam: [0] } });
+  const m0 = T.tkFrame(R, [], { ...o, ed: { rm: [4], beam: [0] } });
+  assert.strictEqual(m.length, m0.length, 'moved area keeps its edits');
+});
+t('tkFrRows: beam on the track row (or its own code), blocking on bridging; ACT / CRC added mains', () => {
+  const it = { id: 'j', code: 'CJ', sec: 'CEILINGS', fr: { preset: 'joists', mem: 'J', sp: 16, trk: 'TR', brc: '', brMax: 0 } }, R = [0, 0, 20, 0, 20, 30, 0, 30];
+  const rows = (fr, ed) => { const i = { ...it, fr: { ...it.fr, ...fr } }; return plain(T.tkFrRows(i, T.tkFrSum(T.tkFrame(R, [], { sp: 16, ang: 0, ed }), 0), 0, {})); };
+  const t0 = rows({}).find(r => r.code === 'TR').qty;
+  assert.strictEqual(rows({}, { beam: [0] }).find(r => r.code === 'TR').qty, t0 + 30, 'beam LF on track row');
+  const own = rows({ beam: 'BX' }, { beam: [0] }); assert.strictEqual(own.find(r => r.code === 'BX').qty, 30); assert.strictEqual(own.find(r => r.code === 'TR').qty, t0);
+  assert.strictEqual(rows({}, { blk: [0] }).find(r => r.id === 'j:b').qty, 30, 'blocking with no bridging member: track code');
+  assert.ok(!rows({}).some(r => r.id === 'j:b'), 'no blocking, no bridging: no row');
+  const A = T.tkLayAct([0, 0, 20, 0, 20, 12, 0, 12], [], { tile: '2x4' }), A1 = T.tkLayAct([0, 0, 20, 0, 20, 12, 0, 12], [], { tile: '2x4', ed: { add: [2] } });
+  assert.strictEqual(A1.segs.filter(g => g.r === 'main').length, A.segs.filter(g => g.r === 'main').length + 1, 'add main');
+  assert.strictEqual(T.tkLayAct([0, 0, 20, 0, 20, 12, 0, 12], [], { tile: '2x4', ed: { rm: [0] } }).segs.filter(g => g.r === 'main').length, A.segs.filter(g => g.r === 'main').length - 1, 'remove main');
+  const C = T.tkLayCrc([0, 0, 20, 0, 20, 12, 0, 12], [], {}), C1 = T.tkLayCrc([0, 0, 20, 0, 20, 12, 0, 12], [], { ed: { add: [1] } });
+  assert.strictEqual(C1.segs.filter(g => g.r === 'crc').length, C.segs.filter(g => g.r === 'crc').length + 1, 'add CRC');
+  assert.ok(C1.cnt.clip > C.cnt.clip, 'added CRC gets clips');
 });
 
 console.log(n + ' takeoff tests passed.');
