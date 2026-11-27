@@ -16,7 +16,7 @@ const names = ['TK_SECS', 'TK_PAPER', 'TK_SCALES', 'tkFeet', 'tkFtIn', 'tkLenPx'
   'tkApply', 'tkTotals', 'tkSheetQty', 'tkHeightSplits', 'tkRows', 'tkCopyShapes', 'tkSplitLine', 'tkInsertCorner', 'tkMoveCorner', 'tkDeleteCorner', 'tkOffsetShapes',
   'tkSnapVerts', 'tkNearVertex', 'tkOrtho', 'tkSnapPick', 'tkEnds', 'tkEndMark', 'tkReadout',
   'TK_FR_DEF', 'tkFrRot', 'tkFrUn', 'tkFrIv', 'tkFrUnion', 'tkFrClip', 'tkFrSwap', 'tkFrExt', 'tkFrAuto', 'tkFrAngle', 'tkFrPc', 'tkFrame', 'tkFrSum', 'tkFrameOf', 'tkFrRows', 'tkFrItem',
-  'TK_LAY_DEF', 'TK_LAY_NAME', 'tkLayPre', 'tkLayF', 'tkLayArea', 'tkLayPos', 'tkLayCut', 'tkLayWires', 'tkLayAct', 'tkLayCrc'];
+  'TK_LAY_DEF', 'TK_LAY_NAME', 'tkLayPre', 'tkLayF', 'tkLayArea', 'tkLayPos', 'tkLayCut', 'tkLayWires', 'tkLayAct', 'tkLayCrc', 'tkLayAt', 'tkLayOrg'];
 const T = vm.runInNewContext(names.map(grab).join('\n') + '\n;({' + names.join(',') + '})', { Math, Date, String, Number, Set, Object, Array, JSON, isFinite, parseFloat, NaN, Infinity });
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok - ' + name); };
 const plain = x => JSON.parse(JSON.stringify(x));
@@ -596,6 +596,25 @@ t('layout CRC & furring: 20\' x 30\' @4\' with FC @16" -> LF, pieces, wires, cli
   assert.deepStrictEqual(plain(rows.map(x => [x.id, x.code, x.qty, x.unit])), [['c:c', '150U50-54 CRC', 160, 'LF'], ['c:fc', '7/8" FC 25ga', 450, 'LF'], ['c:p', '200T125-20', 100, 'LF'], ['c:p2', 'Wall angle', 100, 'LF'], ['c:w', 'Hanger wire 12ga', 48, 'EA'], ['c:cl', 'Clip', 120, 'EA']]);
   const H = T.tkLayCrc(RECT, [[10, 8, 14, 8, 14, 12, 10, 12]], { ang: T.tkFrAuto(RECT) }), h = laySum(H);
   near(h.trim.lf, 16, 'furring trim = opening perimeter'); assert.ok(h.crc.lf < 160 && h.fc.lf < 450, 'members cut at the opening');
+});
+t('layout grid start point (org): ACT / CRC / joists line up through it; at the auto start or the center = same as auto', () => {
+  assert.deepStrictEqual(plain(T.tkLayAt(0, 30, 4, 1)), [1, 5, 9, 13, 17, 21, 25, 29]); assert.deepStrictEqual(plain(T.tkLayAt(0, 20, 2, 10)), [2, 4, 6, 8, 10, 12, 14, 16, 18], 'no line on the edges');
+  assert.deepStrictEqual(plain(T.tkLayAt(0, 10, 4, 0.02)), [4.02, 8.02], 'a line within 1/2" of an edge is left out');
+  const a = T.tkFrAuto(RECT), base = { tile: '2x4', ang: a, mainLen: 12, waLen: 12, wireSp: 4 }, auto = laySum(T.tkLayAct(RECT, [], base));
+  const L = T.tkLayAct(RECT, [], { ...base, org: [1, 1] }), r = laySum(L);
+  assert.deepStrictEqual(r.main, { n: 8, lf: 160, st: 16 }, 'mains at x = 1, 5 ... 29 (1\' and 1\' borders)'); assert.strictEqual(r.t4.n, 90, '10 tee lines (y = 1, 3 ... 19) x 9 bays'); assert.strictEqual(L.cnt.wire, 48);
+  assert.ok(L.segs.some(g => g.r === 'main' && Math.abs(g.a[0] - 1) < 1e-9 && Math.abs(g.b[0] - 1) < 1e-9), 'a main passes through the start point');
+  assert.ok(L.segs.some(g => g.r === 't4' && Math.abs(g.a[1] - 1) < 1e-9 && Math.abs(g.b[1] - 1) < 1e-9), 'a cross tee passes through it');
+  assert.deepStrictEqual(laySum(T.tkLayAct(RECT, [], { ...base, org: [15, 10] })), auto, 'start at the center = centered grid');
+  const o = T.tkLayOrg('act', T.tkLayF({ preset: 'act' }), RECT, a, null); near(o[0], 27); near(o[1], 2);
+  assert.deepStrictEqual(laySum(T.tkLayAct(RECT, [], { ...base, org: o })), auto, 'auto start point reproduces the auto grid');
+  assert.deepStrictEqual(plain(T.tkLayOrg('act', {}, RECT, a, [3, 4])), [3, 4]);
+  const t2 = laySum(T.tkLayAct(RECT, [], { ...base, tile: '2x2', org: [1, 1] })); assert.strictEqual(t2.main.n, 8); assert.strictEqual(t2.t2.n, 77, '7 half lines between 8 mains x 11 pieces');
+  const cb = { ang: a, crcSp: 4, fcSp: 16, crcLen: 16, fcLen: 12, perLen: 10, wireSp: 4 }, ca = laySum(T.tkLayCrc(RECT, [], cb)), co = T.tkLayOrg('crc', T.tkLayF({ preset: 'crc' }), RECT, a, null);
+  assert.deepStrictEqual(laySum(T.tkLayCrc(RECT, [], { ...cb, org: co })), ca, 'CRC: auto start point = auto');
+  const C = T.tkLayCrc(RECT, [], { ...cb, org: [0.5, 0.5] }); assert.strictEqual(laySum(C).crc.n, 8); assert.ok(C.segs.some(g => g.r === 'crc' && Math.abs(g.a[0] - 0.5) < 1e-9), 'a CRC through it');
+  const J = T.tkFrame(RECT, [], { sp: 16, ang: a, org: [5, 0] }).filter(g => g.r === 'joist');
+  assert.ok(J.some(g => Math.abs(g.a[0] - 5) < 1e-9 && Math.abs(g.b[0] - 5) < 1e-9), 'a joist through the start point'); assert.ok(J.some(g => Math.abs(g.a[0]) < 1e-9) && J.some(g => Math.abs(g.a[0] - 30) < 1e-9), 'joists at both bearing edges');
 });
 t('layout: preset marks on a sheet -> rows; older framing items (no preset) stay joists', () => {
   const sheet = { id: 's1', w: 3000, h: 2000 };
