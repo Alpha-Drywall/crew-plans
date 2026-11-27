@@ -242,16 +242,55 @@ input[type=range]{width:100%;height:32px}
 .bests .chip{flex:none;display:inline-flex;align-items:center;gap:6px}
 .best{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:var(--ink);background:color-mix(in srgb,var(--ec) 15%,#fff);border:1px solid color-mix(in srgb,var(--ec) 50%,#fff);border-radius:999px;padding:0 7px 0 5px;line-height:18px;margin-right:6px;vertical-align:1px;white-space:nowrap}
 .best i{width:8px;height:8px;border-radius:50%;background:var(--ec);flex:none}
-.bnext{display:flex;align-items:center;gap:4px 10px;flex-wrap:wrap;width:100%;text-align:left;border:1px solid var(--line);border-left:5px solid var(--accent);background:#fff;border-radius:10px;padding:8px 12px;margin:0 0 12px;font:inherit;color:inherit;cursor:pointer;min-height:44px}
-.bnext:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.bnext.tdy{border-left-color:#d92d20;background:#fff8f7}
-.bnext .bnk{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#7a4b00;flex:none}
-.bnext.tdy .bnk{color:#b42318}
-.bnext .bnn{font-weight:800;min-width:0;flex:1 1 150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.bnext .bnw{font-size:13px;color:var(--muted);white-space:nowrap}
-.bnext .bnm{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.bnext .best{margin:0}
-main.dense .bsh.l1{margin:10px 0 2px;min-height:34px;padding:3px 4px}main.dense .bsh.l2{min-height:30px;margin:2px 0}main.dense .bnext{padding:5px 10px;margin-bottom:8px;min-height:36px}
-html.hc .best,html.hc .bnext{border-width:2px}html.hc .bsh.l1{border-bottom-color:#59626d}html.hc .bchv{color:#262c33}html.hc .blink{color:#0b3a75}
+/* This week: Mon-Sun strip on wide screens, one tappable line on phones (both rendered, CSS picks one) */
+.bwk{margin:0 0 12px}
+.bwk-s{background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px 10px 10px}
+.bwk-h{display:flex;align-items:baseline;gap:8px;margin:0 2px 8px;flex-wrap:wrap}
+.bwk-k{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#7a4b00}
+.bwk-t{font-size:13px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+.bwk-r{margin-left:auto;font-size:12px;color:var(--muted)}
+.bwk-g{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.bwk-c{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:0;border:1px solid var(--line);background:#fafbfc;border-radius:9px;padding:6px 8px 7px;font:inherit;color:inherit;text-align:left;min-height:74px}
+button.bwk-c{cursor:pointer;background:#fff}button.bwk-c:hover{border-color:#b9c0c8;background:#fffdf7}
+.bwk-c:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.bwk-c .bwd{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#5d6670}
+.bwk-c .bwn{font-size:12px;color:var(--muted);white-space:nowrap}
+.bwk-c .bwc{font-size:20px;font-weight:800;line-height:1.1;margin-top:2px;font-variant-numeric:tabular-nums}
+.bwk-c .bwc small{font-size:11px;font-weight:700;color:var(--muted);margin-left:3px;letter-spacing:.02em}
+.bwk-c .bwz{font-size:16px;color:#b9c0c8;margin-top:4px}
+.bwk-c .bwdots{display:flex;align-items:center;gap:3px;flex-wrap:wrap;min-height:9px}
+.bwk-c .bwdots i{width:8px;height:8px;border-radius:50%;flex:none}
+.bwk-c .bwdots em{font-style:normal;font-size:11px;font-weight:700;color:var(--muted)}
+.bwk-c.tdy{border:2px solid var(--accent);padding:5px 7px 6px;background:#fffbf0}
+.bwk-c.tdy .bwd{color:#7a4b00}
+.bwk-c.due .bwc{color:#b42318}
+.bwk-c.past{opacity:.5}
+.bwk-l{display:none;align-items:center;gap:6px;width:100%;text-align:left;border:1px solid var(--line);border-left:5px solid var(--accent);background:#fff;border-radius:10px;padding:8px 10px 8px 12px;font:inherit;color:inherit;cursor:pointer;min-height:44px;white-space:nowrap;overflow:hidden}
+.bwk-l:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.bwk-l .bwk-k{flex:none}.bwk-l .bwk-t{flex:none;font-size:13px}
+.bwk-l .bwsep{flex:none;color:#9aa3ad}
+.bwk-l .bwnx{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:13px}
+.bwk-l .bwnx b{font-weight:800}
+.bwk-l .bwnx .edot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px;vertical-align:1px}
+.bwk-l .bwm{flex:none;font-size:12px;color:var(--muted)}
+.bwk-l .bwgo{flex:none;font-size:20px;line-height:1;color:#7b8591;margin-left:2px}
+.bwk-l.tdy{border-left-color:#d92d20;background:#fff8f7}.bwk-l.tdy .bwk-k{color:#b42318}
+@media(max-width:699px){.bwk-s{display:none}.bwk-l{display:flex}}
+.bwk-one .bwk-s{display:none}.bwk-one .bwk-l{display:flex}
+.bwsh h2{margin:0 0 2px}.bwsh .bwsub{font-size:13px;color:var(--muted);margin:0 0 10px}
+.bwsh .bwdh{font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#38414b;margin:12px 2px 4px;display:flex;gap:8px}
+.bwsh .bwdh.tdy{color:#b42318}.bwsh .bwdh span{margin-left:auto;font-weight:600;letter-spacing:0;text-transform:none;color:var(--muted)}
+.bwsh .bwrow{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:1px solid var(--line);background:#fff;border-radius:10px;padding:9px 10px;margin:0 0 6px;font:inherit;color:inherit;cursor:pointer;min-height:48px}
+.bwsh .bwrow:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.bwsh .bwrow .bwrn{flex:1;min-width:0}.bwsh .bwrow .bwrn b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:15px}
+.bwsh .bwrow .bwrn .best{margin-top:3px}
+.bwsh .bwrow .bwra{flex:none;font-weight:700;font-size:14px;font-variant-numeric:tabular-nums}
+.bwsh .bwrow .bwra .muted{font-weight:400;font-size:13px}
+.bidc.bflash{animation:bflash 1.8s ease-out}
+@keyframes bflash{0%,35%{box-shadow:0 0 0 3px var(--accent);background:#fff6dd}100%{box-shadow:0 0 0 3px transparent;background:#fff}}
+main.dense .bsh.l1{margin:10px 0 2px;min-height:34px;padding:3px 4px}main.dense .bsh.l2{min-height:30px;margin:2px 0}
+main.dense .bwk{margin-bottom:8px}main.dense .bwk-s{padding:6px 8px 8px}main.dense .bwk-h{margin-bottom:5px}main.dense .bwk-c{min-height:58px;padding:4px 7px 5px}main.dense .bwk-c.tdy{padding:3px 6px 4px}main.dense .bwk-c .bwc{font-size:17px;margin-top:0}main.dense .bwk-l{padding:5px 10px;min-height:38px}
+html.hc .best,html.hc .bwk-s,html.hc .bwk-l,html.hc .bwk-c,html.hc .bwsh .bwrow{border-width:2px}html.hc .bwk-c.tdy{border-width:3px;padding:4px 6px 5px}html.hc .bwk-c.past{opacity:.7}html.hc .bwk-c .bwz{color:#7b8591}html.hc .bsh.l1{border-bottom-color:#59626d}html.hc .bchv{color:#262c33}html.hc .blink{color:#0b3a75}
 .bidc{display:flex;align-items:center;gap:12px;cursor:pointer;padding:12px 8px 12px 12px}
 .bidc:focus-visible,.uprow:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .bidc .bchk{width:20px;height:20px;flex:none;margin:0;pointer-events:none;accent-color:var(--accent)}.bidc.bsel{outline:2px solid var(--accent);outline-offset:-2px}
@@ -2793,9 +2832,69 @@ function bidCollSet(keys,v){const o=bidCollSt();keys.forEach(k=>o[k]=!!v);lsSet(
 const DOW3=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const wkDay=s=>{const [y,m,d]=String(s||'').split('-').map(Number);return y&&m?DOW3[new Date(Date.UTC(y,m-1,d)).getUTCDay()]+' '+MON3[m-1]+' '+d:''};
 const estBadge=n=>'<span class="best" style="--ec:'+(n==='No estimator'?'#9aa3ad':estColor(n))+'"><i></i>'+esc(n)+'</span>';
-/* "Next due" strip at the top of Bids: the soonest bid due today or later; yours on My bids, everyone's on All bids */
-function bidNextHtml(){const td=today(),mine=lsGet('crewplans.bidView')!=='all'&&!!S.myOfficeId,g=bidComingGroups((S.bids||[]).filter(j=>!mine||j.pm===S.myOfficeId),td);if(!g.length)return '';const j=g[0][2][0],n=dayDiff(td,String(j.bid_date).slice(0,10)),same=g[0][2].filter(x=>x!==j&&x.bid_date===j.bid_date).length;
-  return '<button type="button" class="bnext'+(n===0?' tdy':'')+'" data-bnext="'+esc(j.id)+'" title="Open bid details"><span class="bnk">'+(n===0?'Due today':(mine?'Your next due':'Next due'))+'</span><span class="bnn">'+esc(j.name||'Untitled bid')+'</span><span class="bnm"><span class="bnw">'+wkDay(j.bid_date)+(n>0?' · '+(n===1?'tomorrow':'in '+n+' days'):'')+'</span>'+estBadge(pmName(j.pm)||'No estimator')+(same?'<span class="bnw">+'+same+' more that day</span>':'')+'</span></button>'}
+/* This week at the top of Bids: the bids due in this calendar week (Mon-Sun, same weeks as Coming up), bucketed by day.
+   Days before today keep their bids (shown dimmed, not counted); total and $ count today..Sunday. If nothing is left this week, next week's.
+   pm: only that estimator's bids (My bids). null when neither week has a bid still coming up. */
+function bidWeekDays(list,td,pm){
+  const [y,m,d]=String(td).split('-').map(Number),t0=Date.UTC(y,m-1,d),dow=(new Date(t0).getUTCDay()+6)%7,L=(list||[]).filter(j=>j.bid_date&&(!pm||j.pm===pm));
+  const iso=k=>new Date(t0+(k-dow)*864e5).toISOString().slice(0,10);
+  const mk=w=>{const days=[];
+    for(let i=0;i<7;i++){const s=iso(w*7+i);days.push({d:DOW3[(i+1)%7],iso:s,items:L.filter(j=>String(j.bid_date).slice(0,10)===s&&(s>=td?bidPh(j,td)===0:bidStat(j,td)!=='nobid')).sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')))})}
+    const up=[].concat(...days.filter(x=>x.iso>=td).map(x=>x.items));
+    return {label:w?'Next week':'This week',days,total:up.length,amt:up.reduce((a,j)=>a+(Number(j.bid_amount)||0),0)}};
+  const a=mk(0);if(a.total)return a;const b=mk(1);return b.total?b:null}
+const bidWkMine=()=>lsGet('crewplans.bidView')!=='all'&&!!S.myOfficeId;
+const bidWkNow=()=>bidWeekDays(S.bids,today(),bidWkMine()?S.myOfficeId:null);
+const bidWkRange=w=>{const a=w.days[0].iso,b=w.days[6].iso,ma=+a.slice(5,7),mb=+b.slice(5,7);return MON3[ma-1]+' '+(+a.slice(8))+' – '+(ma===mb?'':MON3[mb-1]+' ')+(+b.slice(8))};
+const bidWkCnt=n=>n+' bid'+(n===1?'':'s');
+const bidWkCol=j=>{const n=pmName(j.pm);return n?estColor(n):'#9aa3ad'};
+/* wide: Mon-Sun strip; phone: one line that opens the week sheet. Both are rendered; a media query shows one. */
+function bidNextHtml(){const td=today(),mine=bidWkMine(),w=bidWkNow();
+  if(!w){const g=bidComingGroups((S.bids||[]).filter(j=>!mine||j.pm===S.myOfficeId),td);if(!g.length)return '';const j=g[0][2][0],n=dayDiff(td,String(j.bid_date).slice(0,10));
+    return '<div class="bwk bwk-one"><button type="button" class="bwk-l" data-bwj="'+esc(j.id)+'" title="Open bid details"><span class="bwk-k">'+(mine?'Your next due':'Next due')+'</span><span class="bwsep">·</span><span class="bwnx"><i class="edot" style="background:'+bidWkCol(j)+'"></i><b>'+esc(j.name||'Untitled bid')+'</b></span><span class="bwm">'+wkDay(j.bid_date)+' · in '+n+' days</span><span class="bwgo" aria-hidden="true">›</span></button></div>'}
+  const nw=w.label==='Next week',up=w.days.filter(x=>x.iso>=td&&x.items.length),tday=nw?null:w.days.find(x=>x.iso===td&&x.items.length),key=nw?(mine?'Your next week':'Next week'):(mine?'Your week':'This week');
+  let h='<div class="bwk"><div class="bwk-s" role="group" aria-label="'+esc(key)+'"><div class="bwk-h"><span class="bwk-k">'+key+'</span><span class="bwk-t">'+bidWkCnt(w.total)+(w.amt?' · '+moneyK(w.amt):'')+'</span><span class="bwk-r">'+bidWkRange(w)+'</span></div><div class="bwk-g">';
+  w.days.forEach(x=>{const n=x.items.length,past=x.iso<td,isT=x.iso===td,cls='bwk-c'+(isT?' tdy':'')+(past?' past':'')+(isT&&n?' due':'');
+    const top='<span class="bwd">'+x.d+'</span><span class="bwn">'+(isT?'Today':MON3[+x.iso.slice(5,7)-1]+' '+(+x.iso.slice(8)))+'</span>';
+    if(!n){h+='<div class="'+cls+'">'+top+'<span class="bwz" aria-hidden="true">–</span></div>';return}
+    const names=x.items.map(j=>(j.name||'Untitled bid')+(pmName(j.pm)?' ('+pmName(j.pm)+')':''));
+    h+='<button type="button" class="'+cls+'" data-bwd="'+x.iso+'" title="'+esc(wkDay(x.iso)+(past?' (due, now waiting)':'')+'\n'+names.join('\n'))+'" aria-label="'+esc(wkDay(x.iso)+', '+bidWkCnt(n)+(past?' were due':' due')+': '+names.join(', '))+'">'+top+
+      '<span class="bwc">'+n+'<small>'+(n===1?'bid':'bids')+'</small></span><span class="bwdots" aria-hidden="true">'+x.items.slice(0,n>6?5:6).map(j=>'<i style="background:'+bidWkCol(j)+'"></i>').join('')+(n>6?'<em>+'+(n-5)+'</em>':'')+'</span></button>'});
+  h+='</div></div>';
+  let line;
+  if(tday){const n=tday.items.length,j=tday.items[0];
+    line='<span class="bwk-k">Due today</span><span class="bwsep">·</span><span class="bwk-t">'+bidWkCnt(n)+'</span><span class="bwsep">·</span><span class="bwnx"><i class="edot" style="background:'+bidWkCol(j)+'"></i><b>'+esc(j.name||'Untitled bid')+'</b></span>'+(n>1?'<span class="bwm">+'+(n-1)+' more</span>':'')+(w.total>n?'<span class="bwm">· '+w.total+' this wk</span>':'')}
+  else{const x=up[0],j=x.items[0],more=x.items.length-1;
+    line='<span class="bwk-k">'+(nw?(mine?'Yours next week':'Next week'):(mine?'Yours this week':'This week'))+'</span><span class="bwsep">·</span><span class="bwk-t">'+bidWkCnt(w.total)+'</span><span class="bwsep">·</span><span class="bwnx">next: <i class="edot" style="background:'+bidWkCol(j)+'"></i><b>'+esc(j.name||'Untitled bid')+'</b></span><span class="bwm">'+x.d+(more?' +'+more+' more that day':'')+'</span>'}
+  return h+'<button type="button" class="bwk-l'+(tday?' tdy':'')+'" data-bwl title="See '+esc(key.toLowerCase())+'’s bids">'+line+'<span class="bwgo" aria-hidden="true">›</span></button></div>'}
+/* phone sheet: the week's bids still coming up, by day; tap one for its details */
+function bidWeekSheet(at){const td=today(),w=bidWkNow();if(!w)return;const mine=bidWkMine(),nw=w.label==='Next week';
+  let h='<div class="bwsh"><h2>'+(nw?(mine?'Your bids next week':'Next week'):(mine?'Your bids this week':'This week'))+'</h2><p class="bwsub">'+bidWkCnt(w.total)+(w.amt?' · '+moneyK(w.amt):'')+' · '+bidWkRange(w)+'</p>';
+  w.days.filter(x=>x.iso>=td&&x.items.length).forEach(x=>{const amt=x.items.reduce((a,j)=>a+(Number(j.bid_amount)||0),0);
+    h+='<div class="bwdh'+(x.iso===td?' tdy':'')+'" data-bwsd="'+x.iso+'">'+(x.iso===td?'Due today':wkDay(x.iso))+'<span>'+bidWkCnt(x.items.length)+(amt?' · '+moneyK(amt):'')+'</span></div>'+
+      x.items.map(j=>'<button type="button" class="bwrow" data-bws="'+esc(j.id)+'"><span class="bwrn"><b>'+esc(j.name||'Untitled bid')+'</b>'+estBadge(pmName(j.pm)||'No estimator')+'<span class="muted small">Due '+(x.iso===td?'today':x.d)+'</span></span><span class="bwra">'+(j.bid_amount!=null&&j.bid_amount!==''?money(j.bid_amount):'<span class="muted">No $</span>')+'</span><span class="bwgo" aria-hidden="true" style="color:#7b8591;font-size:20px">›</span></button>').join('')});
+  const m=modal(h+'<div class="mbtns"><button class="btn" data-x>Close</button></div></div>');
+  $('[data-x]',m).onclick=()=>m.close();
+  $$('[data-bws]',m).forEach(b=>b.onclick=()=>{const j=(S.bids||[]).find(x=>x.id===b.dataset.bws);m.close();if(j)bidPanel(j)});
+  const f=at&&$('[data-bwsd="'+at+'"]',m);if(f)f.scrollIntoView({block:'start'});return m}
+/* click a day on the strip: on the Bid list, open the sections holding that day's bids, scroll to them and flash them; on Pipeline, the week sheet */
+function bidWeekGo(iso){const td=today(),w=bidWkNow(),x=w&&w.days.find(d=>d.iso===iso);if(!x||!x.items.length)return;
+  if(!$('#bidList')){bidWeekSheet(iso);return}
+  const ids=x.items.map(j=>j.id),find=()=>ids.map(id=>$('#bidList .bidc[data-bid="'+CSS.escape(id)+'"]')).filter(Boolean);
+  let els=find();
+  if(els.length<ids.length){const bv=lsGet('crewplans.bidView')==='all'?'all':'mine',keys=[];
+    x.items.forEach(j=>{const ph=bidPh(j,td),sec=['up','wait','nodate','res'][ph];keys.push(bv+':'+sec);
+      if(ph===0){const g=bidComingGroups([j],td);if(g.length)keys.push(bv+':up:'+g[0][0])}
+      else if(bv==='all'&&(ph===1||ph===3))keys.push(bv+':'+sec+':'+(pmName(j.pm)||'No estimator'))});
+    bidCollSet(keys,false);
+    const est=lsGet('crewplans.bidEst')||'';if(est&&x.items.some(j=>pmName(j.pm)!==est))lsSet('crewplans.bidEst','');
+    if(String(S.bidQ||'').trim()&&x.items.some(j=>!bidMatch(j,S.bidQ)))S.bidQ='';
+    const f=lsGet('crewplans.bidFilt')||'open';if(f!=='all'&&x.items.some(j=>!bidFilt(j,f,td)))lsSet('crewplans.bidFilt','all');
+    render();els=find()}
+  if(!els.length)return;
+  els[0].scrollIntoView({block:els.length>2?'start':'center',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
+  els.forEach(el=>{el.classList.remove('bflash');void el.offsetWidth;el.classList.add('bflash');setTimeout(()=>el.classList.remove('bflash'),1900)});
+  els[0].focus({preventScroll:true})}
 function bidDateBlock(d,td,res,cls){if(!d)return '<div class="bdate none'+(cls||'')+'"><span>No</span><b>date</b></div>';const n=dayDiff(td,d),[y,m,dd]=d.split('-').map(Number);
   return '<div class="bdate'+(res?'':n>=0&&n<=7?' soon':n<0?' past':'')+(cls||'')+'" title="'+esc(fmtDay(d))+'"><span>'+MON3[m-1]+(y!==+td.slice(0,4)?' ’'+String(y).slice(2):'')+'</span><b>'+dd+'</b></div>'}
 const bidPill=s=>'<span class="bpill s-'+s+'">'+bidStLabel(s)+'</span>';
@@ -2887,7 +2986,9 @@ async function bidDeleteMany(list){if(!S.isAdmin)return false;list=(list||[]).fi
 function bindBidsSec(){
   $$('[data-bpane]').forEach(b=>b.onclick=()=>{lsSet('crewplans.bidPane',b.dataset.bpane);window.scrollTo(0,0);render()});
   $$('[data-bfilt]').forEach(b=>b.onclick=()=>{lsSet('crewplans.bidFilt',b.dataset.bfilt);render()});
-  const nx=$('[data-bnext]');if(nx)nx.onclick=()=>{const j=(S.bids||[]).find(x=>x.id===nx.dataset.bnext);if(j)bidPanel(j)};
+  const bwj=$('[data-bwj]');if(bwj)bwj.onclick=()=>{const j=(S.bids||[]).find(x=>x.id===bwj.dataset.bwj);if(j)bidPanel(j)};
+  const bwl=$('[data-bwl]');if(bwl)bwl.onclick=()=>bidWeekSheet();
+  $$('[data-bwd]').forEach(b=>b.onclick=()=>bidWeekGo(b.dataset.bwd));
   const qq=$('#bidQ');if(qq)qq.oninput=()=>{S.bidQ=qq.value;$('#bidList').innerHTML=bidListHtml();bindBidList()};
   if($('#trkDl'))$('#trkDl').onclick=trkDownload;
   const sb2=$('#bidSelBtn');if(sb2)sb2.onclick=()=>{S.bidSel=S.bidSel?null:new Set();render()};

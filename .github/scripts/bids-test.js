@@ -13,7 +13,7 @@ function grab(name) {
   if (!lines[i].startsWith('const ')) while (j < lines.length && /^(\s|\})/.test(lines[j])) j++;
   return lines.slice(i, j).join('\n');
 }
-const names = ['BID_ST', 'dayDiff', 'MON3', 'BID_NOWORD_DAYS', 'bidNoWord', 'bidRes', 'bidStat', 'bidPh', 'bidComingGroups', 'bidEstSort', 'bidEstNames', 'bidSecs', 'bidCollOn', 'DOW3', 'wkDay'];
+const names = ['BID_ST', 'dayDiff', 'MON3', 'BID_NOWORD_DAYS', 'bidNoWord', 'bidRes', 'bidStat', 'bidPh', 'bidComingGroups', 'bidEstSort', 'bidEstNames', 'bidSecs', 'bidCollOn', 'DOW3', 'wkDay', 'bidWeekDays'];
 const T = vm.runInNewContext(names.map(grab).join('\n') + '\n;({' + names.join(',') + '})', { Math, Date, String, Number, Set, Object, Array, JSON, RegExp });
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok - ' + name); };
 const TD = '2026-11-26';
@@ -85,9 +85,63 @@ t('collapsed: Results start collapsed, everything else open; a saved choice wins
   assert.strictEqual(T.bidCollOn(null, 'all:up'), false);
 });
 
-t('weekday dates for the Next due strip', () => {
+t('weekday dates for the This week strip', () => {
   assert.strictEqual(T.wkDay('2026-12-01'), 'Tue Dec 1');
   assert.strictEqual(T.wkDay('2026-11-26'), 'Thu Nov 26');
   assert.strictEqual(T.wkDay(''), '');
+});
+const W = (list, td, pm) => { const w = T.bidWeekDays(list, td, pm); return w && plain({ label: w.label, days: w.days.map(x => [x.d, x.iso, ids(x.items)]), total: w.total, amt: w.amt }); };
+t('This week: Thu with bids Thu / Fri / Sun -> This week, Mon-Sun cells, total and $ from today on', () => {
+  const L = [{ id: 'th', name: 'THU', bid_date: '2026-11-26', bid_amount: 100000 }, { id: 'fr', name: 'FRI', bid_date: '2026-11-27', bid_amount: '50000' }, { id: 'su', name: 'SUN', bid_date: '2026-11-29' },
+    { id: 'nx', name: 'NEXT MON', bid_date: '2026-11-30', bid_amount: 9 }, { id: 'mo', name: 'WAITING MON', bid_date: '2026-11-23', bid_amount: 7 }, { id: 'nb', name: 'NO BID TUE', bid_date: '2026-11-24', bid_status: 'nobid' }];
+  const w = W(L, TD);
+  assert.strictEqual(w.label, 'This week');
+  assert.deepStrictEqual(w.days.map(x => x[0] + ' ' + x[1]), ['Mon 2026-11-23', 'Tue 2026-11-24', 'Wed 2026-11-25', 'Thu 2026-11-26', 'Fri 2026-11-27', 'Sat 2026-11-28', 'Sun 2026-11-29']);
+  assert.deepStrictEqual(w.days.map(x => x[2]), [['mo'], [], [], ['th'], ['fr'], [], ['su']]);
+  assert.strictEqual(w.total, 3);
+  assert.strictEqual(w.amt, 150000);
+});
+t('This week: Sat with nothing left -> Next week (Mon-Sun after); nothing in either -> null', () => {
+  const L = [{ id: 'th', bid_date: '2026-11-26' }, { id: 'tu', bid_date: '2026-12-01', bid_amount: 20 }, { id: 'su', bid_date: '2026-12-06' }, { id: 'far', bid_date: '2026-12-07' }];
+  const w = W(L, '2026-11-28');
+  assert.strictEqual(w.label, 'Next week');
+  assert.deepStrictEqual(w.days.map(x => x[1]), ['2026-11-30', '2026-12-01', '2026-12-02', '2026-12-03', '2026-12-04', '2026-12-05', '2026-12-06']);
+  assert.deepStrictEqual(w.days.map(x => x[2].join()), ['', 'tu', '', '', '', '', 'su']);
+  assert.strictEqual(w.total, 2);
+  assert.strictEqual(w.amt, 20);
+  assert.strictEqual(T.bidWeekDays([{ id: 'far', bid_date: '2026-12-07' }], '2026-11-28'), null);
+  assert.strictEqual(T.bidWeekDays([], TD), null);
+  assert.strictEqual(T.bidWeekDays([{ id: 'won', bid_date: '2026-11-27', bid_status: 'won' }], TD), null);
+});
+t('This week: Sunday is the last day of its week (not the first of the next)', () => {
+  const w = W([{ id: 'su', bid_date: '2026-11-29' }, { id: 'mo', bid_date: '2026-11-30' }], '2026-11-29');
+  assert.strictEqual(w.label, 'This week');
+  assert.strictEqual(w.days[0][1], '2026-11-23');
+  assert.deepStrictEqual(w.days[6], ['Sun', '2026-11-29', ['su']]);
+  assert.strictEqual(w.total, 1);
+  const n = W([{ id: 'mo', bid_date: '2026-11-30' }], '2026-11-29');
+  assert.strictEqual(n.label, 'Next week');
+  assert.deepStrictEqual(n.days[0], ['Mon', '2026-11-30', ['mo']]);
+  const m = W([{ id: 'mo', bid_date: '2026-11-30' }], '2026-11-30');
+  assert.strictEqual(m.label, 'This week');
+  assert.deepStrictEqual(m.days[0], ['Mon', '2026-11-30', ['mo']]);
+});
+t('This week: several bids the same day sorted by name, all counted', () => {
+  const L = [{ id: 'z', name: 'ZULU', bid_date: '2026-11-27', bid_amount: 1 }, { id: 'a', name: 'ALPHA', bid_date: '2026-11-27', bid_amount: 2 }, { id: 'm', name: 'MIKE', bid_date: '2026-11-27' }, { id: 't', name: 'TODAY', bid_date: '2026-11-26' }];
+  const w = W(L, TD);
+  assert.deepStrictEqual(w.days[4], ['Fri', '2026-11-27', ['a', 'm', 'z']]);
+  assert.strictEqual(w.total, 4);
+  assert.strictEqual(w.amt, 3);
+});
+t('This week: mine -> only that estimator, falls to Next week on their own bids', () => {
+  const w = W(B, TD, 'o1');
+  assert.strictEqual(w.label, 'Next week');
+  assert.deepStrictEqual(w.days.map(x => x[2].join()).filter(Boolean), ['b']);
+  const all = W(B, TD);
+  assert.strictEqual(all.label, 'This week');
+  assert.deepStrictEqual(all.days.map(x => x[2]), [[], [], [], ['m', 'a'], [], [], []]);
+  assert.strictEqual(W(B, TD, 'o2').label, 'This week');
+  assert.deepStrictEqual(W(B, TD, 'o2').days[3][2], ['m']);
+  assert.strictEqual(T.bidWeekDays(B, TD, 'nobody'), null);
 });
 console.log(n + ' tests passed');
