@@ -5633,8 +5633,15 @@ function tkpRender(root,c,act){
   $$('[data-by]',root).forEach(b=>b.onclick=()=>{viewSet('takeoff',{by:b.dataset.by},TKVW_DEF);act({t:'by',v:b.dataset.by});redraw()});
   tkpBindList($('#tkpL',root),c,act,redraw);
 }
+/* right-click an item in the items panel (docked or popped out) */
+function tkpItemCtx(id,cx,cy,c,act,redraw){const o=document.getElementById('tkCtx');if(o)o.remove();const it=(c.d.items||[]).find(x=>x.id===id);if(!it)return;const off=!!(c.hide&&c.hide[id]);
+  const m=document.createElement('div');m.id='tkCtx';m.className='tkctx';
+  m.innerHTML='<div class="small muted" style="padding:6px 10px 4px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><b>'+esc(it.code||'Item')+'</b></div>'+[['editf','✎ Edit item…'],['pick','✏ Use / highlight this item'],['eye',off?'💡 Turn on (show on the plans)':'💡 Turn off (hide on the plans)'],['solo','💡 Show only this item'],['xi','📄 Show the sheets it\'s on'],['edit','🗑 Delete item…']].map(x=>'<button data-ic="'+x[0]+'">'+x[1]+'</button>').join('');
+  document.body.appendChild(m);const r=m.getBoundingClientRect();m.style.left=Math.max(4,Math.min(cx,innerWidth-r.width-4))+'px';m.style.top=Math.max(4,Math.min(cy,innerHeight-r.height-4))+'px';
+  const close=()=>{m.remove();document.removeEventListener('pointerdown',out,true)},out=e=>{if(!m.contains(e.target))close()};setTimeout(()=>document.addEventListener('pointerdown',out,true),0);m.addEventListener('contextmenu',e=>e.preventDefault());
+  $$('[data-ic]',m).forEach(b=>b.onclick=()=>{close();const k=b.dataset.ic;if(k==='solo')act({t:'eye',id,solo:true});else if(k==='xi'){const co=tkColl();co['xi:'+id]=1;if(tkpBy()==='sheet')viewSet('takeoff',{by:'item'},TKVW_DEF);lsSet('acv.tkCollapsed',JSON.stringify(co));act({t:'by',v:'item'});redraw()}else act({t:k,id})})}
 function tkpBindList(el,c,act,redraw){
-  $$('[data-it]',el).forEach(r=>r.onclick=e=>{if(e.target.closest('[data-ed],[data-eye],[data-xi]'))return;act({t:'pick',id:r.dataset.it,sheet:r.dataset.its||null})});
+  $$('[data-it]',el).forEach(r=>{r.onclick=e=>{if(e.target.closest('[data-ed],[data-eye],[data-xi]'))return;act({t:'pick',id:r.dataset.it,sheet:r.dataset.its||null})};r.ondblclick=e=>{if(e.target.closest('[data-ed],[data-eye],[data-xi]'))return;e.preventDefault();act({t:'editf',id:r.dataset.it})};r.oncontextmenu=e=>{e.preventDefault();tkpItemCtx(r.dataset.it,e.clientX,e.clientY,c,act,redraw)}});
   $$('[data-ed]',el).forEach(b=>b.onclick=()=>act({t:'edit',id:b.dataset.ed}));
   $$('[data-eye]',el).forEach(b=>b.onclick=e=>{e.stopPropagation();act({t:'eye',id:b.dataset.eye,solo:e.shiftKey})});
   $$('[data-xi]',el).forEach(b=>b.onclick=()=>{tkToggleColl('xi:'+b.dataset.xi);redraw()});
@@ -5656,6 +5663,7 @@ function tkpDo(a){
   if(a.t==='by'){if(TKV)tkvSide();return}
   if(a.t==='new'){tkItemForm(null).then(n=>{if(n&&TKV){TKV.item=n.id;tkvMode('draw');tkvSide()}});return}
   if(a.t==='edit'){if(it)tkItemMenu(it);return}
+  if(a.t==='editf'){if(it){if(it.fr)tkFrameForm(it);else tkItemForm(it)}return}
   if(a.t==='open'){const s=tkSheets().find(x=>x.id===a.sid);if(!s)return;if(TKV&&TKV.id)tkGo(s);else{TKV=null;tkOpen(s.id)}return}
   if(!TKV){if(a.t==='pick'&&it){if(a.sheet&&tkSheets().some(s=>s.id===a.sheet)){TKV={item:it.id,hl:it.id};tkOpen(a.sheet)}else tkShowItem(it.id)}return}
   if(a.t==='scale'){tkScaleBox();return}
@@ -5947,7 +5955,9 @@ function tkvBind(){
   };
   st.addEventListener('pointerleave',e=>{if(!TKV||e.pointerType==='touch'||TKV.pts.has(e.pointerId))return;TKV.aim=null;TKV.snapHit=null;tkvOverlay()});
   st.addEventListener('pointerup',end);st.addEventListener('pointercancel',end);
-  st.addEventListener('dblclick',e=>{e.preventDefault();if(TKV&&TKV.draft.length&&TKV.mode!=='select')tkvFinish()});
+  st.addEventListener('dblclick',e=>{e.preventDefault();if(!TKV)return;if(TKV.draft.length&&TKV.mode!=='select'){tkvFinish();return}
+    /* double-click a mark (Select or Move) = edit its item */
+    if(!TKV.draft.length&&(TKV.mode==='select'||TKV.mode==='pan')){const h=tkvHit(tkvImg(e.clientX,e.clientY)),s=h&&tkvShape(h),it=s&&tkItem(s.item);if(it){if(it.fr)tkFrameForm(it);else tkItemForm(it)}}});
   st.addEventListener('contextmenu',e=>{e.preventDefault();if(!TKV||!TKV.W)return;if($('#tkCtx')&&Date.now()-(TKV.ctxAt||0)<800)return;if(TKV.g)TKV.g.long=true;tkCtx(e.clientX,e.clientY)});
   st.addEventListener('wheel',e=>{if(!TKV||!TKV.W)return;e.preventDefault();tkvZoomAt(e.clientX,e.clientY,Math.exp(-e.deltaY*.0015))},{passive:false});
   /* cursors (CSS from data-m / data-h / data-g): hover in select mode (rAF-throttled) and the gesture under way */
