@@ -13,7 +13,7 @@ function grab(name) {
   return lines.slice(i, j).join('\n');
 }
 const names = ['tkDupText', 'tkOffsetLine', 'tkSideOff', 'TK_SECS', 'TK_PAPER', 'TK_SCALES', 'tkFeet', 'tkFtIn', 'tkLenPx', 'tkAreaPx', 'tkShapeQty', 'tkPresetFpp', 'tkGuessPaper', 'tkEvenUp', 'tkCodeHeight', 'tkCodeWidth', 'tkItemWidthIn', 'tkInches', 'tkInStr', 'tkParseScales',
-  'tkApply', 'tkTotals', 'tkSheetQty', 'tkHeightSplits', 'tkRows', 'tkCopyShapes', 'tkSplitLine', 'tkInsertCorner', 'tkMoveCorner', 'tkDeleteCorner', 'tkOffsetShapes',
+  'tkApply', 'tkTotals', 'tkSheetQty', 'tkHeightSplits', 'tkRows', 'tkCopyShapes', 'tkSplitLine', 'tkInsertCorner', 'tkMoveCorner', 'tkDeleteCorner', 'tkCoincident', 'tkOffsetShapes',
   'tkSnapVerts', 'tkNearVertex', 'tkOrtho', 'tkSnapPick', 'tkEnds', 'tkEndMark', 'tkReadout',
   'TK_FR_DEF', 'tkFrRot', 'tkFrUn', 'tkFrIv', 'tkFrUnion', 'tkFrClip', 'tkFrSwap', 'tkFrExt', 'tkFrAuto', 'tkFrAngle', 'tkFrPc', 'tkFrame', 'tkFrSum', 'tkFrameOf', 'tkFrRows', 'tkFrItem',
   'TK_LAY_DEF', 'TK_LAY_NAME', 'tkLayPre', 'tkLayF', 'tkLayArea', 'tkLayPos', 'tkLayCut', 'tkLayWires', 'tkLayAct', 'tkLayCrc', 'tkLayRc', 'tkLayDwg', 'tkLayAt', 'tkLayOrg', 'tkEdNear', 'tkEdRuns', 'tkEdAt',
@@ -324,6 +324,30 @@ t('tkInsertCorner / tkMoveCorner / tkDeleteCorner: editing corners', () => {
   assert.deepStrictEqual(p, [0, 0, 1, 0, 1, 1], 'input untouched');
   const W = 1000, H = 1000;
   near(T.tkLenPx(T.tkInsertCorner([0, 0, 1, 0], 0, 0.3, 0), W, H), 1000, 'a corner on the line keeps the length');
+});
+
+t('tkCoincident: connected ends on the same sheet move together (Shift-drag)', () => {
+  const shapes = [
+    { id: 'a', sheet: 's1', item: 'i1', k: 'line', p: [0.1, 0.1, 0.5, 0.1] },
+    { id: 'b', sheet: 's1', item: 'i1', k: 'line', p: [0.5, 0.1, 0.5, 0.6] },
+    { id: 'c', sheet: 's1', item: 'i2', k: 'poly', p: [0.5, 0.1, 0.9, 0.1, 0.9, 0.5] },
+    { id: 'd', sheet: 's2', item: 'i1', k: 'line', p: [0.5, 0.1, 0.5, 0.9] },
+    { id: 'e', sheet: 's1', item: 'i1', k: 'count', p: [0.5, 0.1] },
+    { id: 'f', sheet: 's1', item: 'i3', k: 'line', p: [0.5001, 0.1, 0.7, 0.7] }];
+  assert.deepStrictEqual(plain(T.tkCoincident(shapes, 's1', 'a', 1)), [{ id: 'a', i: 1 }, { id: 'b', i: 0 }, { id: 'c', i: 0 }, { id: 'f', i: 0 }], 'own corner first; other sheets and counts skipped');
+  assert.deepStrictEqual(plain(T.tkCoincident(shapes, 's1', 'a', 1, 2e-5)), [{ id: 'a', i: 1 }, { id: 'b', i: 0 }, { id: 'c', i: 0 }], 'tight tolerance');
+  assert.deepStrictEqual(plain(T.tkCoincident(shapes, 's1', 'a', 1, 2e-4, { i3: true })).map(x => x.id), ['a', 'b', 'c'], 'hidden items skipped');
+  assert.deepStrictEqual(plain(T.tkCoincident(shapes, 's1', 'a', 0)), [{ id: 'a', i: 0 }], 'a free end');
+  assert.deepStrictEqual(plain(T.tkCoincident(shapes, 's1', 'zz', 0)), [], 'no such mark');
+  const vs = T.tkSnapVerts(shapes, 's1', 100, 100, null, { id: 'a', i: 1, all: { 'b:0': 1, 'c:0': 1 } });
+  assert.ok(!vs.some(v => (v.id === 'b' && v.i === 0) || (v.id === 'c' && v.i === 0) || (v.id === 'a' && v.i === 1)), 'dragged + linked corners are not snap targets');
+  assert.ok(vs.some(v => v.id === 'b' && v.i === 1), 'other corners still are');
+  let q = {}; ['a', 'b', 'c'].forEach(id => { q[id] = shapes.find(x => x.id === id).p.slice(); });
+  q.a = T.tkMoveCorner(q.a, 1, 0.6, 0.2); q.b = T.tkMoveCorner(q.b, 0, 0.6, 0.2); q.c = T.tkMoveCorner(q.c, 0, 0.6, 0.2);
+  const d = T.tkApply({ items: [{ id: 'i1', unit: 'LF' }, { id: 'i2', unit: 'SF' }], shapes: plain(shapes) }, ['a', 'b', 'c'].map(id => ({ t: 'shape', v: { id, p: q[id] } })));
+  near(d.shapes.find(x => x.id === 'a').p[2], 0.6); near(d.shapes.find(x => x.id === 'b').p[1], 0.2); near(d.shapes.find(x => x.id === 'c').p[0], 0.6);
+  const sheet = { w: 1000, h: 1000 };
+  near(T.tkShapeQty(d.shapes.find(x => x.id === 'a'), sheet, { fpp: 0.1 }, { unit: 'LF' }), Math.hypot(0.5 * 1000, 0.1 * 1000) * 0.1, 'length updates with the moved end');
 });
 
 t('tkOffsetShapes: pasted copies move together with new ids', () => {
