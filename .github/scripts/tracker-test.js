@@ -13,7 +13,7 @@ function grab(name) {
   if (!lines[i].startsWith('const ')) while (j < lines.length && /^(\s|\})/.test(lines[j])) j++;
   return lines.slice(i, j).join('\n');
 }
-const names = ['num', 'BID_ST', 'bidStLabel', 'isoD', 'dayDiff', 'MON3', 'BID_NOWORD_DAYS', 'bidNoWord', 'bidLost', 'bidRes', 'bidStat', 'bidFilt', 'bidGcs', 'pipeIn', 'bidYear',
+const names = ['num', 'BID_ST', 'bidStLabel', 'isoD', 'dayDiff', 'MON3', 'BID_NOWORD_DAYS', 'bidNoWord', 'bidLost', 'bidRes', 'bidStat', 'bidFilt', 'bidReview', 'bidInRev', 'bidPlainNotes', 'bidGcs', 'pipeIn', 'bidYear',
   'TRK_TABS', 'trkMon', 'trkText', 'trkDate', 'trkAmt', 'trkStatus', 'trkKey', 'gcKey', 'trkEst', 'TRK_FU', 'TRK_RES', 'TRK_CTX', 'trkSplit',
   'trkParseSheet', 'trkParseBook', 'trkRow', 'trkPatch', 'trkNameNorm', 'trkNameMatch', 'trkPlan', 'pipeCalc', 'niceMax', 'TRK_AW', 'trkGcText', 'trkExportTabs'];
 const T = vm.runInNewContext(names.map(grab).join('\n') + '\n;({' + names.join(',') + '})', { Math, Date, String, Number, Set, Object, Array, JSON, RegExp });

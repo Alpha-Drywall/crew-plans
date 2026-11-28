@@ -16,8 +16,8 @@ const names = ['tkOffsetLine', 'tkSideOff', 'TK_SECS', 'TK_PAPER', 'TK_SCALES', 
   'tkApply', 'tkTotals', 'tkSheetQty', 'tkHeightSplits', 'tkRows', 'tkCopyShapes', 'tkSplitLine', 'tkInsertCorner', 'tkMoveCorner', 'tkDeleteCorner', 'tkOffsetShapes',
   'tkSnapVerts', 'tkNearVertex', 'tkOrtho', 'tkSnapPick', 'tkEnds', 'tkEndMark', 'tkReadout',
   'TK_FR_DEF', 'tkFrRot', 'tkFrUn', 'tkFrIv', 'tkFrUnion', 'tkFrClip', 'tkFrSwap', 'tkFrExt', 'tkFrAuto', 'tkFrAngle', 'tkFrPc', 'tkFrame', 'tkFrSum', 'tkFrameOf', 'tkFrRows', 'tkFrItem',
-  'TK_LAY_DEF', 'TK_LAY_NAME', 'tkLayPre', 'tkLayF', 'tkLayArea', 'tkLayPos', 'tkLayCut', 'tkLayWires', 'tkLayAct', 'tkLayCrc', 'tkLayAt', 'tkLayOrg', 'tkEdNear', 'tkEdRuns', 'tkEdAt',
-  'tkTabOpen', 'tkTabClose', 'tkTabMove', 'tkTabStep', 'tkTabsClean', 'tkHideBulk', 'tkHideAnyOn', 'TK_PAL', 'TK_COLORS', 'tkNextColor', 'tkColorName', 'tkColorOpts'];
+  'TK_LAY_DEF', 'TK_LAY_NAME', 'tkLayPre', 'tkLayF', 'tkLayArea', 'tkLayPos', 'tkLayCut', 'tkLayWires', 'tkLayAct', 'tkLayCrc', 'tkLayRc', 'tkLayAt', 'tkLayOrg', 'tkEdNear', 'tkEdRuns', 'tkEdAt',
+  'tkInPoly', 'tkBulkLayOps', 'tkEndCol', 'tkTabOpen', 'tkTabClose', 'tkTabMove', 'tkTabStep', 'tkTabsClean', 'tkHideBulk', 'tkHideAnyOn', 'TK_PAL', 'TK_COLORS', 'tkNextColor', 'tkColorName', 'tkColorOpts'];
 const T = vm.runInNewContext(names.map(grab).join('\n') + '\n;({' + names.join(',') + '})', { Math, Date, String, Number, Set, Object, Array, JSON, isFinite, parseFloat, NaN, Infinity });
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok - ' + name); };
 const plain = x => JSON.parse(JSON.stringify(x));
@@ -617,6 +617,44 @@ t('layout grid start point (org): ACT / CRC / joists line up through it; at the 
   const J = T.tkFrame(RECT, [], { sp: 16, ang: a, org: [5, 0] }).filter(g => g.r === 'joist');
   assert.ok(J.some(g => Math.abs(g.a[0] - 5) < 1e-9 && Math.abs(g.b[0] - 5) < 1e-9), 'a joist through the start point'); assert.ok(J.some(g => Math.abs(g.a[0]) < 1e-9) && J.some(g => Math.abs(g.a[0] - 30) < 1e-9), 'joists at both bearing edges');
 });
+t('layout RC channel: 20\' x 30\' @16" -> runs, LF, 12\' pieces; perimeter optional; openings cut; start point and edits', () => {
+  const a = T.tkFrAuto(RECT), L = T.tkLayRc(RECT, [], { ang: a, rcSp: 16, rcLen: 12 }), r = laySum(L);
+  assert.deepStrictEqual(r.rc, { n: 23, lf: 460, st: 46 }); assert.strictEqual(r.per, undefined, 'no perimeter unless asked');
+  assert.deepStrictEqual(laySum(T.tkLayRc(RECT, [], { ang: a, rcSp: 24, per: true, perLen: 10 })).rc, { n: 15, lf: 300, st: 30 });
+  assert.deepStrictEqual(laySum(T.tkLayRc(RECT, [], { ang: a, rcSp: 24, per: true, perLen: 10 })).per, { n: 4, lf: 100, st: 10 });
+  assert.strictEqual(laySum(T.tkLayRc(RECT, [], { ang: a, rcSp: 12 })).rc.n, 30);
+  const H = laySum(T.tkLayRc(RECT, [[10, 8, 14, 8, 14, 12, 10, 12]], { ang: a, rcSp: 16 })); assert.ok(H.rc.lf < 460 && H.rc.n > 23, 'runs cut at the opening ' + JSON.stringify(H.rc));
+  const o = T.tkLayOrg('rc', T.tkLayF({ preset: 'rc' }), RECT, a, null); assert.deepStrictEqual(laySum(T.tkLayRc(RECT, [], { ang: a, rcSp: 16, org: o })), r, 'auto start point = auto');
+  const E = T.tkLayRc(RECT, [], { ang: a, rcSp: 16, ed: { rm: [0] } }); assert.strictEqual(laySum(E).rc.n, 22, 'removed run');
+  const F = { preset: 'rc', per: 'J-mold' }, rows = T.tkFrRows({ id: 'r', code: 'RC', fr: F }, T.tkFrSum(T.tkLayRc(RECT, [], { ...T.tkLayF(F), ang: a, per: true }).segs), 0, { area: 600 });
+  assert.deepStrictEqual(plain(rows.map(x => [x.id, x.code, x.qty, x.unit, x.pcs])), [['r:rc', 'RC-1 25ga', 460, 'LF', 46], ['r:p', 'J-mold', 100, 'LF', 10]]);
+  assert.ok(/@16" OC – 46 pcs @12'/.test(rows[0].desc), rows[0].desc); assert.strictEqual(T.tkLayPre({ preset: 'rc' }), 'rc');
+});
+t('layout RC on a sheet -> rows through tkRows', () => {
+  const sheet = { id: 's1', w: 3000, h: 2000 }, d = T.tkApply({}, [{ t: 'item', v: { id: 'f', code: 'RC', sec: 'CEILINGS', unit: 'LF', fr: { preset: 'rc', sfc: '5/8 GWB' } } }, { t: 'scale', sheet: 's1', v: { fpp: 0.05 } },
+    { t: 'shape', v: { id: 'a', item: 'f', sheet: 's1', k: 'frame', p: [0.1, 0.1, 0.3, 0.1, 0.3, 0.3, 0.1, 0.3], dir: 'auto' } }]);
+  assert.deepStrictEqual(plain(T.tkRows(d, [sheet]).map(x => [x.id, x.qty, x.unit])), [['f:rc', 460, 'LF'], ['f:sf', 600, 'SF']]);
+});
+t('bulk layout: one frame per area of the item on every sheet, deducts inside become openings, re-run skips done areas', () => {
+  const sq = (x, y, w) => [x, y, x + w, y, x + w, y + w, x, y + w];
+  const d = { items: [], shapes: [
+    { id: 'a1', item: 'g', sheet: 's1', k: 'poly', p: sq(0.1, 0.1, 0.3) }, { id: 'a2', item: 'g', sheet: 's1', k: 'poly', p: sq(0.6, 0.6, 0.2) },
+    { id: 'a3', item: 'g', sheet: 's2', k: 'poly', p: sq(0.2, 0.2, 0.4) }, { id: 'd1', item: 'g', sheet: 's1', k: 'poly', deduct: true, p: sq(0.2, 0.2, 0.05) },
+    { id: 'd2', item: 'g', sheet: 's1', k: 'poly', deduct: true, p: sq(0.25, 0.3, 0.02) }, { id: 'd3', item: 'g', sheet: 's2', k: 'poly', deduct: true, p: sq(0.21, 0.21, 0.03) },
+    { id: 'x', item: 'h', sheet: 's1', k: 'poly', p: sq(0, 0, 0.5) }, { id: 'dx', item: 'h', sheet: 's1', k: 'poly', deduct: true, p: sq(0.65, 0.65, 0.02) }] };
+  let k = 0; const ops = T.tkBulkLayOps(d, 'g', 'L', 'now', () => 'n' + (++k));
+  assert.strictEqual(ops.length, 3, '3 areas -> 3 layouts');
+  assert.deepStrictEqual(plain(ops.map(o => [o.t, o.v.item, o.v.sheet, o.v.k, o.v.o.length, o.v.dir])), [['shape', 'L', 's1', 'frame', 2, 'auto'], ['shape', 'L', 's1', 'frame', 0, 'auto'], ['shape', 'L', 's2', 'frame', 1, 'auto']]);
+  assert.deepStrictEqual(plain(ops[0].v.p), sq(0.1, 0.1, 0.3)); assert.deepStrictEqual(plain(ops[0].v.o[0]), sq(0.2, 0.2, 0.05));
+  const d2 = { items: [], shapes: d.shapes.concat([ops[0].v]) };
+  assert.strictEqual(T.tkBulkLayOps(d2, 'g', 'L', 'now', () => 'z').length, 2, 'area that already has the layout is skipped');
+  assert.strictEqual(T.tkBulkLayOps(d2, 'g', 'L2', 'now', () => 'z').length, 3, 'another layout item still goes on all');
+  assert.strictEqual(T.tkBulkLayOps(d, 'none', 'L', 'now', () => 'z').length, 0);
+});
+t('tkEndMark squares / tkEndCol: white square centered on the end, crosshair color with white edge', () => {
+  const m = T.tkEndMark({ x: 10, y: 20, ux: 1, uy: 0 }, 'squares', 10); assert.strictEqual(m.k, 'sq'); near(m.x, 10); near(m.y, 20); near(m.a, 4.5);
+  assert.deepStrictEqual(plain(T.tkEndCol('auto')), { c: '#16191d', e: '#fff' }); assert.strictEqual(T.tkEndCol('red').c, '#e53935'); assert.strictEqual(T.tkEndCol('blue').c, '#1e88e5'); assert.strictEqual(T.tkEndCol('black').c, '#000');
+});
 t('layout: preset marks on a sheet -> rows; older framing items (no preset) stay joists', () => {
   const sheet = { id: 's1', w: 3000, h: 2000 };
   const mk = fr => T.tkApply({}, [{ t: 'item', v: { id: 'f', code: 'L', sec: 'CEILINGS', unit: 'LF', fr } }, { t: 'scale', sheet: 's1', v: { fpp: 0.05 } },
@@ -756,13 +794,12 @@ t('wall side: offset line to the right of travel by half the width; corners mite
   assert.deepStrictEqual(T.tkOffsetLine([0, 0, 1, 1], 10, 10, 0), [0, 0, 1, 1]);
 });
 
-t('color palette: 30 distinct takeoff colors, no pink, new items get the first unused color', () => {
+t('color palette: 30 distinct takeoff colors (true red, magenta, clear pinks), new items get the first unused color', () => {
   assert.strictEqual(T.TK_PAL.length, 30);
   assert.strictEqual(new Set(T.TK_COLORS).size, 30, 'no repeats');
   T.TK_COLORS.forEach(c => assert.match(c, /^#[0-9a-f]{6}$/, 'lower-case hex ' + c));
-  assert.ok(!T.TK_COLORS.includes('#d81b60'), 'the old pink is gone');
-  assert.ok(!T.TK_PAL.some(x => /pink/i.test(x[1])), 'no color named pink');
-  assert.ok(T.TK_PAL.some(x => x[1] === 'Magenta'), 'magenta instead');
+  assert.ok(!T.TK_COLORS.includes('#d81b60'), 'the old muddy red-pink is gone');
+  ['Red', 'Magenta', 'Hot pink', 'Light pink'].forEach(n => assert.ok(T.TK_PAL.some(x => x[1] === n), n + ' is in the palette'));
   assert.strictEqual(T.tkNextColor([]), T.TK_COLORS[0]);
   assert.strictEqual(T.tkNextColor([{ color: T.TK_COLORS[0] }, { color: '#123456' }]), T.TK_COLORS[1], 'skips used colors');
   assert.strictEqual(T.tkNextColor([{ color: T.TK_COLORS[0].toUpperCase() }]), T.TK_COLORS[1], 'case-insensitive');
