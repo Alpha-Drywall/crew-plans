@@ -12,7 +12,7 @@ function grab(name) {
   if (!lines[i].startsWith('const ')) while (j < lines.length && /^(\s|\})/.test(lines[j])) j++;
   return lines.slice(i, j).join('\n');
 }
-const names = ['tkOffsetLine', 'tkSideOff', 'TK_SECS', 'TK_PAPER', 'TK_SCALES', 'tkFeet', 'tkFtIn', 'tkLenPx', 'tkAreaPx', 'tkShapeQty', 'tkPresetFpp', 'tkGuessPaper', 'tkEvenUp', 'tkCodeHeight', 'tkCodeWidth', 'tkItemWidthIn', 'tkInches', 'tkInStr', 'tkParseScales',
+const names = ['tkDupText', 'tkOffsetLine', 'tkSideOff', 'TK_SECS', 'TK_PAPER', 'TK_SCALES', 'tkFeet', 'tkFtIn', 'tkLenPx', 'tkAreaPx', 'tkShapeQty', 'tkPresetFpp', 'tkGuessPaper', 'tkEvenUp', 'tkCodeHeight', 'tkCodeWidth', 'tkItemWidthIn', 'tkInches', 'tkInStr', 'tkParseScales',
   'tkApply', 'tkTotals', 'tkSheetQty', 'tkHeightSplits', 'tkRows', 'tkCopyShapes', 'tkSplitLine', 'tkInsertCorner', 'tkMoveCorner', 'tkDeleteCorner', 'tkOffsetShapes',
   'tkSnapVerts', 'tkNearVertex', 'tkOrtho', 'tkSnapPick', 'tkEnds', 'tkEndMark', 'tkReadout',
   'TK_FR_DEF', 'tkFrRot', 'tkFrUn', 'tkFrIv', 'tkFrUnion', 'tkFrClip', 'tkFrSwap', 'tkFrExt', 'tkFrAuto', 'tkFrAngle', 'tkFrPc', 'tkFrame', 'tkFrSum', 'tkFrameOf', 'tkFrRows', 'tkFrItem',
@@ -837,4 +837,18 @@ t('joist flange width from the member name (to scale), null when unreadable', ()
   assert.strictEqual(T.tkMemFlangeIn(''), null); assert.strictEqual(T.tkMemFlangeIn('joist'), null); assert.strictEqual(T.tkMemFlangeIn(null), null);
 });
 
+
+t('duplicate sheet warning text names the count and what to do', () => {
+  assert.ok(/already open/.test(T.tkDupText(1)) && /anyway/.test(T.tkDupText(1)));
+  assert.ok(/2 other places/.test(T.tkDupText(2)));
+  assert.ok(!/places/.test(T.tkDupText(1)));
+});
+t('index.html wires the duplicate warning into every sheet open', () => {
+  const html = fs.readFileSync('index.html', 'utf8');
+  assert.ok(/async function tkOpen\(sid,ok\)/.test(html) && /!ok&&!await tkDupOk\(sid\)/.test(html), 'tkOpen asks first');
+  assert.ok(/async function tkGo\(n\)\{[^\n]*tkDupOk\(n\.id\)/.test(html), 'tkGo asks first');
+  assert.ok(/m\.t==='who'/.test(html) && /m\.t==='here'/.test(html), 'presence messages');
+  assert.ok(/tkShCarry\(TKV\.id,n\.id\)/.test(html) && /TKANC=tkAnch/.test(html), 'sheet list keeps its place when a sheet opens');
+  assert.ok(/id="tkPdf"/.test(html) && /id="tkSend"/.test(html), 'Send to bid sheet and Markup PDF stay in the menu');
+});
 console.log(n + ' takeoff tests passed.');

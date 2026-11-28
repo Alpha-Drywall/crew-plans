@@ -2395,6 +2395,7 @@ const TIPS={
     ['[data-mode="pin"]',"Pin: tap the sheet to flag something for the foreman, with a photo.","Pin: toca el plano para avisarle algo al mayordomo, con una foto."],
     ['#snNext',"Arrows go to the next or previous sheet.","Las flechas van a la hoja siguiente o anterior."]],
   takeoff:[
+    ['#tkExitB',"Back to the job. The Takeoff tab opens straight into the plans; everything else (items, sheets, Send to bid sheet, Markup PDF) is under Takeoff menu.","Volver al trabajo. La pestaña de cuantificación abre directo en los planos; lo demás (partidas, hojas, Mandar a la hoja de licitación, PDF de marcas) está en el menú de cuantificación."],
     ['#tkBack',"Takeoff menu: + Takeoff item, Send to bid sheet, Markup PDF, download rows, and the list of sheets.","Menú de cuantificación: + Partida, Mandar a la hoja de licitación, PDF de marcas, bajar renglones y la lista de hojas."],
     ['#tkTabs .tktab',"Sheet tabs: each sheet you open gets a tab. Click to switch, × to close, drag to reorder.","Pestañas de hojas: cada hoja que abres tiene su pestaña. Clic para cambiar, × para cerrar, arrastra para ordenar."],
     ['#tkSide .tkpseg',"Items panel: list it By item, or By sheet to see what's on each sheet.","Panel de partidas: ordénalo Por partida, o Por hoja para ver qué hay en cada hoja."],
@@ -2404,7 +2405,7 @@ const TIPS={
     ['#tkSide [data-eye]',"💡 Shows or hides the item on the plans. Shift+click shows only this item.","💡 Muestra u oculta la partida en los planos. Shift+clic muestra solo esta partida."],
     ['#tkXAll',"▾▾ opens every group in the list, ▸▸ folds them all up.","▾▾ abre todos los grupos de la lista, ▸▸ los cierra todos."],
     ['#tkPop',"Pop out: puts the items list in its own window, handy on a second monitor.","Separar: pone la lista de partidas en su propia ventana, útil en un segundo monitor."],
-    ['#tkv .trow [data-tm="draw"]',"Take off draws with the item. Move pans, Select picks marks to move, copy or delete, Scale sets the scale, Measure checks a length without saving it.","Cuantificar dibuja con la partida. Mover desplaza, Seleccionar escoge marcas para mover, copiar o borrar, Escala fija la escala, Medir revisa una medida sin guardarla."],
+    ['#tkv .trow [data-tm="draw"]',"Take off draws with the item. Move pans (and a click on a mark selects it), Select picks marks to move, copy or delete, Scale sets the scale, Measure checks a length without saving it.","Cuantificar dibuja con la partida. Mover desplaza (y un clic en una marca la selecciona), Seleccionar escoge marcas para mover, copiar o borrar, Escala fija la escala, Medir revisa una medida sin guardarla."],
     ['#tkv .tkseg',"How clicks count: Area (corners or drag a box), Linear (corners until ✓ Finish), Segments (every 2 clicks is one piece), Count (each click is one).","Cómo cuentan los clics: Área (esquinas o arrastra un cuadro), Lineal (esquinas hasta ✓ Terminar), Segmentos (cada 2 clics es una pieza), Conteo (cada clic es uno)."],
     ['#tkStage',"Right-click (or long-press on a tablet) the plan or a mark for more: finish, undo, copy, wall side, delete. Hold the right button and drag to move the plan.","Clic derecho (o deja presionado en la tableta) en el plano o en una marca para más: terminar, deshacer, copiar, lado del muro, borrar. Mantén el botón derecho y arrastra para mover el plano."],
     ['#tkScBan',"Scale check: if the scale was read off the sheet, tap Looks right, or Check with a dimension to click a printed dimension and compare.","Revisa la escala: si se leyó de la hoja, toca Se ve bien, o Revisar con una medida para marcar una cota impresa y comparar."],
@@ -5517,7 +5518,7 @@ function tkBindGroups(root,redraw){$$('[data-tkg]',root).forEach(el=>{const go=(
 function renderTakeoff(){
   return '<div id="tkBody"><div class="empty">Loading takeoff…</div></div>';
 }
-/* opening the Takeoff tab goes straight into the drawing viewer (once per visit to the tab: the job shell is rebuilt when the tab changes); "Exit takeoff" in the menu leaves the list here */
+/* opening the Takeoff tab goes straight into the drawing viewer (once per visit to the tab: the job shell is rebuilt when the tab changes); the ‹ Job button (or Takeoff menu → Back to the job) returns to the job; with no plans uploaded the tab only shows a note */
 function bindTakeoff(){
   const jid=jobId();const T=tkFor(jid);
   const go=()=>{if(S.tab!=='takeoff'||jobId()!==jid||TKV||!T.loaded)return;const sh=$('[data-jobshell]');if(sh&&!sh._tkAuto&&T.loaded&&S.loaded.sheets){sh._tkAuto=1;const sid=tkAutoSheet();if(sid){tkOpen(sid);return}}tkRenderBody()};
@@ -5533,16 +5534,18 @@ function tkAutoSheet(){
 function tkMenu(){
   const el=$('#tkv');if(!el||!TK)return;if($('#tkMenu',el)){tkMenuClose();return}
   const jn=(S.job&&S.job.id===TK.job&&S.job.name)||'';
-  el.insertAdjacentHTML('beforeend','<div class="tkmenu" id="tkMenu"><div class="tkmbg" data-mx></div><div class="tkms" role="dialog" aria-modal="true" aria-label="Takeoff menu"><div class="tkmh"><div class="grow"><div class="tkmt">Takeoff</div>'+(jn?'<div class="tkmj">'+esc(jn)+'</div>':'')+'</div><button class="tkmx" data-mx aria-label="Close the menu" title="Close (Esc)">×</button></div><div class="tkmc" id="tkMenuB"></div><div class="tkmf"><button class="btn" id="tkExit" title="Close the drawing viewer and show the takeoff list">‹ Exit takeoff viewer</button></div></div></div>');
+  el.insertAdjacentHTML('beforeend','<div class="tkmenu" id="tkMenu"><div class="tkmbg" data-mx></div><div class="tkms" role="dialog" aria-modal="true" aria-label="Takeoff menu"><div class="tkmh"><div class="grow"><div class="tkmt">Takeoff</div>'+(jn?'<div class="tkmj">'+esc(jn)+'</div>':'')+'</div><button class="tkmx" data-mx aria-label="Close the menu" title="Close (Esc)">×</button></div><div class="tkmc" id="tkMenuB"></div><div class="tkmf"><button class="btn" id="tkExit" title="Leave the takeoff and go back to the job">‹ Back to the job</button></div></div></div>');
   const m=$('#tkMenu',el);$$('[data-mx]',m).forEach(b=>b.onclick=tkMenuClose);$('#tkExit',m).onclick=()=>{tkMenuClose();tkClose()};
   m.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('.mwrap')){e.preventDefault();e.stopPropagation();tkMenuClose()}});
   const bk=$('#tkBack',el);if(bk)bk.setAttribute('aria-expanded','true');tkRenderBody();const f=$('#tkAdd',m)||$('.tkmx',m);if(f)f.focus();
 }
 function tkMenuClose(){const m=$('#tkMenu');if(m)m.remove();const bk=$('#tkBack');if(bk){bk.setAttribute('aria-expanded','false');bk.focus()}}
 function tkRenderBody(){
-  const mb=$('#tkMenuB');if(!mb&&TKV)return;const b=mb||$('#tkBody');if(!b||!TK)return;const d=TK.data,sheets=tkSheets(),tot=tkTotals(d,sheets);
+  const mb=$('#tkMenuB');if(!mb&&TKV)return;const b=mb||$('#tkBody');if(!b||!TK)return;
+  if(!mb){b.innerHTML=tkSheets().length||!S.loaded.sheets||!TK.loaded?'<div class="empty">Loading takeoff…</div>':'<div class="empty"><b>No plans yet</b>Upload the plans on the Plans tab, then the Takeoff tab opens straight into them.<div style="margin-top:10px"><button class="btn primary" id="tkToPlans">Go to Plans</button></div></div>';const g=$('#tkToPlans');if(g)g.onclick=()=>{S.tab='plans';render()};return}
+  const d=TK.data,sheets=tkSheets(),tot=tkTotals(d,sheets);
   const bySec={};d.items.forEach(it=>{const k=TK_SECS.includes(it.sec)?it.sec:'INTERIOR';(bySec[k]=bySec[k]||[]).push(it)});
-  let h='<div class="card"><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" id="tkAdd">+ Takeoff item</button><button class="btn" id="tkAddFr" title="Lay out joists, an ACT grid or CRC &amp; furring over an area: a row per member">+ Layout item</button><button class="btn" id="tkSend">Send to bid sheet</button><button class="btn" id="tkPdf">Markup PDF</button><button class="btn" id="tkXls">Download rows (.xlsx)</button></div>'+
+  let h='<div class="card"><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" id="tkAdd">+ Takeoff item</button><button class="btn" id="tkAddFr" title="Lay out joists, an ACT grid or CRC &amp; furring over an area: a row per member">+ Layout item</button><button class="btn" id="tkSend">Send to bid sheet</button><button class="btn" id="tkPdf" title="Make the markup PDF: a legend page plus every sheet with each row color-coded">▤ Markup PDF</button><button class="btn" id="tkXls">Download rows (.xlsx)</button></div>'+
     '<p class="small muted" style="margin:8px 0 0">Add an item (your code for the TAKEOFF tab, like <b>362S162-25 FF14 G28 FR4</b>), then '+(mb?'pick a sheet below and click the ● next to an item to take off with it.':'open a sheet below and click along the walls.')+' '+(d.sent&&d.sent.at?'Last sent to '+esc(d.sent.file||'the bid sheet')+' '+esc(fmtWhen(d.sent.at))+'.':'')+' <span id="tkSaved" class="muted">'+(TK.ops.length?'Saving…':'Saved')+'</span></p></div>';
   if(!d.items.length)h+='<div class="empty"><b>No takeoff items yet</b>Tap + Takeoff item. Walls are LF, ceilings and soffit faces are SF, door frames and other counts are EA.</div>';
   TK_SECS.forEach(sec=>{const its=(bySec[sec]||[]).sort((a,b)=>(a.n||0)-(b.n||0));if(!its.length)return;
@@ -5766,8 +5769,19 @@ function tkPolyIt(it){return !!it&&(it.unit==='SF'||!!it.fr)}
 function tkvLineW(it,minPx){const sc=tkScaleOf(TKV.id),M=Math.max(TKV.W,TKV.H),mul=TKV.wmul||1;const w=sc&&+sc.fpp>0?tkItemWidthIn(it)/12/sc.fpp*mul:M*.0056*mul;return Math.max(w,(minPx||1.2)/TKV.t.s)}
 /* after a zoom: keep thin lines at least the minimum screen width */
 function tkvWidths(){if(!TKV)return;const k=1/TKV.t.s;$$('#tkShapes [data-w]').forEach(e=>e.setAttribute('stroke-width',Math.max(+e.dataset.w,(+e.dataset.wm||1.2)*k).toFixed(2)))}
-async function tkOpen(sid){
-  const sh=S.sheets.find(s=>s.id===sid);if(!sh||!TK)return;tkTabsInit(sid);
+/* duplicate sheet warning: opening a sheet that another viewer (this window or another window/tab of the job, asked over the pop-out BroadcastChannel) already shows asks first; duplicates are allowed, the warning comes every time */
+const TK_WID=Math.random().toString(36).slice(2);
+const tkDupText=n=>'This sheet is already open'+(n>1?' in '+n+' other places':' somewhere else')+' (another takeoff window or tab). Open it again anyway?';
+async function tkDupOk(sid){
+  if(!TK)return true;let n=0;if($('#tkv')&&TKV&&TKV.id===sid)n++;
+  const T=tkpChan(TK.job);
+  if(T){const id=uuid(),Q={id,n:new Set()};T.q=Q;try{T.ch.postMessage({t:'who',sid,q:id})}catch(e){}await new Promise(r=>setTimeout(r,150));n+=Q.n.size;if(T.q===Q)T.q=null}
+  return n?confirmBox(tkDupText(n),'Open anyway',false):true;
+}
+async function tkOpen(sid,ok){
+  const sh=S.sheets.find(s=>s.id===sid);if(!sh||!TK)return;
+  if(!ok&&!await tkDupOk(sid)){if(!$('#tkv')){TKV=null;if(S.view==='job'&&S.tab==='takeoff'){S.tab='plans';window.scrollTo(0,0);render()}}return}
+  tkTabsInit(sid);
   const list=tkSheets();const ni=list.findIndex(s=>s.id===sid);
   TKV={id:sid,sh,list,ni,W:0,H:0,t:{x:0,y:0,s:1},minS:.05,mode:TKV&&TKV.mode||'pan'/* opens in Move so nothing gets drawn or picked by accident; sheet switches keep the current mode */,item:TKV&&TKV.item||null,draft:[],cur:null,pts:new Map(),g:null,sel:null,hide:{},wmul:tkWmulGet(),hl:TKV&&TKV.hl||null,mine:[],lm:['seg','area'].includes(lsGet('acv.tkLineMode'))?lsGet('acv.tkLineMode'):'run',last:TKV&&TKV.last||{},dNext:false,msel:[],cont:null,contN:0,drag:null,box:null};
   if(TKV.hl&&!tkItem(TKV.hl))TKV.hl=null;tkAutoApply();
@@ -5777,11 +5791,11 @@ async function tkOpen(sid){
   {const tb=$('#tkBody');if(tb)tb.innerHTML='<div class="empty">The takeoff viewer is open.</div>'}
   const el=document.createElement('div');el.id='tkv';el.className='tkv';document.body.appendChild(el);document.body.classList.add('noscroll');
   const jn=(S.job&&S.job.id===TK.job&&S.job.name)||'';
-  el.innerHTML='<div class="vbar"><button id="tkBack" class="tkmb" title="Takeoff menu: items, sheets, Send to bid sheet, Markup PDF, download rows" aria-label="Takeoff menu" aria-haspopup="dialog" aria-expanded="false"><span class="tkmi" aria-hidden="true">☰</span> Takeoff<span class="vlbl"> menu</span></button><div class="vt">'+(jn?'<div class="vtj" id="tkJob" title="'+esc(jn)+'">'+esc(jn)+'</div>':'')+'<div class="vtn" title="'+esc(sh.name||'Sheet')+'">'+esc(sh.name||'Sheet')+(ni>=0&&list.length>1?' <span class="vtc">('+(ni+1)+'/'+list.length+')</span>':'')+'</div></div><button id="tkPrev"'+(ni<=0?' disabled':'')+'>‹</button><button id="tkNext"'+(ni<0||ni>=list.length-1?' disabled':'')+'>›</button></div><div class="tktabs" id="tkTabs" role="tablist" aria-label="Open sheets"></div>'+
+  el.innerHTML='<div class="vbar"><button id="tkExitB" class="tkmb" title="Back to the job (Plans tab)" aria-label="Back to the job">‹<span class="vlbl"> Job</span></button><button id="tkBack" class="tkmb" title="Takeoff menu: items, sheets, Send to bid sheet, Markup PDF, download rows" aria-label="Takeoff menu" aria-haspopup="dialog" aria-expanded="false"><span class="tkmi" aria-hidden="true">☰</span> Takeoff<span class="vlbl"> menu</span></button><div class="vt">'+(jn?'<div class="vtj" id="tkJob" title="'+esc(jn)+'">'+esc(jn)+'</div>':'')+'<div class="vtn" title="'+esc(sh.name||'Sheet')+'">'+esc(sh.name||'Sheet')+(ni>=0&&list.length>1?' <span class="vtc">('+(ni+1)+'/'+list.length+')</span>':'')+'</div></div><button id="tkPrev"'+(ni<=0?' disabled':'')+'>‹</button><button id="tkNext"'+(ni<0||ni>=list.length-1?' disabled':'')+'>›</button></div><div class="tktabs" id="tkTabs" role="tablist" aria-label="Open sheets"></div>'+
     '<div class="tkwrap"><div id="tkStage"><div id="tkBoard"><img id="tkImg" alt="" draggable="false"><svg id="tkInk" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="tkHatch" patternUnits="userSpaceOnUse" width="24" height="24" patternTransform="rotate(45)"><rect width="24" height="24" fill="#fff" fill-opacity=".55"/><line x1="0" y1="0" x2="0" y2="24" stroke="#c62828" stroke-width="5" stroke-opacity=".6"/></pattern></defs><g id="tkShapes"></g><g id="tkLive"></g></svg></div><svg id="tkSel" class="tksel" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"></svg><canvas id="tkOv" class="tkov" aria-hidden="true"></canvas><canvas id="tkMag" class="tkmag" aria-hidden="true"></canvas><div class="tkcr" id="tkCr" aria-live="off"></div><div class="hint" id="tkHint">Loading sheet…</div><div class="tkread" id="tkRead"></div></div>'+
     '<div class="tkside" id="tkSide"></div></div>'+
     '<div class="vtools"><div class="trow"><button class="tb" data-tm="draw">✏ Take off</button><button class="tb" data-tm="pan">✋ Move</button><button class="tb" data-tm="select">☝ Select</button><button class="tb" data-tm="scale">📐 Scale</button><button class="tb" data-tm="measure">📏 Measure</button><button class="tb" id="tkDone">✓ Finish</button><button class="tb" id="tkUndo">↶ Undo point</button><button class="tb" id="tkSnap">Snap: on</button><button class="tb" id="tkOrtho" title="Lock lines level / plumb (or hold Shift)" aria-pressed="false">⊥ Ortho</button><span class="tkseg" title="Area: click the corners, or drag a rectangle (+ Layout lays out joists / ACT grid / CRC &amp; furring). Linear: each click adds a corner until ✓ Finish. Segments: every 2 clicks make one straight piece. Count: each click counts one."><button class="tb" data-lm="area">Area</button><select class="tb tklay" id="tkLay" title="+ Layout: draw the area as a joist / ACT grid / CRC & furring layout (or right-click an area → Add layout)" aria-label="Layout"><option value="">+ Layout: Off</option><option value="joists">Layout: Joists</option><option value="act">Layout: ACT</option><option value="crc">Layout: CRC</option><option value="dwg">Layout: Drywall susp.</option></select><button class="tb" data-lm="run">Linear</button><button class="tb" data-lm="seg">Segments</button><button class="tb" data-lm="count">Count</button></span><button class="tb" id="tkWm" title="Draw takeoff lines thinner or thicker">Line: 1x</button><button class="tb" id="tkCopy">⧉ Copy to sheet…</button><button class="tb" id="tkFit">⤢ Fit</button></div></div>';
-  $('#tkBack').onclick=()=>tkMenu();$('#tkFit').onclick=tkvFit;tkTabsBind($('#tkTabs'));
+  $('#tkExitB').onclick=()=>tkClose();$('#tkBack').onclick=()=>tkMenu();$('#tkFit').onclick=tkvFit;tkTabsBind($('#tkTabs'));
   $('#tkPrev').onclick=()=>tkStep(-1);$('#tkNext').onclick=()=>tkStep(1);
   $$('[data-tm]',el).forEach(b=>b.onclick=()=>tkvMode(b.dataset.tm));
   $('#tkDone').onclick=tkvFinish;$('#tkUndo').onclick=tkvUndoPt;$('#tkCopy').onclick=tkvCopy;
@@ -5838,10 +5852,10 @@ function tkTabsBind(b){
 }
 function tkClose(){
   tkTabSaveT();tkCtxClose();const el=$('#tkv');if(el)el.remove();TKV=null;document.body.classList.remove('noscroll');window.removeEventListener('keydown',tkvKey);window.removeEventListener('keyup',tkvKeyUp);
-  tkFlush();tkpPush();if(S.tab==='takeoff')tkRenderBody();
+  tkFlush();tkpPush();if(S.view==='job'&&S.tab==='takeoff'){S.tab='plans';window.scrollTo(0,0);render()}
 }
 function tkStep(d){if(!TKV)return;tkGo(TKV.list[TKV.ni+d])}
-function tkGo(n){if(!TKV||!n)return;tkTabSaveT();tkCtxClose();const it=TKV.item,hl=TKV.hl,last=TKV.last,md=TKV.mode;const el=$('#tkv');if(el)el.remove();window.removeEventListener('keydown',tkvKey);window.removeEventListener('keyup',tkvKeyUp);TKV={item:it,hl,last,mode:md};tkOpen(n.id)}
+async function tkGo(n){if(!TKV||!n)return;if(n.id!==TKV.id&&!await tkDupOk(n.id))return;if(!TKV)return;tkTabSaveT();TKANC=tkAnch($('#tkSide'));tkShCarry(TKV.id,n.id);tkCtxClose();const it=TKV.item,hl=TKV.hl,last=TKV.last,md=TKV.mode;const el=$('#tkv');if(el)el.remove();window.removeEventListener('keydown',tkvKey);window.removeEventListener('keyup',tkvKeyUp);TKV={item:it,hl,last,mode:md};tkOpen(n.id,true)}
 /* drawing mode: Linear ('run') / Segments (LF items), Area (SF items) or Count (EA items) (SF items); switching to the other kind picks the last item of that kind, or asks */
 async function tkvSetLm(m){
   if(!TKV)return;tkCtxClose();if(TKV.draft.length&&TKV.mode==='draw')tkvFinish();const it=tkItem(TKV.item),u=m==='area'?'SF':'LF';
@@ -5984,9 +5998,17 @@ function tkpHtml(c){
     '<div id="tkpL">'+tkpList(c)+'</div>'+tkpFoot(c);
 }
 /* renders the panel into root; act({t:'pick'|'eye'|'open'|'edit'|'new'|'scale'|'all'|'by'|'pop',...}) does the work (here, or in the plan window from a pop-out) */
+/* keep the list's place: remember which sheet header sits at the top of the visible list and where, then put it back after a re-render or after the viewer is rebuilt for another sheet */
+let TKANC=null;
+/* going from sheet A to sheet B: each keeps the expanded/collapsed state it had in the By sheet list, so nothing above or below changes height */
+function tkShCarry(a,b){if(!a||!b||a===b)return;const ao=tkpShOpen({sid:a},a),bo=tkpShOpen({sid:a},b),c=tkColl();
+  if(ao)c['vo:'+a]=1;else delete c['vo:'+a];delete c['vo:'+b];if(bo)delete c['vs:'+b];else c['vs:'+b]=1;delete c['vs:'+a];
+  lsSet('acv.tkCollapsed',Object.keys(c).length?JSON.stringify(c):null)}
+function tkAnch(root){if(!root)return null;const r=root.getBoundingClientRect(),hs=$$('[data-xs]',root);for(const el of hs){const b=el.getBoundingClientRect();if(b.bottom>r.top+1)return {k:el.dataset.xs,d:b.top-r.top,st:root.scrollTop}}return {k:null,d:0,st:root.scrollTop}}
+function tkAnchSet(root,a){if(!a)return;const el=a.k?[...$$('[data-xs]',root)].find(x=>x.dataset.xs===a.k):null;root.scrollTop=a.st;if(el){const r=root.getBoundingClientRect();root.scrollTop+=el.getBoundingClientRect().top-r.top-a.d}}
 function tkpRender(root,c,act){
-  const fq=document.activeElement&&document.activeElement.id==='tkQ',ss=fq?[document.activeElement.selectionStart,document.activeElement.selectionEnd]:null,st=root.scrollTop;
-  root.innerHTML=tkpHtml(c);root.scrollTop=st;
+  const fq=document.activeElement&&document.activeElement.id==='tkQ',ss=fq?[document.activeElement.selectionStart,document.activeElement.selectionEnd]:null,st=root.scrollTop,anc=TKANC||tkAnch(root);TKANC=null;
+  root.innerHTML=tkpHtml(c);root.scrollTop=st;tkAnchSet(root,anc);
   const qi=$('#tkQ',root);if(fq&&qi){qi.focus();try{qi.setSelectionRange(ss[0],ss[1])}catch(e){}}
   const redraw=()=>tkpRender(root,c,act);
   qi.oninput=()=>{TKQ=qi.value;const l=$('#tkpL',root);l.innerHTML=tkpList(c);tkpBindList(l,c,act,redraw)};
@@ -6059,6 +6081,8 @@ function tkpEnd(){if(!TKP)return;clearInterval(TKP.poll);try{TKP.ch.close()}catc
 function tkpMsg(m){if(!m||!TKP)return;
   if(m.t==='hello'){tkpLive(true);tkpState(true)}
   else if(m.t==='bye'){TKP.win=null;tkpLive(false)}
+  else if(m.t==='who'){if($('#tkv')&&TKV&&TKV.id===m.sid)try{TKP.ch.postMessage({t:'here',q:m.q,sid:m.sid,w:TK_WID})}catch(e){}}
+  else if(m.t==='here'){if(TKP.q&&m.q===TKP.q.id)TKP.q.n.add(m.w)}
   else if(m.t==='act'){tkpDo(m.a);setTimeout(()=>tkpState(),30)}}
 function tkpLive(on){if(!TKP||TKP.live===on)return;TKP.live=on;if(!on){clearInterval(TKP.poll);TKP.poll=0}if($('#tkv'))tkvViewApply()}
 const tkpPopped=()=>!!(TKP&&TKP.live&&TK&&TKP.job===TK.job);
@@ -6423,7 +6447,8 @@ function tkvGridNudge(s,dx,dy){
 function tkvTap(cx,cy,alt,shift){
   const p0=tkvImg(cx,cy);if(p0.x<0||p0.y<0||p0.x>TKV.W||p0.y>TKV.H)return;
   if(TKV.gpick){tkvGridPick(p0);return}
-  if(TKV.mode==='pan')return;
+  if(TKV.mode==='pan'){/* Move: a plain click on a mark selects and highlights it (nothing is drawn); a click on empty plan changes nothing */
+    if(TKV.draft.length)return;const h=tkvHit(p0);if(h&&!(shift?false:tkvSelIds().length===1&&TKV.sel===h)){if(shift){const l=tkvSelIds().slice(),i=l.indexOf(h);if(i>=0)l.splice(i,1);else l.push(h);TKV.msel=l;TKV.sel=l.length===1?l[0]:null}else{TKV.sel=h;TKV.msel=[h]}tkvPaint()}return}
   if(TKV.mode==='select'){tkvSelTap(p0,shift);return}
   const it=tkItem(TKV.item);
   if(TKV.mode==='draw'){
