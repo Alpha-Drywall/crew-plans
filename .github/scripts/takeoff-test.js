@@ -16,7 +16,7 @@ const names = ['tkDupText', 'tkOffsetLine', 'tkSideOff', 'TK_SECS', 'TK_PAPER', 
   'tkApply', 'tkTotals', 'tkSheetQty', 'tkHeightSplits', 'tkRows', 'tkCopyShapes', 'tkSplitLine', 'tkInsertCorner', 'tkMoveCorner', 'tkDeleteCorner', 'tkOffsetShapes',
   'tkSnapVerts', 'tkNearVertex', 'tkOrtho', 'tkSnapPick', 'tkEnds', 'tkEndMark', 'tkReadout',
   'TK_FR_DEF', 'tkFrRot', 'tkFrUn', 'tkFrIv', 'tkFrUnion', 'tkFrClip', 'tkFrSwap', 'tkFrExt', 'tkFrAuto', 'tkFrAngle', 'tkFrPc', 'tkFrame', 'tkFrSum', 'tkFrameOf', 'tkFrRows', 'tkFrItem',
-  'TK_LAY_DEF', 'TK_LAY_NAME', 'tkLayPre', 'tkLayF', 'tkLayArea', 'tkLayPos', 'tkLayCut', 'tkLayWires', 'tkLayAct', 'tkLayCrc', 'tkLayRc', 'tkLayAt', 'tkLayOrg', 'tkEdNear', 'tkEdRuns', 'tkEdAt',
+  'TK_LAY_DEF', 'TK_LAY_NAME', 'tkLayPre', 'tkLayF', 'tkLayArea', 'tkLayPos', 'tkLayCut', 'tkLayWires', 'tkLayAct', 'tkLayCrc', 'tkLayRc', 'tkLayDwg', 'tkLayAt', 'tkLayOrg', 'tkEdNear', 'tkEdRuns', 'tkEdAt',
   'tkInPoly', 'tkMemFlangeIn', 'tkBulkLayOps', 'tkEndCol', 'tkTabOpen', 'tkTabClose', 'tkTabMove', 'tkTabStep', 'tkTabsClean', 'tkHideBulk', 'tkHideAnyOn', 'TK_PAL', 'TK_COLORS', 'tkNextColor', 'tkColorName', 'tkColorOpts'];
 const T = vm.runInNewContext(names.map(grab).join('\n') + '\n;({' + names.join(',') + '})', { Math, Date, String, Number, Set, Object, Array, JSON, isFinite, parseFloat, NaN, Infinity });
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok - ' + name); };
@@ -616,6 +616,26 @@ t('layout grid start point (org): ACT / CRC / joists line up through it; at the 
   const C = T.tkLayCrc(RECT, [], { ...cb, org: [0.5, 0.5] }); assert.strictEqual(laySum(C).crc.n, 8); assert.ok(C.segs.some(g => g.r === 'crc' && Math.abs(g.a[0] - 0.5) < 1e-9), 'a CRC through it');
   const J = T.tkFrame(RECT, [], { sp: 16, ang: a, org: [5, 0] }).filter(g => g.r === 'joist');
   assert.ok(J.some(g => Math.abs(g.a[0] - 5) < 1e-9 && Math.abs(g.b[0] - 5) < 1e-9), 'a joist through the start point'); assert.ok(J.some(g => Math.abs(g.a[0]) < 1e-9) && J.some(g => Math.abs(g.a[0] - 30) < 1e-9), 'joists at both bearing edges');
+});
+t('layout drywall suspension: 20\' x 30\' @16" -> mains 4\' OC, cross tees, wall angle, wire; 24" cross tees; openings cut; start point and edits', () => {
+  const a = T.tkFrAuto(RECT), L = T.tkLayDwg(RECT, [], { ang: a, xtSp: 16, mainLen: 12, waLen: 12, wireSp: 4 }), r = laySum(L);
+  assert.deepStrictEqual(r.main, { n: 8, lf: 160, st: 16 }, '8 mains 4\' OC (1\' from each wall), 20\' each = 2 sticks');
+  assert.deepStrictEqual(r.xt, { n: 135, lf: 450, st: 0 }, '15 lines @16" x 9 pieces between mains / walls');
+  assert.deepStrictEqual(r.wa, { n: 4, lf: 100, st: 10 }, 'wall angle = full perimeter'); assert.strictEqual(L.cnt.wire, 48, '6 wires on each 20\' main');
+  assert.deepStrictEqual(laySum(T.tkLayDwg(RECT, [], { ang: a, xtSp: 24 })).xt, { n: 90, lf: 300, st: 0 }, '10 lines @24"');
+  const H = laySum(T.tkLayDwg(RECT, [[10, 8, 14, 8, 14, 12, 10, 12]], { ang: a, xtSp: 16 })); assert.ok(H.main.lf < 160 && H.main.n > 8 && H.xt.lf < 450, 'cut at the opening ' + JSON.stringify(H));
+  const o = T.tkLayOrg('dwg', T.tkLayF({ preset: 'dwg' }), RECT, a, null); assert.deepStrictEqual(laySum(T.tkLayDwg(RECT, [], { ang: a, xtSp: 16, org: o })), r, 'auto start point = auto');
+  const S2 = laySum(T.tkLayDwg(RECT, [], { ang: a, xtSp: 16, org: [2, 2] })); assert.ok(S2.main.n >= 7 && S2.xt.n > 0, 'start point moves the grid');
+  assert.strictEqual(laySum(T.tkLayDwg(RECT, [], { ang: a, ed: { rm: [0] } })).main.n, 7, 'removed main');
+  assert.strictEqual(laySum(T.tkLayDwg(RECT, [], { ang: a, ed: { add: [2] } })).main.n, 9, 'added main');
+  const F = { preset: 'dwg', sfc: '5/8 GWB', xtSp: 24 }, f = T.tkLayF(F), L2 = T.tkLayDwg(RECT, [], { ...f, ang: a }), rows = T.tkFrRows({ id: 'd', code: 'DWG', fr: F }, T.tkFrSum(L2.segs), 0, { ...L2.cnt, area: 600 });
+  assert.deepStrictEqual(plain(rows.map(x => [x.id, x.qty, x.unit, x.pcs])), [['d:m', 160, 'LF', 16], ['d:x', 300, 'LF', 90], ['d:wa', 100, 'LF', 10], ['d:w', 48, 'EA', null], ['d:sf', 600, 'SF', null]]);
+  assert.ok(/@24" OC – 90 pcs/.test(rows[1].desc), rows[1].desc); assert.strictEqual(T.tkLayPre({ preset: 'dwg' }), 'dwg'); assert.strictEqual(T.TK_LAY_NAME.dwg, 'Drywall suspension');
+});
+t('layout drywall suspension on a sheet -> rows through tkRows', () => {
+  const sheet = { id: 's1', w: 3000, h: 2000 }, d = T.tkApply({}, [{ t: 'item', v: { id: 'f', code: 'DWG', sec: 'CEILINGS', unit: 'LF', fr: { preset: 'dwg', sfc: '5/8 GWB' } } }, { t: 'scale', sheet: 's1', v: { fpp: 0.05 } },
+    { t: 'shape', v: { id: 'a', item: 'f', sheet: 's1', k: 'frame', p: [0.1, 0.1, 0.3, 0.1, 0.3, 0.3, 0.1, 0.3], dir: 'auto' } }]);
+  assert.deepStrictEqual(plain(T.tkRows(d, [sheet]).map(x => [x.id, x.qty, x.unit])), [['f:m', 160, 'LF'], ['f:x', 450, 'LF'], ['f:wa', 100, 'LF'], ['f:w', 48, 'EA'], ['f:sf', 600, 'SF']]);
 });
 t('layout RC channel: 20\' x 30\' @16" -> runs, LF, 12\' pieces; perimeter optional; openings cut; start point and edits', () => {
   const a = T.tkFrAuto(RECT), L = T.tkLayRc(RECT, [], { ang: a, rcSp: 16, rcLen: 12 }), r = laySum(L);

@@ -4971,7 +4971,7 @@ function renderLogList(){
 /* ===== Takeoff (office only): measure walls (LF), ceilings/soffits (SF) and counts (EA) on plan sheets, send rows to the bid sheet's TAKEOFF tab.
    Stored in table takeoffs (one row per job, office-only RLS): data = {v,items[],shapes[],scales{},sent{}}.
    item  = {id,n,code,desc,sec,unit:'LF'|'SF'|'EA',h,w (line width in inches, optional; blank = full wall thickness from the code: framing + 5/8" per board layer),color,
-           fr: layout item (unit LF) = {preset:'joists'|'act'|'crc'|'rc' (none = joists),...}: joists {mem,sp,trk,trkAll,brc,brMax,endJ,king,sfc,waste}, see Framing layout and Layout presets below; its rows are one per member, not one per item}
+           fr: layout item (unit LF) = {preset:'joists'|'act'|'crc'|'rc'|'dwg' (none = joists),...}: joists {mem,sp,trk,trkAll,brc,brMax,endJ,king,sfc,waste}, see Framing layout and Layout presets below; its rows are one per member, not one per item}
    shape = {id,item,sheet,k:'line'|'poly'|'count'|'frame' (framing area: o = openings [[x,y,...],...], dir 'auto'|'edge'|'ang', edge, ang, org, ed = manual edits {add,rm,dbl,beam,blk} in feet from the layout's start point, see tkFrame),p:[x0,y0,x1,y1,...] (0-1 of the sheet image),by,at, deduct:true on a poly = cut-out that subtracts its area,
            h: this line's own wall height in feet (optional; LF the same, but its own bid row "@ h"), note: short label shown on the sheet and in the markup PDF}
    sheets.scale_text = the printed scale(s) read at upload (PDF text) or later by OCR, best first, '; ' between; '' = looked, none found
@@ -5171,12 +5171,12 @@ const TK_FR_ROLES={joist:'Joists',king:'King joists',track:'Track',hdr:'Headers'
      furring trim around each opening; clips = CRC x furring crossings; hanger wires along each CRC run every wireSp plus one at each end.
    rc (resilient channel) = {rc,rcSp (in),rcLen (ft stock),per (optional perimeter, blank = none),perLen,sfc,waste}: RC every rcSp running like the CRC / joists (the layout's direction,
      turn it like any layout), centered, cut at openings; no clips / screws / wires. ===== */
-const TK_LAY_DEF={act:{tile:'2x4',main:"ACT main tee 12'",mainLen:12,t4:"ACT 4' cross tee",t2:"ACT 2' cross tee",wa:'ACT wall angle',waLen:12,wire:'Hanger wire 12ga',wireSp:4,tileCode:'ACT tile 2x4',waste:0},crc:{crc:'150U50-54 CRC',crcSp:4,crcLen:16,fc:'7/8" FC 25ga',fcSp:16,fcLen:12,per:'200T125-20',per2:'',perLen:10,wire:'Hanger wire 12ga',wireSp:4,clip:'',sfc:'',waste:0},rc:{rc:'RC-1 25ga',rcSp:16,rcLen:12,per:'',perLen:10,sfc:'',waste:0}};
-const TK_LAY_NAME={joists:'Joists',act:'ACT grid',crc:'CRC & furring',rc:'RC channel'};
+const TK_LAY_DEF={act:{tile:'2x4',main:"ACT main tee 12'",mainLen:12,t4:"ACT 4' cross tee",t2:"ACT 2' cross tee",wa:'ACT wall angle',waLen:12,wire:'Hanger wire 12ga',wireSp:4,tileCode:'ACT tile 2x4',waste:0},crc:{crc:'150U50-54 CRC',crcSp:4,crcLen:16,fc:'7/8" FC 25ga',fcSp:16,fcLen:12,per:'200T125-20',per2:'',perLen:10,wire:'Hanger wire 12ga',wireSp:4,clip:'',sfc:'',waste:0},rc:{rc:'RC-1 25ga',rcSp:16,rcLen:12,per:'',perLen:10,sfc:'',waste:0},dwg:{main:"DWG main runner 12'",mainLen:12,xt:'DWG cross tee 4\'',xtSp:16,wa:'DWG wall angle',waLen:12,wire:'Hanger wire 12ga',wireSp:4,sfc:'',waste:0}};
+const TK_LAY_NAME={joists:'Joists',act:'ACT grid',crc:'CRC & furring',rc:'RC channel',dwg:'Drywall suspension'};
 /* a layout item's preset ('joists' when none) */
 /* flange width (inches) from a stud / joist name: 800S162-43 -> 1.62, 362S125-33 -> 1.25, bare 200 -> 2, 125 -> 1.25; null when not readable */
 function tkMemFlangeIn(nm){const t=String(nm==null?'':nm).trim(),m=/\d{3,4}\s*[A-Za-z]\s*(\d{3})(?!\d)/.exec(t)||/^(\d{3})$/.exec(t);return m?(+m[1])/100:null}
-function tkLayPre(fr){const p=fr&&fr.preset;return p==='act'||p==='crc'||p==='rc'?p:'joists'}
+function tkLayPre(fr){const p=fr&&fr.preset;return p==='act'||p==='crc'||p==='rc'||p==='dwg'?p:'joists'}
 /* a layout item's settings with the preset's defaults filled in */
 function tkLayF(fr){const p=tkLayPre(fr);return p==='joists'?{...TK_FR_DEF,...(fr||{}),preset:'joists'}:{...TK_LAY_DEF[p],...(fr||{}),preset:p}}
 /* net area (SF) of an outline less its openings, all in feet */
@@ -5204,6 +5204,7 @@ function tkLayOrg(pre,f,p,a,org){
   let u=(U[0]+U[1])/2,v=V[0];
   if(pre==='act'){const two=f.tile==='2x2',VL=tkLayPos(V[0],V[1],two?2:4,1),UL=tkLayPos(U[0],U[1],2,1);if(VL.length)v=VL[0];if(UL.length)u=UL[0]}
   else if(pre==='rc'){const RV=tkLayPos(V[0],V[1],(+f.rcSp||16)/12,0);if(RV.length)v=RV[0]}
+  else if(pre==='dwg'){const MV=tkLayPos(V[0],V[1],4,0),XU=tkLayPos(U[0],U[1],(+f.xtSp||16)/12,0);if(MV.length)v=MV[0];if(XU.length)u=XU[0]}
   else if(pre==='crc'){const CV=tkLayPos(V[0],V[1],+f.crcSp||4,0),FU=tkLayPos(U[0],U[1],(+f.fcSp||16)/12,0);if(CV.length)v=CV[0];if(FU.length)u=FU[0]}
   return tkFrUn(u,v,a);
 }
@@ -5252,6 +5253,19 @@ function tkLayRc(poly,holes,o){
   RV.forEach(v=>tkFrClip(R,v).forEach(iv=>add('rc',iv[0],v,iv[1],v,+o.rcLen||12)));
   if(o.per){const n=R0.length/2;for(let i=0;i<n;i++){const j=(i+1)%n;add('per',R0[2*i],R0[2*i+1],R0[2*j],R0[2*j+1],+o.perLen||10)}}
   return {segs:out,cnt:{},ref,jv:RV,sp};
+}
+/* Drywall suspension (DWG grid) over an area (feet), o = {ang,xtSp (in, 16 or 24),mainLen,waLen,wireSp,org ([x,y] feet: a main and a cross tee pass through it; none = centered),ed}:
+   main runners every 4' running like joists, cross tees every xtSp between the mains (a piece per gap, also from the wall to the first / last main), all cut at openings,
+   wall angle on the perimeter, hanger wires along each main every wireSp plus one at each end: {segs [{r:'main'|'xt'|'wa',a,b,len,st (mains, wall angle)}], cnt {wire}} */
+function tkLayDwg(poly,holes,o){
+  o=o||{};const a=+o.ang||0,out=[],cnt={wire:0};if(Math.floor((poly||[]).length/2)<3)return {segs:out,cnt};
+  const R0=tkFrRot(poly,a),R=[R0].concat((holes||[]).filter(h=>h&&h.length>=6).map(h=>tkFrRot(h,a))),SR=R.map(tkFrSwap),U=tkFrExt(R0,0),V=tkFrExt(R0,1),xs=(+o.xtSp||16)/12;
+  const add=(r,u0,v0,u1,v1,st)=>{const len=Math.hypot(u1-u0,v1-v0);if(len>1e-6){const g={r,a:tkFrUn(u0,v0,a),b:tkFrUn(u1,v1,a),len};if(st)g.st=Math.max(1,Math.ceil((len-1/24)/st-1e-6));out.push(g)}};
+  const G=o.org?tkFrRot(o.org,a):null,MV0=G?tkLayAt(V[0],V[1],4,G[1]):tkLayPos(V[0],V[1],4,0),XU=G?tkLayAt(U[0],U[1],xs,G[0]):tkLayPos(U[0],U[1],xs,0),ref={u:G?G[0]:(U[0]+U[1])/2,v:G?G[1]:MV0.length?MV0[0]:V[0]},MV=tkEdRuns(MV0,ref.v,4,o.ed);
+  MV.forEach(v=>tkFrClip(R,v).forEach(iv=>{add('main',iv[0],v,iv[1],v,+o.mainLen||12);cnt.wire+=tkLayWires(iv[1]-iv[0],+o.wireSp)}));
+  XU.forEach(u=>tkFrClip(SR,u).forEach(iv=>tkLayCut(iv,MV,(v0,v1)=>add('xt',u,v0,u,v1))));
+  const n=R0.length/2;for(let i=0;i<n;i++){const j=(i+1)%n;add('wa',R0[2*i],R0[2*i+1],R0[2*j],R0[2*j+1],+o.waLen||12)}
+  return {segs:out,cnt,ref,jv:MV,sp:4};
 }
 /* rotate flat points [x,y,...] into (u,v) for joists at angle a (radians) */
 function tkFrRot(p,a){const c=Math.cos(a),s=Math.sin(a),o=[];for(let i=0;i+1<p.length;i+=2)o.push(p[i]*c+p[i+1]*s,-p[i]*s+p[i+1]*c);return o}
@@ -5329,7 +5343,7 @@ function tkFrameOf(sh,sheet,scale,fr){
   const fpp=scale&&+scale.fpp;if(!fpp||!sheet||!sheet.w||!sheet.h||!sh)return null;const pre=tkLayPre(fr),f=tkLayF(fr),kx=sheet.w*fpp,ky=sheet.h*fpp;
   const ft=q=>(q||[]).map((x,i)=>x*(i%2?ky:kx));const p=ft(sh.p),ang=tkFrAngle(p,sh.dir,+sh.edge,sh.ang),H=(sh.o||[]).map(ft),org=Array.isArray(sh.org)&&sh.org.length===2&&isFinite(+sh.org[0])&&isFinite(+sh.org[1])?ft(sh.org):null;
   const ed=sh.ed&&typeof sh.ed==='object'?sh.ed:null,J=pre==='joists'?tkFrame(p,H,{sp:f.sp,ang,org,ed,brMax:f.brc?f.brMax:0,trkAll:f.trkAll,endJ:f.endJ,king:f.king}):null;
-  const L=pre==='act'?tkLayAct(p,H,{...f,ang,org,ed}):pre==='crc'?tkLayCrc(p,H,{...f,ang,org,ed,per2:!!String(f.per2||'').trim()}):pre==='rc'?tkLayRc(p,H,{...f,ang,org,ed,per:!!String(f.per||'').trim()}):{segs:J,cnt:{},ref:J.ref,jv:J.jv,sp:J.sp};
+  const L=pre==='act'?tkLayAct(p,H,{...f,ang,org,ed}):pre==='crc'?tkLayCrc(p,H,{...f,ang,org,ed,per2:!!String(f.per2||'').trim()}):pre==='rc'?tkLayRc(p,H,{...f,ang,org,ed,per:!!String(f.per||'').trim()}):pre==='dwg'?tkLayDwg(p,H,{...f,ang,org,ed}):{segs:J,cnt:{},ref:J.ref,jv:J.jv,sp:J.sp};
   const segs=L.segs,sum=tkFrSum(segs,f.waste);let lf=0;Object.keys(sum).forEach(r=>lf+=sum[r].lf);
   return {segs,sum,lf,ang,kx,ky,org,cnt:{...L.cnt,area:tkLayArea(p,H)},pre,ref:L.ref,jv:L.jv||[],sp:L.sp};
 }
@@ -5354,6 +5368,11 @@ function tkFrRows(it,sum,un,cnt){
     row('p2',f.per2,'Perimeter (2nd) '+f.per2+' – '+W(p2.st)+' pcs @'+f.perLen+"'",p2.lf,W(p2.st));
     row('w',f.wire,'Hanger wire @'+f.wireSp+"' along CRC – "+W(C.wire)+' ea',W(C.wire),undefined,'EA');
     row('cl',f.clip,'Clips / wire ties (CRC x furring) – '+W(C.clip)+' ea',W(C.clip),undefined,'EA');
+  }else if(pre==='dwg'){const m=g('main'),x=g('xt'),wa=g('wa');
+    row('m',f.main,(ds||'Drywall suspension')+" – main runner @4' OC – "+W(m.st)+' pcs @'+f.mainLen+"'",m.lf,W(m.st));
+    row('x',f.xt,'Cross tee @'+f.xtSp+'" OC – '+W(x.n)+' pcs',x.lf,W(x.n));
+    row('wa',f.wa,'Wall angle – '+W(wa.st)+' pcs @'+f.waLen+"'",wa.lf,W(wa.st));
+    row('w',f.wire,'Hanger wire @'+f.wireSp+"' along mains – "+W(C.wire)+' ea',W(C.wire),undefined,'EA');
   }else if(pre==='rc'){const c=g('rc'),p=g('per');
     row('rc',f.rc,(ds||'RC channel')+' – '+f.rc+' @'+f.rcSp+'" OC – '+W(c.st)+' pcs @'+f.rcLen+"'",c.lf,W(c.st));
     row('p',f.per,'Perimeter '+f.per+' – '+W(p.st)+' pcs @'+f.perLen+"'",p.lf,W(p.st));
@@ -5574,6 +5593,7 @@ async function tkItemForm(it,pre){
 /* one-line summary of a layout's totals (one mark or a whole item): "@16" OC · 24 joists · 2 track", "ACT 2x4 · 75 tiles · 7 mains", "CRC @4' · FC @16" · 48 wires" */
 function tkFrText(sum,it,cnt){const g=k=>(sum[k]||{}).n||0,F=tkLayF(it&&it.fr),pre=F.preset,C=cnt||{};
   if(pre==='act'){if(!g('main')&&!g('t4'))return '';const t=Math.ceil((C.area||0)/(F.tile==='2x2'?4:8)*(1+(+F.waste||0)/100)-1e-9);return 'ACT '+F.tile+' · '+t+' tile'+(t===1?'':'s')+' · '+g('main')+' main'+(g('main')===1?'':'s')+' · '+(g('t4')+g('t2'))+' tees'}
+  if(pre==='dwg'){if(!g('main')&&!g('xt'))return '';return 'DWG · '+g('main')+' main'+(g('main')===1?'':'s')+' @4\' · '+g('xt')+' cross tees @'+F.xtSp+'"'+' · '+(C.wire||0)+' wires'}
   if(pre==='rc'){if(!g('rc'))return '';return 'RC @'+F.rcSp+'" OC · '+g('rc')+' run'+(g('rc')===1?'':'s')}
   if(pre==='crc'){if(!g('crc')&&!g('fc'))return '';return "CRC @"+F.crcSp+"' · FC @"+F.fcSp+'" · '+(C.wire||0)+' wires'+(C.clip?' · '+C.clip+' clips':'')}
   const j=g('joist')+g('king'),t=g('track')+g('hdr'),b=g('br'),bm=g('beam');if(!j&&!t)return '';return '@'+F.sp+'" OC · '+j+' joist'+(j===1?'':'s')+' · '+t+' track'+(bm?' · '+bm+' beam':'')+(b?' · '+b+' bridging':'')}
@@ -5581,18 +5601,19 @@ function tkFrText(sum,it,cnt){const g=k=>(sum[k]||{}).n||0,F=tkLayF(it&&it.fr),p
 function tkLayTag(it,r){const F=tkLayF(it&&it.fr);if(!r)return 'Set the scale to lay out the '+TK_LAY_NAME[F.preset];
   if(F.preset==='act'){const t=Math.ceil((r.cnt.area||0)/(F.tile==='2x2'?4:8)*(1+(+F.waste||0)/100)-1e-9);return 'ACT '+F.tile+' · '+t+' tiles'}
   if(F.preset==='crc')return "CRC @"+F.crcSp+"' · FC @"+F.fcSp+'"';
+  if(F.preset==='dwg')return "DWG 4' × "+F.xtSp+'" · '+((r.sum.main||{}).n||0)+' mains';
   if(F.preset==='rc')return F.rc+' @'+F.rcSp+'" OC · '+((r.sum.rc||{}).st||0)+' pcs';
   return F.mem+' @'+F.sp+'" OC · '+(((r.sum.joist||{}).n||0)+((r.sum.king||{}).n||0))+' pcs'}
 /* short name of a layout item's setup for pickers and the PDF legend */
-function tkLaySh(fr){const F=tkLayF(fr);return F.preset==='act'?'ACT grid '+F.tile:F.preset==='crc'?"CRC @"+F.crcSp+"' · FC @"+F.fcSp+'"':F.preset==='rc'?'RC '+F.rc+' @'+F.rcSp+'" OC':'Joists '+F.mem+' @'+F.sp+'" OC'}
+function tkLaySh(fr){const F=tkLayF(fr);return F.preset==='dwg'?"DWG grid 4' × "+F.xtSp+'"':F.preset==='act'?'ACT grid '+F.tile:F.preset==='crc'?"CRC @"+F.crcSp+"' · FC @"+F.fcSp+'"':F.preset==='rc'?'RC '+F.rc+' @'+F.rcSp+'" OC':'Joists '+F.mem+' @'+F.sp+'" OC'}
 /* what the "turn" actions call the main members of a preset */
-const TK_LAY_RUN={joists:'joists',act:'mains',crc:'CRC',rc:'RC'};
+const TK_LAY_RUN={joists:'joists',act:'mains',crc:'CRC',rc:'RC',dwg:'mains'};
 /* line styles of each preset's members, drawn in this order: [role, width, opacity, dash (0 solid, 1 long, 2 short), highlight (amber halo)] */
-const TK_LAY_ST={joists:[['hdr',7,.6,0,1],['king',7,.6,0,1],['beam',8,.55,0,1],['joist',1.1,.9],['br',1.4,1,1],['track',3.2,1],['king',2.2,1],['hdr',2.6,1],['beam',3.6,1]],act:[['t2',.6,.75,2],['t4',.8,.85],['main',1.8,1],['wa',3.4,1]],crc:[['fc',.7,.85],['trim',1.6,1],['per2',2.4,.8,2],['per',3.2,1],['crc',2.6,1,1]],rc:[['rc',1.3,.95],['per',3.2,1]]};
+const TK_LAY_ST={joists:[['hdr',7,.6,0,1],['king',7,.6,0,1],['beam',8,.55,0,1],['joist',1.1,.9],['br',1.4,1,1],['track',3.2,1],['king',2.2,1],['hdr',2.6,1],['beam',3.6,1]],act:[['t2',.6,.75,2],['t4',.8,.85],['main',1.8,1],['wa',3.4,1]],crc:[['fc',.7,.85],['trim',1.6,1],['per2',2.4,.8,2],['per',3.2,1],['crc',2.6,1,1]],rc:[['rc',1.3,.95],['per',3.2,1]],dwg:[['xt',.7,.85],['main',2,1],['wa',3.4,1]]};
 /* bid row key -> member role (for the line sample in the PDF legend) */
-const TK_LAY_ROWR={j:'joist',t:'track',b:'br',bm:'beam',m:'main',t4:'t4',t2:'t2',wa:'wa',c:'crc',fc:'fc',p:'per',p2:'per2',rc:'rc'};
+const TK_LAY_ROWR={j:'joist',t:'track',b:'br',bm:'beam',m:'main',t4:'t4',t2:'t2',wa:'wa',x:'xt',c:'crc',fc:'fc',p:'per',p2:'per2',rc:'rc'};
 /* pick a layout preset (for + Layout item) */
-async function tkLayAsk(){const v=await formBox('New layout item',[{k:'p',label:'Layout',type:'select',value:lsGet('acv.tkLayPre')||'joists',options:[['joists','Joists (metal-stud ceiling framing)'],['act','ACT grid (lay-in ceiling)'],['crc','CRC & furring (suspended drywall ceiling)'],['rc','RC channel (resilient channel)']]}],'Next');return v?v.p:null}
+async function tkLayAsk(){const v=await formBox('New layout item',[{k:'p',label:'Layout',type:'select',value:lsGet('acv.tkLayPre')||'joists',options:[['joists','Joists (metal-stud ceiling framing)'],['act','ACT grid (lay-in ceiling)'],['crc','CRC & furring (suspended drywall ceiling)'],['rc','RC channel (resilient channel)'],['dwg','Drywall suspension (DWG grid for board)']]}],'Next');return v?v.p:null}
 /* layout item settings for its preset (joists / ACT grid / CRC & furring). New items start from the last settings used for that preset (kept on this device). */
 async function tkFrameForm(it,pre,opt){
   opt=opt||{};
@@ -5607,9 +5628,10 @@ async function tkFrameForm(it,pre,opt){
   const intro={joists:'Draw an area and it lays out the joists at this spacing, track where they bear, bridging rows and framing around openings. Each member goes to the TAKEOFF tab as its own LF row (pieces rounded up to the inch).',
     act:'Draw a room and it lays out the lay-in grid: main tees 4\' OC, cross tees, wall angle all around and hanger wires along the mains. Openings (lights, diffusers) take tiles off. Each part goes to the TAKEOFF tab as its own row; a blank code leaves that row out.',
     crc:'Draw a ceiling and it lays out the CRC, the furring channel across it, the perimeter member and hanger wires; openings cut the members and get furring trim around them. Each part goes to the TAKEOFF tab as its own row; a blank code leaves that row out.',
+    dwg:'Draw a ceiling and it lays out the drywall suspension grid: main runners 4\' OC, cross tees at 16" or 24" OC between them, wall angle all around and hanger wires along the mains. Openings cut the grid. Each part goes to the TAKEOFF tab as its own row; a blank code leaves that row out. Add an area SF code to get the board.',
     rc:'Draw a ceiling or wall area and it lays out resilient channel at this spacing (turn it to run the other way), cut at openings, with an optional perimeter member. RC goes to the TAKEOFF tab as LF with pieces of the stock length.'}[pre];
-  let body='<div class="tkfrh">Item</div>'+fld('code','Name in the list',isNew?(opt.nm||NM):it.code,pre==='act'?'ACT-1 2x4 grid':pre==='crc'?'GWB ceiling on CRC':pre==='rc'?'RC-1 at ceiling':'CJ-1 ceiling joists')+sel('sec','Section',TK_SECS.map(x=>o(x,x.charAt(0)+x.slice(1).toLowerCase(),it?it.sec:'CEILINGS')).join(''))+
-    fld('desc','Row description (column B)',it?it.desc:{joists:'Ceiling joists',act:'ACT grid',crc:'Suspended ceiling',rc:'RC channel'}[pre],'',1);
+  let body='<div class="tkfrh">Item</div>'+fld('code','Name in the list',isNew?(opt.nm||NM):it.code,pre==='act'?'ACT-1 2x4 grid':pre==='crc'?'GWB ceiling on CRC':pre==='rc'?'RC-1 at ceiling':pre==='dwg'?'GWB ceiling on DWG grid':'CJ-1 ceiling joists')+sel('sec','Section',TK_SECS.map(x=>o(x,x.charAt(0)+x.slice(1).toLowerCase(),it?it.sec:'CEILINGS')).join(''))+
+    fld('desc','Row description (column B)',it?it.desc:{joists:'Ceiling joists',act:'ACT grid',crc:'Suspended ceiling',rc:'RC channel',dwg:'Drywall suspension'}[pre],'',1);
   if(pre==='joists')body+='<div class="tkfrh">Joists</div>'+fld('mem','Joist member',f.mem,'600S162-43')+
       '<label class="field"><span>Spacing</span><span class="tkfrsp"><select name="sp">'+SP.map(x=>o(x,x+'" OC',cust?'':f.sp)).join('')+o('c','Custom…',cust?'c':'')+'</select><input name="spc" inputmode="decimal" value="'+(cust?esc(f.sp):'')+'" placeholder="in"'+(cust?'':' hidden')+'></span></label>'+
       sel('endJ','Extra joist at each end',o('','No',f.endJ?'1':'')+o('1','Yes (double end joists)',f.endJ?'1':''))+sel('king','At openings',o('1','Headers + king joists each side',f.king?'1':'')+o('','Headers only',f.king?'1':''))+
@@ -5624,9 +5646,11 @@ async function tkFrameForm(it,pre,opt){
   if(pre==='crc')body+='<div class="tkfrh">CRC</div>'+fld('crc','CRC (code)',f.crc,'150U50-54 CRC')+num('crcSp','CRC spacing',[2,3,4],f.crcSp,"' OC")+num('crcLen','CRC length',[12,16,20],f.crcLen,"'")+num('wireSp','Hanger wire along CRC every',[3,4,5],f.wireSp,"'")+fld('wire','Hanger wire (code)',f.wire,'Hanger wire 12ga')+
       '<div class="tkfrh">Furring</div>'+fld('fc','Furring channel / hat (code)',f.fc,'7/8" FC 25ga')+num('fcSp','Furring spacing',[12,16,24],f.fcSp,'" OC')+num('fcLen','Furring length',[12,16,20],f.fcLen,"'")+fld('clip','Clips / wire ties (code, blank = none)',f.clip,'FC clip')+
       '<div class="tkfrh">Perimeter</div>'+fld('per','Perimeter member (code)',f.per,'200T125-20 or wall angle')+fld('per2','2nd perimeter member (blank = none)',f.per2,'Wall angle')+num('perLen','Perimeter sticks',[10,12],f.perLen,"'");
+  if(pre==='dwg')body+='<div class="tkfrh">Grid</div>'+fld('main','Main runner (code)',f.main,"DWG main runner 12'")+num('mainLen','Main runner length',[10,12],f.mainLen,"'")+fld('xt','Cross tee (code)',f.xt,"DWG cross tee 4'")+num('xtSp','Cross tees',[16,24],f.xtSp,'" OC')+
+      '<div class="tkfrh">Perimeter and wires</div>'+fld('wa','Wall angle (code)',f.wa,'DWG wall angle')+num('waLen','Wall angle sticks',[10,12],f.waLen,"'")+fld('wire','Hanger wire (code)',f.wire,'Hanger wire 12ga')+num('wireSp','Wire along mains every',[3,4,5],f.wireSp,"'");
   if(pre==='rc')body+='<div class="tkfrh">RC channel</div>'+fld('rc','RC member (code)',f.rc,'RC-1 25ga')+num('rcSp','Spacing',[12,16,24],f.rcSp,'" OC')+num('rcLen','Stock length',[10,12],f.rcLen,"'")+
       '<div class="tkfrh">Perimeter</div>'+fld('per','Perimeter member (code, blank = none)',f.per,'J-mold or angle')+num('perLen','Perimeter sticks',[10,12],f.perLen,"'");
-  if(pre!=='act')body+='<div class="tkfrh">Area</div>'+fld('sfc','Area SF row code (blank = none)',f.sfc||'','5/8 X GWB ceiling',1);
+  if(pre!=='act')body+='<div class="tkfrh">'+(pre==='dwg'?'Board (optional)':'Area')+'</div>'+fld('sfc','Area SF row code (blank = none)',f.sfc||'','5/8 X GWB ceiling',1);
   body+='<div class="tkfrh">Totals</div>'+fld('waste','Waste %',f.waste||'','0')+sel('color','Color',tkColorOpts(col).map(x=>o(x[0],x[1],col)).join(''));
   return new Promise(res=>{let done=false;
     const m=modal('<h2>'+(isNew?'New layout: '+NM:'Layout ('+NM+'): '+esc(it.code))+'</h2><p class="small muted" style="margin:-4px 0 6px">'+intro+'</p><form class="tkfrf" data-pre="'+pre+'">'+body+
@@ -5642,6 +5666,8 @@ async function tkFrameForm(it,pre,opt){
         fr={preset:'joists',mem:c80('mem'),sp:Math.round(sp*1000)/1000,trk:c80('trk'),beam:c80('beam'),trkAll:v('trkAll')==='1',brc:c80('brc'),brMax:v('brc')?Math.round(bm*1000)/1000:0,endJ:v('endJ')==='1',king:v('king')==='1',sfc:c80('sfc'),waste:Math.round(w*100)/100}}
       else if(pre==='act'){if(!v('main')){toast('Give it a main tee.');return}
         fr={preset:'act',tile:v('tile')==='2x2'?'2x2':'2x4',main:c80('main'),mainLen:+v('mainLen')||12,t4:c80('t4'),t2:c80('t2'),wa:c80('wa'),waLen:+v('waLen')||12,wire:c80('wire'),wireSp:+v('wireSp')||4,tileCode:c80('tileCode'),waste:Math.round(w*100)/100}}
+      else if(pre==='dwg'){if(!v('main')){toast('Give it a main runner.');return}
+        fr={preset:'dwg',main:c80('main'),mainLen:+v('mainLen')||12,xt:c80('xt'),xtSp:+v('xtSp')===24?24:16,wa:c80('wa'),waLen:+v('waLen')||12,wire:c80('wire'),wireSp:+v('wireSp')||4,sfc:c80('sfc'),waste:Math.round(w*100)/100}}
       else if(pre==='rc'){if(!v('rc')){toast('Give it an RC member.');return}
         fr={preset:'rc',rc:c80('rc'),rcSp:+v('rcSp')||16,rcLen:+v('rcLen')||12,per:c80('per'),perLen:+v('perLen')||10,sfc:c80('sfc'),waste:Math.round(w*100)/100}}
       else{if(!v('crc')||!v('fc')){toast('Give it a CRC and a furring member.');return}
@@ -5684,7 +5710,7 @@ async function tkvFrameAct(c,s,p0,pre){
   if(c==='frrot'){const sc=tkScaleOf(TKV.id),r=sc&&tkFrameOf(s,TKV.sh,sc,it&&it.fr);const a=r?r.ang*180/Math.PI:+s.ang||0;tkDo({t:'shape',v:{id:s.id,dir:'ang',edge:null,ang:Math.round(((a+90)%180)*1000)/1000}});tkvPaint();return}
   if(c==='fredge'){const es=tkvNearSeg(s,p0);if(es){tkDo({t:'shape',v:{id:s.id,dir:'edge',edge:es.seg,ang:null}});tkvPaint()}return}
   if(c==='fropen'){if(TKV.draft.length)tkvFinish();tkvUseItem(s.item);TKV.mode='draw';TKV.dNext=true;tkvPaint();toast('Click the opening\'s corners inside the layout area (or drag a rectangle).');return}
-  if(c==='frorg'){if(!tkScaleOf(TKV.id)){tkScaleBox();return}if(TKV.draft.length)tkvCancel();TKV.gpick={id:s.id,a:null};TKV.sel=s.id;tkvTools();tkvPaint();toast('Click the grid start point (a '+(P==='act'?'main / cross tee crossing':P==='crc'?'CRC / furring crossing':P==='rc'?'RC run':'joist')+' on the plan). Esc cancels.');return}
+  if(c==='frorg'){if(!tkScaleOf(TKV.id)){tkScaleBox();return}if(TKV.draft.length)tkvCancel();TKV.gpick={id:s.id,a:null};TKV.sel=s.id;tkvTools();tkvPaint();toast('Click the grid start point (a '+(P==='act'||P==='dwg'?'main / cross tee crossing':P==='crc'?'CRC / furring crossing':P==='rc'?'RC run':'joist')+' on the plan). Esc cancels.');return}
   if(c==='frctr'){tkDo({t:'shape',v:{id:s.id,org:null}});tkvPaint();toast(P==='joists'?'Joists laid out from the edge again.':'Grid centered again.');return}
   if(c==='frdelo'){const o=(s.o||[]).filter(q=>!tkInPoly(p0,q,TKV.W,TKV.H));tkDo({t:'shape',v:{id:s.id,o}});tkvPaint();return}
   if(c==='frrm'){const W=TKV.W,H=TKV.H,same=(a,b)=>a&&b&&a.length===b.length&&a.every((x,i)=>Math.abs(x-b[i])<1e-6);
@@ -5768,7 +5794,7 @@ async function tkOpen(sid,ok){
   el.innerHTML='<div class="vbar"><button id="tkExitB" class="tkmb" title="Back to the job (Plans tab)" aria-label="Back to the job">‹<span class="vlbl"> Job</span></button><button id="tkBack" class="tkmb" title="Takeoff menu: items, sheets, Send to bid sheet, Markup PDF, download rows" aria-label="Takeoff menu" aria-haspopup="dialog" aria-expanded="false"><span class="tkmi" aria-hidden="true">☰</span> Takeoff<span class="vlbl"> menu</span></button><div class="vt">'+(jn?'<div class="vtj" id="tkJob" title="'+esc(jn)+'">'+esc(jn)+'</div>':'')+'<div class="vtn" title="'+esc(sh.name||'Sheet')+'">'+esc(sh.name||'Sheet')+(ni>=0&&list.length>1?' <span class="vtc">('+(ni+1)+'/'+list.length+')</span>':'')+'</div></div><button id="tkPrev"'+(ni<=0?' disabled':'')+'>‹</button><button id="tkNext"'+(ni<0||ni>=list.length-1?' disabled':'')+'>›</button></div><div class="tktabs" id="tkTabs" role="tablist" aria-label="Open sheets"></div>'+
     '<div class="tkwrap"><div id="tkStage"><div id="tkBoard"><img id="tkImg" alt="" draggable="false"><svg id="tkInk" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="tkHatch" patternUnits="userSpaceOnUse" width="24" height="24" patternTransform="rotate(45)"><rect width="24" height="24" fill="#fff" fill-opacity=".55"/><line x1="0" y1="0" x2="0" y2="24" stroke="#c62828" stroke-width="5" stroke-opacity=".6"/></pattern></defs><g id="tkShapes"></g><g id="tkLive"></g></svg></div><svg id="tkSel" class="tksel" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"></svg><canvas id="tkOv" class="tkov" aria-hidden="true"></canvas><canvas id="tkMag" class="tkmag" aria-hidden="true"></canvas><div class="tkcr" id="tkCr" aria-live="off"></div><div class="hint" id="tkHint">Loading sheet…</div><div class="tkread" id="tkRead"></div></div>'+
     '<div class="tkside" id="tkSide"></div></div>'+
-    '<div class="vtools"><div class="trow"><button class="tb" data-tm="draw">✏ Take off</button><button class="tb" data-tm="pan">✋ Move</button><button class="tb" data-tm="select">☝ Select</button><button class="tb" data-tm="scale">📐 Scale</button><button class="tb" data-tm="measure">📏 Measure</button><button class="tb" id="tkDone">✓ Finish</button><button class="tb" id="tkUndo">↶ Undo point</button><button class="tb" id="tkSnap">Snap: on</button><button class="tb" id="tkOrtho" title="Lock lines level / plumb (or hold Shift)" aria-pressed="false">⊥ Ortho</button><span class="tkseg" title="Area: click the corners, or drag a rectangle (+ Layout lays out joists / ACT grid / CRC &amp; furring). Linear: each click adds a corner until ✓ Finish. Segments: every 2 clicks make one straight piece. Count: each click counts one."><button class="tb" data-lm="area">Area</button><select class="tb tklay" id="tkLay" title="+ Layout: draw the area as a joist / ACT grid / CRC & furring layout (or right-click an area → Add layout)" aria-label="Layout"><option value="">+ Layout: Off</option><option value="joists">Layout: Joists</option><option value="act">Layout: ACT</option><option value="crc">Layout: CRC</option></select><button class="tb" data-lm="run">Linear</button><button class="tb" data-lm="seg">Segments</button><button class="tb" data-lm="count">Count</button></span><button class="tb" id="tkWm" title="Draw takeoff lines thinner or thicker">Line: 1x</button><button class="tb" id="tkCopy">⧉ Copy to sheet…</button><button class="tb" id="tkFit">⤢ Fit</button></div></div>';
+    '<div class="vtools"><div class="trow"><button class="tb" data-tm="draw">✏ Take off</button><button class="tb" data-tm="pan">✋ Move</button><button class="tb" data-tm="select">☝ Select</button><button class="tb" data-tm="scale">📐 Scale</button><button class="tb" data-tm="measure">📏 Measure</button><button class="tb" id="tkDone">✓ Finish</button><button class="tb" id="tkUndo">↶ Undo point</button><button class="tb" id="tkSnap">Snap: on</button><button class="tb" id="tkOrtho" title="Lock lines level / plumb (or hold Shift)" aria-pressed="false">⊥ Ortho</button><span class="tkseg" title="Area: click the corners, or drag a rectangle (+ Layout lays out joists / ACT grid / CRC &amp; furring). Linear: each click adds a corner until ✓ Finish. Segments: every 2 clicks make one straight piece. Count: each click counts one."><button class="tb" data-lm="area">Area</button><select class="tb tklay" id="tkLay" title="+ Layout: draw the area as a joist / ACT grid / CRC & furring layout (or right-click an area → Add layout)" aria-label="Layout"><option value="">+ Layout: Off</option><option value="joists">Layout: Joists</option><option value="act">Layout: ACT</option><option value="crc">Layout: CRC</option><option value="dwg">Layout: Drywall susp.</option></select><button class="tb" data-lm="run">Linear</button><button class="tb" data-lm="seg">Segments</button><button class="tb" data-lm="count">Count</button></span><button class="tb" id="tkWm" title="Draw takeoff lines thinner or thicker">Line: 1x</button><button class="tb" id="tkCopy">⧉ Copy to sheet…</button><button class="tb" id="tkFit">⤢ Fit</button></div></div>';
   $('#tkExitB').onclick=()=>tkClose();$('#tkBack').onclick=()=>tkMenu();$('#tkFit').onclick=tkvFit;tkTabsBind($('#tkTabs'));
   $('#tkPrev').onclick=()=>tkStep(-1);$('#tkNext').onclick=()=>tkStep(1);
   $$('[data-tm]',el).forEach(b=>b.onclick=()=>tkvMode(b.dataset.tm));
@@ -6547,7 +6573,7 @@ function tkCtx(cx,cy,sub){
   const add=(k,t,on,kb)=>{if(on===undefined||on)A.push('<button data-c="'+k+'"><span>'+t+'</span>'+(kb?'<span class="kb">'+esc(kb)+'</span>':'')+'</button>')};
   if(sub){const pick=sub==='count'?eas:sub==='run'?TK.data.items.filter(x=>tkSameKind(x,it)):sub==='mark'?TK.data.items.filter(x=>tkSameKind(x,hit_it)):TK.data.items;const cur=sub==='mark'?hs&&hs.item:sub==='count'?null:TKV.item;
     if(sub!=='lay')A.push('<div class="tkctxh">'+{items:'Switch item',run:'Change item for this linear',mark:'Change item for this mark',count:'Count here: which item?'}[sub]+'</div>');
-    if(sub==='lay'){A.push('<div class="tkctxh">Add layout to this area</div>');add('frthis:joists','Joists');add('frthis:act','ACT grid');add('frthis:crc','CRC & furring');add('frthis:rc','RC channel');add('back','‹ Back');sep()}
+    if(sub==='lay'){A.push('<div class="tkctxh">Add layout to this area</div>');add('frthis:joists','Joists');add('frthis:act','ACT grid');add('frthis:crc','CRC & furring');add('frthis:rc','RC channel');add('frthis:dwg','Drywall suspension');add('back','‹ Back');sep()}
     else srt(pick).forEach(x=>A.push('<button data-si="'+esc(x.id)+'"'+(x.id===cur?' class="on"':'')+'><span class="sw" style="background:'+esc(x.color)+'"></span>'+esc(x.code)+' <span class="muted">'+esc(x.unit)+'</span></button>'));if(sub!=='lay'){add('back','‹ Back');sep()}}
   else{
     if(TKV.gpick){add('gdone','✓ Done (keep the current direction)',!!TKV.gpick.a,'Esc');add('gcan','Cancel start grid',!TKV.gpick.a,'Esc');sep()}
@@ -6574,7 +6600,7 @@ function tkCtx(cx,cy,sub){
         const RN=TK_LAY_RUN[tkLayPre(hit_it.fr)],RU=RN.charAt(0).toUpperCase()+RN.slice(1);
         add('frset','▦ Layout settings ('+TK_LAY_NAME[tkLayPre(hit_it.fr)]+')…');add('frrot','⟳ Turn '+RN+' 90°');add('fredge',RU+' parallel to this edge',!!es&&es.d<14/TKV.t.s);add('frauto',RU+': auto (span the short way)',!!hs.dir&&hs.dir!=='auto');
         add('frorg','⌖ Start grid here…');add('frctr',hit_it.fr&&tkLayPre(hit_it.fr)==='joists'?'Joists from the edge (clear start point)':'Center grid',Array.isArray(hs.org));
-        const E=tkvFrEdAt(hs,p0),ed=hs.ed||{},PR=tkLayPre(hit_it.fr),one=PR==='joists'?'joist':PR==='act'?'main':'CRC';
+        const E=tkvFrEdAt(hs,p0),ed=hs.ed||{},PR=tkLayPre(hit_it.fr),one=PR==='joists'?'joist':PR==='act'||PR==='dwg'?'main':'CRC';
         if(E){sep();add('frjadd','+ Add '+one+' here');
           if(PR==='joists'){add('frjdbl','Double this joist',E.jo!=null);add('frjtri','Triple this joist',E.jo!=null);add('frjund','Undo double',E.dk!=null)}
           add('frjrm','Remove this '+one,E.jo!=null);add('frjres','Restore removed '+TK_LAY_RUN[PR]+' ('+(ed.rm||[]).length+')',(ed.rm||[]).length>0);
@@ -6669,7 +6695,7 @@ async function tkvFinish(){
   if(it.fr&&TKV.dDraft){TKV.dDraft=false;TKV.dNext=false;let cx=0,cy=0;d.forEach(p=>{cx+=p.x;cy+=p.y});const c={x:cx/d.length,y:cy/d.length};
     const host=TK.data.shapes.find(s=>s.sheet===TKV.id&&s.k==='frame'&&tkItem(s.item)&&tkInPoly(c,s.p||[],TKV.W,TKV.H));
     if(!host){toast('Draw the opening inside a layout area.');tkvPaint();return}
-    tkDo({t:'shape',v:{id:host.id,o:(host.o||[]).concat([np])}});{const F=tkLayF(tkItem(host.item).fr);toast(F.preset==='act'?'Opening added: tiles taken off.':F.preset==='crc'?'Opening added: CRC and furring cut, furring trim around it.':F.preset==='rc'?'Opening added: RC cut.':'Opening added: joists cut, headers'+(F.king?' and king joists':'')+' added.')}tkvPaint();return}
+    tkDo({t:'shape',v:{id:host.id,o:(host.o||[]).concat([np])}});{const F=tkLayF(tkItem(host.item).fr);toast(F.preset==='act'?'Opening added: tiles taken off.':F.preset==='crc'?'Opening added: CRC and furring cut, furring trim around it.':F.preset==='rc'?'Opening added: RC cut.':F.preset==='dwg'?'Opening added: mains and cross tees cut.':'Opening added: joists cut, headers'+(F.king?' and king joists':'')+' added.')}tkvPaint();return}
   const v={id:uuid(),item:it.id,sheet:TKV.id,k:it.fr?'frame':it.unit==='SF'?'poly':'line',p:np,by:'office',at:new Date().toISOString()};if(it.fr)v.dir='auto';if(v.k==='line'){const sd=tkdrGet().side;if(sd!=='C')v.al=sd}
   if(it.unit==='SF'&&TKV.dDraft){v.deduct=true;let cx=0,cy=0;d.forEach(p=>{cx+=p.x;cy+=p.y});const c={x:cx/d.length,y:cy/d.length};
     const host=TK.data.shapes.find(s=>s.sheet===TKV.id&&s.k==='poly'&&!s.deduct&&tkItem(s.item)&&tkItem(s.item).unit==='SF'&&tkInPoly(c,s.p||[],TKV.W,TKV.H));if(host)v.item=host.item;
@@ -6898,6 +6924,8 @@ async function tkMarkupPdf(){
        (rows: main tee LF (+pcs), 4' cross tee EA, 2' cross tee EA (2x2), wall angle LF (+pcs), hanger wire EA, tiles SF; openings = lights, take tiles off)
      CRC & furring: fr:{preset:'crc',crc:'150U50-54 CRC',crcSp:4,crcLen:16,fc:'7/8" FC 25ga',fcSp:16,fcLen:12,per:'200T125-20',per2:'',perLen:10,wire,wireSp:4,clip:'',sfc:'',waste}
        (rows: CRC LF, furring LF (+ trim around openings), perimeter LF, 2nd perimeter LF, hanger wire EA, clips EA),
+     Drywall suspension: fr:{preset:'dwg',main:"DWG main runner 12'",mainLen:12,xt:"DWG cross tee 4'",xtSp:16|24,wa,waLen:12,wire,wireSp:4,sfc:'',waste} (mains 4' OC, cross tees xtSp" OC between mains, cut at openings;
+       rows: main runner LF (+pcs), cross tee LF (+pcs), wall angle LF (+pcs), hanger wire EA, optional board SF via sfc),
      RC channel: fr:{preset:'rc',rc:'RC-1 25ga',rcSp:16,rcLen:12,per:'',perLen:10,sfc:'',waste} (RC runs like CRC / joists, the layout's direction; rows: RC LF with pcs, perimeter LF if per),
    {t:'scale',sheet,v:{fpp,label,how}}, {t:'del_shape',id}, {t:'del_item',id}; alphaTakeoff.rows(jobId) -> bid sheet rows; alphaTakeoff.fpp(ftPerIn,paperWidthIn,imageW). */
 window.alphaTakeoff={
