@@ -45,6 +45,11 @@ button{cursor:pointer}
 .orow .grow{flex:1;min-width:0}
 .orow input:not([type]){width:100%;border:1px solid var(--line);border-radius:8px;padding:7px 8px;margin-top:4px;font-size:14px}
 .top .jl{display:none}
+.top .tr{grid-column:3;display:flex;align-items:center;justify-content:flex-end;gap:2px}
+.jhead .top{grid-template-columns:48px minmax(0,1fr) auto}
+.top .hico{vertical-align:-3px;flex:none}
+@media (max-width:699px){.jhead .top h1{font-size:17px}.jhead .top h1 .brand{width:22px;height:22px}}
+.top #jhome .dsk{font-size:14px;font-weight:600;margin-left:4px}
 .dsk{display:none}
 .tcper{display:flex;align-items:center;gap:10px;margin:0 0 12px;text-align:center}
 .tcper .btn{min-width:44px}
@@ -103,6 +108,8 @@ button{cursor:pointer}
  .top h1 .brand{width:36px;height:36px}
  .top h1 .jn{display:none}
  .top>button:last-child:not(:first-child){grid-column:5;grid-row:1}
+ .jhead .top{grid-template-columns:minmax(96px,auto) minmax(0,1fr) auto minmax(0,1fr) minmax(96px,auto)}
+ .top>.tr{grid-column:5;grid-row:1}
  .ptools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
  .ptools .pbar,.ptools .pbar2{margin:0}
  .ptools .pbar select{flex:0 1 auto;width:auto;max-width:230px}
@@ -1707,10 +1714,24 @@ async function loadAreas(){const id=jobId();if(!id)return;await loadBudget();try
 async function loadLogs(){const id=jobId();if(!id)return;if(S.tab!=='labor')S.loaded.labor=false;try{const d=await q(sb.from('logs').select('*').eq('job_id',id).order('date',{ascending:false}).limit(300));if(jobId()!==id)return;S.logs=d;S.loaded.logs=true;loadMat();if(S.tab!=='log')tmNagSync();if(S.tab==='log'){renderLogList();const b=$('#logForm');if(b&&b._fillIfEmpty)b._fillIfEmpty()}}catch(e){toast(errMsg(e))}}
 async function loadMembers(){const id=jobId();if(!id)return;try{const d=await q(sb.from('members').select('*').eq('job_id',id).order('joined_at'));if(jobId()!==id)return;S.members=d;d.forEach(m=>S.people[m.user_id]=m.name);render();if(V)buildPins()}catch(e){}}
 async function loadInvites(){const id=jobId();if(!id||!isAdminRole())return [];try{S.invites=await q(sb.from('invites').select('*').eq('job_id',id).order('created_at',{ascending:false}))}catch(e){toast(errMsg(e))}return S.invites}
-function closeJob(){
+function closeJob(home){
   if(V)closeSheet();
   if(S.chan){sb.removeChannel(S.chan);S.chan=null}
-  S.job=null;S.role=null;S.view=S.fromDash&&dashOk()?'dash':'jobs';S.fromDash=false;lsSet('crewplans.lastJob',null);render();
+  if(home===true){S.fromDash=false;if(homeTabs()&&!homeLand(lsGet('crewplans.homeSec')))lsSet('crewplans.homeSec','jobs')}
+  S.job=null;S.role=null;S.view=S.fromDash&&dashOk()?'dash':'jobs';S.fromDash=false;lsSet('crewplans.lastJob',null);window.scrollTo(0,0);render();
+}
+/* Home button (job header, plans viewer, Takeoff viewer and its menu): one tap to the office homepage, Jobs or Bids (whichever was last used there). Takeoff drawing in progress is finished and every unsaved takeoff op is sent first (waits a few seconds; if the network is down it keeps retrying in the background); the viewer closes like the usual exits do (the pop-out panel is told, live sync is closed with the job). */
+const homeLand=s=>s==='bids'||s==='jobs';
+async function goHome(){
+  if(S.goingHome)return;S.goingHome=true;
+  try{
+    if(TKV){if(TKV.mode==='draw'&&TKV.draft&&TKV.draft.length)await tkvFinish();if(TKV)tkClose(true)}
+    for(let i=0;i<30&&TK&&TK.ops.length;i++){
+      if(TK.saving){await new Promise(r=>setTimeout(r,150));continue}
+      clearTimeout(TK.t);const n=TK.ops.length;await tkFlush(TK);if(TK&&TK.fail&&TK.ops.length>=n){toast('Takeoff not saved yet: it keeps trying in the background.');break}
+    }
+    closeJob(true);
+  }finally{S.goingHome=false}
 }
 
 /* ===== render ===== */
@@ -1729,9 +1750,9 @@ function render(){
   if(j.stage==='bid'&&S.tab!=='plans'&&S.tab!=='takeoff')S.tab=tkOk()?'takeoff':'plans';
   if(!app.querySelector('[data-jobshell]')||app.dataset.job!==j.id||app.dataset.tab!==S.tab||app.dataset.role!==S.role){
     app.dataset.job=j.id;app.dataset.tab=S.tab;app.dataset.role=S.role;
-    app.innerHTML='<div data-jobshell><div class="jhead"><div class="top"><button id="back" aria-label="Back">‹</button><div class="jl" id="jt2"></div><h1><div class="ttl"><span class="brand"></span>Alpha Operations</div><div class="jn" id="jt"></div></h1>'+(isAdminRole()?'<button id="jmenu" aria-label="Job menu">⋯</button>':'')+'</div>'+
+    app.innerHTML='<div data-jobshell><div class="jhead"><div class="top"><button id="back" aria-label="Back">‹</button><div class="jl" id="jt2"></div><h1><div class="ttl"><span class="brand"></span>Alpha Operations</div><div class="jn" id="jt"></div></h1><div class="tr"><button id="jhome" aria-label="Home: all jobs" title="Home: all jobs"><svg class="hico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 20.5h18M5 20.5V9.5l7-5.5 7 5.5v11M9.5 20.5v-6h5v6"/></svg><span class="dsk">Home</span></button>'+(isAdminRole()?'<button id="jmenu" aria-label="Job menu">⋯</button>':'')+'</div></div>'+
       jobTabsHtml(j.stage==='bid'?['plans'].concat(tkOk()?['takeoff']:[]):['plans','progress'].concat(tkOk()?['takeoff']:[],canLog()?['log'].concat(billTabOk()?[]:['labor'],['mat']):[],billTabOk()?['money']:[]))+'</div>'+(billTabOk()&&(S.tab==='billing'||S.tab==='labor')?moneySeg():'')+'<main id="tabBody"></main></div>';
-    $('#back').onclick=closeJob;
+    $('#back').onclick=()=>closeJob();$('#jhome').onclick=goHome;
     $$('.tabs button').forEach(b=>b.onclick=()=>{S.tab=b.dataset.tab==='money'?(S.moneyTab||'billing'):b.dataset.tab;window.scrollTo(0,0);render()});
     $$('[data-money]').forEach(b=>b.onclick=()=>{S.tab=S.moneyTab=b.dataset.money;window.scrollTo(0,0);render()});
     if($('#jmenu'))$('#jmenu').onclick=jobMenu;
@@ -2354,6 +2375,7 @@ const TIPS={
     ['#undoBtn',"Undo your last mark.","Deshacer tu última marca."],
     ['[data-mode="pan"]',"Move: drag to move around, pinch to zoom.","Mover: arrastra para moverte, pellizca para hacer zoom."]],
   job:[
+    ['#jhome',"Home: one tap back to all your jobs, from any tab.","Inicio: un toque para volver a todos tus trabajos, desde cualquier pestaña."],
     ['.tabs2 .tg:first-child',"On a phone the tabs come in two rows. Field: Plans, Progress and the Daily Report, what the crew uses every day.","En el teléfono las pestañas van en dos filas. Campo: Planos, Avance y el Reporte diario, lo que la cuadrilla usa cada día."],
     ['.tabs2 .tg:nth-child(2)',"Second row: the rest of the job. Office has Takeoff, Materials and Money; foremen get Labor and Materials under More.","Segunda fila: lo demás del trabajo. Oficina tiene Cuantificación, Material y Dinero; los mayordomos tienen Mano de obra y Material en Más."],
     ['.tabs button[data-tab="plans"]',"Plans: every sheet for the job, always the newest version. Use it to look things up, drop pins and quick highlights.","Planos: todas las hojas del trabajo, siempre la versión más nueva. Úsalo para consultar, poner pines y marcas rápidas."],
@@ -2396,6 +2418,7 @@ const TIPS={
     ['[data-mode="pin"]',"Pin: tap the sheet to flag something for the foreman, with a photo.","Pin: toca el plano para avisarle algo al mayordomo, con una foto."],
     ['#snNext',"Arrows go to the next or previous sheet.","Las flechas van a la hoja siguiente o anterior."]],
   takeoff:[
+    ['#tkHomeB',"Home: save and go straight to all jobs. The ☰ Takeoff menu has it too.","Inicio: guarda y va directo a todos los trabajos. El menú ☰ de cuantificación también lo tiene."],
     ['#tkExitB',"Back to the job. The Takeoff tab opens straight into the plans; everything else (items, sheets, Send to bid sheet, Markup PDF) is under Takeoff menu.","Volver al trabajo. La pestaña de cuantificación abre directo en los planos; lo demás (partidas, hojas, Mandar a la hoja de licitación, PDF de marcas) está en el menú de cuantificación."],
     ['#tkBack',"Takeoff menu: + Takeoff item, Send to bid sheet, Markup PDF, download rows, and the list of sheets.","Menú de cuantificación: + Partida, Mandar a la hoja de licitación, PDF de marcas, bajar renglones y la lista de hojas."],
     ['#tkTabs .tktab',"Sheet tabs: each sheet you open gets a tab. Click to switch, × to close, drag to reorder.","Pestañas de hojas: cada hoja que abres tiene su pestaña. Clic para cambiar, × para cerrar, arrastra para ordenar."],
@@ -5621,8 +5644,8 @@ function tkAutoSheet(){
 function tkMenu(){
   const el=$('#tkv');if(!el||!TK)return;if($('#tkMenu',el)){tkMenuClose();return}
   const jn=(S.job&&S.job.id===TK.job&&S.job.name)||'';
-  el.insertAdjacentHTML('beforeend','<div class="tkmenu" id="tkMenu"><div class="tkmbg" data-mx></div><div class="tkms" role="dialog" aria-modal="true" aria-label="Takeoff menu"><div class="tkmh"><div class="grow"><div class="tkmt">Takeoff</div>'+(jn?'<div class="tkmj">'+esc(jn)+'</div>':'')+'</div><button class="tkmx" data-mx aria-label="Close the menu" title="Close (Esc)">×</button></div><div class="tkmc" id="tkMenuB"></div><div class="tkmf"><button class="btn" id="tkExit" title="Leave the takeoff and go back to the job">‹ Back to the job</button></div></div></div>');
-  const m=$('#tkMenu',el);$$('[data-mx]',m).forEach(b=>b.onclick=tkMenuClose);$('#tkExit',m).onclick=()=>{tkMenuClose();tkClose()};
+  el.insertAdjacentHTML('beforeend','<div class="tkmenu" id="tkMenu"><div class="tkmbg" data-mx></div><div class="tkms" role="dialog" aria-modal="true" aria-label="Takeoff menu"><div class="tkmh"><div class="grow"><div class="tkmt">Takeoff</div>'+(jn?'<div class="tkmj">'+esc(jn)+'</div>':'')+'</div><button class="tkmx" data-mx aria-label="Close the menu" title="Close (Esc)">×</button></div><div class="tkmc" id="tkMenuB"></div><div class="tkmf"><button class="btn" id="tkExit" title="Leave the takeoff and go back to the job">‹ Back to the job</button><button class="btn" id="tkHome" title="Leave the takeoff and go to the home page (all jobs)">⌂ Home</button></div></div></div>');
+  const m=$('#tkMenu',el);$$('[data-mx]',m).forEach(b=>b.onclick=tkMenuClose);$('#tkExit',m).onclick=()=>{tkMenuClose();tkClose()};$('#tkHome',m).onclick=()=>{tkMenuClose();goHome()};
   m.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('.mwrap')){e.preventDefault();e.stopPropagation();tkMenuClose()}});
   const bk=$('#tkBack',el);if(bk)bk.setAttribute('aria-expanded','true');tkRenderBody();const f=$('#tkAdd',m)||$('.tkmx',m);if(f)f.focus();
 }
@@ -5880,11 +5903,11 @@ async function tkOpen(sid,ok){
   {const tb=$('#tkBody');if(tb)tb.innerHTML='<div class="empty">The takeoff viewer is open.</div>'}
   const el=document.createElement('div');el.id='tkv';el.className='tkv';document.body.appendChild(el);document.body.classList.add('noscroll');
   const jn=(S.job&&S.job.id===TK.job&&S.job.name)||'';
-  el.innerHTML='<div class="vbar"><button id="tkExitB" class="tkmb" title="Back to the job (Plans tab)" aria-label="Back to the job">‹<span class="vlbl"> Job</span></button><button id="tkBack" class="tkmb" title="Takeoff menu: items, sheets, Send to bid sheet, Markup PDF, download rows" aria-label="Takeoff menu" aria-haspopup="dialog" aria-expanded="false"><span class="tkmi" aria-hidden="true">☰</span> Takeoff<span class="vlbl"> menu</span></button><div class="vt">'+(jn?'<div class="vtj" id="tkJob" title="'+esc(jn)+'">'+esc(jn)+'</div>':'')+'<div class="vtn" title="'+esc(sh.name||'Sheet')+'">'+esc(sh.name||'Sheet')+(ni>=0&&list.length>1?' <span class="vtc">('+(ni+1)+'/'+list.length+')</span>':'')+'</div></div><button id="tkPrev"'+(ni<=0?' disabled':'')+'>‹</button><button id="tkNext"'+(ni<0||ni>=list.length-1?' disabled':'')+'>›</button></div><div class="tktabs" id="tkTabs" role="tablist" aria-label="Open sheets"></div>'+
+  el.innerHTML='<div class="vbar"><button id="tkExitB" class="tkmb" title="Back to the job (Plans tab)" aria-label="Back to the job">‹<span class="vlbl"> Job</span></button><button id="tkHomeB" class="tkmb" title="Home: all jobs (saves the takeoff first)" aria-label="Home: all jobs"><svg class="hico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 20.5h18M5 20.5V9.5l7-5.5 7 5.5v11M9.5 20.5v-6h5v6"/></svg><span class="vlbl"> Home</span></button><button id="tkBack" class="tkmb" title="Takeoff menu: items, sheets, Send to bid sheet, Markup PDF, download rows" aria-label="Takeoff menu" aria-haspopup="dialog" aria-expanded="false"><span class="tkmi" aria-hidden="true">☰</span> Takeoff<span class="vlbl"> menu</span></button><div class="vt">'+(jn?'<div class="vtj" id="tkJob" title="'+esc(jn)+'">'+esc(jn)+'</div>':'')+'<div class="vtn" title="'+esc(sh.name||'Sheet')+'">'+esc(sh.name||'Sheet')+(ni>=0&&list.length>1?' <span class="vtc">('+(ni+1)+'/'+list.length+')</span>':'')+'</div></div><button id="tkPrev"'+(ni<=0?' disabled':'')+'>‹</button><button id="tkNext"'+(ni<0||ni>=list.length-1?' disabled':'')+'>›</button></div><div class="tktabs" id="tkTabs" role="tablist" aria-label="Open sheets"></div>'+
     '<div class="tkwrap"><div id="tkStage"><div id="tkBoard"><img id="tkImg" alt="" draggable="false"></div><svg id="tkInk" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="tkHatch" patternUnits="userSpaceOnUse" width="24" height="24" patternTransform="rotate(45)"><rect width="24" height="24" fill="#fff" fill-opacity=".55"/><line x1="0" y1="0" x2="0" y2="24" stroke="#c62828" stroke-width="5" stroke-opacity=".6"/></pattern><clipPath id="tkClip"><rect id="tkClipR" width="1" height="1"/></clipPath></defs><g id="tkXf" clip-path="url(#tkClip)"><g id="tkShapes"></g><g id="tkLive"></g></g></svg><svg id="tkSel" class="tksel" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"></svg><canvas id="tkOv" class="tkov" aria-hidden="true"></canvas><canvas id="tkMag" class="tkmag" aria-hidden="true"></canvas><div class="tkcr" id="tkCr" aria-live="off"></div><div class="hint" id="tkHint">Loading sheet…</div><div class="tkread" id="tkRead"></div></div>'+
     '<div class="tkside" id="tkSide"></div></div>'+
     '<div class="vtools"><div class="trow"><button class="tb" data-tm="draw">✏ Take off</button><button class="tb" data-tm="pan">✋ Move</button><button class="tb" data-tm="select">☝ Select</button><button class="tb" data-tm="scale">📐 Scale</button><button class="tb" data-tm="measure">📏 Measure</button><button class="tb" id="tkDone">✓ Finish</button><button class="tb" id="tkUndo">↶ Undo point</button><button class="tb" id="tkSnap">Snap: on</button><button class="tb" id="tkOrtho" title="Lock lines level / plumb (or hold Shift)" aria-pressed="false">⊥ Ortho</button><span class="tkseg" title="Area: click the corners, or drag a rectangle (+ Layout lays out joists / ACT grid / CRC &amp; furring). Linear: each click adds a corner until ✓ Finish. Segments: every 2 clicks make one straight piece. Count: each click counts one."><button class="tb" data-lm="area">Area</button><select class="tb tklay" id="tkLay" title="+ Layout: draw the area as a joist / ACT grid / CRC & furring layout (or right-click an area → Add layout)" aria-label="Layout"><option value="">+ Layout: Off</option><option value="joists">Layout: Joists</option><option value="act">Layout: ACT</option><option value="crc">Layout: CRC</option><option value="dwg">Layout: Drywall susp.</option></select><button class="tb" data-lm="run">Linear</button><button class="tb" data-lm="seg">Segments</button><button class="tb" data-lm="count">Count</button></span><button class="tb" id="tkWm" title="Draw takeoff lines thinner or thicker">Line: 1x</button><button class="tb" id="tkCopy">⧉ Copy to sheet…</button><button class="tb" id="tkFit">⤢ Fit</button></div></div>';
-  $('#tkExitB').onclick=()=>tkClose();$('#tkBack').onclick=()=>tkMenu();$('#tkFit').onclick=tkvFit;tkTabsBind($('#tkTabs'));
+  $('#tkExitB').onclick=()=>tkClose();$('#tkHomeB').onclick=goHome;$('#tkBack').onclick=()=>tkMenu();$('#tkFit').onclick=tkvFit;tkTabsBind($('#tkTabs'));
   $('#tkPrev').onclick=()=>tkStep(-1);$('#tkNext').onclick=()=>tkStep(1);
   $$('[data-tm]',el).forEach(b=>b.onclick=()=>tkvMode(b.dataset.tm));
   $('#tkDone').onclick=tkvFinish;$('#tkUndo').onclick=tkvUndoPt;$('#tkCopy').onclick=tkvCopy;
@@ -5939,9 +5962,9 @@ function tkTabsBind(b){
   const up=e=>{if(!D||e.pointerId!==D.pid)return;const m=D.moved;D=null;try{b.releasePointerCapture(e.pointerId)}catch(_){}if(m){skip=true;setTimeout(()=>{skip=false},0);tkTabsSave();tkTabsRender()}};
   b.addEventListener('pointerup',up);b.addEventListener('pointercancel',up);
 }
-function tkClose(){
+function tkClose(noRender){
   tkTabSaveT();tkCtxClose();const el=$('#tkv');if(el)el.remove();TKV=null;document.body.classList.remove('noscroll');window.removeEventListener('keydown',tkvKey);window.removeEventListener('keyup',tkvKeyUp);
-  tkFlush();tkpPush();if(S.view==='job'&&S.tab==='takeoff'){S.tab='plans';window.scrollTo(0,0);render()}
+  tkFlush();tkpPush();if(S.view==='job'&&S.tab==='takeoff'){S.tab='plans';if(noRender!==true){window.scrollTo(0,0);render()}}
 }
 function tkStep(d){if(!TKV)return;tkGo(TKV.list[TKV.ni+d])}
 async function tkGo(n){if(!TKV||!n)return;if(n.id!==TKV.id&&!await tkDupOk(n.id))return;if(!TKV)return;tkTabSaveT();TKANC=tkAnch($('#tkSide'));tkShCarry(TKV.id,n.id);tkCtxClose();const it=TKV.item,hl=TKV.hl,last=TKV.last,md=TKV.mode;const el=$('#tkv');if(el)el.remove();window.removeEventListener('keydown',tkvKey);window.removeEventListener('keyup',tkvKeyUp);TKV={item:it,hl,last,mode:md};tkOpen(n.id,true)}
@@ -7095,7 +7118,7 @@ async function openSheet(id,layer){
   const cw=canWrite()&&!sup;
   V={id,sh,layer,nl,ni,W:0,H:0,t:{x:0,y:0,s:1},minS:.05,mode:'pan',phase:PHASES[0].k,pen:'thin',pts:new Map(),g:null,marks:[],pins:[],mine:[]};
   const el=$('#viewer');el.hidden=false;document.body.classList.add('noscroll');
-  el.innerHTML='<div class="vbar"><button id="vBack">‹ '+(layer==='progress'?'Progress':'Sheets')+'</button><div class="vt">'+(layer==='progress'?'Progress · ':'')+esc(sh.name||'Sheet')+(ni>=0&&nl.length>1?' <span style="font-weight:400;opacity:.7">('+(ni+1)+'/'+nl.length+')</span>':'')+'</div>'+(vers.length>1?'<select id="vVer" aria-label="Revision">'+vers.map(v=>'<option value="'+esc(v.id)+'"'+(v.id===sh.id?' selected':'')+'>'+esc(revText(v))+(v.is_current!==false?' (current)':' (old)')+'</option>').join('')+'</select>':'')+(function(){const cd=sup?[]:changeDocs(sh),ti=Array.isArray(sh.changes)?curSheets().filter(x=>sh.changes.some(c=>normNo(c)===normNo(sheetNo(x)))):[];const all=cd.concat(ti);return all.length?'<select id="vChg" aria-label="Related changes"><option value="">'+(cd.length?'Changes ('+cd.length+')':'Changes these')+'</option>'+(cd.length?'<optgroup label="RFI / PR pages for this sheet">'+cd.map(d=>'<option value="'+esc(d.id)+'">'+esc(d.name)+'</option>').join('')+'</optgroup>':'')+(ti.length?'<optgroup label="Sheets this changes">'+ti.map(d=>'<option value="'+esc(d.id)+'">'+esc(d.name)+'</option>').join('')+'</optgroup>':'')+'</select>':''})()+'<button id="vLayers">Layers</button></div>'+
+  el.innerHTML='<div class="vbar"><button id="vBack">‹ '+(layer==='progress'?'Progress':'Sheets')+'</button><button id="vHome" aria-label="Home: all jobs" title="Home: all jobs"><svg class="hico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 20.5h18M5 20.5V9.5l7-5.5 7 5.5v11M9.5 20.5v-6h5v6"/></svg></button><div class="vt">'+(layer==='progress'?'Progress · ':'')+esc(sh.name||'Sheet')+(ni>=0&&nl.length>1?' <span style="font-weight:400;opacity:.7">('+(ni+1)+'/'+nl.length+')</span>':'')+'</div>'+(vers.length>1?'<select id="vVer" aria-label="Revision">'+vers.map(v=>'<option value="'+esc(v.id)+'"'+(v.id===sh.id?' selected':'')+'>'+esc(revText(v))+(v.is_current!==false?' (current)':' (old)')+'</option>').join('')+'</select>':'')+(function(){const cd=sup?[]:changeDocs(sh),ti=Array.isArray(sh.changes)?curSheets().filter(x=>sh.changes.some(c=>normNo(c)===normNo(sheetNo(x)))):[];const all=cd.concat(ti);return all.length?'<select id="vChg" aria-label="Related changes"><option value="">'+(cd.length?'Changes ('+cd.length+')':'Changes these')+'</option>'+(cd.length?'<optgroup label="RFI / PR pages for this sheet">'+cd.map(d=>'<option value="'+esc(d.id)+'">'+esc(d.name)+'</option>').join('')+'</optgroup>':'')+(ti.length?'<optgroup label="Sheets this changes">'+ti.map(d=>'<option value="'+esc(d.id)+'">'+esc(d.name)+'</option>').join('')+'</optgroup>':'')+'</select>':''})()+'<button id="vLayers">Layers</button></div>'+
     (sup?'<div class="supbar" id="vSup">SUPERSEDED · '+esc(revText(sh))+(curV?' — tap to open current ('+esc(revText(curV))+')':'')+'</div>':'')+
     '<div id="stage"><div id="board"><img id="planImg" alt="" draggable="false"><svg id="ink" xmlns="http://www.w3.org/2000/svg"><g id="marksG"></g><g id="liveG"></g></svg></div><div id="pinLayer"></div><div class="hint" id="hint">Loading sheet…</div>'+(ni>=0&&nl.length>1?'<button class="snav" id="snPrev" aria-label="Previous sheet"'+(ni===0?' disabled':'')+'>‹</button><button class="snav" id="snNext" aria-label="Next sheet"'+(ni===nl.length-1?' disabled':'')+'>›</button>':'')+'</div>'+
     '<div class="vtools">'+(cw?'<div class="trow" id="phaseRow">'+PHASES.map(p=>'<button class="pc" data-ph="'+p.k+'" style="background:'+p.c+'">'+p.n+'</button>').join('')+'<button class="tb" id="penBtn">Pen: Thin</button></div>':'')+
@@ -7104,7 +7127,7 @@ async function openSheet(id,layer){
   el.classList.remove('nomk');vwApply();$('#mkHide').onclick=()=>mkHideSet(!el.classList.contains('nomk'));
   V.stage=$('#stage');V.board=$('#board');V.img=$('#planImg');
   $('#vBack').onclick=()=>{const v=V;if(location.hash==='#sheet'&&sheetHashPushed){history.back();setTimeout(()=>{if(V&&V===v)closeSheet()},400)}else closeSheet()};
-  $('#vLayers').onclick=layersPanel;$('#fitBtn').onclick=fit;
+  $('#vHome').onclick=()=>{$$('.mwrap').forEach(m=>m.close());goHome()};$('#vLayers').onclick=layersPanel;$('#fitBtn').onclick=fit;
   setTimeout(()=>{if(V&&V.id===id)tipsFor(cw?(layer==='progress'?'markupProg':'markup'):'viewsheet')},1400);
   const sp=$('#snPrev'),sn=$('#snNext');if(sp)sp.onclick=e=>{e.stopPropagation();stepSheet(-1)};if(sn)sn.onclick=e=>{e.stopPropagation();stepSheet(1)};
   ['pointerdown','touchstart'].forEach(t=>[sp,sn].forEach(b=>b&&b.addEventListener(t,e=>e.stopPropagation())));

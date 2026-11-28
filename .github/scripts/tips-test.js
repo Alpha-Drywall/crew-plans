@@ -48,6 +48,8 @@ t('new screens have their tips', () => {
   ['[data-bview="mine"]', '.bests', '.bwk', '#bidList .bsh', '[data-bfilt="rev"]', '#bidList [data-bm]', '#bidSelBtn', '[data-bpane="pipe"]'].forEach(s => has('bids', s));
   has('lookaheadJobs', '#lkGrid [data-rmx]');
   has('job', '.tabs2 .tg:first-child');
+  has('job', '#jhome');
+  has('takeoff', '#tkHomeB');
 });
 
 console.log(n + ' tests passed');
