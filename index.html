@@ -2882,11 +2882,11 @@ function tkvGripBind(g){
     const d=e.key==='ArrowLeft'?(o.side==='left'?-20:20):e.key==='ArrowRight'?(o.side==='left'?20:-20):0;if(!d)return;e.preventDefault();tkvwSet({width:clamp(Math.min(o.width,tkvwMaxW())+d,200,tkvwMaxW())})});
 }
 /* ---- takeoff drawing: cursor, end marks, magnifier, snapping, readout (localStorage 'acv.view.tkdraw'; snap on/off stays in 'acv.tkSnap') ---- */
-const TKDR_DEF={cur:'gap',ends:'ticks',mag:'auto',zoom:3,snapD:'M',ortho:false,diag:false,read:true,xc:'auto',endSz:'M',xSz:'M',xW:'M',op:'def',side:'C',ol:'M'};
+const TKDR_DEF={cur:'gap',ends:'none',mag:'auto',zoom:3,snapD:'M',ortho:false,diag:false,read:true,xc:'auto',endSz:'M',xSz:'M',xW:'M',op:'def',side:'C',ol:'M'};
 /* size steps for line-end marks, crosshair arm length / center gap, and crosshair line weight */
-const TK_ENDSZ={S:.6,M:1,L:1.6,XL:2.4},TK_XSZ={S:[12,4],M:[20,5],L:[34,7],XL:[56,9]},TK_XW={S:.75,M:1,L:2};
+const TK_ENDSZ={XS:.35,S:.6,M:1,L:1.6,XL:2.4},TK_XSZ={S:[12,4],M:[20,5],L:[34,7],XL:[56,9]},TK_XW={S:.75,M:1,L:2};
 const TK_SNAPPX={S:6,M:10,L:16};
-function tkdrGet(){const o=viewGet('tkdraw',TKDR_DEF);return {cur:vpick(o.cur,['gap','full','arrow'],'gap'),ends:vpick(o.ends,['ticks','dots','arrows','squares'],'ticks'),mag:vpick(o.mag,['auto','always','off'],'auto'),zoom:vpick(+o.zoom,[2,3,4],3),snapD:vpick(o.snapD,['S','M','L'],'M'),ortho:o.ortho===true,diag:o.diag===true,read:o.read!==false,xc:vpick(o.xc,['auto','red','blue','black'],'auto'),endSz:vpick(o.endSz,['S','M','L','XL'],'M'),xSz:vpick(o.xSz,['S','M','L','XL'],'M'),xW:vpick(o.xW,['S','M','L'],'M'),op:vpick(o.op,['def','60','80','100'],'def'),side:vpick(o.side,['C','L','R'],'C'),ol:vpick(o.ol,['S','M','L'],'M')}}
+function tkdrGet(){const o=viewGet('tkdraw',TKDR_DEF);return {cur:vpick(o.cur,['gap','full','arrow'],'gap'),ends:vpick(o.ends,['none','ticks','dots','arrows','squares'],'none'),mag:vpick(o.mag,['auto','always','off'],'auto'),zoom:vpick(+o.zoom,[2,3,4],3),snapD:vpick(o.snapD,['S','M','L'],'M'),ortho:o.ortho===true,diag:o.diag===true,read:o.read!==false,xc:vpick(o.xc,['auto','red','blue','black'],'auto'),endSz:vpick(o.endSz,['XS','S','M','L','XL'],'M'),xSz:vpick(o.xSz,['S','M','L','XL'],'M'),xW:vpick(o.xW,['S','M','L'],'M'),op:vpick(o.op,['def','60','80','100'],'def'),side:vpick(o.side,['C','L','R'],'C'),ol:vpick(o.ol,['S','M','L'],'M')}}
 /* mark opacity: Default = see-through (50%, the item you're drawing 75%) so the plan shows; or a fixed 60 / 80 / 100% for crisper, solid lines */
 /* wall side: a line's p is where you clicked; al 'L' = you clicked its left edge (band drawn to the right of travel), 'R' = right edge. Offsets p (0-1) by d image px; +d = right of travel (y down). */
 function tkOffsetLine(p,W,H,d){const q=(p||[]).map(Number),n=Math.floor(q.length/2);if(n<2||!d)return q.slice();const P=[];for(let i=0;i<n;i++)P.push([q[2*i]*W,q[2*i+1]*H]);
@@ -2900,8 +2900,8 @@ function tkdrRows(){const d=tkdrGet(),sn=lsGet('acv.tkSnap')!=='off';return [{he
   {label:'Crosshair color',v:d.xc,opts:[['auto','Auto'],['red','Red'],['blue','Blue'],['black','Black']],set:v=>tkdrSet({xc:v}),note:'Auto = dark with a white edge, shows on black and white'},
   {label:'Wall lines: you click the',v:d.side,opts:[['C','Center'],['L','Left edge'],['R','Right edge']],set:v=>tkdrSet({side:v}),note:'Left / right going the way you draw. The wall band shows to the other side. New marks only; right-click a mark to change it. LF is the same'},
   {label:'Mark opacity',v:d.op,opts:[['def','See-through'],['60','60%'],['80','80%'],['100','Solid']],set:v=>tkdrSet({op:v}),note:'Solid = sharpest lines; see-through lets the plan show under them. Also used in the markup PDF'},
-  {label:'Line ends',v:d.ends,opts:[['ticks','├┤ Ticks'],['dots','• Dots'],['arrows','◄► Arrows'],['squares','▫ White squares']],set:v=>tkdrSet({ends:v}),note:'Drawn in the crosshair color with a white edge; also used in the markup PDF'},
-  {label:'Line end size',v:d.endSz,opts:[['S','Small'],['M','Medium'],['L','Large'],['XL','X-large']],set:v=>tkdrSet({endSz:v}),note:'Ticks, dots and arrows, on screen and in the PDF'},
+  {label:'Line ends',v:d.ends,opts:[['none','None (only when selected)'],['ticks','├┤ Ticks'],['dots','• Dots'],['arrows','◄► Arrows'],['squares','▫ White squares']],set:v=>tkdrSet({ends:v}),note:'Drawn in the crosshair color with a white edge; also used in the markup PDF'},
+  {label:'Line end size',v:d.endSz,opts:[['XS','Extra small'],['S','Small'],['M','Medium'],['L','Large'],['XL','X-large']],set:v=>tkdrSet({endSz:v}),note:'Ticks, dots and arrows, on screen and in the PDF'},
   {label:'Crosshair size',v:d.xSz,opts:[['S','Small'],['M','Medium'],['L','Large'],['XL','X-large']],set:v=>tkdrSet({xSz:v})},
   {label:'Crosshair weight',v:d.xW,opts:[['S','Thin'],['M','Normal'],['L','Bold']],set:v=>tkdrSet({xW:v})},
   {label:'Drawing outline',v:d.ol,opts:[['S','Thin'],['M','Normal'],['L','Bold']],set:v=>tkdrSet({ol:v}),note:'Dashed outline while drawing an area or rectangle, and the select box / lasso'},
@@ -5684,7 +5684,7 @@ function tkvWidths(){if(!TKV)return;const k=1/TKV.t.s;$$('#tkShapes [data-w]').f
 async function tkOpen(sid){
   const sh=S.sheets.find(s=>s.id===sid);if(!sh||!TK)return;tkTabsInit(sid);
   const list=tkSheets();const ni=list.findIndex(s=>s.id===sid);
-  TKV={id:sid,sh,list,ni,W:0,H:0,t:{x:0,y:0,s:1},minS:.05,mode:'draw',item:TKV&&TKV.item||null,draft:[],cur:null,pts:new Map(),g:null,sel:null,hide:{},wmul:tkWmulGet(),hl:TKV&&TKV.hl||null,mine:[],lm:['seg','area'].includes(lsGet('acv.tkLineMode'))?lsGet('acv.tkLineMode'):'run',last:TKV&&TKV.last||{},dNext:false,msel:[],cont:null,contN:0,drag:null,box:null};
+  TKV={id:sid,sh,list,ni,W:0,H:0,t:{x:0,y:0,s:1},minS:.05,mode:TKV&&TKV.mode||'pan'/* opens in Move so nothing gets drawn or picked by accident; sheet switches keep the current mode */,item:TKV&&TKV.item||null,draft:[],cur:null,pts:new Map(),g:null,sel:null,hide:{},wmul:tkWmulGet(),hl:TKV&&TKV.hl||null,mine:[],lm:['seg','area'].includes(lsGet('acv.tkLineMode'))?lsGet('acv.tkLineMode'):'run',last:TKV&&TKV.last||{},dNext:false,msel:[],cont:null,contN:0,drag:null,box:null};
   if(TKV.hl&&!tkItem(TKV.hl))TKV.hl=null;tkAutoApply();
   if(!TKV.item||!tkItem(TKV.item)){const f=TK.data.items[0];TKV.item=f?f.id:null}
   {const ci=tkItem(TKV.item);if(ci&&ci.fr)TKV.lm='frame';else if(ci&&ci.unit==='SF')TKV.lm='area';else if(ci&&ci.unit==='LF'&&TKV.lm==='area')TKV.lm='run'}
@@ -5753,7 +5753,7 @@ function tkClose(){
   tkFlush();tkpPush();if(S.tab==='takeoff')tkRenderBody();
 }
 function tkStep(d){if(!TKV)return;tkGo(TKV.list[TKV.ni+d])}
-function tkGo(n){if(!TKV||!n)return;tkTabSaveT();tkCtxClose();const it=TKV.item,hl=TKV.hl,last=TKV.last;const el=$('#tkv');if(el)el.remove();window.removeEventListener('keydown',tkvKey);window.removeEventListener('keyup',tkvKeyUp);TKV={item:it,hl,last};tkOpen(n.id)}
+function tkGo(n){if(!TKV||!n)return;tkTabSaveT();tkCtxClose();const it=TKV.item,hl=TKV.hl,last=TKV.last,md=TKV.mode;const el=$('#tkv');if(el)el.remove();window.removeEventListener('keydown',tkvKey);window.removeEventListener('keyup',tkvKeyUp);TKV={item:it,hl,last,mode:md};tkOpen(n.id)}
 /* drawing mode: Linear ('run') / Segments (LF items), Area (SF items) or Count (EA items) (SF items); switching to the other kind picks the last item of that kind, or asks */
 async function tkvSetLm(m){
   if(!TKV)return;tkCtxClose();if(TKV.draft.length&&TKV.mode==='draw')tkvFinish();const it=tkItem(TKV.item),u=m==='area'?'SF':'LF';
@@ -5947,7 +5947,7 @@ function tkpDo(a){
   if(a.t==='color'){if(it&&/^#[0-9a-f]{6}$/i.test(a.c||'')&&it.color!==a.c){tkDo({t:'item',v:{id:it.id,color:a.c.toLowerCase()}});if(TKV)tkvPaint();else if(S.tab==='takeoff')tkRenderBody();tkpPush()}return}
   /* recording dot: arm this item on the sheet you're on; never switches sheets (only opens one when none is open) */
   if(a.t==='dip'){if(!it)return;const sid=(TKV&&TKV.id)||a.sheet||(tkItemSheets(it.id)[0]||{}).id||(tkSheets()[0]||{}).id;const s=sid&&tkSheets().find(x=>x.id===sid);if(!s)return;
-    if(!TKV||!TKV.id){TKV={item:it.id,hl:TKV&&TKV.hl||null};tkOpen(s.id);return}
+    if(!TKV||!TKV.id){TKV={item:it.id,hl:TKV&&TKV.hl||null,mode:'draw'};tkOpen(s.id);return}
     if(TKV.draft.length)tkvFinish();TKV.item=it.id;tkvUseItem(it.id);if(s.id!==TKV.id){TKV.mode='draw';tkGo(s);return}tkvMode('draw');return}
   if(a.t==='blay'){if(it&&TK_LAY_NAME[a.pre])tkBulkLay(it.id,a.pre);return}
   if(a.t==='open'){const s=tkSheets().find(x=>x.id===a.sid);if(!s)return;if(TKV&&TKV.id)tkGo(s);else{TKV=null;tkOpen(s.id)}return}
@@ -6026,6 +6026,7 @@ function tkpwRender(){const W=TKPW,el=$('#tkpSide'),root=$('#tkpw');if(!W||!el||
   tkpRender(el,{d:W.data,sheets:W.sheets,sid:W.sid,item:W.item,hl:W.hl,hide:W.hide,draw:!!W.draw,pop:true},tkpwAct)}
 /* end marks of one line in the markup PDF, like on screen: crosshair color with a white edge, drawn normally (not multiplied, so the white shows); squares also on inside corners */
 function tkPdfEnds(g,p,W,H,M,style,half){
+  if(style==='none')return;
   const K=tkEndCol(tkdrGet().xc),tw=Math.max(M*.0006,1.5),n=Math.floor(p.length/2);g.save();g.globalCompositeOperation='source-over';g.globalAlpha=1;g.setLineDash([]);g.lineCap='butt';g.lineJoin='round';
   const sq=(x,y,a)=>{g.beginPath();g.rect(x-a,y-a,2*a,2*a);g.fillStyle='#fff';g.fill();g.strokeStyle=K.c;g.lineWidth=Math.max(a*.25,tw*.8);g.stroke()};
   tkEnds(p,W,H).forEach(e=>{const m=tkEndMark(e,style,half);g.beginPath();
@@ -6039,6 +6040,7 @@ function tkPdfEnds(g,p,W,H,M,style,half){
 /* a finished line's end marks (ticks / dots / arrows / white squares, see tkEndMark) in the crosshair color with a white edge (tkEndCol), not the wall's color,
    and small squares on its inside corners (white filled with 'squares'); widths keep a screen px minimum through data-w / data-wm */
 function tkvEndsSvg(p,lw,c,style){
+  if(style==='none')return '';/* None: solid item color right to the end; the selection look still marks the ends of a selected mark */
   const W=TKV.W,H=TKV.H,M=Math.max(W,H),n=Math.floor(p.length/2);if(n<2)return '';const ez=TK_ENDSZ[tkdrGet().endSz]||1,half=(lw/2+M*.005)*ez,tw=M*.0008,f=v=>v.toFixed(1),K=tkEndCol(tkdrGet().xc),k=1/TKV.t.s;
   const sw=(w,mn)=>' data-w="'+w.toFixed(2)+'" data-wm="'+mn+'" stroke-width="'+Math.max(w,mn*k).toFixed(2)+'"';let s='';
   const sq=(x,y,a)=>'<rect data-end="sq" x="'+f(x-a)+'" y="'+f(y-a)+'" width="'+f(2*a)+'" height="'+f(2*a)+'" fill="#fff" stroke="'+K.c+'"'+sw(Math.max(a*.25,tw),1.2)+'/>';
