@@ -17,7 +17,7 @@ const names = ['tkOffsetLine', 'tkSideOff', 'TK_SECS', 'TK_PAPER', 'TK_SCALES', 
   'tkSnapVerts', 'tkNearVertex', 'tkOrtho', 'tkSnapPick', 'tkEnds', 'tkEndMark', 'tkReadout',
   'TK_FR_DEF', 'tkFrRot', 'tkFrUn', 'tkFrIv', 'tkFrUnion', 'tkFrClip', 'tkFrSwap', 'tkFrExt', 'tkFrAuto', 'tkFrAngle', 'tkFrPc', 'tkFrame', 'tkFrSum', 'tkFrameOf', 'tkFrRows', 'tkFrItem',
   'TK_LAY_DEF', 'TK_LAY_NAME', 'tkLayPre', 'tkLayF', 'tkLayArea', 'tkLayPos', 'tkLayCut', 'tkLayWires', 'tkLayAct', 'tkLayCrc', 'tkLayAt', 'tkLayOrg', 'tkEdNear', 'tkEdRuns', 'tkEdAt',
-  'tkTabOpen', 'tkTabClose', 'tkTabMove', 'tkTabStep', 'tkTabsClean', 'tkHideBulk', 'tkHideAnyOn'];
+  'tkTabOpen', 'tkTabClose', 'tkTabMove', 'tkTabStep', 'tkTabsClean', 'tkHideBulk', 'tkHideAnyOn', 'TK_PAL', 'TK_COLORS', 'tkNextColor', 'tkColorName', 'tkColorOpts'];
 const T = vm.runInNewContext(names.map(grab).join('\n') + '\n;({' + names.join(',') + '})', { Math, Date, String, Number, Set, Object, Array, JSON, isFinite, parseFloat, NaN, Infinity });
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok - ' + name); };
 const plain = x => JSON.parse(JSON.stringify(x));
@@ -755,4 +755,23 @@ t('wall side: offset line to the right of travel by half the width; corners mite
   close(T.tkSideOff('L', 4), 2); close(T.tkSideOff('R', 4), -2); close(T.tkSideOff(undefined, 4), 0);
   assert.deepStrictEqual(T.tkOffsetLine([0, 0, 1, 1], 10, 10, 0), [0, 0, 1, 1]);
 });
+
+t('color palette: 30 distinct takeoff colors, no pink, new items get the first unused color', () => {
+  assert.strictEqual(T.TK_PAL.length, 30);
+  assert.strictEqual(new Set(T.TK_COLORS).size, 30, 'no repeats');
+  T.TK_COLORS.forEach(c => assert.match(c, /^#[0-9a-f]{6}$/, 'lower-case hex ' + c));
+  assert.ok(!T.TK_COLORS.includes('#d81b60'), 'the old pink is gone');
+  assert.ok(!T.TK_PAL.some(x => /pink/i.test(x[1])), 'no color named pink');
+  assert.ok(T.TK_PAL.some(x => x[1] === 'Magenta'), 'magenta instead');
+  assert.strictEqual(T.tkNextColor([]), T.TK_COLORS[0]);
+  assert.strictEqual(T.tkNextColor([{ color: T.TK_COLORS[0] }, { color: '#123456' }]), T.TK_COLORS[1], 'skips used colors');
+  assert.strictEqual(T.tkNextColor([{ color: T.TK_COLORS[0].toUpperCase() }]), T.TK_COLORS[1], 'case-insensitive');
+  const all = T.TK_COLORS.map(color => ({ color }));
+  assert.strictEqual(T.tkNextColor(all), T.TK_COLORS[0], 'all used: cycles');
+  assert.strictEqual(T.tkColorName('#E53935'), 'Red');
+  assert.strictEqual(T.tkColorName('#123456'), 'Custom #123456');
+  assert.strictEqual(T.tkColorOpts('#123456').length, 31, 'a custom color stays pickable in the item form');
+  assert.strictEqual(T.tkColorOpts('#1e88e5').length, 30);
+});
+
 console.log(n + ' takeoff tests passed.');
