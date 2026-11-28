@@ -713,7 +713,6 @@ html.hc .tksh{border:2px solid #59626d}
 .tkmc .tkhere{font-size:12px;font-weight:700;color:#9a5b00;background:#fdf0d5;border-radius:6px;padding:2px 8px;white-space:nowrap}
 @keyframes tkmfade{from{opacity:0}to{opacity:1}}
 @media (prefers-reduced-motion:reduce){.tkms,.tkmbg{animation:none}}
-.tkem{margin:2px 0 6px 16px}
 .tkns{display:inline-block;min-width:14px;padding:0 3px;border-radius:7px;background:#c62828;color:#fff;font-size:10px;font-weight:700;text-align:center;line-height:14px}
 .tkit .q{font-variant-numeric:tabular-nums}
 .tkpfoot{position:sticky;bottom:-10px;margin:12px -10px -10px;padding:8px 10px;background:#fff;border-top:1px solid var(--line);font-size:12px;display:grid;gap:2px;box-shadow:0 -4px 10px #0000000d}
@@ -6064,11 +6063,11 @@ function tkpList(c){
   if(!d.items.length&&tkpBy()!=='sheet')return '<div class="small muted">No items yet. Tap + Item.</div>';
   if(tkpBy()==='sheet'){
     const its={};d.items.forEach(it=>its[it.id]=it);/* keep plan order so rows don't jump under your cursor when the sheet changes (the open sheet is highlighted, not moved) */const order=c.sheets.slice();
-    order.forEach(s=>{const m=SQ.sheets[s.id]||{},nmHit=q&&(s.name||'').toLowerCase().includes(q);let ids=Object.keys(m).filter(k=>its[k]).sort((a,b)=>(its[a].n||0)-(its[b].n||0));const n=ids.length;
+    order.forEach(s=>{const m=SQ.sheets[s.id]||{},nmHit=q&&(s.name||'').toLowerCase().includes(q);let ids=Object.keys(m).filter(k=>its[k]).sort((a,b)=>(its[a].n||0)-(its[b].n||0));const n=ids.length,marked=n>0;/* only marked sheets expand: unmarked ones are plain rows (tap or Open ›) with no arrow and no empty text */
       if(q&&!nmHit){ids=ids.filter(k=>tkpMatch(its[k],q));if(!ids.length)return}
-      const open=q?true:tkpShOpen(c,s.id),un=ids.some(k=>m[k].unscaled);
-      h+='<div class="tksh'+(s.id===c.sid?' cur':'')+'" data-xs="'+esc(s.id)+'" role="button" tabindex="0" aria-expanded="'+open+'"><span class="tkchev">'+(open?'▾':'▸')+'</span><span class="nm" title="'+esc(s.name||'Sheet')+'">'+esc(s.name||'Sheet')+'</span>'+(un?'<span class="tkns" title="No scale on this sheet">!</span>':'<span class="tksc" title="'+esc(tkScaleTag(d.scales[s.id],s.scale_text))+'">'+esc((d.scales[s.id]&&d.scales[s.id].label||'no scale').replace(/ = 1'-0"$/,''))+'</span>')+'<span class="ct">'+n+' item'+(n===1?'':'s')+'</span>'+(n?(()=>{const on=tkHideAnyOn(c.hide,Object.keys(m).filter(k=>its[k]));return '<button class="tkeye tkshe'+(on?'':' off')+'" data-sheye="'+esc(s.id)+'" data-on="'+(on?0:1)+'" title="'+(on?'Turn off every item on this sheet':'Turn on every item on this sheet')+'" aria-pressed="'+on+'">💡</button>'})():'')+(s.id===c.sid?'<span class="tkhere">open</span>':'<button class="op" data-open="'+esc(s.id)+'" title="Open this sheet">Open ›</button>')+'</div>';
-      if(open)h+=ids.length?ids.map(k=>tkpRow(c,its[k],{t:m[k],sheet:s.id})).join(''):'<div class="small muted tkem">No marks on this sheet yet</div>'});
+      const open=marked&&(q?true:tkpShOpen(c,s.id)),un=ids.some(k=>m[k].unscaled);
+      h+='<div class="tksh'+(s.id===c.sid?' cur':'')+(marked?'':' um')+'" data-xs="'+esc(s.id)+'"'+(marked?'':' data-um="1"')+' role="button" tabindex="0"'+(marked?' aria-expanded="'+open+'"':'')+'><span class="tkchev">'+(marked?open?'▾':'▸':'')+'</span><span class="nm" title="'+esc(s.name||'Sheet')+'">'+esc(s.name||'Sheet')+'</span>'+(un?'<span class="tkns" title="No scale on this sheet">!</span>':'<span class="tksc" title="'+esc(tkScaleTag(d.scales[s.id],s.scale_text))+'">'+esc((d.scales[s.id]&&d.scales[s.id].label||'no scale').replace(/ = 1'-0"$/,''))+'</span>')+'<span class="ct">'+n+' item'+(n===1?'':'s')+'</span>'+(n?(()=>{const on=tkHideAnyOn(c.hide,Object.keys(m).filter(k=>its[k]));return '<button class="tkeye tkshe'+(on?'':' off')+'" data-sheye="'+esc(s.id)+'" data-on="'+(on?0:1)+'" title="'+(on?'Turn off every item on this sheet':'Turn on every item on this sheet')+'" aria-pressed="'+on+'">💡</button>'})():'')+(s.id===c.sid?'<span class="tkhere">open</span>':'<button class="op" data-open="'+esc(s.id)+'" title="Open this sheet">Open ›</button>')+'</div>';
+      if(open)h+=ids.map(k=>tkpRow(c,its[k],{t:m[k],sheet:s.id})).join('')});
     return (d.items.length?'':'<div class="small muted" style="margin:0 0 6px">No items yet. Tap + Item.</div>')+(h||(c.sheets.length?'<div class="small muted">Nothing matches “'+esc(TKQ)+'”.</div>':'<div class="small muted">No sheets yet. Upload the plans on the Plans tab.</div>'));
   }
   TK_SECS.forEach(sec=>{let its=d.items.filter(it=>(TK_SECS.includes(it.sec)?it.sec:'INTERIOR')===sec).sort((a,b)=>(a.n||0)-(b.n||0));const k='v:'+sec;const tot={};its.forEach(it=>tot[it.id]=cur[it.id]||{});
@@ -6128,7 +6127,7 @@ function tkpBindList(el,c,act,redraw){
   $$('[data-sheye]',el).forEach(b=>b.onclick=e=>{e.stopPropagation();act({t:'eyes',sheet:b.dataset.sheye,on:b.dataset.on==='1'})});
   $$('[data-go]',el).forEach(b=>b.onclick=()=>act({t:'pick',id:b.dataset.gi,sheet:b.dataset.go,on:1}));
   $$('[data-open]',el).forEach(b=>b.onclick=e=>{e.stopPropagation();act({t:'open',sid:b.dataset.open})});
-  $$('[data-xs]',el).forEach(r=>{const go=e=>{if(e.target.closest('[data-open],[data-sheye]'))return;tkToggleColl(tkpShKey(c,r.dataset.xs));redraw()};r.onclick=go;r.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go(e)}}});
+  $$('[data-xs]',el).forEach(r=>{const go=e=>{if(e.target.closest('[data-open],[data-sheye]'))return;if(r.dataset.um){if(r.dataset.xs!==c.sid)act({t:'open',sid:r.dataset.xs});return}tkToggleColl(tkpShKey(c,r.dataset.xs));redraw()};r.onclick=go;r.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go(e)}}});
   tkBindGroups(el,redraw);
 }
 function tkvSide(){
