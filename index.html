@@ -5684,7 +5684,7 @@ function tkvWidths(){if(!TKV)return;const k=1/TKV.t.s;$$('#tkShapes [data-w]').f
 async function tkOpen(sid){
   const sh=S.sheets.find(s=>s.id===sid);if(!sh||!TK)return;tkTabsInit(sid);
   const list=tkSheets();const ni=list.findIndex(s=>s.id===sid);
-  TKV={id:sid,sh,list,ni,W:0,H:0,t:{x:0,y:0,s:1},minS:.05,mode:'draw',item:TKV&&TKV.item||null,draft:[],cur:null,pts:new Map(),g:null,sel:null,hide:{},wmul:tkWmulGet(),hl:TKV&&TKV.hl||null,mine:[],lm:['seg','area'].includes(lsGet('acv.tkLineMode'))?lsGet('acv.tkLineMode'):'run',last:TKV&&TKV.last||{},dNext:false,msel:[],cont:null,contN:0,drag:null,box:null};
+  TKV={id:sid,sh,list,ni,W:0,H:0,t:{x:0,y:0,s:1},minS:.05,mode:TKV&&TKV.mode||'pan'/* opens in Move so nothing gets drawn or picked by accident; sheet switches keep the current mode */,item:TKV&&TKV.item||null,draft:[],cur:null,pts:new Map(),g:null,sel:null,hide:{},wmul:tkWmulGet(),hl:TKV&&TKV.hl||null,mine:[],lm:['seg','area'].includes(lsGet('acv.tkLineMode'))?lsGet('acv.tkLineMode'):'run',last:TKV&&TKV.last||{},dNext:false,msel:[],cont:null,contN:0,drag:null,box:null};
   if(TKV.hl&&!tkItem(TKV.hl))TKV.hl=null;tkAutoApply();
   if(!TKV.item||!tkItem(TKV.item)){const f=TK.data.items[0];TKV.item=f?f.id:null}
   {const ci=tkItem(TKV.item);if(ci&&ci.fr)TKV.lm='frame';else if(ci&&ci.unit==='SF')TKV.lm='area';else if(ci&&ci.unit==='LF'&&TKV.lm==='area')TKV.lm='run'}
@@ -5753,7 +5753,7 @@ function tkClose(){
   tkFlush();tkpPush();if(S.tab==='takeoff')tkRenderBody();
 }
 function tkStep(d){if(!TKV)return;tkGo(TKV.list[TKV.ni+d])}
-function tkGo(n){if(!TKV||!n)return;tkTabSaveT();tkCtxClose();const it=TKV.item,hl=TKV.hl,last=TKV.last;const el=$('#tkv');if(el)el.remove();window.removeEventListener('keydown',tkvKey);window.removeEventListener('keyup',tkvKeyUp);TKV={item:it,hl,last};tkOpen(n.id)}
+function tkGo(n){if(!TKV||!n)return;tkTabSaveT();tkCtxClose();const it=TKV.item,hl=TKV.hl,last=TKV.last,md=TKV.mode;const el=$('#tkv');if(el)el.remove();window.removeEventListener('keydown',tkvKey);window.removeEventListener('keyup',tkvKeyUp);TKV={item:it,hl,last,mode:md};tkOpen(n.id)}
 /* drawing mode: Linear ('run') / Segments (LF items), Area (SF items) or Count (EA items) (SF items); switching to the other kind picks the last item of that kind, or asks */
 async function tkvSetLm(m){
   if(!TKV)return;tkCtxClose();if(TKV.draft.length&&TKV.mode==='draw')tkvFinish();const it=tkItem(TKV.item),u=m==='area'?'SF':'LF';
@@ -5947,7 +5947,7 @@ function tkpDo(a){
   if(a.t==='color'){if(it&&/^#[0-9a-f]{6}$/i.test(a.c||'')&&it.color!==a.c){tkDo({t:'item',v:{id:it.id,color:a.c.toLowerCase()}});if(TKV)tkvPaint();else if(S.tab==='takeoff')tkRenderBody();tkpPush()}return}
   /* recording dot: arm this item on the sheet you're on; never switches sheets (only opens one when none is open) */
   if(a.t==='dip'){if(!it)return;const sid=(TKV&&TKV.id)||a.sheet||(tkItemSheets(it.id)[0]||{}).id||(tkSheets()[0]||{}).id;const s=sid&&tkSheets().find(x=>x.id===sid);if(!s)return;
-    if(!TKV||!TKV.id){TKV={item:it.id,hl:TKV&&TKV.hl||null};tkOpen(s.id);return}
+    if(!TKV||!TKV.id){TKV={item:it.id,hl:TKV&&TKV.hl||null,mode:'draw'};tkOpen(s.id);return}
     if(TKV.draft.length)tkvFinish();TKV.item=it.id;tkvUseItem(it.id);if(s.id!==TKV.id){TKV.mode='draw';tkGo(s);return}tkvMode('draw');return}
   if(a.t==='blay'){if(it&&TK_LAY_NAME[a.pre])tkBulkLay(it.id,a.pre);return}
   if(a.t==='open'){const s=tkSheets().find(x=>x.id===a.sid);if(!s)return;if(TKV&&TKV.id)tkGo(s);else{TKV=null;tkOpen(s.id)}return}
