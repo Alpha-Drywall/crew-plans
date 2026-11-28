@@ -6060,7 +6060,8 @@ function tkpRow(c,it,o){
 }
 function tkpList(c){
   const d=c.d,q=TKQ.trim().toLowerCase(),SQ=tkSheetQty(d,c.sheets),all=tkTotals(d,c.sheets),cur=SQ.sheets[c.sid]||{};let h='';
-  if(!d.items.length)return '<div class="small muted">No items yet. Tap + Item.</div>';
+  /* By sheet lists EVERY current sheet (plan order), marked or not, even before the job has any items; By item has nothing to list without items */
+  if(!d.items.length&&tkpBy()!=='sheet')return '<div class="small muted">No items yet. Tap + Item.</div>';
   if(tkpBy()==='sheet'){
     const its={};d.items.forEach(it=>its[it.id]=it);/* keep plan order so rows don't jump under your cursor when the sheet changes (the open sheet is highlighted, not moved) */const order=c.sheets.slice();
     order.forEach(s=>{const m=SQ.sheets[s.id]||{},nmHit=q&&(s.name||'').toLowerCase().includes(q);let ids=Object.keys(m).filter(k=>its[k]).sort((a,b)=>(its[a].n||0)-(its[b].n||0));const n=ids.length;
@@ -6068,7 +6069,7 @@ function tkpList(c){
       const open=q?true:tkpShOpen(c,s.id),un=ids.some(k=>m[k].unscaled);
       h+='<div class="tksh'+(s.id===c.sid?' cur':'')+'" data-xs="'+esc(s.id)+'" role="button" tabindex="0" aria-expanded="'+open+'"><span class="tkchev">'+(open?'▾':'▸')+'</span><span class="nm" title="'+esc(s.name||'Sheet')+'">'+esc(s.name||'Sheet')+'</span>'+(un?'<span class="tkns" title="No scale on this sheet">!</span>':'<span class="tksc" title="'+esc(tkScaleTag(d.scales[s.id],s.scale_text))+'">'+esc((d.scales[s.id]&&d.scales[s.id].label||'no scale').replace(/ = 1'-0"$/,''))+'</span>')+'<span class="ct">'+n+' item'+(n===1?'':'s')+'</span>'+(n?(()=>{const on=tkHideAnyOn(c.hide,Object.keys(m).filter(k=>its[k]));return '<button class="tkeye tkshe'+(on?'':' off')+'" data-sheye="'+esc(s.id)+'" data-on="'+(on?0:1)+'" title="'+(on?'Turn off every item on this sheet':'Turn on every item on this sheet')+'" aria-pressed="'+on+'">💡</button>'})():'')+(s.id===c.sid?'<span class="tkhere">open</span>':'<button class="op" data-open="'+esc(s.id)+'" title="Open this sheet">Open ›</button>')+'</div>';
       if(open)h+=ids.length?ids.map(k=>tkpRow(c,its[k],{t:m[k],sheet:s.id})).join(''):'<div class="small muted tkem">No marks on this sheet yet</div>'});
-    return h||'<div class="small muted">Nothing matches “'+esc(TKQ)+'”.</div>';
+    return (d.items.length?'':'<div class="small muted" style="margin:0 0 6px">No items yet. Tap + Item.</div>')+(h||(c.sheets.length?'<div class="small muted">Nothing matches “'+esc(TKQ)+'”.</div>':'<div class="small muted">No sheets yet. Upload the plans on the Plans tab.</div>'));
   }
   TK_SECS.forEach(sec=>{let its=d.items.filter(it=>(TK_SECS.includes(it.sec)?it.sec:'INTERIOR')===sec).sort((a,b)=>(a.n||0)-(b.n||0));const k='v:'+sec;const tot={};its.forEach(it=>tot[it.id]=cur[it.id]||{});
     if(q)its=its.filter(it=>tkpMatch(it,q));if(!its.length)return;
