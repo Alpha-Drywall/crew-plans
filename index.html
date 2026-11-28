@@ -562,6 +562,7 @@ html.hc .tktab{border:2px solid #000;border-bottom:0;background:#fff;color:#000}
 #tkStage{position:relative;flex:1;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;cursor:crosshair}
 #tkBoard{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform;background:#fff;box-shadow:0 2px 14px #0003}
 #tkBoard img{display:block;width:100%;height:100%;pointer-events:none}
+#tkSel{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;overflow:hidden;z-index:2}
 #tkInk{position:absolute;left:0;top:0;width:100%;height:100%;mix-blend-mode:multiply;pointer-events:none}
 .tkread{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);background:#1d232b;color:#fff;font-weight:700;font-size:16px;padding:6px 14px;border-radius:999px;pointer-events:none;display:none}
 #tkStage.tkxh{cursor:none}
@@ -5172,6 +5173,8 @@ const TK_FR_ROLES={joist:'Joists',king:'King joists',track:'Track',hdr:'Headers'
 const TK_LAY_DEF={act:{tile:'2x4',main:"ACT main tee 12'",mainLen:12,t4:"ACT 4' cross tee",t2:"ACT 2' cross tee",wa:'ACT wall angle',waLen:12,wire:'Hanger wire 12ga',wireSp:4,tileCode:'ACT tile 2x4',waste:0},crc:{crc:'150U50-54 CRC',crcSp:4,crcLen:16,fc:'7/8" FC 25ga',fcSp:16,fcLen:12,per:'200T125-20',per2:'',perLen:10,wire:'Hanger wire 12ga',wireSp:4,clip:'',sfc:'',waste:0},rc:{rc:'RC-1 25ga',rcSp:16,rcLen:12,per:'',perLen:10,sfc:'',waste:0},dwg:{main:"DWG main runner 12'",mainLen:12,xt:'DWG cross tee 4\'',xtSp:16,wa:'DWG wall angle',waLen:12,wire:'Hanger wire 12ga',wireSp:4,sfc:'',waste:0}};
 const TK_LAY_NAME={joists:'Joists',act:'ACT grid',crc:'CRC & furring',rc:'RC channel',dwg:'Drywall suspension'};
 /* a layout item's preset ('joists' when none) */
+/* flange width (inches) from a stud / joist name: 800S162-43 -> 1.62, 362S125-33 -> 1.25, bare 200 -> 2, 125 -> 1.25; null when not readable */
+function tkMemFlangeIn(nm){const t=String(nm==null?'':nm).trim(),m=/\d{3,4}\s*[A-Za-z]\s*(\d{3})(?!\d)/.exec(t)||/^(\d{3})$/.exec(t);return m?(+m[1])/100:null}
 function tkLayPre(fr){const p=fr&&fr.preset;return p==='act'||p==='crc'||p==='rc'||p==='dwg'?p:'joists'}
 /* a layout item's settings with the preset's defaults filled in */
 function tkLayF(fr){const p=tkLayPre(fr);return p==='joists'?{...TK_FR_DEF,...(fr||{}),preset:'joists'}:{...TK_LAY_DEF[p],...(fr||{}),preset:p}}
@@ -5775,7 +5778,7 @@ async function tkOpen(sid){
   const el=document.createElement('div');el.id='tkv';el.className='tkv';document.body.appendChild(el);document.body.classList.add('noscroll');
   const jn=(S.job&&S.job.id===TK.job&&S.job.name)||'';
   el.innerHTML='<div class="vbar"><button id="tkBack" class="tkmb" title="Takeoff menu: items, sheets, Send to bid sheet, Markup PDF, download rows" aria-label="Takeoff menu" aria-haspopup="dialog" aria-expanded="false"><span class="tkmi" aria-hidden="true">☰</span> Takeoff<span class="vlbl"> menu</span></button><div class="vt">'+(jn?'<div class="vtj" id="tkJob" title="'+esc(jn)+'">'+esc(jn)+'</div>':'')+'<div class="vtn" title="'+esc(sh.name||'Sheet')+'">'+esc(sh.name||'Sheet')+(ni>=0&&list.length>1?' <span class="vtc">('+(ni+1)+'/'+list.length+')</span>':'')+'</div></div><button id="tkPrev"'+(ni<=0?' disabled':'')+'>‹</button><button id="tkNext"'+(ni<0||ni>=list.length-1?' disabled':'')+'>›</button></div><div class="tktabs" id="tkTabs" role="tablist" aria-label="Open sheets"></div>'+
-    '<div class="tkwrap"><div id="tkStage"><div id="tkBoard"><img id="tkImg" alt="" draggable="false"><svg id="tkInk" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="tkHatch" patternUnits="userSpaceOnUse" width="24" height="24" patternTransform="rotate(45)"><rect width="24" height="24" fill="#fff" fill-opacity=".55"/><line x1="0" y1="0" x2="0" y2="24" stroke="#c62828" stroke-width="5" stroke-opacity=".6"/></pattern></defs><g id="tkShapes"></g><g id="tkLive"></g></svg></div><canvas id="tkOv" class="tkov" aria-hidden="true"></canvas><canvas id="tkMag" class="tkmag" aria-hidden="true"></canvas><div class="tkcr" id="tkCr" aria-live="off"></div><div class="hint" id="tkHint">Loading sheet…</div><div class="tkread" id="tkRead"></div></div>'+
+    '<div class="tkwrap"><div id="tkStage"><div id="tkBoard"><img id="tkImg" alt="" draggable="false"><svg id="tkInk" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="tkHatch" patternUnits="userSpaceOnUse" width="24" height="24" patternTransform="rotate(45)"><rect width="24" height="24" fill="#fff" fill-opacity=".55"/><line x1="0" y1="0" x2="0" y2="24" stroke="#c62828" stroke-width="5" stroke-opacity=".6"/></pattern></defs><g id="tkShapes"></g><g id="tkLive"></g></svg></div><svg id="tkSel" class="tksel" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"></svg><canvas id="tkOv" class="tkov" aria-hidden="true"></canvas><canvas id="tkMag" class="tkmag" aria-hidden="true"></canvas><div class="tkcr" id="tkCr" aria-live="off"></div><div class="hint" id="tkHint">Loading sheet…</div><div class="tkread" id="tkRead"></div></div>'+
     '<div class="tkside" id="tkSide"></div></div>'+
     '<div class="vtools"><div class="trow"><button class="tb" data-tm="draw">✏ Take off</button><button class="tb" data-tm="pan">✋ Move</button><button class="tb" data-tm="select">☝ Select</button><button class="tb" data-tm="scale">📐 Scale</button><button class="tb" data-tm="measure">📏 Measure</button><button class="tb" id="tkDone">✓ Finish</button><button class="tb" id="tkUndo">↶ Undo point</button><button class="tb" id="tkSnap">Snap: on</button><button class="tb" id="tkOrtho" title="Lock lines level / plumb (or hold Shift)" aria-pressed="false">⊥ Ortho</button><span class="tkseg" title="Area: click the corners, or drag a rectangle (+ Layout lays out joists / ACT grid / CRC &amp; furring). Linear: each click adds a corner until ✓ Finish. Segments: every 2 clicks make one straight piece. Count: each click counts one."><button class="tb" data-lm="area">Area</button><select class="tb tklay" id="tkLay" title="+ Layout: draw the area as a joist / ACT grid / CRC & furring layout (or right-click an area → Add layout)" aria-label="Layout"><option value="">+ Layout: Off</option><option value="joists">Layout: Joists</option><option value="act">Layout: ACT</option><option value="crc">Layout: CRC</option><option value="dwg">Layout: Drywall susp.</option></select><button class="tb" data-lm="run">Linear</button><button class="tb" data-lm="seg">Segments</button><button class="tb" data-lm="count">Count</button></span><button class="tb" id="tkWm" title="Draw takeoff lines thinner or thicker">Line: 1x</button><button class="tb" id="tkCopy">⧉ Copy to sheet…</button><button class="tb" id="tkFit">⤢ Fit</button></div></div>';
   $('#tkBack').onclick=()=>tkMenu();$('#tkFit').onclick=tkvFit;tkTabsBind($('#tkTabs'));
@@ -6033,6 +6036,7 @@ function tkpDo(a){
   /* recording dot: arm this item on the sheet you're on; never switches sheets (only opens one when none is open) */
   if(a.t==='dip'){if(!it)return;const sid=(TKV&&TKV.id)||a.sheet||(tkItemSheets(it.id)[0]||{}).id||(tkSheets()[0]||{}).id;const s=sid&&tkSheets().find(x=>x.id===sid);if(!s)return;
     if(!TKV||!TKV.id){TKV={item:it.id,hl:TKV&&TKV.hl||null,mode:'draw'};tkOpen(s.id);return}
+    if(TKV.mode==='draw'&&TKV.item===it.id&&s.id===TKV.id){if(TKV.draft.length)tkvFinish();tkvMode('pan');return}/* red dot clicked again = stop taking off (green) */
     if(TKV.draft.length)tkvFinish();TKV.item=it.id;tkvUseItem(it.id);if(s.id!==TKV.id){TKV.mode='draw';tkGo(s);return}tkvMode('draw');return}
   if(a.t==='blay'){if(it&&TK_LAY_NAME[a.pre])tkBulkLay(it.id,a.pre);return}
   if(a.t==='open'){const s=tkSheets().find(x=>x.id===a.sid);if(!s)return;if(TKV&&TKV.id)tkGo(s);else{TKV=null;tkOpen(s.id)}return}
@@ -6170,7 +6174,8 @@ function tkvFrameSvg(s,it,p,sel,dim,op,sw,tags){
   (s.o||[]).forEach(o=>{h+='<polygon data-open="1" points="'+pts(o)+'" fill="url(#tkHatch)" stroke="'+c+'" stroke-width="'+f(sw*.3)+'" stroke-dasharray="'+f(sw*2)+' '+f(sw*1.2)+'"/>'});
   const sc=tkScaleOf(TKV.id),r=tkFrameOf({...s,p},TKV.sh,sc,it.fr);
   if(r&&!TKV.frOff){const fpp=+sc.fpp,d={};r.segs.forEach(g=>{d[g.r]=(d[g.r]||'')+'M'+f(g.a[0]/fpp)+' '+f(g.a[1]/fpp)+'L'+f(g.b[0]/fpp)+' '+f(g.b[1]/fpp)});
-    TK_LAY_ST[r.pre].forEach(([k,w,a,ds,hi])=>{if(d[k])h+='<path data-fr="'+k+'" d="'+d[k]+'" fill="none" stroke-linecap="butt" vector-effect="non-scaling-stroke" stroke-width="'+f2(w*hc)+'" stroke="'+(hi?'#ffab00':c)+'"'+(a<1?' stroke-opacity="'+a+'"':'')+(ds===1?' stroke-dasharray="7 4"':ds===2?' stroke-dasharray="2 2"':'')+'/>'})}
+    TK_LAY_ST[r.pre].forEach(([k,w,a,ds,hi])=>{if(d[k]){const fl=k==='joist'&&r.pre==='joists'&&+sc.fpp>0?tkMemFlangeIn(it.fr&&it.fr.mem):null,tw=fl?fl/12/fpp:0;/* joists: the flange width to scale (image px), never under the screen minimum */
+      h+='<path data-fr="'+k+'" d="'+d[k]+'" fill="none" stroke-linecap="butt"'+(tw?' data-w="'+f2(tw)+'" data-wm="'+f2(w*hc)+'" stroke-width="'+f2(Math.max(tw,w*hc/TKV.t.s))+'"':' vector-effect="non-scaling-stroke" stroke-width="'+f2(w*hc)+'"')+' stroke="'+(hi?'#ffab00':c)+'"'+(a<1?' stroke-opacity="'+a+'"':'')+(ds===1?' stroke-dasharray="7 4"':ds===2?' stroke-dasharray="2 2"':'')+'/>'}})}
   if(r&&r.org&&sel&&!TKV.frOff){const fpp=+sc.fpp,x=r.org[0]/fpp,y=r.org[1]/fpp,k=6/TKV.t.s;h+='<path data-org="1" d="M'+f(x-k)+' '+f(y)+'H'+f(x+k)+'M'+f(x)+' '+f(y-k)+'V'+f(y+k)+'" stroke="#ffab00" stroke-width="'+f2(2*hc)+'" vector-effect="non-scaling-stroke" fill="none"/><circle data-org="1" cx="'+f(x)+'" cy="'+f(y)+'" r="'+f(k*.6)+'" fill="none" stroke="#ffab00" stroke-width="'+f2(1.5*hc)+'" vector-effect="non-scaling-stroke"/>'}
   h+='</g>';
   const lp=tkFrLabelAt(p,W,H,M*.009);tags.push([tkLayTag(it,r),lp[0],lp[1],c,dim]);
@@ -6182,10 +6187,12 @@ function tkvOutline(){const px={S:1,M:2,L:3.5}[tkdrGet().ol]*(document.documentE
 /* a selected / highlighted mark, PlanSwift style: a red line along it with a dashed white line on top between its points, and white squares (dark edge) at the points; screen-constant.
    q = 0-1 points, closed = area / layout, hv = put data-hv (corner index) on the squares (grab handles of the selected mark) */
 function tkvMarkHi(q,closed,hv){
-  const W=TKV.W,H=TKV.H,k=1/TKV.t.s,r=4*k,f=v=>v.toFixed(1),K=tkEndCol(tkdrGet().xc),pts=[];let h='';
-  for(let i=0;i+1<q.length;i+=2){const x=q[i]*W,y=q[i+1]*H;pts.push(f(x)+','+f(y));h+='<rect'+(hv?' data-hv="'+(i/2)+'"':'')+' x="'+f(x-r)+'" y="'+f(y-r)+'" width="'+f(2*r)+'" height="'+f(2*r)+'" fill="#fff" stroke="'+K.c+'" stroke-width="'+(1.4*k).toFixed(2)+'"/>'}
+  /* drawn in screen px in the #tkSel layer above the sheet (not inside the zoomed, multiply-blended board): vector, crisp and the same width at every zoom and DPR.
+     A dark casing under the red and the white dashes keeps it visible on red items; handle squares scale with the Line end size setting. */
+  const t=TKV.t,W=TKV.W,H=TKV.H,ez=TK_ENDSZ[tkdrGet().endSz]||1,r=Math.max(2.5,4*ez),f=v=>v.toFixed(1),K=tkEndCol(tkdrGet().xc),pts=[];let h='';
+  for(let i=0;i+1<q.length;i+=2){const x=t.x+q[i]*W*t.s,y=t.y+q[i+1]*H*t.s;pts.push(f(x)+','+f(y));h+='<rect'+(hv?' data-hv="'+(i/2)+'"':'')+' data-end="sq" x="'+f(x-r)+'" y="'+f(y-r)+'" width="'+f(2*r)+'" height="'+f(2*r)+'" fill="#fff" stroke="'+K.c+'" stroke-width="1.4"/>'}
   if(pts.length<2)return h;const tg=closed?'polygon':'polyline',a='<'+tg+' points="'+pts.join(' ')+'" fill="none" stroke-linejoin="round" stroke-linecap="butt"';
-  return a+' data-hi="red" stroke="#e53935" stroke-width="'+(3.2*k).toFixed(2)+'"/>'+a+' data-hi="dash" stroke="#fff" stroke-width="'+(1.3*k).toFixed(2)+'" stroke-dasharray="'+(6*k).toFixed(2)+' '+(4*k).toFixed(2)+'"/>'+h;
+  return a+' data-hi="case" stroke="#111" stroke-opacity=".85" stroke-width="5.6"/>'+a+' data-hi="red" stroke="#e53935" stroke-width="3.2"/>'+a+' data-hi="dash" stroke="#fff" stroke-width="1.3" stroke-dasharray="6 4"/>'+h;
 }
 /* a mark's points as drawn now (mid-drag included) */
 function tkvMarkPts(sh){return (TKV.drag&&(TKV.drag.m?TKV.drag.m[sh.id]:TKV.drag.id===sh.id&&TKV.drag.p)||sh.p||[]).map(Number)}
@@ -6206,14 +6213,14 @@ function tkvLive(){
     s+=poly&&pts.length>2&&TKV.dDraft?'<polygon data-draft="1" points="'+ps+'" fill="url(#tkHatch)" stroke="#c62828" stroke-width="'+ol.w+'" stroke-dasharray="'+ol.d+'"/>':poly&&pts.length>2?'<polygon data-draft="1" points="'+ps+'" fill="'+c+'" fill-opacity=".18" stroke="'+c+'" stroke-width="'+ol.w+'" stroke-dasharray="'+ol.d+'"/>':'<polyline points="'+ps+'" fill="none" stroke="'+c+'"'+(lf?' stroke-opacity="'+(TKV.cont?'.85':'.7')+'"':'')+' stroke-width="'+(lf?lw.toFixed(2):ol.w)+'" stroke-linecap="'+(lf?'butt':'round')+'" stroke-linejoin="'+(lf?'miter':'round')+'"/>';
     {const k=1/TKV.t.s,a=7*k,w=(1.4*k).toFixed(2);s+=TKV.draft.map((p,i)=>{const b=i===0&&TKV.mode==='draw'&&tkPolyIt(it)&&TKV.draft.length>2?a*1.6:a;return '<rect x="'+(p.x-b/2).toFixed(1)+'" y="'+(p.y-b/2).toFixed(1)+'" width="'+b.toFixed(1)+'" height="'+b.toFixed(1)+'" fill="none" stroke="#1d232b" stroke-width="'+w+'"/>'}).join('')}
   }
-  if(TKV.hl)s+=tkvHlSvg();
+  let hi='';if(TKV.hl)hi+=tkvHlSvg();
   {const ids=(TKV.msel||[]).filter(id=>id!==TKV.sel);let o='';ids.forEach(id=>{const sh=tkvShape(id);if(sh&&sh.sheet===TKV.id&&!TKV.hide[sh.item])o+=tkvMarkHi(tkvMarkPts(sh),sh.k!=='line',false)});
     if(TKV.sel&&!TKV.box){const sh=tkvShape(TKV.sel);if(sh&&sh.sheet===TKV.id)o+=tkvMarkHi(tkvMarkPts(sh),sh.k!=='line',TKV.mode==='select'&&sh.k!=='count')}
-    if(o)s+='<g data-selmk="1" pointer-events="none">'+o+'</g>'}
+    if(o)hi+='<g data-selmk="1" pointer-events="none">'+o+'</g>'}
   if(TKV.box&&TKV.box.l){const o=tkvOutline();s+='<polygon data-box="1" points="'+TKV.box.l.map(v=>v.x.toFixed(1)+','+v.y.toFixed(1)).join(' ')+'" fill="#1e88e5" fill-opacity=".08" stroke="#1e88e5" stroke-width="'+o.w+'" stroke-dasharray="'+o.d+'"/>'}
   else if(TKV.box){const a=TKV.box.a,b=TKV.box.b,o=tkvOutline();s+='<rect data-box="1" x="'+Math.min(a.x,b.x).toFixed(1)+'" y="'+Math.min(a.y,b.y).toFixed(1)+'" width="'+Math.abs(b.x-a.x).toFixed(1)+'" height="'+Math.abs(b.y-a.y).toFixed(1)+'" fill="#1e88e5" fill-opacity=".08" stroke="#1e88e5" stroke-width="'+o.w+'" stroke-dasharray="'+o.d+'"/>'}
   if(TKV.gpick&&TKV.gpick.a){const k=1/TKV.t.s,a=TKV.gpick.a,w=(1.6*k).toFixed(2);s+='<g data-gpick="1"><circle cx="'+a.x.toFixed(1)+'" cy="'+a.y.toFixed(1)+'" r="'+(7*k).toFixed(1)+'" fill="none" stroke="#ffab00" stroke-width="'+w+'"/>'+(TKV.cur?'<line x1="'+a.x.toFixed(1)+'" y1="'+a.y.toFixed(1)+'" x2="'+TKV.cur.x.toFixed(1)+'" y2="'+TKV.cur.y.toFixed(1)+'" stroke="#ffab00" stroke-width="'+w+'" stroke-dasharray="'+(6*k).toFixed(1)+' '+(4*k).toFixed(1)+'"/>':'')+'</g>'}
-  g.innerHTML=s;tkvOverlay();
+  g.innerHTML=s;{const sl=$('#tkSel');if(sl)sl.innerHTML=hi}tkvOverlay();
   const rd=$('#tkRead');if(!rd)return;const sc=tkScaleOf(TKV.id);
   if(!pts.length||(TKV.mode!=='draw'&&TKV.mode!=='measure'&&TKV.mode!=='scale')){rd.style.display='none';return}
   const np=[];pts.forEach(p=>np.push(p.x/W,p.y/H));let txt='';
@@ -6533,6 +6540,8 @@ function tkCtxOut(e){const m=$('#tkCtx');if(!m||m.contains(e.target))return;if(T
 function tkCtx(cx,cy,sub){
   if(!TKV||!TKV.W)return;tkCtxClose();TKV.ctxAt=Date.now();const p0=tkvImg(cx,cy),it=tkItem(TKV.item),dr=TKV.draft.length,draw=TKV.mode==='draw',sel=TKV.mode==='select';
   const hit=tkvHit(p0),hs=tkvShape(hit),hit_it=hs&&tkItem(hs.item),last=TKV.mine.slice().reverse().find(id=>TK.data.shapes.some(s=>s.id===id&&s.sheet===TKV.id));
+  /* right-click on a mark selects it (same look as a left-click select) unless it is already part of the selection */
+  if(!sub&&hit&&hs&&!dr&&!TKV.gpick&&!tkvSelIds().includes(hit)){TKV.sel=hit;TKV.msel=[hit];tkvPaint()}
   const ids=tkvSelIds(),many=ids.length>1,C=tkMac()?'⌘':'Ctrl+',eas=TK.data.items.filter(x=>x.unit==='EA');
   const srt=l=>l.slice().sort((a,b)=>TK_SECS.indexOf(a.sec)-TK_SECS.indexOf(b.sec)||(a.n||0)-(b.n||0));
   const G=[];let A=[];const sep=()=>{if(A.length)G.push(A.join(''));A=[]};
@@ -6544,8 +6553,9 @@ function tkCtx(cx,cy,sub){
   else{
     if(TKV.gpick){add('gdone','✓ Done (keep the current direction)',!!TKV.gpick.a,'Esc');add('gcan','Cancel start grid',!TKV.gpick.a,'Esc');sep()}
     if(hs&&hit_it&&!dr)A.push('<div class="tkctxh tkctxi"><span class="sw" style="background:'+esc(hit_it.color)+'"></span><span>'+esc(hit_it.code)+' · '+esc(tkvQtyText(hs))+(hs.k==='line'&&+hs.h>0?' · @'+esc(tkFtIn(+hs.h)):'')+(hs.note?' · “'+esc(hs.note)+'”':'')+'</span></div>');
+    add('stop','■ Stop',TKV.mode==='draw'||TKV.mode==='measure'||TKV.mode==='scale'||dr>0||!!TKV.gpick,'Esc');
     add('undo','↶ Undo last point',dr>(TKV.cont?TKV.contN:0),'Backspace');
-    add('fin','■ Stop',dr>=2&&(!draw||!it||(it.unit==='LF'&&!it.fr)),'Enter');
+    add('fin','Finish line (keep it)',dr>=2&&(!draw||!it||(it.unit==='LF'&&!it.fr)),'Enter');
     add('close','Close area',draw&&tkPolyIt(it)&&dr>=3,'Enter');
     add('cancel','✕ Cancel drawing',dr>0,'Esc');
     add('runit','Change item for this linear ▸',draw&&dr>0&&!!it&&it.unit!=='EA'&&TK.data.items.some(x=>x.id!==it.id&&tkSameKind(x,it)));
@@ -6615,6 +6625,7 @@ function tkCtx(cx,cy,sub){
     tkCtxClose();
     if(c==='gdone'||c==='gcan'){tkvGridEnd(c==='gdone');return}
     if(c==='undo')tkvUndoPt();
+    else if(c==='stop'){if(TKV.gpick)tkvGridEnd(false);if(TKV.draft.length>=2&&TKV.mode==='draw'){const ci=tkItem(TKV.item);if(ci&&ci.unit==='LF'&&!ci.fr)tkvFinish()}tkvCancel();tkvMode('pan')}
     else if(c==='fin'||c==='close')tkvFinish();
     else if(c==='cancel')tkvCancel();
     else if(c==='deduct'){TKV.dNext=!TKV.dNext;tkvTools()}

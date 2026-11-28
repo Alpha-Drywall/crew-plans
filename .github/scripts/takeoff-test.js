@@ -17,7 +17,7 @@ const names = ['tkOffsetLine', 'tkSideOff', 'TK_SECS', 'TK_PAPER', 'TK_SCALES', 
   'tkSnapVerts', 'tkNearVertex', 'tkOrtho', 'tkSnapPick', 'tkEnds', 'tkEndMark', 'tkReadout',
   'TK_FR_DEF', 'tkFrRot', 'tkFrUn', 'tkFrIv', 'tkFrUnion', 'tkFrClip', 'tkFrSwap', 'tkFrExt', 'tkFrAuto', 'tkFrAngle', 'tkFrPc', 'tkFrame', 'tkFrSum', 'tkFrameOf', 'tkFrRows', 'tkFrItem',
   'TK_LAY_DEF', 'TK_LAY_NAME', 'tkLayPre', 'tkLayF', 'tkLayArea', 'tkLayPos', 'tkLayCut', 'tkLayWires', 'tkLayAct', 'tkLayCrc', 'tkLayRc', 'tkLayDwg', 'tkLayAt', 'tkLayOrg', 'tkEdNear', 'tkEdRuns', 'tkEdAt',
-  'tkInPoly', 'tkBulkLayOps', 'tkEndCol', 'tkTabOpen', 'tkTabClose', 'tkTabMove', 'tkTabStep', 'tkTabsClean', 'tkHideBulk', 'tkHideAnyOn', 'TK_PAL', 'TK_COLORS', 'tkNextColor', 'tkColorName', 'tkColorOpts'];
+  'tkInPoly', 'tkMemFlangeIn', 'tkBulkLayOps', 'tkEndCol', 'tkTabOpen', 'tkTabClose', 'tkTabMove', 'tkTabStep', 'tkTabsClean', 'tkHideBulk', 'tkHideAnyOn', 'TK_PAL', 'TK_COLORS', 'tkNextColor', 'tkColorName', 'tkColorOpts'];
 const T = vm.runInNewContext(names.map(grab).join('\n') + '\n;({' + names.join(',') + '})', { Math, Date, String, Number, Set, Object, Array, JSON, isFinite, parseFloat, NaN, Infinity });
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok - ' + name); };
 const plain = x => JSON.parse(JSON.stringify(x));
@@ -829,6 +829,12 @@ t('color palette: 30 distinct takeoff colors (true red, magenta, clear pinks), n
   assert.strictEqual(T.tkColorName('#123456'), 'Custom #123456');
   assert.strictEqual(T.tkColorOpts('#123456').length, 31, 'a custom color stays pickable in the item form');
   assert.strictEqual(T.tkColorOpts('#1e88e5').length, 30);
+});
+
+t('joist flange width from the member name (to scale), null when unreadable', () => {
+  near(T.tkMemFlangeIn('800S162-43'), 1.62); near(T.tkMemFlangeIn('600S162-43'), 1.62); near(T.tkMemFlangeIn('362S125-33'), 1.25);
+  near(T.tkMemFlangeIn('200'), 2); near(T.tkMemFlangeIn('125'), 1.25); near(T.tkMemFlangeIn(' 1000S200-54 '), 2);
+  assert.strictEqual(T.tkMemFlangeIn(''), null); assert.strictEqual(T.tkMemFlangeIn('joist'), null); assert.strictEqual(T.tkMemFlangeIn(null), null);
 });
 
 console.log(n + ' takeoff tests passed.');
