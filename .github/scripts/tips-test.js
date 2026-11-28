@@ -43,7 +43,7 @@ t('every tipsFor(\'key\') in the app has tips', () => {
 
 t('new screens have their tips', () => {
   const has = (k, sel) => assert(TIPS[k].some(s => s[0] === sel), k + ' missing ' + sel);
-  ['#tkBack', '#tkQ', '#tkSide [data-rec]', '#tkSide [data-col]', '#tkSide [data-eye]', '#tkXAll', '#tkPop', '#tkScBan', '#tkViewB', '#tkStage'].forEach(s => has('takeoff', s));
+  ['#tkExitB', '#tkBack', '#tkQ', '#tkSide [data-rec]', '#tkSide [data-col]', '#tkSide [data-eye]', '#tkXAll', '#tkPop', '#tkScBan', '#tkViewB', '#tkStage'].forEach(s => has('takeoff', s));
   ['#tkLay', '#tkStage'].forEach(s => has('takeoffLayout', s));
   ['[data-bview="mine"]', '.bests', '.bwk', '#bidList .bsh', '[data-bfilt="rev"]', '#bidList [data-bm]', '#bidSelBtn', '[data-bpane="pipe"]'].forEach(s => has('bids', s));
   has('lookaheadJobs', '#lkGrid [data-rmx]');
