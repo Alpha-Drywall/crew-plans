@@ -672,6 +672,45 @@ html.hc .tkq{border:2px solid #59626d}
 html.hc .tksh{border:2px solid #59626d}
 .tkshe{font-size:13px;flex:none}.tkalle.off{opacity:.6}
 .tkit2{margin-left:10px}.tkeye.ph{display:inline-block;width:22px;flex:0 0 auto}
+.tkdot.ph{display:inline-block;width:18px;flex:0 0 auto}
+.tkit .tkdot,.tkit .tkeye{padding:2px 2px}
+.tkit:has(.tkrec){gap:4px}
+.tkrec{flex:0 0 auto;align-self:stretch;width:15px;margin:-7px -3px -7px -4px;padding:0 0 0 3px;border:0;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:7px 0 0 7px}
+.tkrec i{display:block;width:9px;height:9px;border-radius:50%;background:transparent;transition:background-color .12s,box-shadow .12s}
+.tkit:hover .tkrec i,.tkrec:focus-visible i{background:#2e9e44}
+.tkrec:hover i{box-shadow:0 0 0 3px #2e9e4433}
+.tkit.rec .tkrec i{background:#e53935;box-shadow:0 0 0 3px #e5393533}
+@media (hover:none){.tkrec i{box-shadow:inset 0 0 0 1.5px #c3c9d1}.tkit.rec .tkrec i{box-shadow:0 0 0 3px #e5393533}}
+.tkit .tksw{width:16px;height:16px;border-radius:4px;border:0;padding:0;margin:0 1px;cursor:pointer;flex:0 0 auto;box-shadow:inset 0 0 0 1px #0000002e;transition:transform .1s}
+.tkit .tksw:hover,.tkit .tksw[aria-expanded=true]{transform:scale(1.18);box-shadow:0 0 0 2px #fff,0 0 0 3px #1d232b66}
+.tkv.tvbig .tkit .tksw{width:22px;height:22px}.tkv.tvbig .tkrec{width:20px}
+.tkpal{position:fixed;z-index:300;background:#fff;color:#1d232b;border-radius:12px;box-shadow:0 12px 32px #0000004d,0 0 0 1px #0000001a;padding:10px;width:max-content}
+.tkpalg{display:grid;grid-template-columns:repeat(6,26px);gap:6px}
+.tkpalg button{width:26px;height:26px;border-radius:6px;border:0;padding:0;cursor:pointer;box-shadow:inset 0 0 0 1px #00000026;transition:transform .08s}
+.tkpalg button:hover,.tkpalg button:focus-visible{transform:scale(1.14);outline:none;box-shadow:0 0 0 2px #fff,0 0 0 3px #1d232b88}
+.tkpalg button.on{box-shadow:0 0 0 2px #fff,0 0 0 4px #1d232b}
+.tkpalc{display:flex;align-items:center;gap:8px;margin-top:10px;padding:6px 6px 6px 8px;border-top:1px solid var(--line);border-radius:0 0 6px 6px;font-size:13px;font-weight:600;cursor:pointer}
+.tkpalc:hover{background:#f1f3f5}.tkpalc .sw{display:none}
+.tkpalc input{margin-left:auto;width:34px;height:24px;border:0;padding:0;background:none;cursor:pointer}
+.tkv .vbar .vt{min-width:0;line-height:1.2}
+.tkv .vbar .vtj{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;opacity:.72;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tkv .vbar .vtn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tkv .vbar .vtc{font-weight:400;opacity:.7}
+.tkv .vbar .tkmb{white-space:nowrap;padding:8px 12px}
+.tkv .vbar .tkmb[aria-expanded=true]{background:#ffffff2e;box-shadow:inset 0 -3px 0 var(--accent)}
+.tkmenu{position:absolute;inset:0;z-index:40;display:flex}
+.tkmbg{position:absolute;inset:0;background:#0f141a66;animation:tkmfade .15s ease-out}
+.tkms{position:relative;width:min(440px,100%);height:100%;background:var(--bg,#f3f5f7);display:flex;flex-direction:column;box-shadow:8px 0 28px #0000004d;animation:tkdrwL .18s ease-out}
+.tkmh{display:flex;align-items:center;gap:8px;background:var(--head);color:#fff;padding:calc(8px + env(safe-area-inset-top)) 8px 8px 16px;min-height:52px}
+.tkmt{font-weight:700;font-size:16px}.tkmj{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tkmh .grow{min-width:0}
+.tkmx{background:#ffffff14;border:0;color:#fff;border-radius:8px;width:40px;height:40px;font-size:22px;line-height:1;cursor:pointer}
+.tkmc{flex:1;overflow:auto;padding:12px;-webkit-overflow-scrolling:touch}
+.tkmf{padding:10px 12px calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:#fff}
+.tkmf .btn{width:100%}
+.tkmc .tkhere{font-size:12px;font-weight:700;color:#9a5b00;background:#fdf0d5;border-radius:6px;padding:2px 8px;white-space:nowrap}
+@keyframes tkmfade{from{opacity:0}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){.tkms,.tkmbg{animation:none}}
 .tkem{margin:2px 0 6px 16px}
 .tkns{display:inline-block;min-width:14px;padding:0 3px;border-radius:7px;background:#c62828;color:#fff;font-size:10px;font-weight:700;text-align:center;line-height:14px}
 .tkit .q{font-variant-numeric:tabular-nums}
@@ -726,6 +765,8 @@ body.tkpbody{overflow:hidden}
  .tkv.tvdrw .tkside{position:absolute;top:0;bottom:0;right:0;z-index:8;width:min(var(--tkw,290px),86vw);height:auto;max-height:none;box-shadow:-8px 0 24px #0003;border-left:1px solid var(--line);animation:tkdrwR .18s ease-out}
  .tkv.tvdrw.tvl .tkside{right:auto;left:0;box-shadow:8px 0 24px #0003;border-left:0;border-right:1px solid var(--line);animation-name:tkdrwL}
  .tkv .vbar .vlbl{display:none}
+ .tkv .vbar .tkmb{padding:8px 9px}.tkv .vbar .tkmb .tkmi{display:none}
+ .tkv .vbar .vtj{font-size:10px}
  .tkv .vbar .tkvb{padding:8px 9px}
 }
 @keyframes tkdrwR{from{transform:translateX(100%)}to{transform:none}}
@@ -2808,8 +2849,8 @@ function tkvwSet(p,keepStage){const o=viewSet('takeoff',p,TKVW_DEF);tkvViewApply
 /* adds the panel button, ⚙ View and the resize handle to an open takeoff viewer (called from tkvSide, once per viewer) */
 function tkvViewInit(){
   const el=$('#tkv');if(!el||el._vw)return;const side=$('#tkSide',el),bar=$('.vbar',el);if(!side||!bar)return;el._vw=1;
-  const nx=$('#tkPrev',el);const h='<button id="tkPanT" class="tkvb" title="Show or hide the items list ( \\ key)" aria-controls="tkSide">☰<span class="vlbl"> Items</span></button><button id="tkViewB" class="tkvb" title="View settings: items panel side, width, style, text size; drawing: cursor, line ends, magnifier, snapping" aria-haspopup="dialog" aria-expanded="false">⚙<span class="vlbl"> View</span></button><button id="tkDock" class="tkvb" title="The items list is in its own window. Bring it back here">⇥<span class="vlbl"> Dock panel</span></button>';
-  if(nx)nx.insertAdjacentHTML('beforebegin',h);else bar.insertAdjacentHTML('beforeend',h);
+  const h='<button id="tkPanT" class="tkvb" title="Show or hide the items list ( \\ key)" aria-controls="tkSide">☰<span class="vlbl"> Items</span></button><button id="tkDock" class="tkvb" title="The items list is in its own window. Bring it back here">⇥<span class="vlbl"> Dock panel</span></button><button id="tkViewB" class="tkvb" title="View settings: items panel side, width, style, text size; drawing: cursor, line ends, magnifier, snapping" aria-haspopup="dialog" aria-expanded="false">⚙<span class="vlbl"> View</span></button>';
+  bar.insertAdjacentHTML('beforeend',h);
   side.insertAdjacentHTML('beforebegin','<div class="tkgrip" id="tkGrip" role="separator" aria-orientation="vertical" aria-label="Resize the items list" tabindex="0" title="Drag to resize · double-click to reset"><i></i></div>');
   $('#tkPanT',el).onclick=()=>tkvwSet({hidden:!tkvwGet().hidden});
   $('#tkViewB',el).onclick=e=>tkvViewPop(e.currentTarget);$('#tkDock',el).onclick=()=>tkpDock();
@@ -4879,7 +4920,12 @@ function renderLogList(){
    scales[sheetId] = {fpp:feet per image pixel,label,how:'cal'|'preset', src:'auto' + text,paper,multi when read off the sheet (tkAutoScale: scale_text + paper size pw), ok:true once checked / confirmed}
    Claude (or anyone in the signed-in app page) can use window.alphaTakeoff — see the end of this section. ===== */
 const TK_SECS=['INTERIOR','EXTERIOR','CEILINGS','HMDFS','ALTERNATES'];
-const TK_COLORS=['#e53935','#1e88e5','#43a047','#fb8c00','#8e24aa','#00acc1','#d81b60','#6d4c41','#3949ab','#7cb342','#f4511e','#00897b','#5e35b1','#c0ca33','#039be5','#546e7a'];
+/* takeoff color palette (PlanSwift-style): clear, distinct colors; new items take the first one not used yet */
+const TK_PAL=[['#e53935','Red'],['#1e88e5','Blue'],['#43a047','Green'],['#fb8c00','Orange'],['#8e24aa','Purple'],['#00acc1','Teal'],['#c026d3','Magenta'],['#6d4c41','Brown'],['#3949ab','Indigo'],['#7cb342','Lime'],['#f4511e','Deep orange'],['#00897b','Sea green'],['#5e35b1','Violet'],['#9e9d24','Olive'],['#039be5','Sky'],['#546e7a','Slate'],['#fdd835','Yellow'],['#1a237e','Navy'],['#8b1a1a','Maroon'],['#1b5e20','Forest'],['#2962ff','Royal blue'],['#00c853','Bright green'],['#ffab00','Amber'],['#9575cd','Lavender'],['#ff69b4','Hot pink'],['#37474f','Charcoal'],['#1de9b6','Mint'],['#bf360c','Rust'],['#f48fb1','Light pink'],['#212121','Black']];
+const TK_COLORS=TK_PAL.map(x=>x[0]);
+function tkNextColor(items){const used=new Set((items||[]).map(x=>String(x.color||'').toLowerCase()));return TK_COLORS.find(c=>!used.has(c))||TK_COLORS[(items||[]).length%TK_COLORS.length]}
+function tkColorName(c){const f=TK_PAL.find(x=>x[0]===String(c||'').toLowerCase());return f?f[1]:'Custom '+String(c||'')}
+function tkColorOpts(cur){const l=TK_PAL.slice();if(cur&&!TK_COLORS.includes(String(cur).toLowerCase()))l.push([cur,'Custom '+cur]);return l}
 const TK_SCALES=[['1/16" = 1\'-0"',16],['3/32" = 1\'-0"',32/3],['1/8" = 1\'-0"',8],['3/16" = 1\'-0"',16/3],['1/4" = 1\'-0"',4],['3/8" = 1\'-0"',8/3],['1/2" = 1\'-0"',2],['3/4" = 1\'-0"',4/3],['1" = 1\'-0"',1],['1 1/2" = 1\'-0"',2/3],['1" = 10\'',10],['1" = 20\'',20],['1" = 30\'',30],['1" = 40\'',40],['1" = 50\'',50]];
 const TK_PAPER=[[36,24],[42,30],[48,36],[30,42],[24,36],[34,22],[17,11],[22,34],[11,17]];
 /* feet from 12'-6", 12' 6", 12.5, 12'6, 150" */
@@ -5393,16 +5439,33 @@ function tkBindGroups(root,redraw){$$('[data-tkg]',root).forEach(el=>{const go=(
 function renderTakeoff(){
   return '<div id="tkBody"><div class="empty">Loading takeoff…</div></div>';
 }
+/* opening the Takeoff tab goes straight into the drawing viewer (once per visit to the tab: the job shell is rebuilt when the tab changes); "Exit takeoff" in the menu leaves the list here */
 function bindTakeoff(){
   const jid=jobId();const T=tkFor(jid);
-  if(T.loaded)tkRenderBody();
-  tkLoad(jid,false).then(()=>{if(TK===T)tkAutoApply();if(S.tab==='takeoff'&&jobId()===jid&&!TKV)tkRenderBody()});
+  const go=()=>{if(S.tab!=='takeoff'||jobId()!==jid||TKV||!T.loaded)return;const sh=$('[data-jobshell]');if(sh&&!sh._tkAuto&&T.loaded&&S.loaded.sheets){sh._tkAuto=1;const sid=tkAutoSheet();if(sid){tkOpen(sid);return}}tkRenderBody()};
+  go();
+  tkLoad(jid,false).then(()=>{if(TK===T)tkAutoApply();go()});
 }
+/* the sheet the Takeoff tab opens on: the last one open on this device, else the first with marks, else the first sheet */
+function tkAutoSheet(){
+  const l=tkSheets();if(!l.length||!TK)return null;let st={};try{st=JSON.parse(lsGet('acv.tkTabs.'+TK.job)||'{}')||{}}catch(e){}
+  if(st.act&&l.some(s=>s.id===st.act))return st.act;const on=new Set((TK.data.shapes||[]).map(x=>x.sheet));const m=l.find(s=>on.has(s.id));return (m||l[0]).id;
+}
+/* ☰ Takeoff menu in the viewer: a side sheet with what the Takeoff tab list had (tkRenderBody renders into #tkMenuB while it is open) */
+function tkMenu(){
+  const el=$('#tkv');if(!el||!TK)return;if($('#tkMenu',el)){tkMenuClose();return}
+  const jn=(S.job&&S.job.id===TK.job&&S.job.name)||'';
+  el.insertAdjacentHTML('beforeend','<div class="tkmenu" id="tkMenu"><div class="tkmbg" data-mx></div><div class="tkms" role="dialog" aria-modal="true" aria-label="Takeoff menu"><div class="tkmh"><div class="grow"><div class="tkmt">Takeoff</div>'+(jn?'<div class="tkmj">'+esc(jn)+'</div>':'')+'</div><button class="tkmx" data-mx aria-label="Close the menu" title="Close (Esc)">×</button></div><div class="tkmc" id="tkMenuB"></div><div class="tkmf"><button class="btn" id="tkExit" title="Close the drawing viewer and show the takeoff list">‹ Exit takeoff viewer</button></div></div></div>');
+  const m=$('#tkMenu',el);$$('[data-mx]',m).forEach(b=>b.onclick=tkMenuClose);$('#tkExit',m).onclick=()=>{tkMenuClose();tkClose()};
+  m.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('.mwrap')){e.preventDefault();e.stopPropagation();tkMenuClose()}});
+  const bk=$('#tkBack',el);if(bk)bk.setAttribute('aria-expanded','true');tkRenderBody();const f=$('#tkAdd',m)||$('.tkmx',m);if(f)f.focus();
+}
+function tkMenuClose(){const m=$('#tkMenu');if(m)m.remove();const bk=$('#tkBack');if(bk){bk.setAttribute('aria-expanded','false');bk.focus()}}
 function tkRenderBody(){
-  const b=$('#tkBody');if(!b||!TK)return;const d=TK.data,sheets=tkSheets(),tot=tkTotals(d,sheets);
+  const mb=$('#tkMenuB');if(!mb&&TKV)return;const b=mb||$('#tkBody');if(!b||!TK)return;const d=TK.data,sheets=tkSheets(),tot=tkTotals(d,sheets);
   const bySec={};d.items.forEach(it=>{const k=TK_SECS.includes(it.sec)?it.sec:'INTERIOR';(bySec[k]=bySec[k]||[]).push(it)});
   let h='<div class="card"><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" id="tkAdd">+ Takeoff item</button><button class="btn" id="tkAddFr" title="Lay out joists, an ACT grid or CRC &amp; furring over an area: a row per member">+ Layout item</button><button class="btn" id="tkSend">Send to bid sheet</button><button class="btn" id="tkPdf">Markup PDF</button><button class="btn" id="tkXls">Download rows (.xlsx)</button></div>'+
-    '<p class="small muted" style="margin:8px 0 0">Add an item (your code for the TAKEOFF tab, like <b>362S162-25 FF14 G28 FR4</b>), then open a sheet below and click along the walls. '+(d.sent&&d.sent.at?'Last sent to '+esc(d.sent.file||'the bid sheet')+' '+esc(fmtWhen(d.sent.at))+'.':'')+' <span id="tkSaved" class="muted">'+(TK.ops.length?'Saving…':'Saved')+'</span></p></div>';
+    '<p class="small muted" style="margin:8px 0 0">Add an item (your code for the TAKEOFF tab, like <b>362S162-25 FF14 G28 FR4</b>), then '+(mb?'pick a sheet below and click the ● next to an item to take off with it.':'open a sheet below and click along the walls.')+' '+(d.sent&&d.sent.at?'Last sent to '+esc(d.sent.file||'the bid sheet')+' '+esc(fmtWhen(d.sent.at))+'.':'')+' <span id="tkSaved" class="muted">'+(TK.ops.length?'Saving…':'Saved')+'</span></p></div>';
   if(!d.items.length)h+='<div class="empty"><b>No takeoff items yet</b>Tap + Takeoff item. Walls are LF, ceilings and soffit faces are SF, door frames and other counts are EA.</div>';
   TK_SECS.forEach(sec=>{const its=(bySec[sec]||[]).sort((a,b)=>(a.n||0)-(b.n||0));if(!its.length)return;
     h+=tkGroupHd(sec,sec,its.length+' item'+(its.length===1?'':'s')+' · '+esc(tkSumText(its,tot)));if(tkIsColl(sec))return;
@@ -5412,12 +5475,12 @@ function tkRenderBody(){
   h+=tkGroupHd('SHEETS','Sheets',sheets.length+' sheet'+(sheets.length===1?'':'s')+(noSc?' · '+noSc+' with no scale':'')+' · tap to take off');
   if(!sheets.length)h+='<div class="empty">Upload the plans on the Plans tab first.</div>';
   else if(noSc&&!tkIsColl('SHEETS'))h+='<div class="small muted" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:2px 0 8px"><button class="btn" id="tkReadSc" title="Read the printed scale (like 1/8&quot; = 1\'-0&quot;) off each sheet with no scale and use it">Read scales</button><span>Scales are read off the sheets when the plans are uploaded; this reads any sheet still missing one.</span></div>';
-  if(!tkIsColl('SHEETS'))h+=sheets.map(s=>{const sc=d.scales[s.id];return '<div class="card job" data-tks="'+esc(s.id)+'" style="padding:10px 12px"><div class="grow"><div class="name" style="font-size:15px">'+esc(s.name||'Sheet')+'</div><div class="small '+(sc?'muted':'')+'" style="'+(sc?'':'color:#c62828')+'">'+(sc?'Scale '+esc(tkScaleTag(sc,s.scale_text)):esc(tkScaleTag(null,s.scale_text).replace(/^no scale/,'No scale yet')))+(cnt[s.id]?' · '+cnt[s.id]+' takeoff mark'+(cnt[s.id]===1?'':'s'):'')+'</div></div><span class="chev">›</span></div>'}).join('');
+  if(!tkIsColl('SHEETS'))h+=sheets.map(s=>{const sc=d.scales[s.id];return '<div class="card job" data-tks="'+esc(s.id)+'" style="padding:10px 12px"><div class="grow"><div class="name" style="font-size:15px">'+esc(s.name||'Sheet')+'</div><div class="small '+(sc?'muted':'')+'" style="'+(sc?'':'color:#c62828')+'">'+(sc?'Scale '+esc(tkScaleTag(sc,s.scale_text)):esc(tkScaleTag(null,s.scale_text).replace(/^no scale/,'No scale yet')))+(cnt[s.id]?' · '+cnt[s.id]+' takeoff mark'+(cnt[s.id]===1?'':'s'):'')+'</div></div>'+(mb&&TKV&&TKV.id===s.id?'<span class="tkhere">open</span>':'<span class="chev">›</span>')+'</div>'}).join('');
   b.innerHTML=h;
   $('#tkAdd').onclick=()=>tkItemForm(null);$('#tkAddFr').onclick=()=>tkFrameForm(null);
   $('#tkSend').onclick=tkSendBid;$('#tkPdf').onclick=tkMarkupPdf;{const rs=$('#tkReadSc');if(rs)rs.onclick=()=>{rs.disabled=true;tkReadScales().finally(()=>{rs.disabled=false})}}$('#tkXls').onclick=tkDownloadRows;
   $$('[data-tki]',b).forEach(el=>el.onclick=()=>tkItemMenu(tkItem(el.dataset.tki)));
-  $$('[data-tks]',b).forEach(el=>el.onclick=()=>tkOpen(el.dataset.tks));
+  $$('[data-tks]',b).forEach(el=>el.onclick=()=>{const sid=el.dataset.tks;if(mb&&TKV){tkMenuClose();if(sid!==TKV.id)tkTabGo(sid);return}tkOpen(sid)});
   tkBindGroups(b,tkRenderBody);
 }
 async function tkItemForm(it,pre){
@@ -5429,7 +5492,7 @@ async function tkItemForm(it,pre){
     {k:'unit',label:'Measure',type:'select',value:it?it.unit:pre.unit||'LF',options:[['LF','Walls, soffits, lines (LF)'],['SF','Ceilings, areas (SF)'],['EA','Counts, door frames (EA)']]},
     {k:'h',label:'Height for wall SF (blank = from the code\'s height tag, like FF14)',value:it&&it.h&&Math.abs(+it.h-tkCodeHeight(it.code))>1e-6?tkFtIn(+it.h):'',ph:'from the code'},
     {k:'w',label:'Line width in inches: tap a size, type one, or Auto (full wall thickness from the code)',value:it&&+it.w>0?tkInStr(+it.w):'',ph:'auto: '+tkInStr(tkCodeWidth(it?it.code:'',it&&it.h))},
-    {k:'color',label:'Color',type:'select',value:it?it.color:TK_COLORS[d.items.length%TK_COLORS.length],options:TK_COLORS.map((c,i)=>[c,['Red','Blue','Green','Orange','Purple','Teal','Pink','Brown','Indigo','Lime','Deep orange','Sea green','Violet','Olive','Sky','Slate'][i]])}
+    {k:'color',label:'Color',type:'select',value:it?it.color:tkNextColor(d.items),options:tkColorOpts(it&&it.color)}
   ],isNew?'Add':'Save');
   {const ws=$$('.mwrap'),m=ws[ws.length-1],ci=m&&$('[name=code]',m),hi=m&&$('[name=h]',m),wi=m&&$('[name=w]',m);
     if(ci&&wi){const upd=()=>{const hv=hi&&hi.value?tkFeet(hi.value):0;wi.placeholder='auto: '+tkInStr(tkCodeWidth(ci.value,hv>0?hv:0))};ci.addEventListener('input',upd);if(hi)hi.addEventListener('input',upd);upd()}
@@ -5474,7 +5537,7 @@ async function tkFrameForm(it,pre,opt){
   if(!it&&!pre){pre=await tkLayAsk();if(!pre)return null}
   pre=it?tkLayPre(it.fr):pre;lsSet('acv.tkLayPre',pre);const d=TK.data,isNew=!it,dk=pre==='joists'?'acv.tkFrDef':'acv.tkLayDef.'+pre;let def={};try{def=JSON.parse(lsGet(dk)||'{}')||{}}catch(e){}
   const f=tkLayF({...def,...((it&&it.fr)||{}),preset:pre}),o=(v,l,cur)=>'<option value="'+esc(v)+'"'+(String(v)===String(cur)?' selected':'')+'>'+esc(l)+'</option>';
-  const col=it?it.color:TK_COLORS[d.items.length%TK_COLORS.length],NM=TK_LAY_NAME[pre];
+  const col=it?it.color:tkNextColor(d.items),NM=TK_LAY_NAME[pre];
   const fld=(k,l,v,ph,x)=>'<label class="field'+(x?' full':'')+'"><span>'+esc(l)+'</span><input name="'+k+'" value="'+esc(v==null?'':v)+'" placeholder="'+esc(ph||'')+'"></label>';
   const sel=(k,l,opts,x)=>'<label class="field'+(x?' full':'')+'"><span>'+esc(l)+'</span><select name="'+k+'">'+opts+'</select></label>';
   const num=(k,l,L,cur,u)=>sel(k,l,(L.indexOf(+cur)<0?L.concat([+cur]):L).map(x=>o(x,x+u,cur)).join(''));
@@ -5502,7 +5565,7 @@ async function tkFrameForm(it,pre,opt){
   if(pre==='rc')body+='<div class="tkfrh">RC channel</div>'+fld('rc','RC member (code)',f.rc,'RC-1 25ga')+num('rcSp','Spacing',[12,16,24],f.rcSp,'" OC')+num('rcLen','Stock length',[10,12],f.rcLen,"'")+
       '<div class="tkfrh">Perimeter</div>'+fld('per','Perimeter member (code, blank = none)',f.per,'J-mold or angle')+num('perLen','Perimeter sticks',[10,12],f.perLen,"'");
   if(pre!=='act')body+='<div class="tkfrh">Area</div>'+fld('sfc','Area SF row code (blank = none)',f.sfc||'','5/8 X GWB ceiling',1);
-  body+='<div class="tkfrh">Totals</div>'+fld('waste','Waste %',f.waste||'','0')+sel('color','Color',TK_COLORS.map((c,i)=>o(c,['Red','Blue','Green','Orange','Purple','Teal','Pink','Brown','Indigo','Lime','Deep orange','Sea green','Violet','Olive','Sky','Slate'][i],col)).join(''));
+  body+='<div class="tkfrh">Totals</div>'+fld('waste','Waste %',f.waste||'','0')+sel('color','Color',tkColorOpts(col).map(x=>o(x[0],x[1],col)).join(''));
   return new Promise(res=>{let done=false;
     const m=modal('<h2>'+(isNew?'New layout: '+NM:'Layout ('+NM+'): '+esc(it.code))+'</h2><p class="small muted" style="margin:-4px 0 6px">'+intro+'</p><form class="tkfrf" data-pre="'+pre+'">'+body+
       '<div class="mbtns"><button type="button" class="btn" data-x>Cancel</button><button class="btn primary" type="submit">'+(isNew?'Add':'Save')+'</button></div></form>',()=>{if(!done)res(null)});
@@ -5574,7 +5637,7 @@ async function tkvFrameAct(c,s,p0,pre){
     toast(TK_LAY_NAME[tkLayPre(x.fr)]+' layout added ('+x.code+')'+(o.length?' with '+o.length+' opening'+(o.length===1?'':'s'):'')+'. Right-click it to turn the '+TK_LAY_RUN[tkLayPre(x.fr)]+'.')}
 }
 async function tkItemMenu(it){
-  if(!it)return;const shs=tkItemSheets(it.id);const m=modal('<h2>'+esc(it.code)+'</h2><div style="display:grid;gap:10px">'+(shs.length&&!TKV?'<button class="btn primary" data-a="show">Show on sheets ('+shs.length+' sheet'+(shs.length===1?'':'s')+')</button>':'')+'<button class="btn" data-a="edit">Edit</button>'+(it.unit==='SF'&&!it.fr&&TK.data.shapes.some(s=>s.item===it.id&&s.k==='poly'&&!s.deduct)?'<div class="small muted">Add layout to all its areas</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'+Object.keys(TK_LAY_NAME).map(k=>'<button class="btn" data-blay="'+k+'">▦ '+TK_LAY_NAME[k]+'</button>').join('')+'</div>':'')+'<button class="btn danger" data-a="del">Delete item and its marks</button><button class="btn" data-a="x">Close</button></div>');
+  if(!it)return;const shs=tkItemSheets(it.id);const m=modal('<h2>'+esc(it.code)+'</h2><div style="display:grid;gap:10px">'+(shs.length?'<button class="btn primary" data-a="show">Show on sheets ('+shs.length+' sheet'+(shs.length===1?'':'s')+')</button>':'')+'<button class="btn" data-a="edit">Edit</button>'+(it.unit==='SF'&&!it.fr&&TK.data.shapes.some(s=>s.item===it.id&&s.k==='poly'&&!s.deduct)?'<div class="small muted">Add layout to all its areas</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'+Object.keys(TK_LAY_NAME).map(k=>'<button class="btn" data-blay="'+k+'">▦ '+TK_LAY_NAME[k]+'</button>').join('')+'</div>':'')+'<button class="btn danger" data-a="del">Delete item and its marks</button><button class="btn" data-a="x">Close</button></div>');
   $('[data-a=x]',m).onclick=()=>m.close();$('[data-a=edit]',m).onclick=()=>{m.close();if(it.fr)tkFrameForm(it);else tkItemForm(it)};
   const sb2=$('[data-a=show]',m);if(sb2)sb2.onclick=()=>{m.close();tkShowItem(it.id)};
   $$('[data-blay]',m).forEach(b=>b.onclick=()=>{m.close();tkBulkLay(it.id,b.dataset.blay)});
@@ -5603,7 +5666,9 @@ async function tkBulkLay(srcId,pre){
 /* sheets (in plan order) that have marks of this item */
 function tkItemSheets(iid){if(!TK)return [];const on={};TK.data.shapes.forEach(s=>{if(s.item===iid)on[s.sheet]=1});return tkSheets().filter(s=>on[s.id])}
 /* open the first sheet with this item's marks, highlighted */
-function tkShowItem(iid){const l=tkItemSheets(iid);if(!l.length){toast('No marks for this item yet.');return}TKV={item:iid,hl:iid};tkOpen(l[0].id)}
+function tkShowItem(iid){const l=tkItemSheets(iid);if(!l.length){toast('No marks for this item yet.');return}
+  if(TKV&&TKV.id){tkMenuClose();if(TKV.draft.length)tkvFinish();const s=l.find(x=>x.id===TKV.id)||l[0];TKV.item=iid;TKV.hl=iid;tkvUseItem(iid);if(s.id!==TKV.id)tkGo(s);else tkvPaint();return}
+  TKV={item:iid,hl:iid};tkOpen(l[0].id)}
 /* ---- takeoff sheet viewer ---- */
 let TKV=null;
 const TK_WMULS=[0.5,1,1.5,2,3];
@@ -5624,12 +5689,14 @@ async function tkOpen(sid){
   if(!TKV.item||!tkItem(TKV.item)){const f=TK.data.items[0];TKV.item=f?f.id:null}
   {const ci=tkItem(TKV.item);if(ci&&ci.fr)TKV.lm='frame';else if(ci&&ci.unit==='SF')TKV.lm='area';else if(ci&&ci.unit==='LF'&&TKV.lm==='area')TKV.lm='run'}
   TKV.frOff=lsGet('acv.tkFrOff')==='1';
+  {const tb=$('#tkBody');if(tb)tb.innerHTML='<div class="empty">The takeoff viewer is open.</div>'}
   const el=document.createElement('div');el.id='tkv';el.className='tkv';document.body.appendChild(el);document.body.classList.add('noscroll');
-  el.innerHTML='<div class="vbar"><button id="tkBack">‹ Takeoff</button><div class="vt">'+esc(sh.name||'Sheet')+(ni>=0&&list.length>1?' <span style="font-weight:400;opacity:.7">('+(ni+1)+'/'+list.length+')</span>':'')+'</div><button id="tkPrev"'+(ni<=0?' disabled':'')+'>‹</button><button id="tkNext"'+(ni<0||ni>=list.length-1?' disabled':'')+'>›</button></div><div class="tktabs" id="tkTabs" role="tablist" aria-label="Open sheets"></div>'+
+  const jn=(S.job&&S.job.id===TK.job&&S.job.name)||'';
+  el.innerHTML='<div class="vbar"><button id="tkBack" class="tkmb" title="Takeoff menu: items, sheets, Send to bid sheet, Markup PDF, download rows" aria-label="Takeoff menu" aria-haspopup="dialog" aria-expanded="false"><span class="tkmi" aria-hidden="true">☰</span> Takeoff<span class="vlbl"> menu</span></button><div class="vt">'+(jn?'<div class="vtj" id="tkJob" title="'+esc(jn)+'">'+esc(jn)+'</div>':'')+'<div class="vtn" title="'+esc(sh.name||'Sheet')+'">'+esc(sh.name||'Sheet')+(ni>=0&&list.length>1?' <span class="vtc">('+(ni+1)+'/'+list.length+')</span>':'')+'</div></div><button id="tkPrev"'+(ni<=0?' disabled':'')+'>‹</button><button id="tkNext"'+(ni<0||ni>=list.length-1?' disabled':'')+'>›</button></div><div class="tktabs" id="tkTabs" role="tablist" aria-label="Open sheets"></div>'+
     '<div class="tkwrap"><div id="tkStage"><div id="tkBoard"><img id="tkImg" alt="" draggable="false"><svg id="tkInk" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="tkHatch" patternUnits="userSpaceOnUse" width="24" height="24" patternTransform="rotate(45)"><rect width="24" height="24" fill="#fff" fill-opacity=".55"/><line x1="0" y1="0" x2="0" y2="24" stroke="#c62828" stroke-width="5" stroke-opacity=".6"/></pattern></defs><g id="tkShapes"></g><g id="tkLive"></g></svg></div><canvas id="tkOv" class="tkov" aria-hidden="true"></canvas><canvas id="tkMag" class="tkmag" aria-hidden="true"></canvas><div class="tkcr" id="tkCr" aria-live="off"></div><div class="hint" id="tkHint">Loading sheet…</div><div class="tkread" id="tkRead"></div></div>'+
     '<div class="tkside" id="tkSide"></div></div>'+
     '<div class="vtools"><div class="trow"><button class="tb" data-tm="draw">✏ Take off</button><button class="tb" data-tm="pan">✋ Move</button><button class="tb" data-tm="select">☝ Select</button><button class="tb" data-tm="scale">📐 Scale</button><button class="tb" data-tm="measure">📏 Measure</button><button class="tb" id="tkDone">✓ Finish</button><button class="tb" id="tkUndo">↶ Undo point</button><button class="tb" id="tkSnap">Snap: on</button><button class="tb" id="tkOrtho" title="Lock lines level / plumb (or hold Shift)" aria-pressed="false">⊥ Ortho</button><span class="tkseg" title="Area: click the corners, or drag a rectangle (+ Layout lays out joists / ACT grid / CRC &amp; furring). Linear: each click adds a corner until ✓ Finish. Segments: every 2 clicks make one straight piece. Count: each click counts one."><button class="tb" data-lm="area">Area</button><select class="tb tklay" id="tkLay" title="+ Layout: draw the area as a joist / ACT grid / CRC & furring layout (or right-click an area → Add layout)" aria-label="Layout"><option value="">+ Layout: Off</option><option value="joists">Layout: Joists</option><option value="act">Layout: ACT</option><option value="crc">Layout: CRC</option></select><button class="tb" data-lm="run">Linear</button><button class="tb" data-lm="seg">Segments</button><button class="tb" data-lm="count">Count</button></span><button class="tb" id="tkWm" title="Draw takeoff lines thinner or thicker">Line: 1x</button><button class="tb" id="tkCopy">⧉ Copy to sheet…</button><button class="tb" id="tkFit">⤢ Fit</button></div></div>';
-  $('#tkBack').onclick=tkClose;$('#tkFit').onclick=tkvFit;tkTabsBind($('#tkTabs'));
+  $('#tkBack').onclick=()=>tkMenu();$('#tkFit').onclick=tkvFit;tkTabsBind($('#tkTabs'));
   $('#tkPrev').onclick=()=>tkStep(-1);$('#tkNext').onclick=()=>tkStep(1);
   $$('[data-tm]',el).forEach(b=>b.onclick=()=>tkvMode(b.dataset.tm));
   $('#tkDone').onclick=tkvFinish;$('#tkUndo').onclick=tkvUndoPt;$('#tkCopy').onclick=tkvCopy;
@@ -5767,16 +5834,35 @@ const tkpBy=()=>vpick(viewGet('takeoff',TKVW_DEF).by,['item','sheet'],'item');
 function tkpShOpen(c,sid){return sid===c.sid?!tkIsColl('vs:'+sid):tkIsColl('vo:'+sid)}
 function tkpShKey(c,sid){return (sid===c.sid?'vs:':'vo:')+sid}
 function tkpMatch(it,q){return !q||(it.code+' '+(it.desc||'')).toLowerCase().includes(q)}
+/* color palette popover next to an item's color square: pick one of TK_PAL or Custom… (native color picker); pick(hex) does the change */
+function tkPalClose(){const m=$('#tkPal');if(m){m.remove();if(m._b)try{m._b.setAttribute('aria-expanded','false');m._b.focus()}catch(e){}}document.removeEventListener('pointerdown',tkPalOut,true);document.removeEventListener('keydown',tkPalKey,true)}
+function tkPalOut(e){const m=$('#tkPal');if(m&&!m.contains(e.target)&&e.target!==m._b)tkPalClose()}
+function tkPalKey(e){if(e.key==='Escape'){e.preventDefault();e.stopPropagation();tkPalClose()}}
+function tkPalPop(btn,cur,pick){
+  const was=$('#tkPal'),same=was&&was._b===btn;tkPalClose();if(same)return;cur=String(cur||'').toLowerCase();
+  const m=document.createElement('div');m.id='tkPal';m.className='tkpal';m.setAttribute('role','dialog');m.setAttribute('aria-label','Item color');m._b=btn;
+  m.innerHTML='<div class="tkpalg">'+TK_PAL.map(x=>'<button type="button" data-pc="'+x[0]+'" style="background:'+x[0]+'" title="'+esc(x[1])+'" aria-label="'+esc(x[1])+'"'+(x[0]===cur?' class="on" aria-current="true"':'')+'></button>').join('')+'</div>'+
+    '<label class="tkpalc"><span class="sw" style="background:'+esc(cur||'#888888')+'"></span>Custom…<input type="color" value="'+esc(/^#[0-9a-f]{6}$/.test(cur)?cur:'#888888')+'"></label>';
+  document.body.appendChild(m);btn.setAttribute('aria-expanded','true');
+  const r=btn.getBoundingClientRect(),w=m.offsetWidth,h=m.offsetHeight;let x=r.right-w,y=r.bottom+6;if(x<6)x=6;if(x+w>innerWidth-6)x=innerWidth-6-w;if(y+h>innerHeight-6)y=Math.max(6,r.top-6-h);m.style.left=x+'px';m.style.top=y+'px';
+  $$('[data-pc]',m).forEach(b=>b.onclick=()=>{tkPalClose();pick(b.dataset.pc)});
+  const ci=$('input[type=color]',m);ci.onchange=()=>{const v=ci.value;tkPalClose();pick(v)};
+  setTimeout(()=>{document.addEventListener('pointerdown',tkPalOut,true);document.addEventListener('keydown',tkPalKey,true)},0);
+  const f=$('[data-pc].on',m)||$('[data-pc]',m);if(f)f.focus();
+}
 /* one item row: c = panel context {d,sheets,sid,item,hl,hide,pop}; o = {t (this sheet totals), a (all sheets), qs (per sheet), sheet (row under a sheet in By sheet)} */
 function tkpRow(c,it,o){
   const t=o.t||{},cur=!o.sheet||o.sheet===c.sid,eye=!!c.sid,x=!o.sheet&&tkIsColl('xi:'+it.id),qs=o.qs||[];
   const sub=it.fr&&!o.sheet?'<div class="tkfrsum">'+esc((fi=>tkFrText(fi.sum,it,fi.cnt))(tkFrItem(c.d,c.sheets.filter(s=>s.id===c.sid),it))||tkLaySh(it.fr))+'</div>':'<div class="small muted">'+(it.h?esc(tkFtIn(+it.h)):'')+(it.unit==='LF'&&!it.fr?(it.h?' · ':'')+esc(tkInStr(tkItemWidthIn(it)))+' wide':'')+'</div>';
-  let h='<div class="tkit'+(o.sheet?' tkit2':'')+(cur&&it.id===c.item?' on':'')+(cur&&c.hl===it.id?' hl':'')+'" data-it="'+esc(it.id)+'"'+(o.sheet?' data-its="'+esc(o.sheet)+'"':'')+'>'+
+  const rec=cur&&it.id===c.item&&c.draw,on=o.sheet?o.sheet:c.sid?'':' (opens a sheet with it)';
+  let h='<div class="tkit'+(o.sheet?' tkit2':'')+(cur&&it.id===c.item?' on':'')+(cur&&c.hl===it.id?' hl':'')+(rec?' rec':'')+'" data-it="'+esc(it.id)+'"'+(o.sheet?' data-its="'+esc(o.sheet)+'"':'')+'>'+
+    '<button class="tkrec" data-rec="'+esc(it.id)+'"'+(o.sheet?' data-recs="'+esc(o.sheet)+'"':'')+' title="'+(rec?'Taking off this item now':'Take off with this item'+on)+'" aria-label="Take off with '+esc(it.code||'item')+'" aria-pressed="'+!!rec+'"><i></i></button>'+
     (o.sheet?'':'<button class="tkxb" data-xi="'+esc(it.id)+'" title="Sheets this item is on" aria-expanded="'+x+'">'+(x?'▾':'▸')+'</button>')+
-    (eye?'<button class="tkeye'+(c.hide[it.id]?' off':'')+'" data-eye="'+esc(it.id)+'" title="'+(c.hide[it.id]?'Off: hidden on the plans. Click to show':'On: showing on the plans. Click to hide')+' (Shift+click = show only this item)" aria-pressed="'+(c.hide[it.id]?'false':'true')+'" aria-label="Show '+esc(it.code||'item')+' on the plans">💡</button>':o.sheet?'<span class="tkeye ph"></span>':'')+
-    '<span class="sw" style="background:'+esc(it.color)+'"></span><div class="grow"><div class="c" title="'+esc(it.code+(it.desc?' — '+it.desc:''))+'">'+esc(it.code)+'</div>'+(it.desc?'<div class="tkd">'+esc(it.desc)+'</div>':'')+sub+'</div>'+
+    '<div class="grow"><div class="c" title="'+esc(it.code+(it.desc?' — '+it.desc:''))+'">'+esc(it.code)+'</div>'+(it.desc?'<div class="tkd">'+esc(it.desc)+'</div>':'')+sub+'</div>'+
     '<div class="q"><div>'+esc(tkFmtQty(t.qty||0,it.unit))+(t.unscaled?' <span class="tkns" title="'+t.unscaled+' mark(s) on a sheet with no scale">!</span>':'')+'</div>'+(o.sheet?'<div class="small muted">'+t.marks+' mark'+(t.marks===1?'':'s')+'</div>':'<div class="small muted">all: '+esc(tkFmtQty((o.a||{}).qty||0,it.unit))+'</div>')+'</div>'+
-    (o.sheet?'':'<button class="tkdot" data-ed="'+esc(it.id)+'" title="Edit">⋯</button>')+'</div>';
+    (o.sheet?'<span class="tkdot ph"></span>':'<button class="tkdot" data-ed="'+esc(it.id)+'" title="Edit">⋯</button>')+
+    '<button class="sw tksw" data-col="'+esc(it.id)+'" style="background:'+esc(it.color)+'" title="Color: '+esc(tkColorName(it.color))+' (click to change)" aria-label="Change the color of '+esc(it.code||'item')+'" aria-haspopup="dialog"></button>'+
+    (eye?'<button class="tkeye'+(c.hide[it.id]?' off':'')+'" data-eye="'+esc(it.id)+'" title="'+(c.hide[it.id]?'Off: hidden on the plans. Click to show':'On: showing on the plans. Click to hide')+' (Shift+click = show only this item)" aria-pressed="'+(c.hide[it.id]?'false':'true')+'" aria-label="Show '+esc(it.code||'item')+' on the plans">💡</button>':o.sheet?'<span class="tkeye ph"></span>':'')+'</div>';
   if(x){const nm={};c.sheets.forEach(s=>nm[s.id]=s.name||'Sheet');
     h+='<div class="tkxs">'+(qs.length?qs.map(s=>'<button class="'+(s.id===c.sid?'cur':'')+'" data-go="'+esc(s.id)+'" data-gi="'+esc(it.id)+'" title="'+(s.id===c.sid?'This sheet':'Open this sheet')+'"><span class="nm">'+(s.id===c.sid?'● ':'')+esc(nm[s.id])+'</span><span>'+esc(tkFmtQty(s.qty,it.unit))+(s.unscaled?' <span class="tkns">!</span>':'')+'</span></button>').join(''):'<div class="small muted">No marks yet</div>')+'</div>'}
   return h;
@@ -5833,7 +5919,9 @@ function tkpItemCtx(id,cx,cy,c,act,redraw){const o=document.getElementById('tkCt
     if(k==='back'){close();tkpItemCtx(id,cx,cy,c,act,redraw);return}
     close();if(k.startsWith('blay:')){act({t:'blay',id,pre:k.slice(5)});return}if(k==='solo')act({t:'eye',id,solo:true});else if(k==='xi'){const co=tkColl();co['xi:'+id]=1;if(tkpBy()==='sheet')viewSet('takeoff',{by:'item'},TKVW_DEF);lsSet('acv.tkCollapsed',JSON.stringify(co));act({t:'by',v:'item'});redraw()}else act({t:k,id})});bind()}
 function tkpBindList(el,c,act,redraw){
-  $$('[data-it]',el).forEach(r=>{r.onclick=e=>{if(e.target.closest('[data-ed],[data-eye],[data-xi]'))return;act({t:'pick',id:r.dataset.it,sheet:r.dataset.its||null})};r.ondblclick=e=>{if(e.target.closest('[data-ed],[data-eye],[data-xi]'))return;e.preventDefault();act({t:'editf',id:r.dataset.it})};r.oncontextmenu=e=>{e.preventDefault();tkpItemCtx(r.dataset.it,e.clientX,e.clientY,c,act,redraw)}});
+  $$('[data-it]',el).forEach(r=>{r.onclick=e=>{if(e.target.closest('[data-ed],[data-eye],[data-xi],[data-rec],[data-col]'))return;act({t:'pick',id:r.dataset.it,sheet:r.dataset.its||null})};r.ondblclick=e=>{if(e.target.closest('[data-ed],[data-eye],[data-xi],[data-rec],[data-col]'))return;e.preventDefault();act({t:'editf',id:r.dataset.it})};r.oncontextmenu=e=>{e.preventDefault();tkpItemCtx(r.dataset.it,e.clientX,e.clientY,c,act,redraw)}});
+  $$('[data-rec]',el).forEach(b=>b.onclick=e=>{e.stopPropagation();act({t:'dip',id:b.dataset.rec,sheet:b.dataset.recs||null})});
+  $$('[data-col]',el).forEach(b=>b.onclick=e=>{e.stopPropagation();const it=(c.d.items||[]).find(x=>x.id===b.dataset.col);if(it)tkPalPop(b,it.color,v=>act({t:'color',id:it.id,c:v}))});
   $$('[data-ed]',el).forEach(b=>b.onclick=()=>act({t:'edit',id:b.dataset.ed}));
   $$('[data-eye]',el).forEach(b=>b.onclick=e=>{e.stopPropagation();act({t:'eye',id:b.dataset.eye,solo:e.shiftKey})});
   $$('[data-xi]',el).forEach(b=>b.onclick=()=>{tkToggleColl('xi:'+b.dataset.xi);redraw()});
@@ -5845,7 +5933,7 @@ function tkpBindList(el,c,act,redraw){
 }
 function tkvSide(){
   tkvViewInit();tkTabsRender();const el=$('#tkSide');if(!el||!TK||!TKV)return;
-  tkpRender(el,{d:TK.data,sheets:tkSheets(),sid:TKV.id,item:TKV.item,hl:TKV.hl,hide:TKV.hide,pop:false},tkpDo);
+  tkpRender(el,{d:TK.data,sheets:tkSheets(),sid:TKV.id,item:TKV.item,hl:TKV.hl,hide:TKV.hide,draw:TKV.mode==='draw',pop:false},tkpDo);if($('#tkMenuB'))tkRenderBody();
   tkpPush();
 }
 /* panel actions in the plan window (from the docked panel or the pop-out) */
@@ -5856,6 +5944,10 @@ function tkpDo(a){
   if(a.t==='new'){tkItemForm(null).then(n=>{if(n&&TKV){TKV.item=n.id;tkvMode('draw');tkvSide()}});return}
   if(a.t==='edit'){if(it)tkItemMenu(it);return}
   if(a.t==='editf'){if(it){if(it.fr)tkFrameForm(it);else tkItemForm(it)}return}
+  if(a.t==='color'){if(it&&/^#[0-9a-f]{6}$/i.test(a.c||'')&&it.color!==a.c){tkDo({t:'item',v:{id:it.id,color:a.c.toLowerCase()}});if(TKV)tkvPaint();else if(S.tab==='takeoff')tkRenderBody();tkpPush()}return}
+  if(a.t==='dip'){if(!it)return;const sid=a.sheet||(TKV&&TKV.id)||(tkItemSheets(it.id)[0]||{}).id||(tkSheets()[0]||{}).id;const s=sid&&tkSheets().find(x=>x.id===sid);if(!s)return;
+    if(!TKV||!TKV.id){TKV={item:it.id,hl:TKV&&TKV.hl||null};tkOpen(s.id);return}
+    if(TKV.draft.length)tkvFinish();TKV.item=it.id;tkvUseItem(it.id);if(s.id!==TKV.id){TKV.mode='draw';tkGo(s);return}tkvMode('draw');return}
   if(a.t==='blay'){if(it&&TK_LAY_NAME[a.pre])tkBulkLay(it.id,a.pre);return}
   if(a.t==='open'){const s=tkSheets().find(x=>x.id===a.sid);if(!s)return;if(TKV&&TKV.id)tkGo(s);else{TKV=null;tkOpen(s.id)}return}
   if(!TKV){if(a.t==='pick'&&it){if(a.sheet&&tkSheets().some(s=>s.id===a.sheet)){TKV={item:it.id,hl:it.id};tkOpen(a.sheet)}else tkShowItem(it.id)}return}
@@ -5882,7 +5974,7 @@ function tkpLive(on){if(!TKP||TKP.live===on)return;TKP.live=on;if(!on){clearInte
 const tkpPopped=()=>!!(TKP&&TKP.live&&TK&&TKP.job===TK.job);
 /* the plan window tells the pop-out what it shows: sheet, active item, highlight, hidden items, and the takeoff data when it changed */
 function tkpState(full){const T=TKP;if(!T||!TK||TK.job!==T.job)return;const sh=tkSheets();
-  const m={t:'state',sid:TKV&&TKV.id||null,item:TKV&&TKV.item||null,hl:TKV&&TKV.hl||null,hide:TKV&&TKV.hide&&TKV.hj===(TK&&TK.job)?TKV.hide:tkHideGet(TK&&TK.job),hj:TK&&TK.job,rev:TK.rev,job:S.job&&S.job.name||'',tabs:TKT&&TKT.job===TK.job?TKT.ids.slice():null};
+  const m={t:'state',sid:TKV&&TKV.id||null,item:TKV&&TKV.item||null,draw:!!(TKV&&TKV.mode==='draw'),hl:TKV&&TKV.hl||null,hide:TKV&&TKV.hide&&TKV.hj===(TK&&TK.job)?TKV.hide:tkHideGet(TK&&TK.job),hj:TK&&TK.job,rev:TK.rev,job:S.job&&S.job.name||'',tabs:TKT&&TKT.job===TK.job?TKT.ids.slice():null};
   if(full||T.sent!==TK.data){m.data=TK.data;T.sent=TK.data}if(full||T.sentSh!==sh){m.sheets=sh;T.sentSh=sh}
   try{T.ch.postMessage(m)}catch(e){}}
 function tkpPush(){if(TK)tkpChan(TK.job);if(TKP)debounce('tkp',()=>tkpState(),40)}
@@ -5921,7 +6013,7 @@ function tkpwMsg(m){const W=TKPW;if(!m||!W)return;
   if(m.t==='gone'){W.linked=false;tkpwNote(true);return}
   if(m.t!=='state')return;
   if(!W.linked){W.linked=true;tkpwNote(false)}
-  if(m.data){W.data=m.data}if(m.sheets)W.sheets=m.sheets;W.sid=m.sid;W.item=m.item;W.hl=m.hl;W.hide=m.hide||{};W.name=m.job||W.name;
+  if(m.data){W.data=m.data}if(m.sheets)W.sheets=m.sheets;W.sid=m.sid;W.item=m.item;W.hl=m.hl;W.draw=!!m.draw;W.hide=m.hide||{};W.name=m.job||W.name;
   if(W.data)tkpwRender();
 }
 function tkpwAct(a){const W=TKPW;if(!W)return;if(!W.linked){toast('Open this job\'s takeoff in the plan window first.');return}
@@ -5930,7 +6022,7 @@ function tkpwAct(a){const W=TKPW;if(!W)return;if(!W.linked){toast('Open this job
 function tkpwRender(){const W=TKPW,el=$('#tkpSide'),root=$('#tkpw');if(!W||!el||!W.data)return;
   const o=tkvwGet();root.classList.toggle('tvc',o.style==='compact');root.classList.toggle('tvbig',o.big==='on');root.dataset.tt=o.text;
   const sh=W.sheets.find(s=>s.id===W.sid);$('#tkpwJob').textContent=W.name||'Takeoff items';$('#tkpwSh').textContent=sh?(sh.name||'Sheet'):'No sheet open';document.title=(sh?(sh.name||'Sheet')+' · ':'')+'Takeoff items';
-  tkpRender(el,{d:W.data,sheets:W.sheets,sid:W.sid,item:W.item,hl:W.hl,hide:W.hide,pop:true},tkpwAct)}
+  tkpRender(el,{d:W.data,sheets:W.sheets,sid:W.sid,item:W.item,hl:W.hl,hide:W.hide,draw:!!W.draw,pop:true},tkpwAct)}
 /* end marks of one line in the markup PDF, like on screen: crosshair color with a white edge, drawn normally (not multiplied, so the white shows); squares also on inside corners */
 function tkPdfEnds(g,p,W,H,M,style,half){
   const K=tkEndCol(tkdrGet().xc),tw=Math.max(M*.0006,1.5),n=Math.floor(p.length/2);g.save();g.globalCompositeOperation='source-over';g.globalAlpha=1;g.setLineDash([]);g.lineCap='butt';g.lineJoin='round';
@@ -6175,8 +6267,15 @@ function tkvBind(){
   st.addEventListener('pointerup',end);st.addEventListener('pointercancel',end);
   st.addEventListener('dblclick',e=>{e.preventDefault();if(!TKV)return;if(TKV.draft.length&&TKV.mode!=='select'){tkvFinish();return}
     /* double-click a mark (Select or Move) = edit its item */
-    if(!TKV.draft.length&&(TKV.mode==='select'||TKV.mode==='pan')){const h=tkvHit(tkvImg(e.clientX,e.clientY)),s=h&&tkvShape(h),it=s&&tkItem(s.item);if(it){if(it.fr)tkFrameForm(it);else tkItemForm(it)}}});
-  st.addEventListener('contextmenu',e=>{e.preventDefault();if(!TKV||!TKV.W)return;if($('#tkCtx')&&Date.now()-(TKV.ctxAt||0)<800)return;if(TKV.g)TKV.g.long=true;tkCtx(e.clientX,e.clientY)});
+    if(!TKV.draft.length&&(TKV.mode==='select'||TKV.mode==='pan')&&Date.now()-(TKV.cornerAt||0)>600){const h=tkvHit(tkvImg(e.clientX,e.clientY)),s=h&&tkvShape(h),it=s&&tkItem(s.item);if(it){if(it.fr)tkFrameForm(it);else tkItemForm(it)}}});
+  /* mouse right button: a quick click opens the menu; a right-drag pans and opens no menu (the menu waits for the release where the browser fires contextmenu on press) */
+  st.addEventListener('pointerdown',e=>{if(!TKV)return;if(e.pointerType==='mouse'&&(e.button===2||(e.button===0&&e.ctrlKey&&tkMac())))TKV.rc={x:e.clientX,y:e.clientY,id:e.pointerId,down:true,moved:false,pend:null,at:Date.now()};else if(e.pointerType!=='mouse')TKV.rc=null});
+  st.addEventListener('pointermove',e=>{const r=TKV&&TKV.rc;if(r&&r.down&&e.pointerId===r.id&&!r.moved&&Math.hypot(e.clientX-r.x,e.clientY-r.y)>5){r.moved=true;r.pend=null}});
+  const rcUp=e=>{const r=TKV&&TKV.rc;if(!r||!r.down||e.pointerId!==r.id)return;r.down=false;r.at=Date.now();const p=r.pend;r.pend=null;if(p&&!r.moved&&e.type==='pointerup'&&TKV.W)tkCtx(p.x,p.y)};
+  st.addEventListener('pointerup',rcUp);st.addEventListener('pointercancel',rcUp);
+  st.addEventListener('contextmenu',e=>{e.preventDefault();if(!TKV||!TKV.W)return;if($('#tkCtx')&&Date.now()-(TKV.ctxAt||0)<800)return;if(TKV.g)TKV.g.long=true;
+    const r=TKV.rc;if(r&&Date.now()-r.at<5000){if(r.down){r.pend={x:e.clientX,y:e.clientY};return}TKV.rc=null;if(r.moved)return}
+    tkCtx(e.clientX,e.clientY)});
   st.addEventListener('wheel',e=>{if(!TKV||!TKV.W)return;e.preventDefault();tkvZoomAt(e.clientX,e.clientY,Math.exp(-e.deltaY*.0015))},{passive:false});
   /* cursors (CSS from data-m / data-h / data-g): hover in select mode (rAF-throttled) and the gesture under way */
   st.addEventListener('pointermove',e=>{if(!TKV||!TKV.W)return;const g=TKV.g;
@@ -6196,6 +6295,8 @@ function tkvKey(e){
   if(TKV&&/^(Shift|Control|Meta|Alt)$/.test(e.key)){tkvMods(e);tkvHover();return}
   if(!TKV||$('.mwrap')||/INPUT|TEXTAREA|SELECT/.test((e.target&&e.target.tagName)||''))return;
   if($('#tkCtx')){if(e.key==='Escape'){e.preventDefault();tkCtxClose()}return}
+  if($('#tkMenu')){if(e.key==='Escape'){e.preventDefault();tkMenuClose()}return}
+  if($('#tkPal'))return;
   const mod=e.ctrlKey||e.metaKey,k=String(e.key||'').toLowerCase();
   if((e.key==='Tab'&&e.ctrlKey)||(e.altKey&&!mod&&(e.key==='ArrowLeft'||e.key==='ArrowRight'))){e.preventDefault();if(TKT&&TKT.ids.length>1)tkTabGo(tkTabStep(TKT.ids,TKV.id,e.key==='ArrowLeft'||e.shiftKey?-1:1));return}
   if(e.key===' '){e.preventDefault();TKV.space=true;return}
@@ -6247,9 +6348,10 @@ function tkvTap(cx,cy,alt,shift){
 }
 /* Select tool: click = select one mark (its corners show as handles), shift-click = add/remove, double-click on the selected mark's edge = add a corner; a count opens its details */
 function tkvSelTap(p0,shift){
-  const h=tkvHit(p0),now=Date.now(),lt=TKV.lastTap;TKV.lastTap={t:now,x:p0.x,y:p0.y,h};
+  const h=tkvHit(p0),now=Date.now(),lt=TKV.lastTap;TKV.lastTap={t:now,x:p0.x,y:p0.y,h,ws:!!h&&(h===TKV.sel||tkvSelIds().includes(h))};
   if(shift){if(!h)return;const l=TKV.msel.slice();if(TKV.sel&&!l.includes(TKV.sel))l.push(TKV.sel);const i=l.indexOf(h);if(i>=0)l.splice(i,1);else l.push(h);TKV.msel=l;TKV.sel=l.length===1?l[0]:null;tkvPaint();return}
-  if(h&&h===TKV.sel&&lt&&lt.h===h&&now-lt.t<450&&Math.hypot(lt.x-p0.x,lt.y-p0.y)*TKV.t.s<14){TKV.lastTap=null;tkvAddCorner(h,p0);return}
+  /* double-click on the edge of a mark that was already selected = add a corner (then the dblclick does not open the item's edit box) */
+  if(h&&h===TKV.sel&&lt&&lt.h===h&&lt.ws&&now-lt.t<450&&Math.hypot(lt.x-p0.x,lt.y-p0.y)*TKV.t.s<14){TKV.lastTap=null;TKV.cornerAt=now;tkvAddCorner(h,p0);return}
   TKV.sel=h;TKV.msel=h?[h]:[];tkvPaint();
   const s=h&&tkvShape(h);if(s&&s.k==='count')tkvShapeMenu(h);
 }
