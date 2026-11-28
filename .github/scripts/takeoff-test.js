@@ -13,7 +13,7 @@ function grab(name) {
   return lines.slice(i, j).join('\n');
 }
 const names = ['tkDupText', 'tkOffsetLine', 'tkSideOff', 'TK_SECS', 'TK_PAPER', 'TK_SCALES', 'tkFeet', 'tkFtIn', 'tkLenPx', 'tkAreaPx', 'tkShapeQty', 'tkPresetFpp', 'tkGuessPaper', 'tkEvenUp', 'tkCodeHeight', 'tkCodeWidth', 'tkItemWidthIn', 'tkInches', 'tkInStr', 'tkParseScales',
-  'tkApply', 'tkTotals', 'tkSheetQty', 'tkHeightSplits', 'tkRows', 'tkCopyShapes', 'tkSplitLine', 'tkInsertCorner', 'tkMoveCorner', 'tkDeleteCorner', 'tkOffsetShapes',
+  'tkApply', 'tkTotals', 'tkSheetQty', 'tkHeightSplits', 'tkRows', 'tkCopyShapes', 'tkSplitLine', 'tkInsertCorner', 'tkMoveCorner', 'tkDeleteCorner', 'tkCoincident', 'tkArcGeo', 'tkArcPx', 'tkArcFlat', 'tkFlat', 'tkSegPoly', 'tkArcD', 'tkArcCanvas', 'tkArcClean', 'tkArcMake', 'tkArcInsert', 'tkArcDelete', 'tkArcSplitLine', 'tkOffsetShapes',
   'tkSnapVerts', 'tkNearVertex', 'tkOrtho', 'tkSnapPick', 'tkEnds', 'tkEndMark', 'tkReadout',
   'TK_FR_DEF', 'tkFrRot', 'tkFrUn', 'tkFrIv', 'tkFrUnion', 'tkFrClip', 'tkFrSwap', 'tkFrExt', 'tkFrAuto', 'tkFrAngle', 'tkFrPc', 'tkFrame', 'tkFrSum', 'tkFrameOf', 'tkFrRows', 'tkFrItem',
   'TK_LAY_DEF', 'TK_LAY_NAME', 'tkLayPre', 'tkLayF', 'tkLayArea', 'tkLayPos', 'tkLayCut', 'tkLayWires', 'tkLayAct', 'tkLayCrc', 'tkLayRc', 'tkLayDwg', 'tkLayAt', 'tkLayOrg', 'tkEdNear', 'tkEdRuns', 'tkEdAt',
@@ -324,6 +324,30 @@ t('tkInsertCorner / tkMoveCorner / tkDeleteCorner: editing corners', () => {
   assert.deepStrictEqual(p, [0, 0, 1, 0, 1, 1], 'input untouched');
   const W = 1000, H = 1000;
   near(T.tkLenPx(T.tkInsertCorner([0, 0, 1, 0], 0, 0.3, 0), W, H), 1000, 'a corner on the line keeps the length');
+});
+
+t('tkCoincident: connected ends on the same sheet move together (Shift-drag)', () => {
+  const shapes = [
+    { id: 'a', sheet: 's1', item: 'i1', k: 'line', p: [0.1, 0.1, 0.5, 0.1] },
+    { id: 'b', sheet: 's1', item: 'i1', k: 'line', p: [0.5, 0.1, 0.5, 0.6] },
+    { id: 'c', sheet: 's1', item: 'i2', k: 'poly', p: [0.5, 0.1, 0.9, 0.1, 0.9, 0.5] },
+    { id: 'd', sheet: 's2', item: 'i1', k: 'line', p: [0.5, 0.1, 0.5, 0.9] },
+    { id: 'e', sheet: 's1', item: 'i1', k: 'count', p: [0.5, 0.1] },
+    { id: 'f', sheet: 's1', item: 'i3', k: 'line', p: [0.5001, 0.1, 0.7, 0.7] }];
+  assert.deepStrictEqual(plain(T.tkCoincident(shapes, 's1', 'a', 1)), [{ id: 'a', i: 1 }, { id: 'b', i: 0 }, { id: 'c', i: 0 }, { id: 'f', i: 0 }], 'own corner first; other sheets and counts skipped');
+  assert.deepStrictEqual(plain(T.tkCoincident(shapes, 's1', 'a', 1, 2e-5)), [{ id: 'a', i: 1 }, { id: 'b', i: 0 }, { id: 'c', i: 0 }], 'tight tolerance');
+  assert.deepStrictEqual(plain(T.tkCoincident(shapes, 's1', 'a', 1, 2e-4, { i3: true })).map(x => x.id), ['a', 'b', 'c'], 'hidden items skipped');
+  assert.deepStrictEqual(plain(T.tkCoincident(shapes, 's1', 'a', 0)), [{ id: 'a', i: 0 }], 'a free end');
+  assert.deepStrictEqual(plain(T.tkCoincident(shapes, 's1', 'zz', 0)), [], 'no such mark');
+  const vs = T.tkSnapVerts(shapes, 's1', 100, 100, null, { id: 'a', i: 1, all: { 'b:0': 1, 'c:0': 1 } });
+  assert.ok(!vs.some(v => (v.id === 'b' && v.i === 0) || (v.id === 'c' && v.i === 0) || (v.id === 'a' && v.i === 1)), 'dragged + linked corners are not snap targets');
+  assert.ok(vs.some(v => v.id === 'b' && v.i === 1), 'other corners still are');
+  let q = {}; ['a', 'b', 'c'].forEach(id => { q[id] = shapes.find(x => x.id === id).p.slice(); });
+  q.a = T.tkMoveCorner(q.a, 1, 0.6, 0.2); q.b = T.tkMoveCorner(q.b, 0, 0.6, 0.2); q.c = T.tkMoveCorner(q.c, 0, 0.6, 0.2);
+  const d = T.tkApply({ items: [{ id: 'i1', unit: 'LF' }, { id: 'i2', unit: 'SF' }], shapes: plain(shapes) }, ['a', 'b', 'c'].map(id => ({ t: 'shape', v: { id, p: q[id] } })));
+  near(d.shapes.find(x => x.id === 'a').p[2], 0.6); near(d.shapes.find(x => x.id === 'b').p[1], 0.2); near(d.shapes.find(x => x.id === 'c').p[0], 0.6);
+  const sheet = { w: 1000, h: 1000 };
+  near(T.tkShapeQty(d.shapes.find(x => x.id === 'a'), sheet, { fpp: 0.1 }, { unit: 'LF' }), Math.hypot(0.5 * 1000, 0.1 * 1000) * 0.1, 'length updates with the moved end');
 });
 
 t('tkOffsetShapes: pasted copies move together with new ids', () => {
@@ -851,4 +875,136 @@ t('index.html wires the duplicate warning into every sheet open', () => {
   assert.ok(/tkShCarry\(TKV\.id,n\.id\)/.test(html) && /TKANC=tkAnch/.test(html), 'sheet list keeps its place when a sheet opens');
   assert.ok(/id="tkPdf"/.test(html) && /id="tkSend"/.test(html), 'Send to bid sheet and Markup PDF stay in the menu');
 });
+/* ---- arcs: a 1000 x 1000 px sheet at 0.1 ft per px, so R = 100 px = 10 ft. Points are 0-1. ---- */
+{
+  const SH = { w: 1000, h: 1000 }, SC = { fpp: 0.1 }, n = v => v / 1000;
+  const pt = (x, y) => [n(x), n(y)], R = 100, c = 500, r45 = R * Math.SQRT1_2;
+  const flat = (...a) => [].concat(...a);
+  const quarter = { k: 'line', sheet: 's', item: 'i', p: flat(pt(c + R, c), pt(c, c + R)), arc: [pt(c + r45, c + r45), null] };
+  const qty = (sh, unit) => T.tkShapeQty(sh, SH, SC, { unit });
+
+  t('arcs: quarter circle R=10 ft is 15.708 LF (true arc length, not the 14.142 chord)', () => {
+    near(qty(quarter, 'LF'), Math.PI / 2 * 10, 'quarter arc');
+    near(qty({ ...quarter, arc: undefined }, 'LF'), Math.hypot(10, 10), 'no arc = the straight chord, as older marks');
+    near(qty({ ...quarter, p: flat(pt(c, c + R), pt(c + R, c)), arc: [pt(c + r45, c + r45), null] }, 'LF'), Math.PI / 2 * 10, 'same going the other way round');
+  });
+  t('arcs: arc length of a major arc (270 degrees) and of a straight-through (collinear) arc point', () => {
+    const maj = { k: 'line', p: flat(pt(c, c - R), pt(c + R, c)), arc: [pt(c - R, c), null] };
+    near(qty(maj, 'LF'), 1.5 * Math.PI * 10, 'three quarters of a circle');
+    near(qty({ ...maj, p: flat(pt(c + R, c), pt(c, c - R)) }, 'LF'), 1.5 * Math.PI * 10, 'reversed');
+    near(qty({ k: 'line', p: flat(pt(100, 100), pt(300, 100)), arc: [pt(200, 100), null] }, 'LF'), 20, 'arc point on the chord = straight');
+    near(qty({ k: 'line', p: flat(pt(100, 100), pt(300, 100), pt(300, 300)), arc: [null, pt(300, 200), null] }, 'LF'), 40, 'polyline: arc only where given');
+    const poly = { k: 'line', p: flat(pt(100, 800), pt(300, 800), pt(500, 800)), arc: [pt(200, 700), null, null] };
+    near(qty(poly, 'LF'), T.tkArcGeo({ x: 100, y: 800 }, { x: 200, y: 700 }, { x: 300, y: 800 }).len * 0.1 + 20, 'polyline: arc piece + straight piece');
+  });
+  t('arcs: semicircle area R=10 ft is 157.08 SF; a full circle (two arcs) is 314.16 SF', () => {
+    const semi = { k: 'poly', p: flat(pt(c - R, c), pt(c + R, c)), arc: [pt(c, c - R), null] };
+    near(qty(semi, 'SF'), Math.PI * 100 / 2, 'semicircle');
+    near(qty({ ...semi, arc: [pt(c, c + R), null] }, 'SF'), Math.PI * 100 / 2, 'bulging the other way');
+    near(qty({ ...semi, arc: [pt(c, c - R), pt(c, c + R)] }, 'SF'), Math.PI * 100, 'two semicircles = circle');
+    near(qty({ ...semi, arc: [pt(c, c - R), null], deduct: true }, 'SF'), -Math.PI * 100 / 2, 'a deduct area stays negative');
+  });
+  t('arcs: area with an arc side: quarter pie, rectangle with a bulge out and a bite in (both polygon directions)', () => {
+    const pie = [pt(c, c), pt(c + R, c), pt(c, c + R)];
+    near(qty({ k: 'poly', p: flat(...pie), arc: [null, pt(c + r45, c + r45), null] }, 'SF'), Math.PI * 100 / 4, 'quarter of a circle');
+    near(qty({ k: 'poly', p: flat(...pie.slice().reverse()), arc: [pt(c + r45, c + r45), null, null] }, 'SF'), Math.PI * 100 / 4, 'quarter, other direction');
+    const rect = flat(pt(400, 400), pt(600, 400), pt(600, 600), pt(400, 600));
+    near(qty({ k: 'poly', p: rect }, 'SF'), 400, 'plain 20 x 20 ft');
+    near(qty({ k: 'poly', p: rect, arc: [pt(500, 300), null, null, null] }, 'SF'), 400 + Math.PI * 100 / 2, 'top side bulges out: + semicircle');
+    near(qty({ k: 'poly', p: rect, arc: [pt(500, 500), null, null, null] }, 'SF'), 400 - Math.PI * 100 / 2, 'top side bites in: - semicircle');
+    const rev = flat(pt(400, 400), pt(400, 600), pt(600, 600), pt(600, 400));
+    near(qty({ k: 'poly', p: rev, arc: [null, null, null, pt(500, 300)] }, 'SF'), 400 + Math.PI * 100 / 2, 'reversed polygon: closing side bulges out');
+    near(qty({ k: 'poly', p: rect, arc: [null, null, null, pt(300, 500)] }, 'SF'), 400 + Math.PI * 100 / 2, 'the closing side can be an arc');
+  });
+  t('tkArcGeo / tkArcFlat / tkFlat: circle through 3 points; flattened polyline stays on the arc', () => {
+    const g = T.tkArcGeo({ x: c + R, y: c }, { x: c + r45, y: c + r45 }, { x: c, y: c + R });
+    near(g.cx, c); near(g.cy, c); near(g.r, R); near(g.sweep, Math.PI / 2); assert.strictEqual(g.large, false);
+    assert.strictEqual(T.tkArcGeo({ x: 0, y: 0 }, { x: 5, y: 0 }, { x: 10, y: 0 }), null, 'collinear');
+    assert.strictEqual(T.tkArcGeo({ x: 0, y: 0 }, { x: 5, y: 5 }, { x: 0, y: 0 }), null, 'zero chord');
+    const fp = T.tkFlat(quarter.p, quarter.arc, 1000, 1000, false);
+    assert.ok(fp.length > 10, 'many pieces'); near(fp[0], quarter.p[0]); near(fp[fp.length - 1], quarter.p[3]);
+    for (let i = 0; i + 1 < fp.length; i += 2) near(Math.hypot(fp[i] * 1000 - c, fp[i + 1] * 1000 - c), R, 'on the circle (' + i + ')');
+    const L = T.tkLenPx(fp, 1000, 1000); assert.ok(Math.abs(L - Math.PI / 2 * R) / (Math.PI / 2 * R) < 1e-3, 'flattened length is within 0.1% of the arc: ' + L);
+    assert.deepStrictEqual(plain(T.tkFlat([0.1, 0.1, 0.5, 0.1], null, 1000, 1000, false)), [0.1, 0.1, 0.5, 0.1], 'no arc = same points');
+    const closed = T.tkFlat(flat(pt(400, 400), pt(600, 400), pt(600, 600)), [null, null, pt(400, 500)], 1000, 1000, true);
+    assert.ok(closed.length > 6 && Math.abs(closed[closed.length - 1] * 1000 - 600) > 0, 'a closing arc adds points but not the first point again');
+    assert.ok(T.tkSegPoly(quarter.p, quarter.arc, 1000, 1000, 0, false).length > 5 && T.tkSegPoly(quarter.p, quarter.arc, 1000, 1000, 1, false).length === 0, 'segment polyline');
+  });
+  t('tkArcD / tkArcCanvas: SVG arc commands and canvas arcs with the right flags', () => {
+    const P = [{ x: c + R, y: c }, { x: c, y: c + R }], A = [{ x: c + r45, y: c + r45 }, null];
+    assert.strictEqual(T.tkArcD(P, A, false, v => String(Math.round(v))), 'M600 500A100 100 0 0 1 500 600');
+    assert.strictEqual(T.tkArcD(P.slice().reverse(), [{ x: c + r45, y: c + r45 }, null], false, v => String(Math.round(v))), 'M500 600A100 100 0 0 0 600 500', 'other way round = other sweep flag');
+    assert.strictEqual(T.tkArcD([{ x: c, y: c - R }, { x: c + R, y: c }], [{ x: c - R, y: c }, null], false, v => String(Math.round(v))), 'M500 400A100 100 0 1 0 600 500', 'major arc: large-arc flag');
+    assert.strictEqual(T.tkArcD([{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }], null, true, v => String(v)), 'M0 0L10 0L10 10L0 0Z');
+    const calls = []; const g = { moveTo: (...a) => calls.push(['m', ...a]), lineTo: (...a) => calls.push(['l', ...a]), arc: (...a) => calls.push(['a', ...a]) };
+    T.tkArcCanvas(g, P, A, false);
+    assert.deepStrictEqual(calls.map(x => x[0]), ['m', 'a']); near(calls[1][1], c); near(calls[1][3], R); near(calls[1][5] - calls[1][4], Math.PI / 2); assert.strictEqual(calls[1][6], false, 'clockwise on screen (increasing angle)');
+  });
+  t('tkArcClean / tkApply: arc lists are tidied; shapes without arc are unchanged (backward compatible)', () => {
+    assert.strictEqual(T.tkArcClean(undefined, 3, 'poly'), null); assert.strictEqual(T.tkArcClean([null, null], 2, 'line'), null);
+    assert.deepStrictEqual(plain(T.tkArcClean([[0.1, 0.2]], 3, 'poly')), [[0.1, 0.2], null, null], 'shorter is padded');
+    assert.strictEqual(T.tkArcClean([[0.1, 0.2], null, null, null], 3, 'poly'), null, 'longer is dropped');
+    assert.deepStrictEqual(plain(T.tkArcClean([[0.1, 0.2], ['x', 1]], 2, 'line')), [[0.1, 0.2], null], 'bad entries become straight');
+    assert.deepStrictEqual(plain(T.tkArcClean([null, [0.5, 0.5]], 2, 'line')), null, 'a line has no segment after its last point');
+    const items = [{ id: 'i', unit: 'LF', code: 'x' }, { id: 'j', unit: 'SF', code: 'y' }];
+    let d = T.tkApply({ items }, [{ t: 'shape', v: { id: 'a', item: 'i', sheet: 's', k: 'line', p: [0.1, 0.1, 0.3, 0.1], arc: [[0.2, 0.05], null] } }, { t: 'shape', v: { id: 'b', item: 'j', sheet: 's', k: 'poly', p: [0, 0, 1, 0, 1, 1], arc: [null, null, null, null] } },
+      { t: 'shape', v: { id: 'c', item: 'i', sheet: 's', k: 'line', p: [0.1, 0.1, 0.3, 0.1] } }]);
+    assert.deepStrictEqual(plain(d.shapes[0].arc), [[0.2, 0.05], null]); assert.ok(!('arc' in d.shapes[1]), 'all-null arc not kept'); assert.ok(!('arc' in d.shapes[2]), 'old shape keeps no arc key');
+    d = T.tkApply(d, [{ t: 'shape', v: { id: 'a', arc: null } }]); assert.ok(!('arc' in d.shapes[0]), 'arc:null (undo / make straight) removes it');
+    d = T.tkApply(d, [{ t: 'shape', v: { id: 'a', p: [0.1, 0.1, 0.3, 0.1, 0.5, 0.1], arc: [[0.2, 0.05], null] } }]); assert.deepStrictEqual(plain(d.shapes[0].arc), [[0.2, 0.05], null, null], 'apply pads');
+  });
+  t('tkArcMake / tkArcInsert / tkArcDelete / tkArcSplitLine keep arcs lined up with their points', () => {
+    const sq = flat(pt(400, 400), pt(600, 400), pt(600, 600), pt(400, 600));
+    const mk = T.tkArcMake(sq, null, 0, 1000, 1000, { x: 0.5, y: 0.5 }, 0.5);
+    assert.strictEqual(mk.length, 4); assert.ok(mk[0][1] < 0.4, 'bulges away from the center (up)'); near(mk[0][0], 0.5);
+    const mk2 = T.tkArcMake(flat(pt(100, 100), pt(300, 100)), null, 0, 1000, 1000, null, 0.5); near(mk2[0][1] > 0.1 ? 1 : 0, 1, 'a line bows to the left of the way drawn');
+    near(qty({ k: 'poly', p: sq, arc: T.tkArcMake(sq, null, 0, 1000, 1000, { x: 0.5, y: 0.5 }, 0.5) }, 'SF') > 400 ? 1 : 0, 1, 'area grows with an outward arc');
+    // insert on a straight side: arcs stay with their sides
+    let r = T.tkArcInsert(sq, [null, [0.7, 0.5], null, null], 0, 0.5, 0.4, 1000, 1000);
+    assert.deepStrictEqual(plain(r.p), flat(pt(400, 400), pt(500, 400), pt(600, 400), pt(600, 600), pt(400, 600)));
+    assert.deepStrictEqual(plain(r.arc), [null, null, [0.7, 0.5], null, null]);
+    // insert on an arc: the arc is cut in two, same total length, new point on the circle
+    const line = flat(pt(c - R, c), pt(c + R, c)), la = [pt(c, c - R), null];
+    r = T.tkArcInsert(line, la, 0, 0.5, 0.41, 1000, 1000);
+    assert.strictEqual(r.p.length, 6); near(r.p[2], 0.5, 'new point snapped onto the circle'); near(r.p[3], 0.4, 'top of the circle');
+    near(T.tkLenPx(r.p, 1000, 1000, r.arc), Math.PI * R, 'two quarter arcs = the semicircle');
+    near(T.tkLenPx(r.p.slice(0, 4), 1000, 1000, r.arc.slice(0, 2)), Math.PI * R / 2, 'first half');
+    // delete a point next to an arc: the merged side is straight, other arcs stay
+    const tri = flat(pt(100, 100), pt(300, 100), pt(300, 300), pt(100, 300));
+    r = T.tkArcDelete(tri, [[0.2, 0.05], [0.35, 0.2], null, [0.05, 0.2]], 1, 3);
+    assert.deepStrictEqual(plain(r.p), flat(pt(100, 100), pt(300, 300), pt(100, 300))); assert.deepStrictEqual(plain(r.arc), [null, null, [0.05, 0.2]], 'side 0 and side 1 merged straight, last arc kept');
+    r = T.tkArcDelete(tri, [null, null, null, [0.05, 0.2]], 0, 3); assert.deepStrictEqual(plain(r.arc), null, 'point 0 gone: the closing arc ends at it, so it is straight now');
+    assert.strictEqual(T.tkArcDelete(tri.slice(0, 6), null, 0, 3), null, 'still needs 3');
+    // split a line with an arc
+    const halves = T.tkArcSplitLine(line, la, 0, 0.5, 0.4, 1000, 1000);
+    assert.strictEqual(halves.length, 2);
+    near(T.tkLenPx(halves[0].p, 1000, 1000, halves[0].arc) + T.tkLenPx(halves[1].p, 1000, 1000, halves[1].arc), Math.PI * R, 'the two halves add up to the arc');
+    near(T.tkLenPx(halves[0].p, 1000, 1000, halves[0].arc), Math.PI * R / 2, 'quarter each');
+    assert.strictEqual(T.tkArcSplitLine(line, la, 1, 0.5, 0.4, 1000, 1000), null, 'a line has no segment after its last point');
+  });
+  t('tkOffsetShapes / tkCopyShapes carry arcs; a layout area with an arc side uses the true curved area', () => {
+    const sh = [{ id: 'a', p: [0.1, 0.1, 0.3, 0.1], arc: [[0.2, 0.05], null] }, { id: 'b', p: [0.1, 0.1, 0.3, 0.1] }];
+    const o = plain(T.tkOffsetShapes(sh, 0.1, 0.2, (() => { let k = 0; return () => 'n' + ++k })()));
+    assert.deepStrictEqual(o[0].arc, [[0.3, 0.25], null]); assert.ok(!('arc' in o[1]), 'no arc key added');
+    const cp = T.tkCopyShapes({ shapes: [{ id: 'a', sheet: 's1', item: 'i', p: [0, 0, 1, 1], arc: [[0.2, 0.3], null] }] }, 's1', 's2', () => 'z');
+    assert.deepStrictEqual(plain(cp[0].arc), [[0.2, 0.3], null]); assert.notStrictEqual(cp[0].arc[0], cp[0].arc[0] && null);
+    const rect = flat(pt(400, 400), pt(600, 400), pt(600, 600), pt(400, 600));
+    const FR = { mem: '600S162-43', sp: 16, trk: '600T150-43' };
+    const base = { id: 'f', item: 'i', sheet: 's', k: 'frame', p: rect };
+    const curved = { ...base, arc: [pt(500, 300), null, null, null] };
+    const r0 = T.tkFrameOf(base, SH, SC, FR), r1 = T.tkFrameOf(curved, SH, SC, FR);
+    near(r0.cnt.area, 400, 'plain frame area SF'); assert.ok(Math.abs(r1.cnt.area - (400 + Math.PI * 50)) / (400 + Math.PI * 50) < 0.005, 'frame area with the bulge: ' + r1.cnt.area);
+    assert.ok(r1.lf > r0.lf, 'more joist LF over the bigger area');
+  });
+}
+
+t('index.html wires arc points: Make arc / Make straight menu items, arc handles, SVG + PDF drawing, API doc', () => {
+  const html = fs.readFileSync('index.html', 'utf8');
+  assert.ok(/data-c="mkarc"|add\('mkarc','Make arc'/.test(html) && /add\('mkstr','Make straight'/.test(html), 'right-click items');
+  assert.ok(/tkvDblEdge\(h,p0\)/.test(html), 'double-click the middle of a side');
+  assert.ok(/data-hm=/.test(html) && /tkvNearArcMid/.test(html), 'draggable arc point');
+  assert.ok(/tkArcD\(/.test(html) && /tkArcCanvas\(g,/.test(html), 'viewer arcs and markup PDF arcs');
+  assert.ok(/arc\?:\[m0,m1,\.\.\]/.test(html), 'alphaTakeoff doc mentions arc');
+});
+
 console.log(n + ' takeoff tests passed.');
