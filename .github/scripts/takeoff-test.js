@@ -1049,4 +1049,19 @@ t('Extend line: tkExtendLine joins corners on at the end or the front, keeps arc
   const back = T.tkApply(after, [{ t: 'shape', v: { id: 'm', p, arc } }]);
   assert.deepStrictEqual(plain(back.shapes[0].p), p); assert.deepStrictEqual(plain(back.shapes[0].arc), arc);
 });
+t('By sheet list: only marked sheets get an expand arrow; unmarked are plain rows with no empty text', () => {
+  const ctx = { TKQ: '', tkpBy: () => 'sheet', tkpShOpen: () => true, tkIsColl: () => false, tkScaleTag: () => '', tkHideAnyOn: () => true, tkTotals: () => ({}), tkSheetQty: T.tkSheetQty, tkpRow: () => '<row/>', Math, Object, Array, String, Number, Set };
+  const L = vm.runInNewContext(['tkpList', 'tkpMatch', 'esc'].map(grab).join('\n') + '\n;(function(c){Object.keys(c).forEach(k=>this[k]=c[k]);return tkpList})', ctx);
+  const f = L(ctx);
+  const mk = q => { ctx.TKQ = q; return f({ d: { items: [{ id: 'i', code: 'W1', unit: 'LF', n: 1 }], shapes: [{ id: 'm', item: 'i', sheet: 'b', k: 'line', p: [0, 0, .5, 0] }], scales: {} }, sheets: [{ id: 'a', name: 'A1' }, { id: 'b', name: 'A2' }, { id: 'c', name: 'ROOF' }], sid: 'a', hide: {} }); };
+  const h = mk('');
+  const rows = h.split('<div class="tksh').slice(1);
+  assert.strictEqual(rows.length, 3);
+  assert(!/tkchev">[▾▸]/.test(rows[0]) && !/aria-expanded/.test(rows[0]) && /data-um="1"/.test(rows[0]), 'unmarked A1: no arrow');
+  assert(/tkchev">▾/.test(rows[1]) && /aria-expanded="true"/.test(rows[1]) && !/data-um/.test(rows[1]), 'marked A2: arrow');
+  assert(/data-um="1"/.test(rows[2]) && /data-open="c"/.test(rows[2]), 'unmarked C keeps Open');
+  assert(!/No marks on this sheet/.test(h) && /0 items/.test(rows[0]));
+  const s2 = mk('roof');
+  assert(/ROOF/.test(s2) && !/A2/.test(s2), 'search still finds an unmarked sheet by name');
+});
 console.log(n + ' takeoff tests passed.');
