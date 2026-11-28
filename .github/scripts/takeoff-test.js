@@ -14,12 +14,12 @@ function grab(name) {
 }
 const names = ['tkDupText', 'tkOffsetLine', 'tkSideOff', 'TK_SECS', 'TK_PAPER', 'TK_SCALES', 'tkFeet', 'tkFtIn', 'tkLenPx', 'tkAreaPx', 'tkShapeQty', 'tkPresetFpp', 'tkGuessPaper', 'tkEvenUp', 'tkCodeHeight', 'tkCodeWidth', 'tkItemWidthIn', 'tkInches', 'tkInStr', 'tkParseScales',
   'tkApply', 'tkTotals', 'tkSheetQty', 'tkHeightSplits', 'tkRows', 'tkCopyShapes', 'tkSplitLine', 'tkInsertCorner', 'tkMoveCorner', 'tkDeleteCorner', 'tkCoincident', 'tkArcGeo', 'tkArcPx', 'tkArcFlat', 'tkFlat', 'tkSegPoly', 'tkArcD', 'tkArcCanvas', 'tkArcClean', 'tkArcMake', 'tkArcInsert', 'tkArcDelete', 'tkArcSplitLine', 'tkOffsetShapes',
-  'tkSnapVerts', 'tkEndPick', 'tkExtendLine', 'tkNearVertex', 'tkOrtho', 'tkSnapPick', 'tkEnds', 'tkEndMark', 'tkReadout', 'tkSideShape', 'tkSideInv', 'tkSideVerts',
+  'tkSnapVerts', 'tkEndPick', 'tkExtendLine', 'tkNearVertex', 'tkOrtho', 'tkSnapPick', 'tkEnds', 'tkEndMark', 'tkReadout', 'tkScaleRead', 'tkAutoScale', 'tkSideShape', 'tkSideInv', 'tkSideVerts',
   'TK_FR_DEF', 'tkFrRot', 'tkFrUn', 'tkFrIv', 'tkFrUnion', 'tkFrClip', 'tkFrSwap', 'tkFrExt', 'tkFrAuto', 'tkFrAngle', 'tkFrPc', 'tkFrame', 'tkFrSum', 'tkFrameOf', 'tkFrRows', 'tkFrItem',
   'TK_LAY_DEF', 'TK_LAY_NAME', 'tkLayPre', 'tkLayF', 'tkLayArea', 'tkLayPos', 'tkLayCut', 'tkLayWires', 'tkLayAct', 'tkLayCrc', 'tkLayRc', 'tkLayDwg', 'tkLayAt', 'tkLayOrg', 'tkEdNear', 'tkEdRuns', 'tkEdAt',
   'tkInPoly', 'tkMemFlangeIn', 'tkBulkLayOps', 'tkEndCol', 'tkTabOpen', 'tkTabClose', 'tkTabMove', 'tkTabStep', 'tkTabsClean', 'tkHideBulk', 'tkHideAnyOn', 'TK_PAL', 'TK_COLORS', 'tkNextColor', 'tkColorName', 'tkColorOpts'];
 const T = vm.runInNewContext(names.map(grab).join('\n') + '\n;({' + names.join(',') + '})', { Math, Date, String, Number, Set, Object, Array, JSON, isFinite, parseFloat, NaN, Infinity });
-let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok - ' + name); };
+let n = 0; const pend = []; const t = (name, fn) => { const r = fn(); n++; if (r && r.then) pend.push(r.then(() => console.log('ok - ' + name))); else console.log('ok - ' + name); };
 const plain = x => JSON.parse(JSON.stringify(x));
 const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, (msg || '') + ' expected ' + b + ', got ' + a);
 
@@ -1049,6 +1049,21 @@ t('Extend line: tkExtendLine joins corners on at the end or the front, keeps arc
   const back = T.tkApply(after, [{ t: 'shape', v: { id: 'm', p, arc } }]);
   assert.deepStrictEqual(plain(back.shapes[0].p), p); assert.deepStrictEqual(plain(back.shapes[0].arc), arc);
 });
+t('By sheet list: only marked sheets get an expand arrow; unmarked are plain rows with no empty text', () => {
+  const ctx = { TKQ: '', tkpBy: () => 'sheet', tkpShOpen: () => true, tkIsColl: () => false, tkScaleTag: () => '', tkHideAnyOn: () => true, tkTotals: () => ({}), tkSheetQty: T.tkSheetQty, tkpRow: () => '<row/>', Math, Object, Array, String, Number, Set };
+  const L = vm.runInNewContext(['tkpList', 'tkpMatch', 'esc'].map(grab).join('\n') + '\n;(function(c){Object.keys(c).forEach(k=>this[k]=c[k]);return tkpList})', ctx);
+  const f = L(ctx);
+  const mk = q => { ctx.TKQ = q; return f({ d: { items: [{ id: 'i', code: 'W1', unit: 'LF', n: 1 }], shapes: [{ id: 'm', item: 'i', sheet: 'b', k: 'line', p: [0, 0, .5, 0] }], scales: {} }, sheets: [{ id: 'a', name: 'A1' }, { id: 'b', name: 'A2' }, { id: 'c', name: 'ROOF' }], sid: 'a', hide: {} }); };
+  const h = mk('');
+  const rows = h.split('<div class="tksh').slice(1);
+  assert.strictEqual(rows.length, 3);
+  assert(!/tkchev">[▾▸]/.test(rows[0]) && !/aria-expanded/.test(rows[0]) && /data-um="1"/.test(rows[0]), 'unmarked A1: no arrow');
+  assert(/tkchev">▾/.test(rows[1]) && /aria-expanded="true"/.test(rows[1]) && !/data-um/.test(rows[1]), 'marked A2: arrow');
+  assert(/data-um="1"/.test(rows[2]) && /data-open="c"/.test(rows[2]), 'unmarked C keeps Open');
+  assert(!/No marks on this sheet/.test(h) && /0 items/.test(rows[0]));
+  const s2 = mk('roof');
+  assert(/ROOF/.test(s2) && !/A2/.test(s2), 'search still finds an unmarked sheet by name');
+});
 t('wall side while drawing: the cursor/preview points are the offset line, mitred at corners; stored centers untouched', () => {
   const P = [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }];
   const L = plain(T.tkSideShape(P, 200, 200, T.tkSideOff('L', 10)));
@@ -1079,3 +1094,31 @@ t('tkSideVerts: other marks\' corners as drawn (offset for L/R marks, raw for ce
   assert.strictEqual(T.tkSideVerts(sh, 's', 200, 200, { i: true }, null, () => 10).length, 0, 'hidden items');
 });
 console.log(n + ' takeoff tests passed.');
+t('Auto scale button: this sheet reads the printed scale (OCR when not read yet), sets it with the check step; unreadable falls back to Set scale; All sheets = Read scales', async () => {
+  const run = async (sh, all, ocrTxt, scaleAfter) => {
+    const log = []; const ctx = { TKV: { id: 's', sh, scAuto: 0 }, log, tkScBan: () => log.push('ban'), tkvSide: () => log.push('side'), toast: m => log.push('toast:' + m), tkScaleBox: () => log.push('box'), errMsg: e => String(e),
+      tkScaleOf: () => scaleAfter && ctx.set, tkDo: o => { ctx.set = o.v; log.push('do:' + o.v.label) }, tkReadScales: async () => { log.push('readScales'); if (scaleAfter) ctx.set = { label: 'x' } },
+      tkScaleOcr: async x => { log.push('ocr'); if (ocrTxt) x.scale_text = ocrTxt; return x.scale_text },
+      tkScaleRead: T.tkScaleRead || (t2 => ({ best: null, list: [] })), tkAutoScale: T.tkAutoScale };
+    vm.runInNewContext(grab('tkScAuto') + '\n;globalThis.__f=tkScAuto', Object.assign(ctx, { globalThis: ctx }));
+    await ctx.__f(all); return { log, ctx };
+  };
+  assert(T.tkAutoScale && T.tkScaleRead, 'helpers exported');
+  const ok = { id: 's', w: 3600, h: 2400, pw: 36, ph: 24, scale_text: '1/8" = 1\'-0"' };
+  let r = await run({ ...ok }, false, null, false);
+  assert(r.log.some(x => x.startsWith('do:')) && !r.log.includes('ocr') && !r.log.includes('box'), 'text already read: set, no OCR, no fallback');
+  r = await run({ ...ok, scale_text: '' }, false, '1/8" = 1\'-0"', false);
+  assert(r.log.includes('ocr') && r.log.some(x => x.startsWith('do:')), 'not read yet: OCR then set');
+  r = await run({ ...ok, scale_text: '' }, false, '', false);
+  assert(r.log.includes('box') && r.log.some(x => /Could not read a scale/.test(x)) && !r.log.some(x => x.startsWith('do:')), 'unreadable: says so, opens Set scale');
+  r = await run({ ...ok, pw: 0, ph: 0 }, false, null, false);
+  assert(r.log.includes('box') && r.log.some(x => /paper size/.test(x)), 'scale text but no paper size: says so, opens Set scale');
+  r = await run({ ...ok }, true, null, true);
+  assert(r.log.includes('readScales') && !r.log.includes('box'), 'All sheets runs Read scales; no fallback when this sheet got one');
+  r = await run({ ...ok }, true, null, false);
+  assert(r.log.includes('readScales') && r.log.includes('box'), 'All sheets but this one still has none: falls back');
+  assert.strictEqual(r.ctx.TKV.scAuto, 0, 'busy flag cleared');
+  const html = fs.readFileSync('index.html', 'utf8');
+  ['data-scb="auto"', 'data-scb="autoall"', 'Set scale by hand', 'data-autosc="all"', "a.t==='autoscale'"].forEach(k => assert(html.includes(k), 'wired: ' + k));
+});
+Promise.all(pend).then(() => console.log(n + ' takeoff tests passed.')).catch(e => { console.error(e); process.exit(1); });
