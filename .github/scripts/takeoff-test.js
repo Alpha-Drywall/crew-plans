@@ -14,7 +14,7 @@ function grab(name) {
 }
 const names = ['tkDupText', 'tkOffsetLine', 'tkSideOff', 'TK_SECS', 'TK_PAPER', 'TK_SCALES', 'tkFeet', 'tkFtIn', 'tkLenPx', 'tkAreaPx', 'tkShapeQty', 'tkPresetFpp', 'tkGuessPaper', 'tkEvenUp', 'tkCodeHeight', 'tkCodeWidth', 'tkItemWidthIn', 'tkInches', 'tkInStr', 'tkParseScales',
   'tkApply', 'tkTotals', 'tkSheetQty', 'tkHeightSplits', 'tkRows', 'tkCopyShapes', 'tkSplitLine', 'tkInsertCorner', 'tkMoveCorner', 'tkDeleteCorner', 'tkCoincident', 'tkArcGeo', 'tkArcPx', 'tkArcFlat', 'tkFlat', 'tkSegPoly', 'tkArcD', 'tkArcCanvas', 'tkArcClean', 'tkArcMake', 'tkArcInsert', 'tkArcDelete', 'tkArcSplitLine', 'tkOffsetShapes',
-  'tkSnapVerts', 'tkScaleRead', 'tkAutoScale', 'tkNearVertex', 'tkOrtho', 'tkSnapPick', 'tkEnds', 'tkEndMark', 'tkReadout',
+  'tkSnapVerts', 'tkEndPick', 'tkExtendLine', 'tkNearVertex', 'tkOrtho', 'tkSnapPick', 'tkEnds', 'tkEndMark', 'tkReadout', 'tkScaleRead', 'tkAutoScale',
   'TK_FR_DEF', 'tkFrRot', 'tkFrUn', 'tkFrIv', 'tkFrUnion', 'tkFrClip', 'tkFrSwap', 'tkFrExt', 'tkFrAuto', 'tkFrAngle', 'tkFrPc', 'tkFrame', 'tkFrSum', 'tkFrameOf', 'tkFrRows', 'tkFrItem',
   'TK_LAY_DEF', 'TK_LAY_NAME', 'tkLayPre', 'tkLayF', 'tkLayArea', 'tkLayPos', 'tkLayCut', 'tkLayWires', 'tkLayAct', 'tkLayCrc', 'tkLayRc', 'tkLayDwg', 'tkLayAt', 'tkLayOrg', 'tkEdNear', 'tkEdRuns', 'tkEdAt',
   'tkInPoly', 'tkMemFlangeIn', 'tkBulkLayOps', 'tkEndCol', 'tkTabOpen', 'tkTabClose', 'tkTabMove', 'tkTabStep', 'tkTabsClean', 'tkHideBulk', 'tkHideAnyOn', 'TK_PAL', 'TK_COLORS', 'tkNextColor', 'tkColorName', 'tkColorOpts'];
@@ -1018,6 +1018,38 @@ t('items panel: By sheet lists every current sheet, even with no items or marks'
   const Q = T2.tkSheetQty({ items: [{ id: 'i', unit: 'EA' }], shapes: [{ id: 'm', item: 'i', sheet: 'b', k: 'pt', p: [.1, .1] }], scales: {} }, sh);
   assert.deepStrictEqual(Object.keys(Q.sheets), ['b']);
 });
+t('Extend line: tkEndPick finds the end handle under the click (start / end / none)', () => {
+  const p = [.1, .1, .5, .1, .5, .5];
+  assert.strictEqual(T.tkEndPick(p, 1000, 1000, { x: 104, y: 98 }, 12), 'start');
+  assert.strictEqual(T.tkEndPick(p, 1000, 1000, { x: 497, y: 505 }, 12), 'end');
+  assert.strictEqual(T.tkEndPick(p, 1000, 1000, { x: 500, y: 100 }, 12), null, 'a middle corner is not an end');
+  assert.strictEqual(T.tkEndPick(p, 1000, 1000, { x: 300, y: 100 }, 12), null, 'mid-segment starts a new line');
+  assert.strictEqual(T.tkEndPick([.2, .2, .2, .2002], 1000, 1000, { x: 200, y: 200 }, 12), 'start', 'both ends in reach: the nearer');
+  assert.strictEqual(T.tkEndPick([.1, .1], 1000, 1000, { x: 100, y: 100 }, 12), null, 'one point is not a line');
+});
+
+t('Extend line: tkExtendLine joins corners on at the end or the front, keeps arcs on old segments, drops duplicate corners', () => {
+  const p = [.1, .1, .5, .1, .5, .5], arc = [[.3, .05], null, null];
+  const e = plain(T.tkExtendLine(p, arc, [.5, .8, .9, .8], false));
+  assert.deepStrictEqual(e.p, [.1, .1, .5, .1, .5, .5, .5, .8, .9, .8]);
+  assert.deepStrictEqual(e.arc, [[.3, .05], null, null, null, null], 'old arc stays on segment 0; one entry per point (last unused)');
+  assert.strictEqual(e.added, 2);
+  const f = plain(T.tkExtendLine(p, arc, [.1, .4, .0, .4], true));
+  assert.deepStrictEqual(f.p, [0, .4, .1, .4, .1, .1, .5, .1, .5, .5], 'new corners go on the front, farthest first');
+  assert.deepStrictEqual(f.arc, [null, null, [.3, .05], null, null], 'the arc moves with its segment (now segment 2)');
+  const d = plain(T.tkExtendLine(p, null, [.5, .5, .5, .5, .7, .5, .7, .5], false));
+  assert.deepStrictEqual(d.p, [.1, .1, .5, .1, .5, .5, .7, .5], 'duplicates (a double-click) dropped, also against the end');
+  assert.strictEqual(d.arc, null);
+  const n = plain(T.tkExtendLine(p, arc, [], false)); assert.strictEqual(n.added, 0); assert.deepStrictEqual(n.p, p);
+  assert.deepStrictEqual(p, [.1, .1, .5, .1, .5, .5], 'input untouched');
+  /* with tkApply: arc survives the saved op and undo restores both */
+  const base = { items: [{ id: 'i', unit: 'LF' }], shapes: [{ id: 'm', item: 'i', sheet: 's', k: 'line', p, arc }], scales: {} };
+  const after = T.tkApply(base, [{ t: 'shape', v: { id: 'm', p: e.p, arc: e.arc } }]);
+  assert.deepStrictEqual(plain(after.shapes[0].p), e.p); assert.deepStrictEqual(plain(after.shapes[0].arc[0]), [.3, .05]); assert.strictEqual(after.shapes.length, 1);
+  const back = T.tkApply(after, [{ t: 'shape', v: { id: 'm', p, arc } }]);
+  assert.deepStrictEqual(plain(back.shapes[0].p), p); assert.deepStrictEqual(plain(back.shapes[0].arc), arc);
+});
+console.log(n + ' takeoff tests passed.');
 t('Auto scale button: this sheet reads the printed scale (OCR when not read yet), sets it with the check step; unreadable falls back to Set scale; All sheets = Read scales', async () => {
   const run = async (sh, all, ocrTxt, scaleAfter) => {
     const log = []; const ctx = { TKV: { id: 's', sh, scAuto: 0 }, log, tkScBan: () => log.push('ban'), tkvSide: () => log.push('side'), toast: m => log.push('toast:' + m), tkScaleBox: () => log.push('box'), errMsg: e => String(e),
