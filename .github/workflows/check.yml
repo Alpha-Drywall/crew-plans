@@ -41,3 +41,5 @@ jobs:
         run: node .github/scripts/office-review-test.js
       - name: Test the tips (every step has a selector, English and Spanish; every screen that shows tips has them)
         run: node .github/scripts/tips-test.js
+      - name: Test the Home button (finishes drawing, flushes takeoff saves, leaves the job)
+        run: node .github/scripts/home-test.js
