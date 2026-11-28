@@ -35,3 +35,5 @@ jobs:
         run: node .github/scripts/tracker-test.js
       - name: Test the bid list (Coming up by bid date, Due today / This week / Later, estimator groups, collapsed sections)
         run: node .github/scripts/bids-test.js
+      - name: Test bid In for review, lookahead job remove / undo, phone job-tab rows (Field / Office)
+        run: node .github/scripts/office-review-test.js
