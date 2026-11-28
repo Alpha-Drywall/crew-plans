@@ -5001,23 +5001,101 @@ function tkFtIn(ft){
   if(!isFinite(ft))return '';let neg=ft<0;ft=Math.abs(ft);let f=Math.floor(ft),i=Math.round((ft-f)*12);if(i===12){f++;i=0}
   return (neg?'-':'')+f+"'-"+i+'"';
 }
-/* pixel length of a polyline (normalized points on a W x H image) */
-function tkLenPx(p,W,H){
-  let L=0;for(let i=2;i+1<p.length;i+=2)L+=Math.hypot((p[i]-p[i-2])*W,(p[i+1]-p[i-1])*H);return L;
+/* ---- arcs. A segment of a line, polyline or area can be a true circular arc: through its two end points and one more point on the arc.
+   A shape keeps arc = [m0,m1,...], one entry per point: arc[i] = [x,y] (0-1 of the sheet, a point ON the arc between point i and the next one; an area's last entry is the segment
+   back to the first point) or null = straight. No arc key = all straight, as in older marks. Lengths and areas use the true arc (the circle through the three points). ---- */
+/* the circle through a, m, b (image px {x,y}), arc a -> m -> b: {cx,cy,r,t0 (start angle),sweep (signed radians, > 0 = increasing angle),len,large}; null when the three points are in line */
+function tkArcGeo(a,m,b){
+  const bx=b.x-a.x,by=b.y-a.y,mx=m.x-a.x,my=m.y-a.y,ch=Math.hypot(bx,by),d=2*(bx*my-by*mx);
+  if(!(ch>0)||Math.abs(d)<1e-6*ch*ch)return null;
+  const b2=bx*bx+by*by,m2=mx*mx+my*my,ux=(my*b2-by*m2)/d,uy=(bx*m2-mx*b2)/d,r=Math.hypot(ux,uy),cx=a.x+ux,cy=a.y+uy,TAU=2*Math.PI,mod=v=>((v%TAU)+TAU)%TAU;
+  const t0=Math.atan2(a.y-cy,a.x-cx),tm=Math.atan2(m.y-cy,m.x-cx),t1=Math.atan2(b.y-cy,b.x-cx),ccw=mod(t1-t0),sweep=mod(tm-t0)<ccw?ccw:ccw-TAU;
+  return {cx,cy,r,t0,sweep,len:Math.abs(sweep)*r,large:Math.abs(sweep)>Math.PI};
+}
+/* the arc entries of a shape's points as image px, or null when none: [{x,y}|null] */
+function tkArcPx(arc,W,H){return Array.isArray(arc)&&arc.some(Boolean)?arc.map(a=>a?{x:a[0]*W,y:a[1]*H}:null):null}
+/* points along arc a -> m -> b every maxDeg degrees (default 4), start left out, end included: flat [x,y,...] in px */
+function tkArcFlat(a,m,b,maxDeg){
+  const g=tkArcGeo(a,m,b);if(!g)return [b.x,b.y];const n=Math.max(2,Math.ceil(Math.abs(g.sweep)/((maxDeg||4)*Math.PI/180))),o=[];
+  for(let k=1;k<n;k++){const t=g.t0+g.sweep*k/n;o.push(g.cx+g.r*Math.cos(t),g.cy+g.r*Math.sin(t))}o.push(b.x,b.y);return o;
+}
+/* a shape's points with every arc turned into short straight pieces (layouts, hit tests): normalized in, normalized out; closed = area (the closing segment may be an arc too) */
+function tkFlat(p,arc,W,H,closed,maxDeg){
+  p=(p||[]).map(Number);const A=tkArcPx(arc,W,H);if(!A)return p.slice();const n=Math.floor(p.length/2),o=[];
+  for(let i=0;i<n;i++){const a={x:p[2*i]*W,y:p[2*i+1]*H};o.push(p[2*i],p[2*i+1]);
+    if(i<n-1||closed){const j=(i+1)%n,b={x:p[2*j]*W,y:p[2*j+1]*H};if(A[i]){const f=tkArcFlat(a,A[i],b,maxDeg);for(let k=0;k+3<f.length;k+=2)o.push(f[k]/W,f[k+1]/H)}}}
+  return o;
+}
+/* the points of segment i (to the next point) as a px polyline [{x,y}], arc included */
+function tkSegPoly(p,arc,W,H,i,closed){
+  const n=Math.floor((p||[]).length/2),j=(i+1)%n;if(i<0||i>=n||(i>=n-1&&!closed))return [];const a={x:p[2*i]*W,y:p[2*i+1]*H},b={x:p[2*j]*W,y:p[2*j+1]*H},m=arc&&arc[i]?{x:arc[i][0]*W,y:arc[i][1]*H}:null;
+  if(!m)return [a,b];const f=tkArcFlat(a,m,b,4),o=[a];for(let k=0;k+1<f.length;k+=2)o.push({x:f[k],y:f[k+1]});return o;
+}
+/* SVG path "d" through px points pts [{x,y}] with arcs arcs [{x,y}|null]: M, then L or A per segment */
+function tkArcD(pts,arcs,closed,f){
+  f=f||(v=>v.toFixed(1));const n=pts.length;if(!n)return '';let d='M'+f(pts[0].x)+' '+f(pts[0].y);
+  for(let i=0;i<(closed?n:n-1);i++){const b=pts[(i+1)%n],g=arcs&&arcs[i]?tkArcGeo(pts[i],arcs[i],b):null;
+    d+=g?'A'+f(g.r)+' '+f(g.r)+' 0 '+(g.large?1:0)+' '+(g.sweep>0?1:0)+' '+f(b.x)+' '+f(b.y):'L'+f(b.x)+' '+f(b.y)}
+  return d+(closed?'Z':'');
+}
+/* the same on a canvas 2D context: real arcs (markup PDF, magnifier). Does not close the path (call closePath for an area). */
+function tkArcCanvas(g,pts,arcs,closed){
+  const n=pts.length;if(!n)return;g.moveTo(pts[0].x,pts[0].y);
+  for(let i=0;i<(closed?n:n-1);i++){const b=pts[(i+1)%n],r=arcs&&arcs[i]?tkArcGeo(pts[i],arcs[i],b):null;
+    if(r)g.arc(r.cx,r.cy,r.r,r.t0,r.t0+r.sweep,r.sweep<0);else g.lineTo(b.x,b.y)}
+}
+/* tidy an arc list read from saved data / Claude: one entry per point (shorter is padded, longer is dropped), [x,y] numbers or null, nothing on a line's last point; null when nothing is left */
+function tkArcClean(arc,n,k){
+  if(!Array.isArray(arc)||arc.length>n)return null;const o=[];
+  for(let i=0;i<n;i++){const a=arc[i];o.push(Array.isArray(a)&&a.length>=2&&isFinite(+a[0])&&isFinite(+a[1])&&!(k==='line'&&i>=n-1)?[+a[0],+a[1]]:null)}
+  return o.some(Boolean)?o:null;
+}
+/* a new arc on segment seg: its point is the chord's middle pushed sideways by bow x the chord length (away = {x,y} 0-1: bulge away from it, e.g. an area's center; else to the left of the way drawn).
+   p / arc normalized; W,H the sheet px. -> the new arc list (length n) */
+function tkArcMake(p,arc,seg,W,H,away,bow){
+  const n=Math.floor((p||[]).length/2),j=(seg+1)%n;if(!(seg>=0&&seg<n))return arc||null;const ax=p[2*seg]*W,ay=p[2*seg+1]*H,bx=p[2*j]*W,by=p[2*j+1]*H,L=Math.hypot(bx-ax,by-ay)||1;
+  let nx=-(by-ay)/L,ny=(bx-ax)/L;const mx=(ax+bx)/2,my=(ay+by)/2;if(away&&(mx-away.x*W)*nx+(my-away.y*H)*ny<0){nx=-nx;ny=-ny}
+  const h=(bow||.15)*L,o=[];for(let i=0;i<n;i++)o.push(arc&&arc[i]?[arc[i][0],arc[i][1]]:null);o[seg]=[(mx+nx*h)/W,(my+ny*h)/H];return o;
+}
+/* add a point on segment seg at (x,y) (0-1), keeping the arcs: on an arc segment the point goes on the arc and the arc is cut in two. -> {p,arc} (arc null = all straight) */
+function tkArcInsert(p,arc,seg,x,y,W,H){
+  const n=Math.floor((p||[]).length/2);if(!(seg>=0&&seg<n))return {p:(p||[]).slice(),arc:arc||null};const o=[];for(let i=0;i<n;i++)o.push(arc&&arc[i]?[arc[i][0],arc[i][1]]:null);
+  const j=(seg+1)%n,m=o[seg];let q=[x,y],m1=null,m2=null;
+  if(m){const A={x:p[2*seg]*W,y:p[2*seg+1]*H},B={x:p[2*j]*W,y:p[2*j+1]*H},g=tkArcGeo(A,{x:m[0]*W,y:m[1]*H},B);
+    if(g){const TAU=2*Math.PI,mod=v=>((v%TAU)+TAU)%TAU;let tq=Math.atan2(y*H-g.cy,x*W-g.cx),dl=g.sweep>0?mod(tq-g.t0):-mod(g.t0-tq);if(Math.abs(dl)>Math.abs(g.sweep))dl=Math.abs(dl-g.sweep)<Math.abs(dl)?g.sweep:0;
+      const pt=t=>[(g.cx+g.r*Math.cos(t))/W,(g.cy+g.r*Math.sin(t))/H];q=pt(g.t0+dl);m1=pt(g.t0+dl/2);m2=pt(g.t0+dl+(g.sweep-dl)/2)}}
+  o[seg]=m1;o.splice(seg+1,0,m2);return {p:tkInsertCorner(p,seg,q[0],q[1]),arc:o.some(Boolean)?o:null};
+}
+/* remove point i (min points kept like tkDeleteCorner); the two segments around it become one straight segment, other arcs stay. -> {p,arc} or null */
+function tkArcDelete(p,arc,i,min){
+  const q=tkDeleteCorner(p,i,min);if(!q)return null;const n=Math.floor(p.length/2),o=[];for(let k=0;k<n;k++)o.push(arc&&arc[k]?[arc[k][0],arc[k][1]]:null);
+  o.splice(i,1);const prev=i>0?i-1:n-2;if(prev>=0&&prev<o.length)o[prev]=null;return {p:q,arc:o.some(Boolean)?o:null};
+}
+/* cut a line at (x,y) on segment seg into two lines, keeping arcs (the cut goes through the arc). -> [{p,arc},{p,arc}] or null */
+function tkArcSplitLine(p,arc,seg,x,y,W,H){
+  const n=Math.floor((p||[]).length/2);if(!(seg>=0&&seg<n-1))return null;const r=tkArcInsert(p,arc,seg,x,y,W,H),o=r.arc||[],a1=o.slice(0,seg+1).concat([null]),a2=o.slice(seg+1);
+  const f=a=>a.some(Boolean)?a:null;return [{p:r.p.slice(0,2*(seg+2)),arc:f(a1)},{p:r.p.slice(2*(seg+1)),arc:f(a2.slice(0,Math.floor((r.p.length-2*(seg+1))/2)))}];
+}
+/* pixel length of a polyline (normalized points on a W x H image); arc = its arcs: true arc length on those segments */
+function tkLenPx(p,W,H,arc){
+  let L=0;const A=tkArcPx(arc,W,H);for(let i=2;i+1<p.length;i+=2){const a={x:p[i-2]*W,y:p[i-1]*H},b={x:p[i]*W,y:p[i+1]*H},g=A&&A[i/2-1]?tkArcGeo(a,A[i/2-1],b):null;L+=g?g.len:Math.hypot(b.x-a.x,b.y-a.y)}return L;
 }
 /* pixel area of a closed polygon (shoelace) */
-function tkAreaPx(p,W,H){
-  let a=0;const n=Math.floor(p.length/2);if(n<3)return 0;
+function tkAreaPx(p,W,H,arc){
+  let a=0;const n=Math.floor(p.length/2),A=tkArcPx(arc,W,H);if(n<3&&!(n===2&&A))return 0;
   for(let i=0;i<n;i++){const j=(i+1)%n;a+=p[2*i]*W*p[2*j+1]*H-p[2*j]*W*p[2*i+1]*H}
-  return Math.abs(a)/2;
+  a/=2;/* an arc segment adds (or, bulging inward, takes off) the circular segment between its chord and the arc: r²/2 (θ − sin θ) */
+  if(A)for(let i=0;i<n;i++){if(!A[i])continue;const j=(i+1)%n,pa={x:p[2*i]*W,y:p[2*i+1]*H},pb={x:p[2*j]*W,y:p[2*j+1]*H},g=tkArcGeo(pa,A[i],pb);if(!g)continue;
+    const th=Math.abs(g.sweep),seg=g.r*g.r/2*(th-Math.sin(th)),cr=(pb.x-pa.x)*(A[i].y-pa.y)-(pb.y-pa.y)*(A[i].x-pa.x);a+=-Math.sign(cr)*seg}
+  return Math.abs(a);
 }
 /* quantity of one shape in its item's unit; null when the sheet has no scale (counts never need one); a deduct area (cut-out) is negative; a frame = LF of all its members */
 function tkShapeQty(sh,sheet,scale,it){
   if(!sh)return 0;if(sh.k==='count')return 1;
   if(sh.k==='frame'){const r=tkFrameOf(sh,sheet,scale,it&&it.fr);return r?r.lf:null}
   const fpp=scale&&+scale.fpp;if(!fpp||!sheet||!sheet.w||!sheet.h)return null;
-  if(sh.k==='poly')return (sh.deduct?-1:1)*tkAreaPx(sh.p||[],sheet.w,sheet.h)*fpp*fpp;
-  return tkLenPx(sh.p||[],sheet.w,sheet.h)*fpp;
+  if(sh.k==='poly')return (sh.deduct?-1:1)*tkAreaPx(sh.p||[],sheet.w,sheet.h,sh.arc)*fpp*fpp;
+  return tkLenPx(sh.p||[],sheet.w,sheet.h,sh.arc)*fpp;
 }
 /* feet per image pixel for a printed scale (feet per paper inch) on a sheet of paper width pw inches drawn W pixels wide */
 function tkPresetFpp(ftPerIn,pw,W){return W>0&&pw>0&&ftPerIn>0?ftPerIn*pw/W:0}
@@ -5118,7 +5196,7 @@ function tkApply(data,ops){
   for(const o of ops||[]){
     if(o.t==='item'){const i=d.items.findIndex(x=>x.id===o.v.id);if(i>=0)d.items[i]={...d.items[i],...o.v};else d.items.push({...o.v})}
     else if(o.t==='del_item'){d.items=d.items.filter(x=>x.id!==o.id);d.shapes=d.shapes.filter(s=>s.item!==o.id)}
-    else if(o.t==='shape'){const i=d.shapes.findIndex(x=>x.id===o.v.id);if((i<0||o.v.item!=null)&&!d.items.some(x=>x.id===o.v.item))continue;if(i<0&&!o.v.sheet)continue;if(i>=0)d.shapes[i]={...d.shapes[i],...o.v};else d.shapes.push({...o.v})}
+    else if(o.t==='shape'){const i=d.shapes.findIndex(x=>x.id===o.v.id);if((i<0||o.v.item!=null)&&!d.items.some(x=>x.id===o.v.item))continue;if(i<0&&!o.v.sheet)continue;const ns=i>=0?{...d.shapes[i],...o.v}:{...o.v};if('arc' in ns){const c=ns.k==='count'?null:tkArcClean(ns.arc,Math.floor((ns.p||[]).length/2),ns.k);if(c)ns.arc=c;else delete ns.arc}if(i>=0)d.shapes[i]=ns;else d.shapes.push(ns)}
     else if(o.t==='del_shape'){d.shapes=d.shapes.filter(s=>s.id!==o.id)}
     else if(o.t==='scale'){if(o.v)d.scales[o.sheet]=o.v;else delete d.scales[o.sheet]}
     else if(o.t==='sent'){d.sent=o.v||{}}
@@ -5341,7 +5419,7 @@ function tkFrSum(segs,waste){
 /* a layout mark's layout on its sheet: {segs (in feet), sum, lf (all members), ang, cnt {wire,clip,area (net SF)}, pre}; null with no scale */
 function tkFrameOf(sh,sheet,scale,fr){
   const fpp=scale&&+scale.fpp;if(!fpp||!sheet||!sheet.w||!sheet.h||!sh)return null;const pre=tkLayPre(fr),f=tkLayF(fr),kx=sheet.w*fpp,ky=sheet.h*fpp;
-  const ft=q=>(q||[]).map((x,i)=>x*(i%2?ky:kx));const p=ft(sh.p),ang=tkFrAngle(p,sh.dir,+sh.edge,sh.ang),H=(sh.o||[]).map(ft),org=Array.isArray(sh.org)&&sh.org.length===2&&isFinite(+sh.org[0])&&isFinite(+sh.org[1])?ft(sh.org):null;
+  const ft=q=>(q||[]).map((x,i)=>x*(i%2?ky:kx));const p0=ft(sh.p),p=sh.arc?ft(tkFlat(sh.p,sh.arc,sheet.w,sheet.h,true,3)):p0,ang=tkFrAngle(p0,sh.dir,+sh.edge,sh.ang),H=(sh.o||[]).map(ft),org=Array.isArray(sh.org)&&sh.org.length===2&&isFinite(+sh.org[0])&&isFinite(+sh.org[1])?ft(sh.org):null;
   const ed=sh.ed&&typeof sh.ed==='object'?sh.ed:null,J=pre==='joists'?tkFrame(p,H,{sp:f.sp,ang,org,ed,brMax:f.brc?f.brMax:0,trkAll:f.trkAll,endJ:f.endJ,king:f.king}):null;
   const L=pre==='act'?tkLayAct(p,H,{...f,ang,org,ed}):pre==='crc'?tkLayCrc(p,H,{...f,ang,org,ed,per2:!!String(f.per2||'').trim()}):pre==='rc'?tkLayRc(p,H,{...f,ang,org,ed,per:!!String(f.per||'').trim()}):pre==='dwg'?tkLayDwg(p,H,{...f,ang,org,ed}):{segs:J,cnt:{},ref:J.ref,jv:J.jv,sp:J.sp};
   const segs=L.segs,sum=tkFrSum(segs,f.waste);let lf=0;Object.keys(sum).forEach(r=>lf+=sum[r].lf);
@@ -5412,11 +5490,11 @@ function tkCoincident(shapes,sheet,id,i,eps,hide){
 /* copies of shapes moved by (dx,dy) (0-1 of the sheet) with new ids, points rounded like drawn ones */
 function tkOffsetShapes(shapes,dx,dy,mkId){
   const off=q=>(q||[]).map((v,i)=>Math.round((+v+(i%2?dy:dx))*10000)/10000);
-  return (shapes||[]).map(s=>({...s,id:mkId(),p:off(s.p),...(Array.isArray(s.o)?{o:s.o.map(off)}:{}),...(Array.isArray(s.org)?{org:off(s.org)}:{})}));
+  return (shapes||[]).map(s=>({...s,id:mkId(),p:off(s.p),...(Array.isArray(s.o)?{o:s.o.map(off)}:{}),...(Array.isArray(s.org)?{org:off(s.org)}:{}),...(Array.isArray(s.arc)?{arc:s.arc.map(a=>a?off(a):null)}:{})}));
 }
 /* copy one sheet's shapes onto another sheet (same spots), for typical floors */
 function tkCopyShapes(data,fromSheet,toSheet,mkId,itemIds){
-  return (data.shapes||[]).filter(s=>s.sheet===fromSheet&&(!itemIds||itemIds.includes(s.item))).map(s=>({...s,id:mkId(),sheet:toSheet,p:(s.p||[]).slice(),...(Array.isArray(s.o)?{o:s.o.map(r=>r.slice())}:{})}));
+  return (data.shapes||[]).filter(s=>s.sheet===fromSheet&&(!itemIds||itemIds.includes(s.item))).map(s=>({...s,id:mkId(),sheet:toSheet,p:(s.p||[]).slice(),...(Array.isArray(s.o)?{o:s.o.map(r=>r.slice())}:{}),...(Array.isArray(s.arc)?{arc:s.arc.map(a=>a&&a.slice())}:{})}));
 }
 /* ---- precise drawing (pure, tested in takeoff-test.js): snapping, ortho lock, end marks, live readout. Points here are image px {x,y}. ---- */
 /* every corner / end of the marks on one sheet: [{x,y,id,i}]; counts are not snap targets; hide = {itemId:true}; skip = {id,i} (the corner being dragged) */
@@ -5920,7 +5998,7 @@ function tkvTools(){
   tkScBan();const h=$('#tkHint');if(!h||!TKV.W)return;
   h.textContent=TKV.mode==='draw'&&TKV.cont?'Continuing the linear: click each next corner · Enter or right-click ■ Stop to finish · Esc cancels (the mark stays as it was)':
     TKV.mode==='draw'?(it?(it.fr?(TKV.dNext||TKV.dDraft?'Opening: click its corners inside a layout area (or drag a rectangle) · ✓ Finish':'Layout ('+TK_LAY_NAME[tkLayPre(it.fr)]+'): click the area\'s corners (click the first one or ✓ Finish to close) or drag a rectangle · Alt+drag = opening · right-click a layout area to turn the '+TK_LAY_RUN[tkLayPre(it.fr)]+' or edit'):it.unit==='LF'?(TKV.lm==='seg'?'Segments: click both ends of each wall piece · right-click for more · drag to move':'Click each corner along the wall · double-click or ✓ Finish to end the linear · Shift = level/plumb · right-click for more · drag to move'):it.unit==='SF'?(TKV.dNext?'Deduct: click the corners of the cut-out (or drag a rectangle) · ✓ Finish':'Area: click the corners (click the first one or ✓ Finish to close) or drag a rectangle · Alt+drag/click = deduct · space+drag to move'):'Click each item to count it · drag to move'):'Pick a takeoff item on the right'):
-    TKV.mode==='pan'?'Drag to move · wheel or pinch to zoom · click a mark to select it, then drag its points to reshape (Shift = connected points too)':TKV.mode==='select'?'Click a mark to select it · drag to move the sheet · drag a selected mark\'s points to reshape (Shift-drag moves connected ends too) · right-click a point to delete it · shift-click to pick several, shift+drag a box to pick an area · right-click (long-press) for more':TKV.mode==='scale'?'Click both ends of a dimension you know (they snap to line ends) · Shift = level/plumb':'Click points to measure (not saved) · ✓ Finish · Shift = level/plumb';
+    TKV.mode==='pan'?'Drag to move · wheel or pinch to zoom · click a mark to select it, then drag its points to reshape (Shift = connected points too)':TKV.mode==='select'?'Click a mark to select it · drag its points to reshape (Shift-drag = connected ends too) · double-click the middle of a side = arc · shift-click to pick several · right-click for more':TKV.mode==='scale'?'Click both ends of a dimension you know (they snap to line ends) · Shift = level/plumb':'Click points to measure (not saved) · ✓ Finish · Shift = level/plumb';
   h.style.display='block';
 }
 /* ---- takeoff items panel: By item | By sheet, search, and a pop-out window for a second monitor ---- */
@@ -6179,18 +6257,18 @@ function tkvPaint(fast){
   const on={};TK.data.shapes.forEach(s=>{if(s.sheet===TKV.id&&its[s.item])on[s.id]=1});TKV.msel=(TKV.msel||[]).filter(id=>on[id]);if(TKV.sel&&!on[TKV.sel])TKV.sel=null;
   const hl=TKV.hl&&its[TKV.hl]?TKV.hl:null;{const ci=its[TKV.item];if(ci){TKV.last[ci.fr?'FR':ci.unit]=ci.id;if(ci.fr)TKV.last['FR:'+tkLayPre(ci.fr)]=ci.id}}
   const tags=[],fs=M*.009,ends=tkdrGet().ends;
-  g.innerHTML=TK.data.shapes.filter(s=>s.sheet===TKV.id&&its[s.item]&&!TKV.hide[s.item]&&s.id!==TKV.cont).map(s=>{const it=its[s.item],c=esc(it.color),p=(TKV.drag&&(TKV.drag.m?TKV.drag.m[s.id]:TKV.drag.id===s.id&&TKV.drag.p)||(s.p||[])).map(Number),sel=TKV.sel===s.id||TKV.msel.includes(s.id);
+  g.innerHTML=TK.data.shapes.filter(s=>s.sheet===TKV.id&&its[s.item]&&!TKV.hide[s.item]&&s.id!==TKV.cont).map(s=>{const it=its[s.item],c=esc(it.color),p=(TKV.drag&&(TKV.drag.m?TKV.drag.m[s.id]:TKV.drag.id===s.id&&TKV.drag.p)||(s.p||[])).map(Number),ar=s.k==='count'?null:tkvArcOf(s),A=tkArcPx(ar,W,H),sd=A?tkArcD(p.reduce((o,v,i)=>{if(i%2)o[o.length-1].y=v*H;else o.push({x:v*W,y:0});return o},[]),A,s.k!=='line'):'',sel=TKV.sel===s.id||TKV.msel.includes(s.id);
     const dim='';
     const pts=[];for(let i=0;i+1<p.length;i+=2)pts.push((p[i]*W).toFixed(1)+','+(p[i+1]*H).toFixed(1));
     const op=tkMarkOp(it.id===TKV.item);
     const tg=(s.k==='line'&&+s.h>0?'@'+tkFtIn(+s.h):'')+(s.note?(s.k==='line'&&+s.h>0?' ':'')+s.note:'');
     if(tg){let x,y;if(s.k==='count'){x=p[0]*W+M*.009;y=p[1]*H-M*.009}else if(s.k==='poly'){x=0;y=0;const n=p.length/2;for(let i=0;i<n;i++){x+=p[2*i]*W;y+=p[2*i+1]*H}x/=n;y/=n}else{const i=Math.floor((p.length/2-1)/2)*2;x=(p[i]+p[i+2])/2*W;y=(p[i+1]+p[i+3])/2*H-M*.008}tags.push([tg,x,y,c,dim])}
     if(s.k==='count')return '<g'+dim+'><circle cx="'+(p[0]*W).toFixed(1)+'" cy="'+(p[1]*H).toFixed(1)+'" r="'+(M*.007).toFixed(1)+'" fill="'+c+'" fill-opacity="'+op+'" stroke="'+(sel?'#000':c)+'" stroke-width="'+(sw*(sel?.8:.4)).toFixed(1)+'"/></g>';
-    if(s.k==='frame')return tkvFrameSvg(s,it,p,sel,dim,op,sw,tags);
-    if(s.k==='poly'&&s.deduct)return '<polygon'+dim+' data-deduct="1" points="'+pts.join(' ')+'" fill="url(#tkHatch)" stroke="'+(sel?'#000':c)+'" stroke-width="'+(sw*(sel?.8:.5)).toFixed(1)+'" stroke-dasharray="'+(sw*2.5).toFixed(1)+' '+(sw*1.5).toFixed(1)+'" stroke-linejoin="round"/>';
-    if(s.k==='poly')return '<polygon'+dim+' points="'+pts.join(' ')+'" fill="'+c+'" fill-opacity="'+(op*.4).toFixed(2)+'" stroke="'+(sel?'#000':c)+'" stroke-width="'+(sw*(sel?.8:.5)).toFixed(1)+'" stroke-linejoin="round"/>';
-    const lw=tkvLineW(it,0)*(sel?1.15:1),pa=s.al?tkOffsetLine(p,W,H,tkSideOff(s.al,tkvLineW(it,0))):p,ptsa=s.al?(()=>{const r=[];for(let i=0;i+1<pa.length;i+=2)r.push((pa[i]*W).toFixed(1)+','+(pa[i+1]*H).toFixed(1));return r})():pts;
-    return '<g'+dim+'><polyline points="'+ptsa.join(' ')+'" fill="none" stroke="'+c+'" stroke-opacity="'+(tkdrGet().op==='def'?(sel?.85:it.id===TKV.item?.9:.7):tkMarkOp())+'" data-w="'+lw.toFixed(2)+'" stroke-width="'+Math.max(lw,1.2/TKV.t.s).toFixed(2)+'" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4"/>'+tkvEndsSvg(pa,lw,c,ends)+'</g>';
+    if(s.k==='frame')return tkvFrameSvg(ar?{...s,arc:ar}:s,it,p,sel,dim,op,sw,tags);
+    if(s.k==='poly'&&s.deduct)return '<'+(A?'path d="'+sd+'"':'polygon points="'+pts.join(' ')+'"')+dim+' data-deduct="1" fill="url(#tkHatch)" stroke="'+(sel?'#000':c)+'" stroke-width="'+(sw*(sel?.8:.5)).toFixed(1)+'" stroke-dasharray="'+(sw*2.5).toFixed(1)+' '+(sw*1.5).toFixed(1)+'" stroke-linejoin="round"/>';
+    if(s.k==='poly')return '<'+(A?'path d="'+sd+'"':'polygon points="'+pts.join(' ')+'"')+dim+' fill="'+c+'" fill-opacity="'+(op*.4).toFixed(2)+'" stroke="'+(sel?'#000':c)+'" stroke-width="'+(sw*(sel?.8:.5)).toFixed(1)+'" stroke-linejoin="round"/>';
+    const lw=tkvLineW(it,0)*(sel?1.15:1),pa=s.al?tkOffsetLine(ar?tkFlat(p,ar,W,H,false):p,W,H,tkSideOff(s.al,tkvLineW(it,0))):p,ptsa=s.al?(()=>{const r=[];for(let i=0;i+1<pa.length;i+=2)r.push((pa[i]*W).toFixed(1)+','+(pa[i+1]*H).toFixed(1));return r})():pts;
+    return '<g'+dim+'><'+(A&&!s.al?'path d="'+sd+'"':'polyline points="'+ptsa.join(' ')+'"')+' fill="none" stroke="'+c+'" stroke-opacity="'+(tkdrGet().op==='def'?(sel?.85:it.id===TKV.item?.9:.7):tkMarkOp())+'" data-w="'+lw.toFixed(2)+'" stroke-width="'+Math.max(lw,1.2/TKV.t.s).toFixed(2)+'" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4"/>'+tkvEndsSvg(pa,lw,c,ends)+'</g>';
   }).join('')+tags.map(([t,x,y,c,dim])=>{const w=fs*.62*t.length+fs*.8;return '<g data-tag="1"'+dim+'><rect x="'+(x-w/2).toFixed(1)+'" y="'+(y-fs*.75).toFixed(1)+'" width="'+w.toFixed(1)+'" height="'+(fs*1.5).toFixed(1)+'" rx="'+(fs*.3).toFixed(1)+'" fill="#fff" fill-opacity=".9" stroke="'+c+'" stroke-width="'+(fs*.12).toFixed(1)+'"/><text x="'+x.toFixed(1)+'" y="'+(y+fs*.35).toFixed(1)+'" font-size="'+fs.toFixed(1)+'" font-family="sans-serif" font-weight="700" text-anchor="middle" fill="#111">'+esc(t)+'</text></g>'}).join('');
   tkvLive();if(fast===true)return;tkvSide();tkvTools();
 }
@@ -6201,7 +6279,8 @@ function tkFrLabelAt(p,W,H,fs){let x0=Infinity,x1=-Infinity,y0=Infinity;for(let 
 function tkvFrameSvg(s,it,p,sel,dim,op,sw,tags){
   const W=TKV.W,H=TKV.H,M=Math.max(W,H),c=esc(it.color),hc=document.documentElement.classList.contains('hc')?1.5:1,f=v=>v.toFixed(1),f2=v=>v.toFixed(2);
   const pts=q=>{const a=[];for(let i=0;i+1<q.length;i+=2)a.push(f(q[i]*W)+','+f(q[i+1]*H));return a.join(' ')};
-  let h='<g'+dim+' data-frame="'+esc(s.id)+'" data-pre="'+tkLayPre(it.fr)+'"><polygon points="'+pts(p)+'" fill="'+c+'" fill-opacity="'+f2(op*.14)+'" stroke="'+(sel?'#000':c)+'" stroke-width="'+f(sw*(sel?.6:.3))+'" stroke-linejoin="round"/>';
+  const FA=tkArcPx(s.arc,W,H),fo=FA?'path d="'+tkArcD(p.reduce((o,v,i)=>{if(i%2)o[o.length-1].y=v*H;else o.push({x:v*W,y:0});return o},[]),FA,true)+'"':'polygon points="'+pts(p)+'"';
+  let h='<g'+dim+' data-frame="'+esc(s.id)+'" data-pre="'+tkLayPre(it.fr)+'"><'+fo+' fill="'+c+'" fill-opacity="'+f2(op*.14)+'" stroke="'+(sel?'#000':c)+'" stroke-width="'+f(sw*(sel?.6:.3))+'" stroke-linejoin="round"/>';
   (s.o||[]).forEach(o=>{h+='<polygon data-open="1" points="'+pts(o)+'" fill="url(#tkHatch)" stroke="'+c+'" stroke-width="'+f(sw*.3)+'" stroke-dasharray="'+f(sw*2)+' '+f(sw*1.2)+'"/>'});
   const sc=tkScaleOf(TKV.id),r=tkFrameOf({...s,p},TKV.sh,sc,it.fr);
   if(r&&!TKV.frOff){const fpp=+sc.fpp,d={};r.segs.forEach(g=>{d[g.r]=(d[g.r]||'')+'M'+f(g.a[0]/fpp)+' '+f(g.a[1]/fpp)+'L'+f(g.b[0]/fpp)+' '+f(g.b[1]/fpp)});
@@ -6217,20 +6296,28 @@ function tkvOutline(){const px={S:1,M:2,L:3.5}[tkdrGet().ol]*(document.documentE
 /* live drawing, rubber band to the cursor and the running length/area; corner handles of the selected mark; the selection box */
 /* a selected / highlighted mark, PlanSwift style: a red line along it with a dashed white line on top between its points, and white squares (dark edge) at the points; screen-constant.
    q = 0-1 points, closed = area / layout, hv = put data-hv (corner index) on the squares (grab handles of the selected mark) */
-function tkvMarkHi(q,closed,hv){
+function tkvMarkHi(q,closed,hv,arc){
   /* drawn in screen px in the #tkSel layer above the sheet (not inside the zoomed, multiply-blended board): vector, crisp and the same width at every zoom and DPR.
-     A dark casing under the red and the white dashes keeps it visible on red items; handle squares scale with the Line end size setting. */
-  const t=TKV.t,W=TKV.W,H=TKV.H,ez=TK_ENDSZ[tkdrGet().endSz]||1,r=Math.max(2.5,4*ez),f=v=>v.toFixed(1),K=tkEndCol(tkdrGet().xc),pts=[];let h='';
-  for(let i=0;i+1<q.length;i+=2){const x=t.x+q[i]*W*t.s,y=t.y+q[i+1]*H*t.s;pts.push(f(x)+','+f(y));h+='<rect'+(hv?' data-hv="'+(i/2)+'"':'')+' data-end="sq" x="'+f(x-r)+'" y="'+f(y-r)+'" width="'+f(2*r)+'" height="'+f(2*r)+'" fill="#fff" stroke="'+K.c+'" stroke-width="1.4"/>'}
-  if(pts.length<2)return h;const tg=closed?'polygon':'polyline',a='<'+tg+' points="'+pts.join(' ')+'" fill="none" stroke-linejoin="round" stroke-linecap="butt"';
+     A dark casing under the red and the white dashes keeps it visible on red items; handle squares scale with the Line end size setting.
+     arc = the mark's arcs: the line follows them, and each arc gets a round handle (data-hm = its segment) on its arc point */
+  const t=TKV.t,W=TKV.W,H=TKV.H,ez=TK_ENDSZ[tkdrGet().endSz]||1,r=Math.max(2.5,4*ez),f=v=>v.toFixed(1),K=tkEndCol(tkdrGet().xc),pts=[],sp=[];let h='';
+  for(let i=0;i+1<q.length;i+=2){const x=t.x+q[i]*W*t.s,y=t.y+q[i+1]*H*t.s;pts.push(f(x)+','+f(y));sp.push({x,y});h+='<rect'+(hv?' data-hv="'+(i/2)+'"':'')+' data-end="sq" x="'+f(x-r)+'" y="'+f(y-r)+'" width="'+f(2*r)+'" height="'+f(2*r)+'" fill="#fff" stroke="'+K.c+'" stroke-width="1.4"/>'}
+  const A=arc&&arc.some(Boolean)?arc.map(m=>m?{x:t.x+m[0]*W*t.s,y:t.y+m[1]*H*t.s}:null):null;
+  if(A)A.forEach((m,i)=>{if(m&&(closed||i<sp.length-1))h+='<circle'+(hv?' data-hm="'+i+'"':'')+' data-end="arc" cx="'+f(m.x)+'" cy="'+f(m.y)+'" r="'+f(r*1.05)+'" fill="#ffd54f" stroke="'+K.c+'" stroke-width="1.4"/>'});
+  if(pts.length<2)return h;
+  if(A){const d=tkArcD(sp,A,closed,f),a='<path d="'+d+'" fill="none" stroke-linejoin="round" stroke-linecap="butt"';
+    return a+' data-hi="case" stroke="#111" stroke-opacity=".85" stroke-width="5.6"/>'+a+' data-hi="red" stroke="#e53935" stroke-width="3.2"/>'+a+' data-hi="dash" stroke="#fff" stroke-width="1.3" stroke-dasharray="6 4"/>'+h}
+  const tg=closed?'polygon':'polyline',a='<'+tg+' points="'+pts.join(' ')+'" fill="none" stroke-linejoin="round" stroke-linecap="butt"';
   return a+' data-hi="case" stroke="#111" stroke-opacity=".85" stroke-width="5.6"/>'+a+' data-hi="red" stroke="#e53935" stroke-width="3.2"/>'+a+' data-hi="dash" stroke="#fff" stroke-width="1.3" stroke-dasharray="6 4"/>'+h;
 }
 /* a mark's points as drawn now (mid-drag included) */
+/* a mark's arcs as drawn now (an arc point being dragged, or marks being moved, included) */
+function tkvArcOf(sh){const d=TKV.drag;return (d&&(d.m?d.am&&d.am[sh.id]:d.id===sh.id&&d.arc))||sh.arc||null}
 function tkvMarkPts(sh){return (TKV.drag&&(TKV.drag.m?TKV.drag.m[sh.id]:TKV.drag.id===sh.id&&TKV.drag.p)||sh.p||[]).map(Number)}
 /* the highlighted item: nothing dims; each of its marks gets the selected-mark look (tkvMarkHi) on top */
 function tkvHlSvg(){
   const it=tkItem(TKV.hl);if(!it||TKV.hide[it.id])return '';let o='';
-  TK.data.shapes.forEach(sh=>{if(sh.sheet!==TKV.id||sh.item!==it.id||sh.id===TKV.cont)return;o+=tkvMarkHi(tkvMarkPts(sh),sh.k!=='line',false)});
+  TK.data.shapes.forEach(sh=>{if(sh.sheet!==TKV.id||sh.item!==it.id||sh.id===TKV.cont)return;o+=tkvMarkHi(tkvMarkPts(sh),sh.k!=='line',false,tkvArcOf(sh))});
   return o?'<g data-hlmk="1" pointer-events="none">'+o+'</g>':'';
 }
 function tkvLive(){
@@ -6245,17 +6332,17 @@ function tkvLive(){
     {const k=1/TKV.t.s,a=7*k,w=(1.4*k).toFixed(2);s+=TKV.draft.map((p,i)=>{const b=i===0&&TKV.mode==='draw'&&tkPolyIt(it)&&TKV.draft.length>2?a*1.6:a;return '<rect x="'+(p.x-b/2).toFixed(1)+'" y="'+(p.y-b/2).toFixed(1)+'" width="'+b.toFixed(1)+'" height="'+b.toFixed(1)+'" fill="none" stroke="#1d232b" stroke-width="'+w+'"/>'}).join('')}
   }
   let hi='';if(TKV.hl)hi+=tkvHlSvg();
-  {const ids=(TKV.msel||[]).filter(id=>id!==TKV.sel);let o='';ids.forEach(id=>{const sh=tkvShape(id);if(sh&&sh.sheet===TKV.id&&!TKV.hide[sh.item])o+=tkvMarkHi(tkvMarkPts(sh),sh.k!=='line',false)});
-    if(TKV.sel&&!TKV.box){const sh=tkvShape(TKV.sel);if(sh&&sh.sheet===TKV.id)o+=tkvMarkHi(tkvMarkPts(sh),sh.k!=='line',(TKV.mode==='select'||TKV.mode==='pan')&&sh.k!=='count')}
+  {const ids=(TKV.msel||[]).filter(id=>id!==TKV.sel);let o='';ids.forEach(id=>{const sh=tkvShape(id);if(sh&&sh.sheet===TKV.id&&!TKV.hide[sh.item])o+=tkvMarkHi(tkvMarkPts(sh),sh.k!=='line',false,tkvArcOf(sh))});
+    if(TKV.sel&&!TKV.box){const sh=tkvShape(TKV.sel);if(sh&&sh.sheet===TKV.id)o+=tkvMarkHi(tkvMarkPts(sh),sh.k!=='line',(TKV.mode==='select'||TKV.mode==='pan')&&sh.k!=='count',tkvArcOf(sh))}
     if(o)hi+='<g data-selmk="1" pointer-events="none">'+o+'</g>'}
   if(TKV.box&&TKV.box.l){const o=tkvOutline();s+='<polygon data-box="1" points="'+TKV.box.l.map(v=>v.x.toFixed(1)+','+v.y.toFixed(1)).join(' ')+'" fill="#1e88e5" fill-opacity=".08" stroke="#1e88e5" stroke-width="'+o.w+'" stroke-dasharray="'+o.d+'"/>'}
   else if(TKV.box){const a=TKV.box.a,b=TKV.box.b,o=tkvOutline();s+='<rect data-box="1" x="'+Math.min(a.x,b.x).toFixed(1)+'" y="'+Math.min(a.y,b.y).toFixed(1)+'" width="'+Math.abs(b.x-a.x).toFixed(1)+'" height="'+Math.abs(b.y-a.y).toFixed(1)+'" fill="#1e88e5" fill-opacity=".08" stroke="#1e88e5" stroke-width="'+o.w+'" stroke-dasharray="'+o.d+'"/>'}
   if(TKV.gpick&&TKV.gpick.a){const k=1/TKV.t.s,a=TKV.gpick.a,w=(1.6*k).toFixed(2);s+='<g data-gpick="1"><circle cx="'+a.x.toFixed(1)+'" cy="'+a.y.toFixed(1)+'" r="'+(7*k).toFixed(1)+'" fill="none" stroke="#ffab00" stroke-width="'+w+'"/>'+(TKV.cur?'<line x1="'+a.x.toFixed(1)+'" y1="'+a.y.toFixed(1)+'" x2="'+TKV.cur.x.toFixed(1)+'" y2="'+TKV.cur.y.toFixed(1)+'" stroke="#ffab00" stroke-width="'+w+'" stroke-dasharray="'+(6*k).toFixed(1)+' '+(4*k).toFixed(1)+'"/>':'')+'</g>'}
   g.innerHTML=s;{const sl=$('#tkSel');if(sl)sl.innerHTML=hi}tkvOverlay();
   const rd=$('#tkRead');if(!rd)return;const sc=tkScaleOf(TKV.id);
-  if(TKV.drag&&TKV.g&&TKV.g.type==='corner'){/* dragging a point: the mark's length / area as it is now */
-    const id=TKV.drag.m?TKV.g.corner.id:TKV.drag.id,sh0=tkvShape(id),np=sh0&&TKV.drag.m?TKV.drag.m[id]:TKV.drag.p,n=TKV.drag.m?Object.keys(TKV.drag.m).length:1;
-    if(sh0&&np){rd.textContent=tkvQtyText({...sh0,p:np})+(n>1?' · +'+(n-1)+' connected':'');rd.style.display='block';return}}
+  if(TKV.drag&&TKV.g&&(TKV.g.type==='corner'||TKV.g.type==='arcm')){/* dragging a point or an arc point: the mark's length / area as it is now */
+    const id=TKV.g.type==='arcm'?TKV.g.arcm.id:TKV.drag.m?TKV.g.corner.id:TKV.drag.id,sh0=tkvShape(id),n=TKV.drag.m?Object.keys(TKV.drag.m).length:1;
+    if(sh0){rd.textContent=tkvQtyText({...sh0,p:tkvMarkPts(sh0),arc:tkvArcOf(sh0)})+(n>1?' · +'+(n-1)+' connected':'');rd.style.display='block';return}}
   if(!pts.length||(TKV.mode!=='draw'&&TKV.mode!=='measure'&&TKV.mode!=='scale')){rd.style.display='none';return}
   const np=[];pts.forEach(p=>np.push(p.x/W,p.y/H));let txt='';
   if(TKV.mode==='scale')txt=Math.round(tkLenPx(np,W,H))+' px — click the other end, then ✓ Finish';
@@ -6335,7 +6422,7 @@ function tkvMag(mg,A,P,d,r,col){
   TK.data.shapes.forEach(sh=>{if(sh.sheet!==TKV.id||TKV.hide[sh.item]||sh.id===TKV.cont)return;const it=tkItem(sh.item);if(!it)return;const q=(TKV.drag&&(TKV.drag.m?TKV.drag.m[sh.id]:TKV.drag.id===sh.id&&TKV.drag.p)||sh.p||[]).map(Number);if(!near(q))return;
     x.strokeStyle=x.fillStyle=it.color;
     if(sh.k==='count'){x.globalAlpha=.55;x.beginPath();x.arc(q[0]*W,q[1]*H,M*.007,0,7);x.fill();return}
-    x.beginPath();for(let i=0;i+1<q.length;i+=2){if(i)x.lineTo(q[i]*W,q[i+1]*H);else x.moveTo(q[i]*W,q[i+1]*H)}
+    x.beginPath();{const AR=tkArcPx(tkvArcOf(sh),W,H);if(AR){const pp=[];for(let i=0;i+1<q.length;i+=2)pp.push({x:q[i]*W,y:q[i+1]*H});tkArcCanvas(x,pp,AR,sh.k==='poly'||sh.k==='frame')}else for(let i=0;i+1<q.length;i+=2){if(i)x.lineTo(q[i]*W,q[i+1]*H);else x.moveTo(q[i]*W,q[i+1]*H)}}
     if(sh.k==='poly'||sh.k==='frame'){x.closePath();x.globalAlpha=.16;x.fill();x.globalAlpha=.8;x.lineWidth=1.5/k;x.stroke();return}
     x.globalAlpha=.45;x.lineWidth=Math.max(tkvLineW(it,0),1.5/k);x.stroke()});
   if(TKV.draft.length&&(TKV.cur||TKV.draft.length>1)){const it=tkItem(TKV.item),c=TKV.mode==='draw'&&it?it.color:TKV.mode==='scale'?'#c62828':'#1d232b';const pts=TKV.draft.concat(TKV.cur?[TKV.cur]:[]);
@@ -6350,11 +6437,11 @@ function tkvBind(){
     TKV.pts.set(e.pointerId,{x:e.clientX,y:e.clientY});tkvMods(e);
     if(TKV.pts.size===2){const [a,b]=[...TKV.pts.values()];TKV.g={type:'pinch',d0:Math.max(1,dist(a,b)),c0:mid(a,b),t0:Object.assign({},TKV.t)};clearTimeout(TKV.aimT);TKV.magOn=false;TKV.aim=null;if(TKV.box||TKV.drag){TKV.box=null;TKV.drag=null;tkvPaint(true)}else tkvOverlay()}
     else if(TKV.pts.size===1){const it=tkItem(TKV.item),btn=TKV.space?1:e.ctrlKey&&tkMac()?2:e.button,sm=TKV.mode==='select'&&!TKV.space&&e.button===0;
-      const hm=(TKV.mode==='select'||TKV.mode==='pan')&&!TKV.space&&e.button===0,cs=hm&&TKV.sel?tkvShape(TKV.sel):null,ci=cs&&cs.k!=='count'&&cs.sheet===TKV.id?tkvNearCorner(cs,tkvImg(e.clientX,e.clientY),12):-1;
+      const hm=(TKV.mode==='select'||TKV.mode==='pan')&&!TKV.space&&e.button===0,cs=hm&&TKV.sel?tkvShape(TKV.sel):null,ci=cs&&cs.k!=='count'&&cs.sheet===TKV.id?tkvNearCorner(cs,tkvImg(e.clientX,e.clientY),12):-1,ai=cs&&ci<0&&cs.k!=='count'&&cs.sheet===TKV.id?tkvNearArcMid(cs,tkvImg(e.clientX,e.clientY),12):-1;
       TKV.g={type:'pan',sx:e.clientX,sy:e.clientY,t0:Object.assign({},TKV.t),moved:false,time:Date.now(),btn,alt:e.altKey,shift:e.shiftKey,
       rect:!TKV.space&&e.button===0&&!e.ctrlKey&&TKV.mode==='draw'&&tkPolyIt(it)&&!TKV.draft.length&&!!tkScaleOf(TKV.id),
-      corner:ci>=0?{id:cs.id,i:ci,p0:(cs.p||[]).slice(),sh:!!e.shiftKey,link:e.shiftKey?tkCoincident(TK.data.shapes,TKV.id,cs.id,ci,2e-4,TKV.hide).slice(1).map(t=>({id:t.id,i:t.i,p0:(tkvShape(t.id).p||[]).slice()})):[]}:null,box:sm&&ci<0&&(e.shiftKey||e.metaKey||e.ctrlKey||e.altKey||!!TKV.boxNext||!!TKV.lassoNext),lasso:sm&&ci<0&&(e.altKey||!!TKV.lassoNext)};
-      if(sm&&ci<0&&!TKV.g.box){const hid=tkvHit(tkvImg(e.clientX,e.clientY)),ids=tkvSelIds();if(hid&&ids.includes(hid)){const m0={};ids.forEach(id=>{const x=tkvShape(id);if(x)m0[id]={p:(x.p||[]).slice(),o:x.o?x.o.map(q=>q.slice()):null,org:Array.isArray(x.org)?x.org.slice():null}});TKV.g.mv={m0,a:tkvImg(e.clientX,e.clientY)}}}
+      arcm:ai>=0?{id:cs.id,seg:ai,arc:cs.arc.map(a=>a&&a.slice())}:null,corner:ci>=0?{id:cs.id,i:ci,p0:(cs.p||[]).slice(),sh:!!e.shiftKey,link:e.shiftKey?tkCoincident(TK.data.shapes,TKV.id,cs.id,ci,2e-4,TKV.hide).slice(1).map(t=>({id:t.id,i:t.i,p0:(tkvShape(t.id).p||[]).slice()})):[]}:null,box:sm&&ci<0&&ai<0&&(e.shiftKey||e.metaKey||e.ctrlKey||e.altKey||!!TKV.boxNext||!!TKV.lassoNext),lasso:sm&&ci<0&&ai<0&&(e.altKey||!!TKV.lassoNext)};
+      if(sm&&ci<0&&ai<0&&!TKV.g.box){const hid=tkvHit(tkvImg(e.clientX,e.clientY)),ids=tkvSelIds();if(hid&&ids.includes(hid)){const m0={};ids.forEach(id=>{const x=tkvShape(id);if(x)m0[id]={p:(x.p||[]).slice(),o:x.o?x.o.map(q=>q.slice()):null,org:Array.isArray(x.org)?x.org.slice():null,arc:Array.isArray(x.arc)?x.arc.map(a=>a&&a.slice()):null}});TKV.g.mv={m0,a:tkvImg(e.clientX,e.clientY)}}}
       TKV.boxNext=false;TKV.lassoNext=false;
       /* touch / pen while drawing: hold still a moment to aim (magnifier, slide to adjust, lift to place); a quick drag still moves the sheet */
       if(e.pointerType!=='mouse'&&tkvDrawing()&&!TKV.space){const g0=TKV.g;g0.aimable=true;tkvAimSet(e,true);TKV.magOn=false;tkvHover();clearTimeout(TKV.aimT);
@@ -6370,12 +6457,13 @@ function tkvBind(){
     TKV.pts.set(e.pointerId,{x:e.clientX,y:e.clientY});const g=TKV.g;if(!g)return;const far=n=>Math.hypot(e.clientX-g.sx,e.clientY-g.sy)>n;
     if(g.type==='pinch'&&TKV.pts.size>=2){const [a,b]=[...TKV.pts.values()];const c=mid(a,b);const r=st.getBoundingClientRect();const s=clamp(g.t0.s*dist(a,b)/g.d0,TKV.minS,6);const ix=(g.c0.x-r.left-g.t0.x)/g.t0.s,iy=(g.c0.y-r.top-g.t0.y)/g.t0.s;TKV.t={s,x:c.x-r.left-ix*s,y:c.y-r.top-iy*s};tkvT()}
     else if(g.type==='aim'){tkvAimSet(e,true);if(far(5)&&!g.aimMoved){g.aimMoved=true;clearTimeout(TKV.lp)}tkvHover()}
-    else if(g.mv&&(g.type==='move'||far(4))){clearTimeout(TKV.lp);g.type='move';g.moved=true;const b=tkvImg(e.clientX,e.clientY),dx=(b.x-g.mv.a.x)/TKV.W,dy=(b.y-g.mv.a.y)/TKV.H,sh=q=>q.map((v,i)=>v+(i%2?dy:dx)),m={};Object.keys(g.mv.m0).forEach(id=>m[id]=sh(g.mv.m0[id].p));g.mv.dx=dx;g.mv.dy=dy;TKV.drag={m};tkvPaint(true)}
+    else if(g.mv&&(g.type==='move'||far(4))){clearTimeout(TKV.lp);g.type='move';g.moved=true;const b=tkvImg(e.clientX,e.clientY),dx=(b.x-g.mv.a.x)/TKV.W,dy=(b.y-g.mv.a.y)/TKV.H,sh=q=>q.map((v,i)=>v+(i%2?dy:dx)),m={};const am={};Object.keys(g.mv.m0).forEach(id=>{m[id]=sh(g.mv.m0[id].p);const za=g.mv.m0[id].arc;if(za)am[id]=za.map(a=>a&&sh(a))});g.mv.dx=dx;g.mv.dy=dy;TKV.drag={m,am};tkvPaint(true)}
     else if(g.corner&&(g.type==='corner'||far(4))){clearTimeout(TKV.lp);g.type='corner';g.moved=true;const cp=g.corner.p0,bj=g.corner.i>0?g.corner.i-1:g.corner.i+1,base=2*bj+1<cp.length?{x:cp[2*bj]*TKV.W,y:cp[2*bj+1]*TKV.H}:null,lk=g.corner.link||[],all={};lk.forEach(t=>all[t.id+':'+t.i]=1);
       const q=tkvSnapPt(tkvImg(e.clientX,e.clientY),{id:g.corner.id,i:g.corner.i,base,all,noShift:!!g.corner.sh});TKV.aimPt=q;if(e.pointerType!=='mouse'){tkvAimSet(e,true);TKV.magOn=true}
       const nx=clamp(q.x,0,TKV.W)/TKV.W,ny=clamp(q.y,0,TKV.H)/TKV.H;
       if(lk.length){const m={};m[g.corner.id]=tkMoveCorner(cp,g.corner.i,nx,ny);lk.forEach(t=>{m[t.id]=tkMoveCorner(m[t.id]||t.p0,t.i,nx,ny)});TKV.drag={m}}
       else TKV.drag={id:g.corner.id,p:tkMoveCorner(cp,g.corner.i,nx,ny)};tkvPaint(true)}
+    else if(g.arcm&&(g.type==='arcm'||far(4))){clearTimeout(TKV.lp);g.type='arcm';g.moved=true;const q=tkvImg(e.clientX,e.clientY),na=g.arcm.arc.slice();na[g.arcm.seg]=[clamp(q.x,0,TKV.W)/TKV.W,clamp(q.y,0,TKV.H)/TKV.H];TKV.drag={id:g.arcm.id,arc:na};tkvPaint(true)}
     else if(g.box&&(g.type==='box'||far(6))){clearTimeout(TKV.lp);if(g.type!=='box')tkCtxClose();g.type='box';g.moved=true;const pb=tkvImg(e.clientX,e.clientY);if(g.lasso){if(!TKV.box||!TKV.box.l)TKV.box={l:[tkvImg(g.sx,g.sy)]};const L=TKV.box.l,q=L[L.length-1];if(Math.hypot(pb.x-q.x,pb.y-q.y)*TKV.t.s>3)L.push(pb)}else TKV.box={a:tkvImg(g.sx,g.sy),b:pb};tkvLive()}
     else if(g.type==='rect'||(g.type==='pan'&&g.rect&&far(10))){
       clearTimeout(TKV.lp);if(g.type!=='rect'){g.type='rect';g.a=tkvSnapPt(tkvImg(g.sx,g.sy));TKV.dDraft=!!(g.alt||e.altKey||TKV.dNext)}
@@ -6386,8 +6474,9 @@ function tkvBind(){
     if(!TKV||!TKV.pts.has(e.pointerId))return;TKV.pts.delete(e.pointerId);clearTimeout(TKV.lp);clearTimeout(TKV.aimT);if(e.pointerType!=='mouse'){TKV.magOn=false;TKV.aim=null}const g=TKV.g;if(!g){tkvOverlay();return}
     if(g.type==='pinch'){if(TKV.pts.size===1){const [a]=[...TKV.pts.values()];TKV.g={type:'pan',sx:a.x,sy:a.y,t0:Object.assign({},TKV.t),moved:true,time:0}}else if(!TKV.pts.size)TKV.g=null;return}
     TKV.g=null;if(TKV.skipTap){TKV.skipTap=false;TKV.drag=null;TKV.box=null;tkvPaint(true);return}
-    if(g.type==='move'){TKV.drag=null;const mv=g.mv;if(e.type!=='pointercancel'&&(mv.dx||mv.dy)){const r4=v=>Math.round(v*1e4)/1e4,sh=q=>q.map((v,i)=>r4(v+(i%2?mv.dy:mv.dx)));tkvEditDo(Object.keys(mv.m0).map(id=>{const z=mv.m0[id],v={id,p:sh(z.p)};if(z.o)v.o=z.o.map(sh);if(z.org)v.org=sh(z.org);return {t:'shape',v}}));toast('Moved '+Object.keys(mv.m0).length+' mark'+(Object.keys(mv.m0).length===1?'':'s')+' · Ctrl+Z undoes')}tkvPaint();return}
+    if(g.type==='move'){TKV.drag=null;const mv=g.mv;if(e.type!=='pointercancel'&&(mv.dx||mv.dy)){const r4=v=>Math.round(v*1e4)/1e4,sh=q=>q.map((v,i)=>r4(v+(i%2?mv.dy:mv.dx)));tkvEditDo(Object.keys(mv.m0).map(id=>{const z=mv.m0[id],v={id,p:sh(z.p)};if(z.o)v.o=z.o.map(sh);if(z.org)v.org=sh(z.org);if(z.arc)v.arc=z.arc.map(a=>a&&sh(a));return {t:'shape',v}}));toast('Moved '+Object.keys(mv.m0).length+' mark'+(Object.keys(mv.m0).length===1?'':'s')+' · Ctrl+Z undoes')}tkvPaint();return}
     if(g.type==='corner'){const dr=TKV.drag;TKV.drag=null;if(dr&&e.type!=='pointercancel'){const ops=dr.m?Object.keys(dr.m).map(id=>({t:'shape',v:{id,p:dr.m[id].map(v=>r4(v))}})):[{t:'shape',v:{id:dr.id,p:dr.p.map(v=>r4(v))}}];tkvEditDo(ops);if(ops.length>1)toast('Moved the point and '+(ops.length-1)+' connected mark'+(ops.length>2?'s':'')+' · Ctrl+Z undoes')}tkvPaint();return}
+    if(g.type==='arcm'){const dr=TKV.drag;TKV.drag=null;if(dr&&dr.arc&&e.type!=='pointercancel')tkvEditDo({t:'shape',v:{id:dr.id,arc:dr.arc.map(a=>a&&a.map(v=>r4(v)))}});tkvPaint();return}
     if(g.type==='box'){const b=TKV.box;TKV.box=null;if(b&&e.type!=='pointercancel'){if(b.l)tkvLassoSel(b.l,g.shift||e.shiftKey);else tkvBoxSel(b,g.shift||e.shiftKey)}else tkvLive();return}
     if(g.type==='rect'){const q=TKV.draft;if(e.type==='pointercancel'||q.length!==4||Math.abs(q[2].x-q[0].x)*TKV.t.s<6||Math.abs(q[2].y-q[0].y)*TKV.t.s<6){TKV.draft=[];TKV.dDraft=false;tkvLive();tkvTools()}else tkvFinish();return}
     if(g.type==='aim'){if(!g.long&&e.type!=='pointercancel')tkvTap(e.clientX,e.clientY,false,false);else tkvOverlay();return}
@@ -6410,10 +6499,10 @@ function tkvBind(){
   st.addEventListener('wheel',e=>{if(!TKV||!TKV.W)return;e.preventDefault();tkvZoomAt(e.clientX,e.clientY,Math.exp(-e.deltaY*.0015))},{passive:false});
   /* cursors (CSS from data-m / data-h / data-g): hover in select mode (rAF-throttled) and the gesture under way */
   st.addEventListener('pointermove',e=>{if(!TKV||!TKV.W)return;const g=TKV.g;
-    if(TKV.pts.has(e.pointerId)){st.dataset.g=!g?'':g.type==='box'?'box':g.type==='corner'?'corner':g.type==='move'||(g.type==='pan'&&g.moved)?'grab':'';return}
+    if(TKV.pts.has(e.pointerId)){st.dataset.g=!g?'':g.type==='box'?'box':g.type==='corner'||g.type==='arcm'?'corner':g.type==='move'||(g.type==='pan'&&g.moved)?'grab':'';return}
     if(e.pointerType==='touch'||(TKV.mode!=='select'&&TKV.mode!=='pan')||TKV.gpick||TKV.hovF)return;const cx=e.clientX,cy=e.clientY;
     TKV.hovF=requestAnimationFrame(()=>{if(!TKV)return;TKV.hovF=0;const p=tkvImg(cx,cy),cs=TKV.sel&&tkvShape(TKV.sel);let h='';
-      if(cs&&cs.k!=='count'&&tkvNearCorner(cs,p,12)>=0)h='corner';else if(TKV.mode==='select'){const id=tkvHit(p);if(id)h=tkvSelIds().includes(id)?'sel':'mark'}
+      if(cs&&cs.k!=='count'&&(tkvNearCorner(cs,p,12)>=0||tkvNearArcMid(cs,p,12)>=0))h='corner';else if(TKV.mode==='select'){const id=tkvHit(p);if(id)h=tkvSelIds().includes(id)?'sel':'mark'}
       if(st.dataset.h!==h)st.dataset.h=h})});
   const gEnd=()=>{st.dataset.g=''};st.addEventListener('pointerup',gEnd);st.addEventListener('pointercancel',gEnd);
   window.addEventListener('keydown',tkvKey);window.addEventListener('keyup',tkvKeyUp);
@@ -6484,7 +6573,7 @@ function tkvSelTap(p0,shift){
   const h=tkvHit(p0),now=Date.now(),lt=TKV.lastTap;TKV.lastTap={t:now,x:p0.x,y:p0.y,h,ws:!!h&&(h===TKV.sel||tkvSelIds().includes(h))};
   if(shift){if(!h)return;const l=TKV.msel.slice();if(TKV.sel&&!l.includes(TKV.sel))l.push(TKV.sel);const i=l.indexOf(h);if(i>=0)l.splice(i,1);else l.push(h);TKV.msel=l;TKV.sel=l.length===1?l[0]:null;tkvPaint();return}
   /* double-click on the edge of a mark that was already selected = add a corner (then the dblclick does not open the item's edit box) */
-  if(h&&h===TKV.sel&&lt&&lt.h===h&&lt.ws&&now-lt.t<450&&Math.hypot(lt.x-p0.x,lt.y-p0.y)*TKV.t.s<14){TKV.lastTap=null;TKV.cornerAt=now;tkvAddCorner(h,p0);return}
+  if(h&&h===TKV.sel&&lt&&lt.h===h&&lt.ws&&now-lt.t<450&&Math.hypot(lt.x-p0.x,lt.y-p0.y)*TKV.t.s<14){TKV.lastTap=null;TKV.cornerAt=now;tkvDblEdge(h,p0);return}
   TKV.sel=h;TKV.msel=h?[h]:[];tkvPaint();
   const s=h&&tkvShape(h);if(s&&s.k==='count')tkvShapeMenu(h);
 }
@@ -6510,25 +6599,44 @@ function tkvSelIds(){if(!TKV)return [];const l=(TKV.msel||[]).slice();if(TKV.sel
 function tkvShape(id){return TK&&id?TK.data.shapes.find(x=>x.id===id)||null:null}
 /* nearest edge of a mark to image point p: {seg,x,y,d,t} in image px (an area includes its closing edge) */
 function tkvNearSeg(s,p){
-  const W=TKV.W,H=TKV.H,q=s.p||[],n=Math.floor(q.length/2);let best=null;
-  for(let i=0;i<n-1+((s.k==='poly'||s.k==='frame')&&n>2?1:0);i++){const j=(i+1)%n,ax=q[2*i]*W,ay=q[2*i+1]*H,bx=q[2*j]*W,by=q[2*j+1]*H,dx=bx-ax,dy=by-ay,l=dx*dx+dy*dy;const t=l?clamp(((p.x-ax)*dx+(p.y-ay)*dy)/l,0,1):0;const x=ax+t*dx,y=ay+t*dy,d=Math.hypot(p.x-x,p.y-y);if(!best||d<best.d)best={seg:i,x,y,d,t}}
+  const W=TKV.W,H=TKV.H,q=s.p||[],n=Math.floor(q.length/2),cl=(s.k==='poly'||s.k==='frame')&&n>2;let best=null;
+  for(let i=0;i<n-1+(cl?1:0);i++){const P=tkSegPoly(q,s.arc,W,H,i,cl);/* an arc segment is measured along its arc */
+    for(let k=0;k+1<P.length;k++){const a=P[k],b=P[k+1],dx=b.x-a.x,dy=b.y-a.y,l=dx*dx+dy*dy,t=l?clamp(((p.x-a.x)*dx+(p.y-a.y)*dy)/l,0,1):0,x=a.x+t*dx,y=a.y+t*dy,d=Math.hypot(p.x-x,p.y-y);if(!best||d<best.d)best={seg:i,x,y,d,t}}}
   return best;
+}
+/* the arc point (yellow dot) of a mark within tol screen px of image point p: its segment, or -1 */
+function tkvNearArcMid(s,p,tol){const a=s&&s.arc;if(!Array.isArray(a))return -1;let bi=-1,bd=tol/TKV.t.s;a.forEach((m,i)=>{if(!m)return;const d=Math.hypot(m[0]*TKV.W-p.x,m[1]*TKV.H-p.y);if(d<bd){bd=d;bi=i}});return bi}
+/* p0 is in the middle part of segment seg (where a double-click makes an arc): within 14 screen px of its middle or 12% of its length */
+function tkvNearMid(s,seg,p0){const q=s.p||[],n=Math.floor(q.length/2),j=(seg+1)%n,a={x:q[2*seg]*TKV.W,y:q[2*seg+1]*TKV.H},b={x:q[2*j]*TKV.W,y:q[2*j+1]*TKV.H};return Math.hypot(p0.x-(a.x+b.x)/2,p0.y-(a.y+b.y)/2)*TKV.t.s<Math.max(14,.12*Math.hypot(b.x-a.x,b.y-a.y)*TKV.t.s)}
+/* Make arc: the segment becomes a circular arc through its two ends and a point bowed out from the middle (drag the yellow dot to bend it) */
+function tkvMakeArc(id,seg){
+  const s=tkvShape(id);if(!s||s.k==='count'||!(seg>=0))return;const n=Math.floor((s.p||[]).length/2);if(seg>=n-((s.k==='poly'||s.k==='frame')?0:1))return;
+  let away=null;if(s.k!=='line'){let x=0,y=0;for(let i=0;i<n;i++){x+=s.p[2*i];y+=s.p[2*i+1]}away={x:x/n,y:y/n}}
+  tkvEditDo({t:'shape',v:{id,arc:tkArcMake(s.p,s.arc,seg,TKV.W,TKV.H,away).map(a=>a&&a.map(v=>r4(v)))}});TKV.sel=id;TKV.msel=[id];tkvPaint();toast('Arc made. Drag the yellow dot to bend it · right-click it for Make straight.');
+}
+function tkvStraight(id,seg){
+  const s=tkvShape(id);if(!s||!Array.isArray(s.arc)||!s.arc[seg])return;const a=s.arc.slice();a[seg]=null;tkvEditDo({t:'shape',v:{id,arc:a.some(Boolean)?a:null}});tkvPaint();toast('Segment straight again.');
+}
+/* double-click on the edge of the selected mark: middle of a segment = Make arc (on its arc point = Make straight), anywhere else on the edge = add a point */
+function tkvDblEdge(id,p0){
+  const s=tkvShape(id);if(!s||s.k==='count'||tkvNearCorner(s,p0,12)>=0)return;const am=tkvNearArcMid(s,p0,12);if(am>=0){tkvStraight(id,am);return}
+  const ns=tkvNearSeg(s,p0);if(!ns||ns.d>14/TKV.t.s)return;if(!(s.arc&&s.arc[ns.seg])&&tkvNearMid(s,ns.seg,p0)){tkvMakeArc(id,ns.seg);return}tkvAddCorner(id,p0);
 }
 /* corner of a mark within tol screen px of image point p, or -1 */
 function tkvNearCorner(s,p,tol){const q=s.p||[];let bi=-1,bd=tol/TKV.t.s;for(let i=0;i+1<q.length;i+=2){const d=Math.hypot(q[i]*TKV.W-p.x,q[i+1]*TKV.H-p.y);if(d<bd){bd=d;bi=i/2}}return bi}
 function tkvAddCorner(id,p0){
   const s=tkvShape(id);if(!s||s.k==='count')return;if(tkvNearCorner(s,p0,12)>=0)return;const ns=tkvNearSeg(s,p0);if(!ns||ns.d>14/TKV.t.s)return;
-  tkvEditDo({t:'shape',v:{id,p:tkInsertCorner(s.p,ns.seg,r4(ns.x/TKV.W),r4(ns.y/TKV.H))}});TKV.sel=id;TKV.msel=[id];tkvPaint();toast('Point added. Drag it to move.');
+  const r=tkArcInsert(s.p,s.arc,ns.seg,r4(ns.x/TKV.W),r4(ns.y/TKV.H),TKV.W,TKV.H);tkvEditDo({t:'shape',v:{id,p:r.p.map(v=>r4(v)),arc:r.arc&&r.arc.map(a=>a&&a.map(v=>r4(v)))}});TKV.sel=id;TKV.msel=[id];tkvPaint();toast('Point added. Drag it to move.');
 }
-function tkvDelCorner(id,i){const s=tkvShape(id);if(!s)return;const q=tkDeleteCorner(s.p,i,s.k==='poly'||s.k==='frame'?3:2);if(!q){toast(s.k!=='line'?'An area needs at least 3 points.':'A line needs at least 2 points.');return}tkvEditDo({t:'shape',v:{id,p:q}});tkvPaint()}
+function tkvDelCorner(id,i){const s=tkvShape(id);if(!s)return;const q=tkArcDelete(s.p,s.arc,i,s.k==='poly'||s.k==='frame'?3:2);if(!q){toast(s.k!=='line'?'An area needs at least 3 points.':'A line needs at least 2 points.');return}tkvEditDo({t:'shape',v:{id,p:q.p,arc:q.arc}});tkvPaint()}
 /* where "Split here" would cut a line mark: the two parts, or null when the point is at an end */
 function tkvSplitAt(s,p0){
-  if(!s||s.k!=='line')return null;const ns=tkvNearSeg(s,p0);if(!ns||ns.d>14/TKV.t.s)return null;const r=tkSplitLine(s.p,ns.seg,r4(ns.x/TKV.W),r4(ns.y/TKV.H));if(!r)return null;
-  const mn=3/TKV.t.s;return tkLenPx(r[0],TKV.W,TKV.H)>mn&&tkLenPx(r[1],TKV.W,TKV.H)>mn?r:null;
+  if(!s||s.k!=='line')return null;const ns=tkvNearSeg(s,p0);if(!ns||ns.d>14/TKV.t.s)return null;const r=tkArcSplitLine(s.p,s.arc,ns.seg,r4(ns.x/TKV.W),r4(ns.y/TKV.H),TKV.W,TKV.H);if(!r)return null;
+  const mn=3/TKV.t.s;return tkLenPx(r[0].p,TKV.W,TKV.H,r[0].arc)>mn&&tkLenPx(r[1].p,TKV.W,TKV.H,r[1].arc)>mn?r:null;
 }
 function tkvSplit(id,p0){
   const s=tkvShape(id),r=tkvSplitAt(s,p0);if(!r)return;const nid=uuid();
-  tkDo([{t:'shape',v:{id,p:r[0]}},{t:'shape',v:{...s,id:nid,p:r[1],at:new Date().toISOString()}}]);TKV.mine.push(nid);tkvPaint();toast('Split into 2 marks. Right-click a half to change its item.');
+  tkDo([{t:'shape',v:{id,p:r[0].p,arc:r[0].arc}},{t:'shape',v:{...s,id:nid,p:r[1].p,arc:r[1].arc,at:new Date().toISOString()}}]);TKV.mine.push(nid);tkvPaint();toast('Split into 2 marks. Right-click a half to change its item.');
 }
 /* the line to pick back up: the last one drawn here this visit, else the newest line on this sheet */
 function tkvLastLine(){
@@ -6619,6 +6727,9 @@ function tkCtx(cx,cy,sub){
       const own=sel&&hit===TKV.sel&&hs.k!=='count',ci=own?tkvNearCorner(hs,p0,12):-1,ns=own&&ci<0?tkvNearSeg(hs,p0):null;
       add('dcorner','Delete point',ci>=0&&(hs.p||[]).length/2>(hs.k==='line'?2:3));
       add('acorner','Add point here',!!ns&&ns.d<14/TKV.t.s);
+      {const am=own?tkvNearArcMid(hs,p0,12):-1,onSeg=!!ns&&ns.d<14/TKV.t.s&&hs.k!=='count';
+       add('mkarc','Make arc',own&&ci<0&&onSeg&&!(hs.arc&&hs.arc[ns.seg]));
+       add('mkstr','Make straight',am>=0||(own&&onSeg&&!!(hs.arc&&hs.arc[ns.seg])))}
       add('split','✂ Split here',hs.k==='line'&&!!tkvSplitAt(hs,p0));
       if(hs.k==='frame'){const es=tkvNearSeg(hs,p0),oi=(hs.o||[]).findIndex(o=>tkInPoly(p0,o,TKV.W,TKV.H));
         const RN=TK_LAY_RUN[tkLayPre(hit_it.fr)],RU=RN.charAt(0).toUpperCase()+RN.slice(1);
@@ -6683,6 +6794,8 @@ function tkCtx(cx,cy,sub){
     else if(c==='count')tkvCountAt(eas[0].id,p0);
     else if(c==='dcorner')tkvDelCorner(hit,tkvNearCorner(hs,p0,12));
     else if(c==='acorner')tkvAddCorner(hit,p0);
+    else if(c==='mkarc'){const ns=tkvNearSeg(hs,p0);if(ns)tkvMakeArc(hit,ns.seg)}
+    else if(c==='mkstr'){const am=tkvNearArcMid(hs,p0,12),ns=tkvNearSeg(hs,p0);tkvStraight(hit,am>=0?am:ns&&ns.seg)}
     else if(c==='split')tkvSplit(hit,p0);
     else if(c.startsWith('fr'))tkvFrameAct(c.split(':')[0],hs,p0,c.split(':')[1]);
     else if(c==='mh')tkvSetH(hit);
@@ -6729,7 +6842,7 @@ async function tkvFinish(){
 /* the mark at image point p: nearest edge / count within reach, else the area it is inside (a layout area over a plain area wins) */
 function tkvHit(p){
   const W=TKV.W,H=TKV.H,tol=14/TKV.t.s;let best=null,bd=tol,ins=null;
-  TK.data.shapes.forEach(s=>{if(s.sheet!==TKV.id||TKV.hide[s.item]||s.id===TKV.cont)return;const q=s.p||[];
+  TK.data.shapes.forEach(s=>{if(s.sheet!==TKV.id||TKV.hide[s.item]||s.id===TKV.cont)return;const q=s.arc&&s.k!=='count'?tkFlat(s.p,s.arc,W,H,s.k==='poly'||s.k==='frame',4):(s.p||[]);
     if(s.k==='count'){const d=Math.hypot(q[0]*W-p.x,q[1]*H-p.y);if(d<bd){bd=d;best=s.id}return}
     const n=q.length/2;for(let i=1;i<n+(s.k==='poly'||s.k==='frame'?1:0);i++){const a={x:q[2*(i-1)]*W,y:q[2*(i-1)+1]*H},b={x:q[2*(i%n)]*W,y:q[2*(i%n)+1]*H};const d=segDist(p.x,p.y,a.x,a.y,b.x,b.y);if(d<bd||(s.k==='frame'&&d<=bd+1e-6&&d<tol)){bd=d;best=s.id}}
     if((s.k==='poly'||s.k==='frame')&&tkInPoly(p,q,W,H)&&(!ins||(s.k==='frame'&&ins.k!=='frame')))ins=s;
@@ -6892,8 +7005,8 @@ async function tkSendBid(){
 }
 /* a layout area in the markup PDF: outline, openings, then the layout like on screen; label "n 600S162-43 @16" OC · 42 pcs" / "n ACT 2x4 · 75 tiles" */
 function tkPdfFrame(g,s,it,sh,scl,W,H,M,labels,lab){
-  const p=s.p||[],poly=q=>{g.beginPath();for(let i=0;i+1<q.length;i+=2){if(i)g.lineTo(q[i]*W,q[i+1]*H);else g.moveTo(q[i]*W,q[i+1]*H)}g.closePath()};
-  g.strokeStyle=g.fillStyle=it.color;poly(p);g.globalAlpha=.12;g.fill();g.globalAlpha=.7;g.lineWidth=M*.0012;g.stroke();
+  const p=s.p||[],poly=(q,ar)=>{g.beginPath();const AR=tkArcPx(ar,W,H);if(AR){const pp=[];for(let i=0;i+1<q.length;i+=2)pp.push({x:q[i]*W,y:q[i+1]*H});tkArcCanvas(g,pp,AR,true)}else for(let i=0;i+1<q.length;i+=2){if(i)g.lineTo(q[i]*W,q[i+1]*H);else g.moveTo(q[i]*W,q[i+1]*H)}g.closePath()};
+  g.strokeStyle=g.fillStyle=it.color;poly(p,s.arc);g.globalAlpha=.12;g.fill();g.globalAlpha=.7;g.lineWidth=M*.0012;g.stroke();
   (s.o||[]).forEach(o=>{poly(o);g.globalAlpha=.85;g.fillStyle='#fff';g.fill();g.setLineDash([M*.003,M*.002]);g.globalAlpha=.8;g.stroke();g.setLineDash([]);g.fillStyle=it.color});
   const r=tkFrameOf(s,sh,scl,it.fr);let lx=0,ly=0;{const n=p.length/2;for(let i=0;i<n;i++){lx+=p[2*i]*W;ly+=p[2*i+1]*H}lx/=n;ly/=n}
   if(r){const fpp=+scl.fpp,u=M*.0006;g.lineCap='butt';
@@ -6922,8 +7035,8 @@ async function tkMarkupPdf(){
       const labels=[],lab=(n,s)=>String(n)+(s.k==='line'&&+s.h>0?' @'+tkFtIn(+s.h):'')+(s.note?' '+String(s.note):'');d.shapes.filter(s=>s.sheet===sh.id).forEach(s=>{const it=d.items.find(x=>x.id===s.item);if(!it)return;let p=s.p||[];g.strokeStyle=it.color;g.fillStyle=it.color;
         if(s.k==='frame'){tkPdfFrame(g,s,it,sh,scl,W,H,M,labels,lab(num[it.id],s));return}
         if(s.k==='count'){g.globalAlpha=.6;g.beginPath();g.arc(p[0]*W,p[1]*H,M*.007,0,7);g.fill();labels.push([lab(num[it.id],s),p[0]*W+M*.009,p[1]*H]);return}
-        if(s.k==='line'&&s.al){const lw0=scl&&+scl.fpp>0?Math.max(tkItemWidthIn(it)/12/scl.fpp*wmul,M*.0006,1.5):M*.0055*wmul;p=tkOffsetLine(p,W,H,tkSideOff(s.al,lw0))}
-        g.beginPath();for(let i=0;i+1<p.length;i+=2){const x=p[i]*W,yy=p[i+1]*H;if(i)g.lineTo(x,yy);else g.moveTo(x,yy)}
+        if(s.k==='line'&&s.al){const lw0=scl&&+scl.fpp>0?Math.max(tkItemWidthIn(it)/12/scl.fpp*wmul,M*.0006,1.5):M*.0055*wmul;p=tkOffsetLine(s.arc?tkFlat(p,s.arc,W,H,false):p,W,H,tkSideOff(s.al,lw0))}
+        g.beginPath();{const AR=s.arc&&!(s.k==='line'&&s.al)?tkArcPx(s.arc,W,H):null;if(AR){const pp=[];for(let i=0;i+1<p.length;i+=2)pp.push({x:p[i]*W,y:p[i+1]*H});tkArcCanvas(g,pp,AR,s.k==='poly')}else for(let i=0;i+1<p.length;i+=2){const x=p[i]*W,yy=p[i+1]*H;if(i)g.lineTo(x,yy);else g.moveTo(x,yy)}}
         if(s.k==='poly'&&s.deduct){g.closePath();g.globalAlpha=.85;g.fillStyle='#fff';g.fill();g.setLineDash([M*.004,M*.003]);g.lineWidth=M*.002;g.stroke();g.setLineDash([]);let cx=0,cy=0;const n=p.length/2;for(let i=0;i<n;i++){cx+=p[2*i];cy+=p[2*i+1]}labels.push([lab('-'+num[it.id],s),cx/n*W,cy/n*H])}
         else if(s.k==='poly'){g.closePath();g.globalAlpha=.25;g.fill();g.globalAlpha=.8;g.lineWidth=M*.002;g.stroke();let cx=0,cy=0;const n=p.length/2;for(let i=0;i<n;i++){cx+=p[2*i];cy+=p[2*i+1]}labels.push([lab(num[it.id],s),cx/n*W,cy/n*H])}
         else{g.globalAlpha=tkdrGet().op==='def'?.55:tkMarkOp(false);const lw=scl&&+scl.fpp>0?Math.max(tkItemWidthIn(it)/12/scl.fpp*wmul,M*.0006,1.5):M*.0055*wmul;g.lineWidth=lw;g.lineCap='butt';g.lineJoin='miter';g.stroke();
@@ -6939,7 +7052,8 @@ async function tkMarkupPdf(){
 }
 /* ---- for Claude (or a script) working in the signed-in app page:
    await alphaTakeoff.load(jobId) -> data; alphaTakeoff.sheets(jobId) -> [{id,name,w,h,pw,ph}];
-   await alphaTakeoff.apply(jobId,[ops]) with ops like {t:'item',v:{id,code,desc,sec,unit,h,w,color}}, {t:'shape',v:{id,item,sheet,k:'line'|'poly'|'count',p:[...0-1],by:'Claude',deduct?:true}},
+   await alphaTakeoff.apply(jobId,[ops]) with ops like {t:'item',v:{id,code,desc,sec,unit,h,w,color}}, {t:'shape',v:{id,item,sheet,k:'line'|'poly'|'count',p:[...0-1],by:'Claude',deduct?:true,arc?:[m0,m1,..]}},
+   arcs: arc has one entry per point, [x,y] (0-1) = a point ON the arc between that point and the next (an area's last entry is the side back to the first point) or null = straight; the segment is the true circle arc through its two ends and that point (LF / SF use the true arc; layouts flatten it),
    framing: {t:'item',v:{id,code:'Ceiling framing',desc:'Ceiling joists',sec:'CEILINGS',unit:'LF',color,fr:{mem:'600S162-43',sp:16,trk:'600T150-43',trkAll:false,brc:'150U50-54 CRC',brMax:4,endJ:false,king:true,waste:0}}}
      then {t:'shape',v:{id,item,sheet,k:'frame',p:[area corners 0-1],o:[[opening corners 0-1],...],dir:'auto'|'edge'|'ang',edge:cornerIndex,ang:degrees,by:'Claude'}}
      (rows: joists + kings, track + headers, bridging, each LF; alphaTakeoff.frame(jobId,shapeId) -> {segs (feet),sum by role,lf,cnt {wire,clip,area},pre}),
