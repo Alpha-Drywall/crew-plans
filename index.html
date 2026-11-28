@@ -589,7 +589,7 @@ html.hc .tkscb,html.hc .tkscbar{border:2px solid #000}
 #tkStage[data-m=select]{cursor:default}
 #tkStage[data-m=select][data-h=mark]{cursor:pointer}
 #tkStage[data-m=select][data-h=sel]{cursor:move}
-#tkStage[data-m=select][data-h=corner]{cursor:crosshair}
+#tkStage[data-m=select][data-h=corner],#tkStage[data-m=pan][data-h=corner]{cursor:crosshair}
 #tkStage[data-m=gpick]{cursor:crosshair}
 #tkStage[data-g=box]{cursor:crosshair!important}
 #tkStage[data-g=corner]{cursor:crosshair!important}
@@ -5402,6 +5402,13 @@ function tkInsertCorner(p,seg,x,y){const q=(p||[]).slice();const n=Math.floor(q.
 function tkMoveCorner(p,i,x,y){const q=(p||[]).slice();if(i>=0&&2*i+1<q.length){q[2*i]=x;q[2*i+1]=y}return q}
 /* remove corner i, keeping at least min corners (2 for a line, 3 for an area); null when it can't */
 function tkDeleteCorner(p,i,min){const q=(p||[]).slice();const n=Math.floor(q.length/2);if(!(i>=0&&i<n)||n<=(min||2))return null;q.splice(2*i,2);return q}
+/* every corner / end on the sheet that sits on corner i of mark id (same spot within eps, normalized 0-1; counts and hidden items skipped), the corner itself first: [{id,i}].
+   Shift-drag moves all of them together, so connected walls stay connected. */
+function tkCoincident(shapes,sheet,id,i,eps,hide){
+  const me=(shapes||[]).find(s=>s.id===id);if(!me||!(me.p&&2*i+1<me.p.length))return [];const x=+me.p[2*i],y=+me.p[2*i+1],e=eps||2e-4,out=[{id,i}];
+  (shapes||[]).forEach(s=>{if(s.sheet!==sheet||s.k==='count'||(hide&&hide[s.item]))return;const q=s.p||[];for(let j=0;2*j+1<q.length;j++){if(s.id===id&&j===i)continue;if(Math.abs(q[2*j]-x)<=e&&Math.abs(q[2*j+1]-y)<=e)out.push({id:s.id,i:j})}});
+  return out;
+}
 /* copies of shapes moved by (dx,dy) (0-1 of the sheet) with new ids, points rounded like drawn ones */
 function tkOffsetShapes(shapes,dx,dy,mkId){
   const off=q=>(q||[]).map((v,i)=>Math.round((+v+(i%2?dy:dx))*10000)/10000);
@@ -5414,7 +5421,7 @@ function tkCopyShapes(data,fromSheet,toSheet,mkId,itemIds){
 /* ---- precise drawing (pure, tested in takeoff-test.js): snapping, ortho lock, end marks, live readout. Points here are image px {x,y}. ---- */
 /* every corner / end of the marks on one sheet: [{x,y,id,i}]; counts are not snap targets; hide = {itemId:true}; skip = {id,i} (the corner being dragged) */
 function tkSnapVerts(shapes,sheet,W,H,hide,skip){
-  const out=[];(shapes||[]).forEach(s=>{if(s.sheet!==sheet||s.k==='count'||(hide&&hide[s.item]))return;const q=s.p||[];for(let i=0;i+1<q.length;i+=2){if(skip&&skip.id===s.id&&skip.i===i/2)continue;out.push({x:+q[i]*W,y:+q[i+1]*H,id:s.id,i:i/2})}});
+  const out=[];(shapes||[]).forEach(s=>{if(s.sheet!==sheet||s.k==='count'||(hide&&hide[s.item]))return;const q=s.p||[];for(let i=0;i+1<q.length;i+=2){if(skip&&((skip.id===s.id&&skip.i===i/2)||(skip.all&&skip.all[s.id+':'+i/2])))continue;out.push({x:+q[i]*W,y:+q[i+1]*H,id:s.id,i:i/2})}});
   return out;
 }
 /* the point in vs nearest to p, closer than tol, or null */
@@ -5907,13 +5914,13 @@ function tkvTools(){
   const sn=$('#tkSnap');if(sn)sn.textContent='Snap: '+(TKV.snap?'on':'off');
   const wm=$('#tkWm');if(wm){wm.textContent='Lines '+(TKV.wmul||1)+'x';wm.title='Screen only: draws every line '+(TKV.wmul||1)+' times its real width so thin lines are easier to see. Each item\'s real width is set on the item (tap the item, Line width).'}
   const ob=$('#tkOrtho');if(ob){ob.classList.toggle('on',!!TKV.ortho);ob.setAttribute('aria-pressed',String(!!TKV.ortho))}
-  if(TKV.stage){const cs=tkdrGet().cur;TKV.stage.classList.toggle('tkxh',draw&&cs!=='arrow');TKV.stage.classList.toggle('tkar',draw&&cs==='arrow');TKV.stage.dataset.m=TKV.gpick?'gpick':TKV.mode;if(TKV.mode!=='select')TKV.stage.dataset.h=''}
+  if(TKV.stage){const cs=tkdrGet().cur;TKV.stage.classList.toggle('tkxh',draw&&cs!=='arrow');TKV.stage.classList.toggle('tkar',draw&&cs==='arrow');TKV.stage.dataset.m=TKV.gpick?'gpick':TKV.mode;if(TKV.mode!=='select'&&TKV.mode!=='pan')TKV.stage.dataset.h=''}
   $$('#tkv [data-lm]').forEach(b=>b.classList.toggle('on',TKV.mode==='draw'&&!!it&&b.dataset.lm===(it.unit==='EA'?'count':it.fr||it.unit==='SF'?'area':TKV.lm==='seg'?'seg':'run')));
   {const ls=$('#tkLay');if(ls){const on=TKV.mode==='draw'&&!!it&&(!!it.fr||it.unit==='SF');ls.hidden=!on;ls.value=it&&it.fr?tkLayPre(it.fr):'';ls.classList.toggle('on',!!(it&&it.fr));if(on&&!lsGet('acv.tipSeen.takeoffLayout')){clearTimeout(TKV.tipT);TKV.tipT=setTimeout(()=>{if(tkTipOk()&&!$('#tkLay').hidden)tipsFor('takeoffLayout')},1500)}}}
   tkScBan();const h=$('#tkHint');if(!h||!TKV.W)return;
   h.textContent=TKV.mode==='draw'&&TKV.cont?'Continuing the linear: click each next corner · Enter or right-click ■ Stop to finish · Esc cancels (the mark stays as it was)':
     TKV.mode==='draw'?(it?(it.fr?(TKV.dNext||TKV.dDraft?'Opening: click its corners inside a layout area (or drag a rectangle) · ✓ Finish':'Layout ('+TK_LAY_NAME[tkLayPre(it.fr)]+'): click the area\'s corners (click the first one or ✓ Finish to close) or drag a rectangle · Alt+drag = opening · right-click a layout area to turn the '+TK_LAY_RUN[tkLayPre(it.fr)]+' or edit'):it.unit==='LF'?(TKV.lm==='seg'?'Segments: click both ends of each wall piece · right-click for more · drag to move':'Click each corner along the wall · double-click or ✓ Finish to end the linear · Shift = level/plumb · right-click for more · drag to move'):it.unit==='SF'?(TKV.dNext?'Deduct: click the corners of the cut-out (or drag a rectangle) · ✓ Finish':'Area: click the corners (click the first one or ✓ Finish to close) or drag a rectangle · Alt+drag/click = deduct · space+drag to move'):'Click each item to count it · drag to move'):'Pick a takeoff item on the right'):
-    TKV.mode==='pan'?'Drag to move · wheel or pinch to zoom':TKV.mode==='select'?'Click a mark to select it · drag to move the sheet · drag a selected mark\'s corners to reshape · shift-click to pick several, shift+drag a box to pick an area · right-click (long-press) for more':TKV.mode==='scale'?'Click both ends of a dimension you know (they snap to line ends) · Shift = level/plumb':'Click points to measure (not saved) · ✓ Finish · Shift = level/plumb';
+    TKV.mode==='pan'?'Drag to move · wheel or pinch to zoom · click a mark to select it, then drag its points to reshape (Shift = connected points too)':TKV.mode==='select'?'Click a mark to select it · drag to move the sheet · drag a selected mark\'s points to reshape (Shift-drag moves connected ends too) · right-click a point to delete it · shift-click to pick several, shift+drag a box to pick an area · right-click (long-press) for more':TKV.mode==='scale'?'Click both ends of a dimension you know (they snap to line ends) · Shift = level/plumb':'Click points to measure (not saved) · ✓ Finish · Shift = level/plumb';
   h.style.display='block';
 }
 /* ---- takeoff items panel: By item | By sheet, search, and a pop-out window for a second monitor ---- */
@@ -6239,13 +6246,16 @@ function tkvLive(){
   }
   let hi='';if(TKV.hl)hi+=tkvHlSvg();
   {const ids=(TKV.msel||[]).filter(id=>id!==TKV.sel);let o='';ids.forEach(id=>{const sh=tkvShape(id);if(sh&&sh.sheet===TKV.id&&!TKV.hide[sh.item])o+=tkvMarkHi(tkvMarkPts(sh),sh.k!=='line',false)});
-    if(TKV.sel&&!TKV.box){const sh=tkvShape(TKV.sel);if(sh&&sh.sheet===TKV.id)o+=tkvMarkHi(tkvMarkPts(sh),sh.k!=='line',TKV.mode==='select'&&sh.k!=='count')}
+    if(TKV.sel&&!TKV.box){const sh=tkvShape(TKV.sel);if(sh&&sh.sheet===TKV.id)o+=tkvMarkHi(tkvMarkPts(sh),sh.k!=='line',(TKV.mode==='select'||TKV.mode==='pan')&&sh.k!=='count')}
     if(o)hi+='<g data-selmk="1" pointer-events="none">'+o+'</g>'}
   if(TKV.box&&TKV.box.l){const o=tkvOutline();s+='<polygon data-box="1" points="'+TKV.box.l.map(v=>v.x.toFixed(1)+','+v.y.toFixed(1)).join(' ')+'" fill="#1e88e5" fill-opacity=".08" stroke="#1e88e5" stroke-width="'+o.w+'" stroke-dasharray="'+o.d+'"/>'}
   else if(TKV.box){const a=TKV.box.a,b=TKV.box.b,o=tkvOutline();s+='<rect data-box="1" x="'+Math.min(a.x,b.x).toFixed(1)+'" y="'+Math.min(a.y,b.y).toFixed(1)+'" width="'+Math.abs(b.x-a.x).toFixed(1)+'" height="'+Math.abs(b.y-a.y).toFixed(1)+'" fill="#1e88e5" fill-opacity=".08" stroke="#1e88e5" stroke-width="'+o.w+'" stroke-dasharray="'+o.d+'"/>'}
   if(TKV.gpick&&TKV.gpick.a){const k=1/TKV.t.s,a=TKV.gpick.a,w=(1.6*k).toFixed(2);s+='<g data-gpick="1"><circle cx="'+a.x.toFixed(1)+'" cy="'+a.y.toFixed(1)+'" r="'+(7*k).toFixed(1)+'" fill="none" stroke="#ffab00" stroke-width="'+w+'"/>'+(TKV.cur?'<line x1="'+a.x.toFixed(1)+'" y1="'+a.y.toFixed(1)+'" x2="'+TKV.cur.x.toFixed(1)+'" y2="'+TKV.cur.y.toFixed(1)+'" stroke="#ffab00" stroke-width="'+w+'" stroke-dasharray="'+(6*k).toFixed(1)+' '+(4*k).toFixed(1)+'"/>':'')+'</g>'}
   g.innerHTML=s;{const sl=$('#tkSel');if(sl)sl.innerHTML=hi}tkvOverlay();
   const rd=$('#tkRead');if(!rd)return;const sc=tkScaleOf(TKV.id);
+  if(TKV.drag&&TKV.g&&TKV.g.type==='corner'){/* dragging a point: the mark's length / area as it is now */
+    const id=TKV.drag.m?TKV.g.corner.id:TKV.drag.id,sh0=tkvShape(id),np=sh0&&TKV.drag.m?TKV.drag.m[id]:TKV.drag.p,n=TKV.drag.m?Object.keys(TKV.drag.m).length:1;
+    if(sh0&&np){rd.textContent=tkvQtyText({...sh0,p:np})+(n>1?' · +'+(n-1)+' connected':'');rd.style.display='block';return}}
   if(!pts.length||(TKV.mode!=='draw'&&TKV.mode!=='measure'&&TKV.mode!=='scale')){rd.style.display='none';return}
   const np=[];pts.forEach(p=>np.push(p.x/W,p.y/H));let txt='';
   if(TKV.mode==='scale')txt=Math.round(tkLenPx(np,W,H))+' px — click the other end, then ✓ Finish';
@@ -6262,7 +6272,7 @@ function tkvSnapPt(p,skip){
   const m=TKV.mods||{},d=tkdrGet(),off=!TKV.snap||!!m.off;
   const vs=off?[]:tkSnapVerts(TK.data.shapes,TKV.id,TKV.W,TKV.H,TKV.hide,skip).concat(TKV.draft.slice(0,-1));
   const a=skip?skip.base||null:TKV.draft[TKV.draft.length-1]||null;
-  const r=tkSnapPick(p,a,{verts:vs,tol:(TK_SNAPPX[d.snapD]||10)/TKV.t.s,ortho:!!(TKV.ortho||m.shift),diag:d.diag,soft:TKV.snap&&!skip,off});
+  const r=tkSnapPick(p,a,{verts:vs,tol:(TK_SNAPPX[d.snapD]||10)/TKV.t.s,ortho:!!(TKV.ortho||(m.shift&&!(skip&&skip.noShift))),diag:d.diag,soft:TKV.snap&&!skip,off});
   TKV.snapHit=r.hit;TKV.snapHow=r.how;return r.p;
 }
 /* modifier keys while drawing: Shift = ortho, Ctrl/⌘ (Alt too, except in Area where Alt = deduct) = no snapping */
@@ -6340,10 +6350,10 @@ function tkvBind(){
     TKV.pts.set(e.pointerId,{x:e.clientX,y:e.clientY});tkvMods(e);
     if(TKV.pts.size===2){const [a,b]=[...TKV.pts.values()];TKV.g={type:'pinch',d0:Math.max(1,dist(a,b)),c0:mid(a,b),t0:Object.assign({},TKV.t)};clearTimeout(TKV.aimT);TKV.magOn=false;TKV.aim=null;if(TKV.box||TKV.drag){TKV.box=null;TKV.drag=null;tkvPaint(true)}else tkvOverlay()}
     else if(TKV.pts.size===1){const it=tkItem(TKV.item),btn=TKV.space?1:e.ctrlKey&&tkMac()?2:e.button,sm=TKV.mode==='select'&&!TKV.space&&e.button===0;
-      const cs=sm&&TKV.sel&&!e.shiftKey?tkvShape(TKV.sel):null,ci=cs&&cs.k!=='count'?tkvNearCorner(cs,tkvImg(e.clientX,e.clientY),12):-1;
+      const hm=(TKV.mode==='select'||TKV.mode==='pan')&&!TKV.space&&e.button===0,cs=hm&&TKV.sel?tkvShape(TKV.sel):null,ci=cs&&cs.k!=='count'&&cs.sheet===TKV.id?tkvNearCorner(cs,tkvImg(e.clientX,e.clientY),12):-1;
       TKV.g={type:'pan',sx:e.clientX,sy:e.clientY,t0:Object.assign({},TKV.t),moved:false,time:Date.now(),btn,alt:e.altKey,shift:e.shiftKey,
       rect:!TKV.space&&e.button===0&&!e.ctrlKey&&TKV.mode==='draw'&&tkPolyIt(it)&&!TKV.draft.length&&!!tkScaleOf(TKV.id),
-      corner:ci>=0?{id:cs.id,i:ci,p0:(cs.p||[]).slice()}:null,box:sm&&ci<0&&(e.shiftKey||e.metaKey||e.ctrlKey||e.altKey||!!TKV.boxNext||!!TKV.lassoNext),lasso:sm&&ci<0&&(e.altKey||!!TKV.lassoNext)};
+      corner:ci>=0?{id:cs.id,i:ci,p0:(cs.p||[]).slice(),sh:!!e.shiftKey,link:e.shiftKey?tkCoincident(TK.data.shapes,TKV.id,cs.id,ci,2e-4,TKV.hide).slice(1).map(t=>({id:t.id,i:t.i,p0:(tkvShape(t.id).p||[]).slice()})):[]}:null,box:sm&&ci<0&&(e.shiftKey||e.metaKey||e.ctrlKey||e.altKey||!!TKV.boxNext||!!TKV.lassoNext),lasso:sm&&ci<0&&(e.altKey||!!TKV.lassoNext)};
       if(sm&&ci<0&&!TKV.g.box){const hid=tkvHit(tkvImg(e.clientX,e.clientY)),ids=tkvSelIds();if(hid&&ids.includes(hid)){const m0={};ids.forEach(id=>{const x=tkvShape(id);if(x)m0[id]={p:(x.p||[]).slice(),o:x.o?x.o.map(q=>q.slice()):null,org:Array.isArray(x.org)?x.org.slice():null}});TKV.g.mv={m0,a:tkvImg(e.clientX,e.clientY)}}}
       TKV.boxNext=false;TKV.lassoNext=false;
       /* touch / pen while drawing: hold still a moment to aim (magnifier, slide to adjust, lift to place); a quick drag still moves the sheet */
@@ -6361,9 +6371,11 @@ function tkvBind(){
     if(g.type==='pinch'&&TKV.pts.size>=2){const [a,b]=[...TKV.pts.values()];const c=mid(a,b);const r=st.getBoundingClientRect();const s=clamp(g.t0.s*dist(a,b)/g.d0,TKV.minS,6);const ix=(g.c0.x-r.left-g.t0.x)/g.t0.s,iy=(g.c0.y-r.top-g.t0.y)/g.t0.s;TKV.t={s,x:c.x-r.left-ix*s,y:c.y-r.top-iy*s};tkvT()}
     else if(g.type==='aim'){tkvAimSet(e,true);if(far(5)&&!g.aimMoved){g.aimMoved=true;clearTimeout(TKV.lp)}tkvHover()}
     else if(g.mv&&(g.type==='move'||far(4))){clearTimeout(TKV.lp);g.type='move';g.moved=true;const b=tkvImg(e.clientX,e.clientY),dx=(b.x-g.mv.a.x)/TKV.W,dy=(b.y-g.mv.a.y)/TKV.H,sh=q=>q.map((v,i)=>v+(i%2?dy:dx)),m={};Object.keys(g.mv.m0).forEach(id=>m[id]=sh(g.mv.m0[id].p));g.mv.dx=dx;g.mv.dy=dy;TKV.drag={m};tkvPaint(true)}
-    else if(g.corner&&(g.type==='corner'||far(4))){clearTimeout(TKV.lp);g.type='corner';g.moved=true;const cp=g.corner.p0,bj=g.corner.i>0?g.corner.i-1:g.corner.i+1,base=2*bj+1<cp.length?{x:cp[2*bj]*TKV.W,y:cp[2*bj+1]*TKV.H}:null;
-      const q=tkvSnapPt(tkvImg(e.clientX,e.clientY),{id:g.corner.id,i:g.corner.i,base});TKV.aimPt=q;if(e.pointerType!=='mouse'){tkvAimSet(e,true);TKV.magOn=true}
-      TKV.drag={id:g.corner.id,p:tkMoveCorner(g.corner.p0,g.corner.i,clamp(q.x,0,TKV.W)/TKV.W,clamp(q.y,0,TKV.H)/TKV.H)};tkvPaint(true)}
+    else if(g.corner&&(g.type==='corner'||far(4))){clearTimeout(TKV.lp);g.type='corner';g.moved=true;const cp=g.corner.p0,bj=g.corner.i>0?g.corner.i-1:g.corner.i+1,base=2*bj+1<cp.length?{x:cp[2*bj]*TKV.W,y:cp[2*bj+1]*TKV.H}:null,lk=g.corner.link||[],all={};lk.forEach(t=>all[t.id+':'+t.i]=1);
+      const q=tkvSnapPt(tkvImg(e.clientX,e.clientY),{id:g.corner.id,i:g.corner.i,base,all,noShift:!!g.corner.sh});TKV.aimPt=q;if(e.pointerType!=='mouse'){tkvAimSet(e,true);TKV.magOn=true}
+      const nx=clamp(q.x,0,TKV.W)/TKV.W,ny=clamp(q.y,0,TKV.H)/TKV.H;
+      if(lk.length){const m={};m[g.corner.id]=tkMoveCorner(cp,g.corner.i,nx,ny);lk.forEach(t=>{m[t.id]=tkMoveCorner(m[t.id]||t.p0,t.i,nx,ny)});TKV.drag={m}}
+      else TKV.drag={id:g.corner.id,p:tkMoveCorner(cp,g.corner.i,nx,ny)};tkvPaint(true)}
     else if(g.box&&(g.type==='box'||far(6))){clearTimeout(TKV.lp);if(g.type!=='box')tkCtxClose();g.type='box';g.moved=true;const pb=tkvImg(e.clientX,e.clientY);if(g.lasso){if(!TKV.box||!TKV.box.l)TKV.box={l:[tkvImg(g.sx,g.sy)]};const L=TKV.box.l,q=L[L.length-1];if(Math.hypot(pb.x-q.x,pb.y-q.y)*TKV.t.s>3)L.push(pb)}else TKV.box={a:tkvImg(g.sx,g.sy),b:pb};tkvLive()}
     else if(g.type==='rect'||(g.type==='pan'&&g.rect&&far(10))){
       clearTimeout(TKV.lp);if(g.type!=='rect'){g.type='rect';g.a=tkvSnapPt(tkvImg(g.sx,g.sy));TKV.dDraft=!!(g.alt||e.altKey||TKV.dNext)}
@@ -6374,8 +6386,8 @@ function tkvBind(){
     if(!TKV||!TKV.pts.has(e.pointerId))return;TKV.pts.delete(e.pointerId);clearTimeout(TKV.lp);clearTimeout(TKV.aimT);if(e.pointerType!=='mouse'){TKV.magOn=false;TKV.aim=null}const g=TKV.g;if(!g){tkvOverlay();return}
     if(g.type==='pinch'){if(TKV.pts.size===1){const [a]=[...TKV.pts.values()];TKV.g={type:'pan',sx:a.x,sy:a.y,t0:Object.assign({},TKV.t),moved:true,time:0}}else if(!TKV.pts.size)TKV.g=null;return}
     TKV.g=null;if(TKV.skipTap){TKV.skipTap=false;TKV.drag=null;TKV.box=null;tkvPaint(true);return}
-    if(g.type==='move'){TKV.drag=null;const mv=g.mv;if(e.type!=='pointercancel'&&(mv.dx||mv.dy)){const r4=v=>Math.round(v*1e4)/1e4,sh=q=>q.map((v,i)=>r4(v+(i%2?mv.dy:mv.dx)));tkDo(Object.keys(mv.m0).map(id=>{const z=mv.m0[id],v={id,p:sh(z.p)};if(z.o)v.o=z.o.map(sh);if(z.org)v.org=sh(z.org);return {t:'shape',v}}));toast('Moved '+Object.keys(mv.m0).length+' mark'+(Object.keys(mv.m0).length===1?'':'s')+' · drag them back to undo')}tkvPaint();return}
-    if(g.type==='corner'){const dr=TKV.drag;TKV.drag=null;if(dr&&e.type!=='pointercancel')tkDo({t:'shape',v:{id:dr.id,p:dr.p.map(v=>r4(v))}});tkvPaint();return}
+    if(g.type==='move'){TKV.drag=null;const mv=g.mv;if(e.type!=='pointercancel'&&(mv.dx||mv.dy)){const r4=v=>Math.round(v*1e4)/1e4,sh=q=>q.map((v,i)=>r4(v+(i%2?mv.dy:mv.dx)));tkvEditDo(Object.keys(mv.m0).map(id=>{const z=mv.m0[id],v={id,p:sh(z.p)};if(z.o)v.o=z.o.map(sh);if(z.org)v.org=sh(z.org);return {t:'shape',v}}));toast('Moved '+Object.keys(mv.m0).length+' mark'+(Object.keys(mv.m0).length===1?'':'s')+' · Ctrl+Z undoes')}tkvPaint();return}
+    if(g.type==='corner'){const dr=TKV.drag;TKV.drag=null;if(dr&&e.type!=='pointercancel'){const ops=dr.m?Object.keys(dr.m).map(id=>({t:'shape',v:{id,p:dr.m[id].map(v=>r4(v))}})):[{t:'shape',v:{id:dr.id,p:dr.p.map(v=>r4(v))}}];tkvEditDo(ops);if(ops.length>1)toast('Moved the point and '+(ops.length-1)+' connected mark'+(ops.length>2?'s':'')+' · Ctrl+Z undoes')}tkvPaint();return}
     if(g.type==='box'){const b=TKV.box;TKV.box=null;if(b&&e.type!=='pointercancel'){if(b.l)tkvLassoSel(b.l,g.shift||e.shiftKey);else tkvBoxSel(b,g.shift||e.shiftKey)}else tkvLive();return}
     if(g.type==='rect'){const q=TKV.draft;if(e.type==='pointercancel'||q.length!==4||Math.abs(q[2].x-q[0].x)*TKV.t.s<6||Math.abs(q[2].y-q[0].y)*TKV.t.s<6){TKV.draft=[];TKV.dDraft=false;tkvLive();tkvTools()}else tkvFinish();return}
     if(g.type==='aim'){if(!g.long&&e.type!=='pointercancel')tkvTap(e.clientX,e.clientY,false,false);else tkvOverlay();return}
@@ -6399,9 +6411,9 @@ function tkvBind(){
   /* cursors (CSS from data-m / data-h / data-g): hover in select mode (rAF-throttled) and the gesture under way */
   st.addEventListener('pointermove',e=>{if(!TKV||!TKV.W)return;const g=TKV.g;
     if(TKV.pts.has(e.pointerId)){st.dataset.g=!g?'':g.type==='box'?'box':g.type==='corner'?'corner':g.type==='move'||(g.type==='pan'&&g.moved)?'grab':'';return}
-    if(e.pointerType==='touch'||TKV.mode!=='select'||TKV.gpick||TKV.hovF)return;const cx=e.clientX,cy=e.clientY;
+    if(e.pointerType==='touch'||(TKV.mode!=='select'&&TKV.mode!=='pan')||TKV.gpick||TKV.hovF)return;const cx=e.clientX,cy=e.clientY;
     TKV.hovF=requestAnimationFrame(()=>{if(!TKV)return;TKV.hovF=0;const p=tkvImg(cx,cy),cs=TKV.sel&&tkvShape(TKV.sel);let h='';
-      if(cs&&cs.k!=='count'&&tkvNearCorner(cs,p,12)>=0)h='corner';else{const id=tkvHit(p);if(id)h=tkvSelIds().includes(id)?'sel':'mark'}
+      if(cs&&cs.k!=='count'&&tkvNearCorner(cs,p,12)>=0)h='corner';else if(TKV.mode==='select'){const id=tkvHit(p);if(id)h=tkvSelIds().includes(id)?'sel':'mark'}
       if(st.dataset.h!==h)st.dataset.h=h})});
   const gEnd=()=>{st.dataset.g=''};st.addEventListener('pointerup',gEnd);st.addEventListener('pointercancel',gEnd);
   window.addEventListener('keydown',tkvKey);window.addEventListener('keyup',tkvKeyUp);
@@ -6426,7 +6438,8 @@ function tkvKey(e){
   if(e.key==='Enter'){e.preventDefault();tkvFinish()}
   else if(e.key==='Escape'){if(TKV.draft.length)tkvCancel();else if(TKV.dNext){TKV.dNext=false;tkvTools()}else if(TKV.sel||TKV.msel.length){TKV.sel=null;TKV.msel=[];tkvPaint()}}
   else if(e.key==='Backspace'||e.key==='Delete'){if(TKV.draft.length){e.preventDefault();tkvUndoPt()}else if(tkvSelIds().length){e.preventDefault();tkvDelMarks(tkvSelIds())}}
-  else if(k==='z'&&mod){e.preventDefault();tkvUndoPt()}
+  else if(k==='z'&&mod){e.preventDefault();if(e.shiftKey)tkvHistStep(true);else if(TKV.draft.length)tkvUndoPt();else tkvHistStep(false)}
+  else if(k==='y'&&mod){e.preventDefault();tkvHistStep(true)}
   else if(k==='c'&&mod){const ids=tkvSelIds();if(ids.length){e.preventDefault();tkvCopyMarks(ids)}}
   else if(k==='v'&&mod){if(TK_CLIP&&TK_CLIP.length){e.preventDefault();const m=TKV.mouse,r=TKV.stage.getBoundingClientRect();tkvPaste(m&&m.x>=r.left&&m.x<=r.right&&m.y>=r.top&&m.y<=r.bottom?tkvImg(m.x,m.y):null)}}
 }
@@ -6505,9 +6518,9 @@ function tkvNearSeg(s,p){
 function tkvNearCorner(s,p,tol){const q=s.p||[];let bi=-1,bd=tol/TKV.t.s;for(let i=0;i+1<q.length;i+=2){const d=Math.hypot(q[i]*TKV.W-p.x,q[i+1]*TKV.H-p.y);if(d<bd){bd=d;bi=i/2}}return bi}
 function tkvAddCorner(id,p0){
   const s=tkvShape(id);if(!s||s.k==='count')return;if(tkvNearCorner(s,p0,12)>=0)return;const ns=tkvNearSeg(s,p0);if(!ns||ns.d>14/TKV.t.s)return;
-  tkDo({t:'shape',v:{id,p:tkInsertCorner(s.p,ns.seg,r4(ns.x/TKV.W),r4(ns.y/TKV.H))}});TKV.sel=id;TKV.msel=[id];tkvPaint();toast('Corner added. Drag it to move.');
+  tkvEditDo({t:'shape',v:{id,p:tkInsertCorner(s.p,ns.seg,r4(ns.x/TKV.W),r4(ns.y/TKV.H))}});TKV.sel=id;TKV.msel=[id];tkvPaint();toast('Point added. Drag it to move.');
 }
-function tkvDelCorner(id,i){const s=tkvShape(id);if(!s)return;const q=tkDeleteCorner(s.p,i,s.k==='poly'||s.k==='frame'?3:2);if(!q){toast(s.k!=='line'?'An area needs at least 3 corners.':'A line needs at least 2 ends.');return}tkDo({t:'shape',v:{id,p:q}});tkvPaint()}
+function tkvDelCorner(id,i){const s=tkvShape(id);if(!s)return;const q=tkDeleteCorner(s.p,i,s.k==='poly'||s.k==='frame'?3:2);if(!q){toast(s.k!=='line'?'An area needs at least 3 points.':'A line needs at least 2 points.');return}tkvEditDo({t:'shape',v:{id,p:q}});tkvPaint()}
 /* where "Split here" would cut a line mark: the two parts, or null when the point is at an end */
 function tkvSplitAt(s,p0){
   if(!s||s.k!=='line')return null;const ns=tkvNearSeg(s,p0);if(!ns||ns.d>14/TKV.t.s)return null;const r=tkSplitLine(s.p,ns.seg,r4(ns.x/TKV.W),r4(ns.y/TKV.H));if(!r)return null;
@@ -6558,12 +6571,23 @@ async function tkvSetNote(id){
 }
 function tkMac(){return /Mac|iP(hone|ad|od)/.test(navigator.platform||'')}
 function tkvQtyText(s){const it=tkItem(s.item),q=tkShapeQty(s,TKV.sh,tkScaleOf(TKV.id),it);if(s.k==='frame'){const r=q==null?null:tkFrameOf(s,TKV.sh,tkScaleOf(TKV.id),it&&it.fr);return r?tkFrText(r.sum,it,r.cnt)+' · '+Math.ceil(r.lf).toLocaleString()+' LF':'no scale on this sheet'}return s.k==='count'?'1 EA':q==null?'no scale on this sheet':s.k==='poly'?(s.deduct?'deduct ':'')+Math.round(q).toLocaleString()+' SF':tkFtIn(q)+' ('+(Math.round(q*10)/10)+' LF)'}
+/* point / move edits go through here so Ctrl+Z / Ctrl+Y (or Shift+Ctrl+Z) can take them back: ops are tkDo shape ops; the shape's old values for the same keys are kept for undo.
+   Undo and redo are tkDo ops too, so they save and sync to the other windows like any edit. */
+function tkvEditDo(ops){
+  ops=[].concat(ops);const bef=[];
+  ops.forEach(o=>{if(o.t!=='shape')return;const s=TK.data.shapes.find(x=>x.id===o.v.id);if(!s)return;const b={id:s.id};Object.keys(o.v).forEach(k=>{if(k!=='id')b[k]=s[k]===undefined?null:s[k]});bef.push({t:'shape',v:b})});
+  tkDo(ops);const H=TKV.hist||(TKV.hist={u:[],r:[]});H.u.push({b:bef,a:ops});if(H.u.length>200)H.u.shift();H.r=[];
+}
+function tkvHistStep(redo){
+  const H=TKV&&TKV.hist,e=H&&(redo?H.r:H.u).pop();if(!e){toast(redo?'Nothing to redo.':'Nothing to undo.');return}
+  tkDo(redo?e.a:e.b);(redo?H.u:H.r).push(e);TKV.drag=null;tkvPaint();toast(redo?'Redone.':'Undone.');
+}
 function tkvUndoPt(){if(!TKV||!TKV.draft.length||(TKV.cont&&TKV.draft.length<=TKV.contN))return;TKV.draft.pop();tkvLive();tkvTools()}
 /* right-click (or long-press on a tablet) menu on the sheet, at the cursor. Never adds a point. Only shows what applies here; sub = a list of items to pick from. */
 function tkCtxClose(){const m=$('#tkCtx');if(m)m.remove();document.removeEventListener('pointerdown',tkCtxOut,true)}
 function tkCtxOut(e){const m=$('#tkCtx');if(!m||m.contains(e.target))return;if(TKV&&TKV.stage&&TKV.stage.contains(e.target))TKV.skipTap=true;tkCtxClose()}
 function tkCtx(cx,cy,sub){
-  if(!TKV||!TKV.W)return;tkCtxClose();TKV.ctxAt=Date.now();const p0=tkvImg(cx,cy),it=tkItem(TKV.item),dr=TKV.draft.length,draw=TKV.mode==='draw',sel=TKV.mode==='select';
+  if(!TKV||!TKV.W)return;tkCtxClose();TKV.ctxAt=Date.now();const p0=tkvImg(cx,cy),it=tkItem(TKV.item),dr=TKV.draft.length,draw=TKV.mode==='draw',sel=TKV.mode==='select'||TKV.mode==='pan';
   const hit=tkvHit(p0),hs=tkvShape(hit),hit_it=hs&&tkItem(hs.item),last=TKV.mine.slice().reverse().find(id=>TK.data.shapes.some(s=>s.id===id&&s.sheet===TKV.id));
   /* right-click on a mark selects it (same look as a left-click select) unless it is already part of the selection */
   if(!sub&&hit&&hs&&!dr&&!TKV.gpick&&!tkvSelIds().includes(hit)){TKV.sel=hit;TKV.msel=[hit];tkvPaint()}
@@ -6593,8 +6617,8 @@ function tkCtx(cx,cy,sub){
     sep();
     if(hs&&hit_it&&!dr&&!(many&&ids.includes(hit))){
       const own=sel&&hit===TKV.sel&&hs.k!=='count',ci=own?tkvNearCorner(hs,p0,12):-1,ns=own&&ci<0?tkvNearSeg(hs,p0):null;
-      add('dcorner','Delete corner',ci>=0&&(hs.p||[]).length/2>(hs.k==='line'?2:3));
-      add('acorner','Add corner here',!!ns&&ns.d<14/TKV.t.s);
+      add('dcorner','Delete point',ci>=0&&(hs.p||[]).length/2>(hs.k==='line'?2:3));
+      add('acorner','Add point here',!!ns&&ns.d<14/TKV.t.s);
       add('split','✂ Split here',hs.k==='line'&&!!tkvSplitAt(hs,p0));
       if(hs.k==='frame'){const es=tkvNearSeg(hs,p0),oi=(hs.o||[]).findIndex(o=>tkInPoly(p0,o,TKV.W,TKV.H));
         const RN=TK_LAY_RUN[tkLayPre(hit_it.fr)],RU=RN.charAt(0).toUpperCase()+RN.slice(1);
