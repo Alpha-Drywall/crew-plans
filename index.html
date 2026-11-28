@@ -5531,6 +5531,23 @@ function tkEnds(p,W,H){
   const mk=(i,j)=>{const x=q[2*i]*W,y=q[2*i+1]*H,dx=x-q[2*j]*W,dy=y-q[2*j+1]*H,l=Math.hypot(dx,dy);return l?{x,y,ux:dx/l,uy:dy/l}:{x,y,ux:1,uy:0}};
   return [mk(0,1),mk(n-1,n-2)];
 }
+/* Extend line: which END of an open line (p = 0-1 pairs) is within tol image px of pt: 'start' | 'end' | null (the nearer one when both are) */
+function tkEndPick(p,W,H,pt,tol){
+  const q=(p||[]).map(Number),n=Math.floor(q.length/2);if(n<2||!pt)return null;
+  const a=Math.hypot(q[0]*W-pt.x,q[1]*H-pt.y),b=Math.hypot(q[2*n-2]*W-pt.x,q[2*n-1]*H-pt.y);
+  if(a>tol&&b>tol)return null;return a<b?'start':'end';
+}
+/* Extend line: the line's points (0-1 pairs) and arcs after added corners (0-1 pairs, in the order they were drawn away from that end) are joined on at its start or end. Same points, same arcs on the old segments (shifted when corners go on the front); consecutive duplicate corners dropped. -> {p,arc,added} */
+function tkExtendLine(p,arc,added,atStart){
+  const q=(p||[]).map(Number),n=Math.floor(q.length/2),ad=[];
+  for(let i=0;i+1<(added||[]).length;i+=2){const x=+added[i],y=+added[i+1],px=ad.length?ad[ad.length-2]:atStart?q[0]:q[2*n-2],py=ad.length?ad[ad.length-1]:atStart?q[1]:q[2*n-1];if(Math.abs(x-px)<1e-6&&Math.abs(y-py)<1e-6)continue;ad.push(x,y)}
+  const k=ad.length/2,old=[];for(let i=0;i<n-1;i++)old.push(arc&&arc[i]?[arc[i][0],arc[i][1]]:null);
+  if(!k)return {p:q.slice(),arc:arc||null,added:0};
+  let np,na;
+  if(atStart){const r=[];for(let i=ad.length-2;i>=0;i-=2)r.push(ad[i],ad[i+1]);np=r.concat(q);na=new Array(k).fill(null).concat(old)}
+  else{np=q.concat(ad);na=old.concat(new Array(k).fill(null))}
+  na.push(null);return {p:np,arc:na.some(Boolean)?na:null,added:k};
+}
 /* the mark at one end e: 'ticks' = a short line square across the end (half = its half length), 'arrows' = a filled arrowhead pointing out, 'dots' = a small dot,
    'squares' = a small white square with a dark edge centered on the end (PlanSwift; a = its half side) */
 function tkEndMark(e,style,half){
@@ -6000,7 +6017,7 @@ function tkvTools(){
   $$('#tkv [data-lm]').forEach(b=>b.classList.toggle('on',TKV.mode==='draw'&&!!it&&b.dataset.lm===(it.unit==='EA'?'count':it.fr||it.unit==='SF'?'area':TKV.lm==='seg'?'seg':'run')));
   {const ls=$('#tkLay');if(ls){const on=TKV.mode==='draw'&&!!it&&(!!it.fr||it.unit==='SF');ls.hidden=!on;ls.value=it&&it.fr?tkLayPre(it.fr):'';ls.classList.toggle('on',!!(it&&it.fr));if(on&&!lsGet('acv.tipSeen.takeoffLayout')){clearTimeout(TKV.tipT);TKV.tipT=setTimeout(()=>{if(tkTipOk()&&!$('#tkLay').hidden)tipsFor('takeoffLayout')},1500)}}}
   tkScBan();const h=$('#tkHint');if(!h||!TKV.W)return;
-  h.textContent=TKV.mode==='draw'&&TKV.cont?'Continuing the linear: click each next corner · Enter or right-click ■ Stop to finish · Esc cancels (the mark stays as it was)':
+  h.textContent=TKV.mode==='draw'&&TKV.cont?'Extending the line: click each next corner · ✓ Finish, double-click or Enter saves it (Ctrl+Z takes the added corners back) · Esc cancels (the line stays as it was)':
     TKV.mode==='draw'?(it?(it.fr?(TKV.dNext||TKV.dDraft?'Opening: click its corners inside a layout area (or drag a rectangle) · ✓ Finish':'Layout ('+TK_LAY_NAME[tkLayPre(it.fr)]+'): click the area\'s corners (click the first one or ✓ Finish to close) or drag a rectangle · Alt+drag = opening · right-click a layout area to turn the '+TK_LAY_RUN[tkLayPre(it.fr)]+' or edit'):it.unit==='LF'?(TKV.lm==='seg'?'Segments: click both ends of each wall piece · right-click for more · drag to move':'Click each corner along the wall · double-click or ✓ Finish to end the linear · Shift = level/plumb · right-click for more · drag to move'):it.unit==='SF'?(TKV.dNext?'Deduct: click the corners of the cut-out (or drag a rectangle) · ✓ Finish':'Area: click the corners (click the first one or ✓ Finish to close) or drag a rectangle · Alt+drag/click = deduct · space+drag to move'):'Click each item to count it · drag to move'):'Pick a takeoff item on the right'):
     TKV.mode==='pan'?'Drag to move · wheel or pinch to zoom · click a mark to select it, then drag its points to reshape (Shift = connected points too)':TKV.mode==='select'?'Click a mark to select it · drag its points to reshape (Shift-drag = connected ends too) · double-click the middle of a side = arc · shift-click to pick several · right-click for more':TKV.mode==='scale'?'Click both ends of a dimension you know (they snap to line ends) · Shift = level/plumb':'Click points to measure (not saved) · ✓ Finish · Shift = level/plumb';
   h.style.display='block';
@@ -6562,6 +6579,7 @@ function tkvTap(cx,cy,alt,shift){
   if(TKV.mode==='select'){tkvSelTap(p0,shift);return}
   const it=tkItem(TKV.item);
   if(TKV.mode==='draw'){
+    if(tkvEndTap(p0))return;
     if(!it){toast('Pick a takeoff item first.');return}
     if(!tkScaleOf(TKV.id)&&it.unit!=='EA'){tkScaleBox();return}
     if(it.unit==='EA'){tkvCountAt(it.id,p0);return}
@@ -6651,14 +6669,19 @@ function tkvLastLine(){
   const m=TKV.mine.slice().reverse().map(tkvShape).find(s=>s&&s.k==='line'&&s.sheet===TKV.id&&tkItem(s.item));if(m)return m;
   return TK.data.shapes.filter(s=>s.sheet===TKV.id&&s.k==='line'&&tkItem(s.item)&&!TKV.hide[s.item]).sort((a,b)=>String(a.at||'').localeCompare(String(b.at||''))).pop()||null;
 }
-/* keep drawing a finished line from its end nearest p0; Stop saves the longer line on the same mark */
-function tkvContinue(id,p0){
+/* Extend line: pick a finished line back up from its end (which = 'start' | 'end', else the end nearest p0); the next clicks add corners to the SAME mark (same id and item, arcs kept), Finish / double-click / Enter saves it (one undo step: Ctrl+Z removes just the added corners), Esc cancels back to the selected line */
+function tkvContinue(id,p0,which){
   const s=tkvShape(id);if(!s||s.k!=='line'||!tkItem(s.item))return;if(TKV.draft.length)tkvFinish();
   const W=TKV.W,H=TKV.H,q=s.p||[],n=Math.floor(q.length/2),pts=[];for(let i=0;i<n;i++)pts.push({x:q[2*i]*W,y:q[2*i+1]*H});if(n<2)return;
-  if(p0&&Math.hypot(pts[0].x-p0.x,pts[0].y-p0.y)<Math.hypot(pts[n-1].x-p0.x,pts[n-1].y-p0.y))pts.reverse();
-  TKV.mode='draw';TKV.sel=null;TKV.msel=[];tkvUseItem(s.item);TKV.cont=id;TKV.contN=n;TKV.draft=pts;TKV.cur=null;tkvPaint();
+  const rev=which?which==='start':!!(p0&&Math.hypot(pts[0].x-p0.x,pts[0].y-p0.y)<Math.hypot(pts[n-1].x-p0.x,pts[n-1].y-p0.y));if(rev)pts.reverse();
+  TKV.mode='draw';TKV.contSel=TKV.sel===id||tkvSelIds().includes(id);TKV.sel=null;TKV.msel=[];tkvUseItem(s.item);TKV.cont=id;TKV.contN=n;TKV.contRev=rev;TKV.draft=pts;TKV.cur=null;tkvPaint();
 }
-function tkvCancel(){if(!TKV)return;const c=TKV.cont;TKV.draft=[];TKV.cur=null;TKV.dDraft=false;TKV.cont=null;TKV.contN=0;if(c)tkvPaint();else{tkvLive();tkvTools()}}
+/* a left click in Take off on an end handle of the selected line picks it back up (Extend line); true when it did */
+function tkvEndTap(p0){
+  const s=TKV.sel&&!TKV.draft.length&&!TKV.cont?tkvShape(TKV.sel):null;if(!s||s.k!=='line'||s.sheet!==TKV.id||!tkItem(s.item)||TKV.hide[s.item])return false;
+  const w=tkEndPick(tkvMarkPts(s),TKV.W,TKV.H,p0,12/TKV.t.s);if(!w)return false;tkvContinue(s.id,p0,w);return true;
+}
+function tkvCancel(){if(!TKV)return;const c=TKV.cont,sl=TKV.contSel;TKV.draft=[];TKV.cur=null;TKV.dDraft=false;TKV.cont=null;TKV.contN=0;TKV.contRev=false;TKV.contSel=false;if(c){if(sl&&tkvShape(c)){TKV.sel=c;TKV.msel=[c]}tkvPaint()}else{tkvLive();tkvTools()}}
 function tkvCountAt(iid,p0){const it=tkItem(iid);if(!it)return;const id=uuid();tkDo({t:'shape',v:{id,item:iid,sheet:TKV.id,k:'count',p:[r4(p0.x/TKV.W),r4(p0.y/TKV.H)],by:'office',at:new Date().toISOString()}});TKV.mine.push(id);tkvPaint()}
 function tkvDelMarks(ids){if(!ids.length)return;tkDo(ids.map(id=>({t:'del_shape',id})));TKV.mine=TKV.mine.filter(x=>!ids.includes(x));TKV.sel=null;TKV.msel=[];tkvPaint()}
 /* copied marks, kept when you go to another sheet */
@@ -6727,7 +6750,7 @@ function tkCtx(cx,cy,sub){
     sep();
     add('newm','New measurement here',draw&&!!it&&it.unit!=='EA');
     const cl=!dr?(hs&&hs.k==='line'?hs:tkvLastLine()):null;
-    add('cont',hs&&hs.k==='line'?'Continue this linear':'Continue last linear',!!cl);
+    add('cont',hs&&hs.k==='line'?'Extend line':'Continue last linear',!!cl);
     add('deduct',it&&it.fr?(TKV.dNext?'Opening: on (next area is an opening) → off':'Draw an opening (cut-out)'):TKV.dNext?'Deduct: on (next area is a cut-out) → off':'Deduct area (cut-out)',draw&&tkPolyIt(it)&&!dr);
     add('count',eas.length===1?'Count here: '+esc(eas[0].code):'Count here ▸',eas.length>0);
     sep();
@@ -6829,12 +6852,15 @@ function tkCtx(cx,cy,sub){
   });
 }
 async function tkvFinish(){
-  if(!TKV)return;const d=TKV.draft,cont=TKV.cont;TKV.draft=[];TKV.cur=null;TKV.cont=null;TKV.contN=0;tkvLive();tkvTools();
+  if(!TKV)return;const d=TKV.draft,cont=TKV.cont,cN=TKV.contN,cRev=TKV.contRev,cSel=TKV.contSel;TKV.draft=[];TKV.cur=null;TKV.cont=null;TKV.contN=0;TKV.contRev=false;TKV.contSel=false;tkvLive();tkvTools();
   const np=[];d.forEach(p=>np.push(r4(p.x/TKV.W),r4(p.y/TKV.H)));
   if(TKV.mode==='scale'){if(d.length<2)return;tkScaleBox(tkLenPx(d.flatMap(p=>[p.x/TKV.W,p.y/TKV.H]),TKV.W,TKV.H));return}
   if(TKV.mode==='measure'){if(d.length<2)return;const sc=tkScaleOf(TKV.id);toast(sc?'Measured '+tkFtIn(tkLenPx(np,TKV.W,TKV.H)*sc.fpp):'Set the scale first.');return}
   if(TKV.mode!=='draw'){if(cont)tkvPaint();return}const it=tkItem(TKV.item);if(!it){if(cont)tkvPaint();return}
-  if(cont&&it.unit==='LF'&&tkvShape(cont)&&d.length>=2){tkDo({t:'shape',v:{id:cont,item:it.id,p:np}});TKV.mine=TKV.mine.filter(x=>x!==cont);TKV.mine.push(cont);tkvPaint();return}
+  if(cont&&it.unit==='LF'&&tkvShape(cont)&&d.length>=2){const sh=tkvShape(cont),ex=tkExtendLine(sh.p,sh.arc,np.slice(2*cN),cRev);
+    if(!ex.added){if(cSel){TKV.sel=cont;TKV.msel=[cont]}tkvPaint();return}
+    const v={id:cont,p:ex.p.map(r4)};if(ex.arc||sh.arc)v.arc=ex.arc;tkvEditDo({t:'shape',v});/* same mark, one undo step: Ctrl+Z takes the added corners back */
+    TKV.mine=TKV.mine.filter(x=>x!==cont);TKV.mine.push(cont);TKV.sel=cont;TKV.msel=[cont];tkvPaint();toast('Line extended · Ctrl+Z undoes');return}
   if(cont)tkvPaint();
   if(it.unit==='LF'&&!it.fr&&d.length<2)return;if(tkPolyIt(it)&&d.length<3){if(d.length)toast('An area needs at least 3 corners.');return}
   if(it.fr&&TKV.dDraft){TKV.dDraft=false;TKV.dNext=false;let cx=0,cy=0;d.forEach(p=>{cx+=p.x;cy+=p.y});const c={x:cx/d.length,y:cy/d.length};
