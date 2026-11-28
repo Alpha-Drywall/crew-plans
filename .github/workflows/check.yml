@@ -39,3 +39,5 @@ jobs:
         run: node .github/scripts/bids-test.js
       - name: Test bid In for review, lookahead job remove / undo, phone job-tab rows (Field / Office)
         run: node .github/scripts/office-review-test.js
+      - name: Test the tips (every step has a selector, English and Spanish; every screen that shows tips has them)
+        run: node .github/scripts/tips-test.js

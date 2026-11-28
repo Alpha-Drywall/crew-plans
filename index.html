@@ -1748,7 +1748,7 @@ function render(){
   {const nb=nudgeBanner();const tb=$('#tabBody');if(nb&&tb&&!$('#nudgeCard',tb)){tb.insertAdjacentHTML('afterbegin',nb);const g=$('#nudgeGo');if(g)g.onclick=()=>{S.tab='progress';window.scrollTo(0,0);render()}}}
   matPaint();
   tmNagSync();
-  clearTimeout(S.tipT);S.tipT=setTimeout(()=>{if(S.view==='job'&&!V)tipsFor(S.tab==='plans'?'job':S.tab)},1200);
+  clearTimeout(S.tipT);S.tipT=setTimeout(()=>{if(S.view==='job'&&!V&&(S.tab!=='takeoff'||tkTipOk()))tipsFor(S.tab==='plans'?'job':S.tab)},1200);
 }
 
 /* labor (office edits budget; everyone on the job can view) */
@@ -2352,12 +2352,15 @@ const TIPS={
     ['#undoBtn',"Undo your last mark.","Deshacer tu última marca."],
     ['[data-mode="pan"]',"Move: drag to move around, pinch to zoom.","Mover: arrastra para moverte, pellizca para hacer zoom."]],
   job:[
+    ['.tabs2 .tg:first-child',"On a phone the tabs come in two rows. Field: Plans, Progress and the Daily Report, what the crew uses every day.","En el teléfono las pestañas van en dos filas. Campo: Planos, Avance y el Reporte diario, lo que la cuadrilla usa cada día."],
+    ['.tabs2 .tg:nth-child(2)',"Second row: the rest of the job. Office has Takeoff, Materials and Money; foremen get Labor and Materials under More.","Segunda fila: lo demás del trabajo. Oficina tiene Cuantificación, Material y Dinero; los mayordomos tienen Mano de obra y Material en Más."],
     ['.tabs button[data-tab="plans"]',"Plans: every sheet for the job, always the newest version. Use it to look things up, drop pins and quick highlights.","Planos: todas las hojas del trabajo, siempre la versión más nueva. Úsalo para consultar, poner pines y marcas rápidas."],
     ['.tabs button[data-tab="progress"]',"Progress: color in the work that's finished. This is what the office looks at to see how the job is going.","Avance: colorea el trabajo que ya está terminado. Esto es lo que la oficina revisa para ver cómo va el trabajo."],
     ['.tabs button[data-tab="money"]',"Office: Money has Billing (this month’s % on each pay app line, load the pay app here) and Labor (hours vs. budget by cost code). Switch with the buttons under the tabs.","Oficina: Dinero tiene Facturación (el % de este mes en cada línea, carga la solicitud aquí) y Mano de obra (horas contra el presupuesto). Cambia con los botones debajo de las pestañas."],
     ['.tabs button[data-tab="log"]',"Daily Report: fill it out every day you're on the job. It's saved as a PDF and can go to the GC.","Reporte diario: llénalo cada día que estés en el trabajo. Se guarda como PDF y se puede mandar al contratista."],
     ['.tabs button[data-tab="mat"]',"Materials: what was ordered on the PO and what has shown up so far. Log deliveries on the daily report.","Material: lo que se pidió en la orden y lo que ya llegó. Anota las entregas en el reporte diario."],
     ['.tabs button[data-tab="labor"]',"Labor: hours used against the budget, by cost code, from the job cost sheet.","Mano de obra: horas usadas contra el presupuesto, por código, de la hoja de costos."],
+    ['.tabs button[data-tab="takeoff"]',"Office: Takeoff opens the plans in the takeoff viewer to measure walls and ceilings and send them to the bid sheet.","Oficina: Cuantificación abre los planos en el visor para medir muros y plafones y mandarlos a la hoja de licitación."],
     ['#revFilt',"Pick which sheets to see: current sheets, revised sheets or RFI/ASI pages.","Escoge qué hojas ver: hojas actuales, hojas revisadas o páginas de RFI/ASI."],
     ['#tabBody .sheet',"Tap a sheet to open it. Pinch to zoom.","Toca una hoja para abrirla. Pellizca para hacer zoom."]],
   progress:[
@@ -2389,8 +2392,53 @@ const TIPS={
   viewsheet:[
     ['[data-mode="pan"]',"Drag to move around the sheet, pinch to zoom.","Arrastra para moverte en el plano, pellizca para hacer zoom."],
     ['[data-mode="pin"]',"Pin: tap the sheet to flag something for the foreman, with a photo.","Pin: toca el plano para avisarle algo al mayordomo, con una foto."],
-    ['#snNext',"Arrows go to the next or previous sheet.","Las flechas van a la hoja siguiente o anterior."]]
+    ['#snNext',"Arrows go to the next or previous sheet.","Las flechas van a la hoja siguiente o anterior."]],
+  takeoff:[
+    ['#tkBack',"Takeoff menu: + Takeoff item, Send to bid sheet, Markup PDF, download rows, and the list of sheets.","Menú de cuantificación: + Partida, Mandar a la hoja de licitación, PDF de marcas, bajar renglones y la lista de hojas."],
+    ['#tkTabs .tktab',"Sheet tabs: each sheet you open gets a tab. Click to switch, × to close, drag to reorder.","Pestañas de hojas: cada hoja que abres tiene su pestaña. Clic para cambiar, × para cerrar, arrastra para ordenar."],
+    ['#tkSide .tkpseg',"Items panel: list it By item, or By sheet to see what's on each sheet.","Panel de partidas: ordénalo Por partida, o Por hoja para ver qué hay en cada hoja."],
+    ['#tkQ',"Search items by code or description, or sheets by name.","Busca partidas por código o descripción, u hojas por nombre."],
+    ['#tkSide [data-rec]',"Recording dot: click it to start drawing with that item on this sheet.","Punto de grabar: haz clic para empezar a dibujar con esa partida en esta hoja."],
+    ['#tkSide [data-col]',"Color square: click to pick the item's color.","Cuadro de color: haz clic para escoger el color de la partida."],
+    ['#tkSide [data-eye]',"💡 Shows or hides the item on the plans. Shift+click shows only this item.","💡 Muestra u oculta la partida en los planos. Shift+clic muestra solo esta partida."],
+    ['#tkXAll',"▾▾ opens every group in the list, ▸▸ folds them all up.","▾▾ abre todos los grupos de la lista, ▸▸ los cierra todos."],
+    ['#tkPop',"Pop out: puts the items list in its own window, handy on a second monitor.","Separar: pone la lista de partidas en su propia ventana, útil en un segundo monitor."],
+    ['#tkv .trow [data-tm="draw"]',"Take off draws with the item. Move pans, Select picks marks to move, copy or delete, Scale sets the scale, Measure checks a length without saving it.","Cuantificar dibuja con la partida. Mover desplaza, Seleccionar escoge marcas para mover, copiar o borrar, Escala fija la escala, Medir revisa una medida sin guardarla."],
+    ['#tkv .tkseg',"How clicks count: Area (corners or drag a box), Linear (corners until ✓ Finish), Segments (every 2 clicks is one piece), Count (each click is one).","Cómo cuentan los clics: Área (esquinas o arrastra un cuadro), Lineal (esquinas hasta ✓ Terminar), Segmentos (cada 2 clics es una pieza), Conteo (cada clic es uno)."],
+    ['#tkStage',"Right-click (or long-press on a tablet) the plan or a mark for more: finish, undo, copy, wall side, delete. Hold the right button and drag to move the plan.","Clic derecho (o deja presionado en la tableta) en el plano o en una marca para más: terminar, deshacer, copiar, lado del muro, borrar. Mantén el botón derecho y arrastra para mover el plano."],
+    ['#tkScBan',"Scale check: if the scale was read off the sheet, tap Looks right, or Check with a dimension to click a printed dimension and compare.","Revisa la escala: si se leyó de la hoja, toca Se ve bien, o Revisar con una medida para marcar una cota impresa y comparar."],
+    ['#tkViewB',"⚙ View: panel side and size, plus drawing settings like the crosshair, line ends, line opacity and which wall side lines go on.","⚙ Vista: lado y tamaño del panel, y ajustes de dibujo como la cruz, los extremos de línea, la opacidad y de qué lado del muro va la línea."]],
+  takeoffLayout:[
+    ['#tkLay',"+ Layout: pick Joists, ACT grid or CRC & furring, then draw the area. It lays out every member and counts it. RC channel is in the layout settings.","+ Trazo: escoge Viguetas, Plafón ACT o CRC y canal, y dibuja el área. Traza cada pieza y la cuenta. El canal RC está en los ajustes del trazo."],
+    ['#tkStage',"Right-click (or long-press) a layout area: Start grid here, Turn 90°, add or remove a joist, add a beam or blocking line, or add an opening.","Clic derecho (o deja presionado) en un área con trazo: Empezar cuadrícula aquí, Girar 90°, agregar o quitar una vigueta, agregar viga o bloqueo, o agregar un hueco."],
+    ['#tkSide [data-it]',"Right-click an area item in the list → Add layout to all its areas, to lay out every room at once.","Clic derecho en una partida de área en la lista → Agregar trazo a todas sus áreas, para trazar todos los cuartos a la vez."]],
+  bids:[
+    ['[data-bview="mine"]',"My bids: the ones you're the estimator on. All bids: everyone's.","Mis licitaciones: las que tú estimas. Todas: las de todos."],
+    ['.bests',"Tap an estimator to see only their bids.","Toca un estimador para ver solo sus licitaciones."],
+    ['.bwk',"This week: what's due each day. Tap a day to see those bids.","Esta semana: lo que se entrega cada día. Toca un día para ver esas licitaciones."],
+    ['#bidList .bsh',"Coming up is grouped by bid date. Tap a heading to fold it up; Collapse all is above the list.","Próximas se agrupan por fecha de entrega. Toca un encabezado para cerrarlo; Cerrar todo está arriba de la lista."],
+    ['[data-bfilt="rev"]',"In review: bids sent in for a second look. Send one in from its ⋯ menu or its panel.","En revisión: licitaciones mandadas para una segunda revisión. Mándala desde su menú ⋯ o su panel."],
+    ['#bidList [data-bm]',"⋯ More: In for review, Didn't bid, Delete. Right-click or long-press a card does the same.","⋯ Más: En revisión, No licitamos, Borrar. Clic derecho o dejar presionada la tarjeta hace lo mismo."],
+    ['#bidSelBtn',"Select: pick several bids, then mark them Didn't bid or delete them together.","Seleccionar: escoge varias licitaciones y márcalas No licitamos o bórralas juntas."],
+    ['[data-bpane="pipe"]',"Pipeline: the year in numbers: total bid, win rate, by month, by estimator and top GCs.","Resumen: el año en números: total licitado, porcentaje ganado, por mes, por estimador y principales contratistas."]],
+  lookahead:[
+    ['[data-lkm]',"By person plans each worker; By job shows how many are on each job.","Por persona planea a cada trabajador; Por trabajo muestra cuántos van a cada trabajo."],
+    ['#lkGrid td.lkc',"Tap a day to put someone on a job. Drag with a mouse to fill several days.","Toca un día para poner a alguien en un trabajo. Arrastra con el mouse para llenar varios días."],
+    ['#lkMulti',"Select several: tap or drag cells, then Assign them all at once.","Seleccionar varios: toca o arrastra celdas y luego Asígnalas todas a la vez."],
+    ['#lkCopy',"Copy last week repeats last week's plan. Same as time card puts each person on the job they last worked.","Copiar la semana pasada repite el plan anterior. Igual que la tarjeta pone a cada quien en el último trabajo donde trabajó."]],
+  lookaheadJobs:[
+    ['#lkAddJob',"+ Plan another job: adds a job to the board.","+ Planear otro trabajo: agrega un trabajo al tablero."],
+    ['#lkGrid [data-rmx]',"✕ takes a job off the board and clears its planned days. Undo in the message brings it back. On a phone you can swipe the job name left.","✕ quita un trabajo del tablero y borra sus días planeados. Deshacer en el aviso lo regresa. En el teléfono puedes deslizar el nombre a la izquierda."]]
 };
+/* office screens: tapping the dark area or Esc closes the tips, so they never trap the plan */
+const TIP_LOOSE=new Set(['takeoff','takeoffLayout','bids','lookahead','lookaheadJobs']);
+/* the tips key for the screen showing now (Tips menu → Show the tips again) */
+function tipsKeyNow(){
+  if(S.view==='tc')return 'tc';if(S.view==='look')return LK.mode==='jobs'?'lookaheadJobs':'lookahead';
+  if(V)return canWrite()?(V.layer==='progress'?'markupProg':'markup'):'viewsheet';
+  if(S.view==='job')return S.tab==='plans'?'job':S.tab;
+  return homeTabs()&&homeSec()==='bids'?'bids':'home';
+}
 const tipsOn=()=>lsGet('acv.tips')!=='0';
 const tipLang=()=>lsGet('acv.lang')||(/^es/i.test(navigator.language||'')?'es':'en');
 let tipBusy=false;
@@ -2424,17 +2472,24 @@ function tipsFor(key){
   try{if(navigator.webdriver)return}catch(e){}
   if(!tipsOn()||tipBusy||lsGet('acv.tipSeen.'+key)||document.querySelector('.mwrap'))return;
   const vis=el=>{if(!el)return false;const r=el.getBoundingClientRect();return r.width>0&&r.height>0};
-  const steps=(TIPS[key]||[]).map(s=>({el:[...document.querySelectorAll(s[0])].find(vis),t:tipLang()==='es'?s[2]:s[1]})).filter(s=>s.el);
-  if(!steps.length)return;
+  const pick=q=>[...document.querySelectorAll(q)].find(vis);
+  const steps=(TIPS[key]||[]).map(s=>({q:s[0],el:pick(s[0]),t:tipLang()==='es'?s[2]:s[1]})).filter(s=>s.el);
+  if(!steps.length)return false;
   lsSet('acv.tipSeen.'+key,'1');tipBusy=true;
   const es=tipLang()==='es';let i=0;
   const ov=document.createElement('div');ov.className='tipov';document.body.appendChild(ov);
   const hole=document.createElement('div');hole.className='tiphole';ov.appendChild(hole);
   const bub=document.createElement('div');bub.className='tipbub';ov.appendChild(bub);
-  const done=()=>{ov.remove();tipBusy=false};
+  const onKey=e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();done()}};
+  const done=()=>{ov.remove();tipBusy=false;window.removeEventListener('keydown',onKey,true)};
+  window.addEventListener('keydown',onKey,true);
+  if(TIP_LOOSE.has(key))ov.addEventListener('pointerdown',e=>{if(!bub.contains(e.target)){e.preventDefault();e.stopPropagation();done()}});
   const show=()=>{
-    const s=steps[i];try{s.el.scrollIntoView({block:'center',behavior:'instant'})}catch(e){s.el.scrollIntoView()}
+    const s=steps[i];if(!s.el.isConnected||!vis(s.el))s.el=pick(s.q);/* the list may have been redrawn since */
+    if(!s.el){steps.splice(i,1);if(i>=steps.length)done();else show();return}
+    try{s.el.scrollIntoView({block:'center',behavior:'instant'})}catch(e){s.el.scrollIntoView()}
     setTimeout(()=>{
+      if(!s.el.isConnected)s.el=pick(s.q)||s.el;
       const r=s.el.getBoundingClientRect();const p=6;
       Object.assign(hole.style,{left:(r.left-p)+'px',top:(r.top-p)+'px',width:(r.width+2*p)+'px',height:(r.height+2*p)+'px'});
       bub.innerHTML='<div>'+esc(s.t)+'</div><div class="tipbtns"><span class="muted small">'+(i+1)+' / '+steps.length+'</span><button class="btn sm" data-skip>'+(es?'Saltar':'Skip')+'</button><button class="btn sm primary" data-next>'+(i<steps.length-1?(es?'Siguiente':'Next'):(es?'Listo':'Got it'))+'</button></div>';
@@ -2446,7 +2501,7 @@ function tipsFor(key){
       $('[data-skip]',bub).onclick=done;
     },120);
   };
-  show();
+  show();return true;
 }
 function tipsMenu(){
   const es=tipLang()==='es';
@@ -2457,7 +2512,7 @@ function tipsMenu(){
     '<button class="btn" data-x>'+(es?'Cerrar':'Close')+'</button></div>');
   $('[data-x]',m).onclick=()=>m.close();
   $('[data-t]',m).onclick=()=>{lsSet('acv.tips',tipsOn()?'0':'1');m.close();toast(tipsOn()?(es?'Consejos activados.':'Tips on.'):(es?'Consejos apagados.':'Tips off.'))};
-  $('[data-r]',m).onclick=()=>{Object.keys(TIPS).forEach(k=>lsSet('acv.tipSeen.'+k,null));lsSet('acv.tips','1');m.close();setTimeout(()=>{const k=S.view==='tc'?'tc':(V?(canWrite()?(V.layer==='progress'?'markupProg':'markup'):'viewsheet'):(S.view==='job'?(S.tab==='plans'?'job':S.tab):'home'));tipsFor(k)},300)};
+  $('[data-r]',m).onclick=()=>{Object.keys(TIPS).forEach(k=>lsSet('acv.tipSeen.'+k,null));lsSet('acv.tips','1');m.close();setTimeout(()=>tipsFor(tipsKeyNow()),300)};
   $('[data-l]',m).onclick=()=>{lsSet('acv.lang',es?'en':'es');m.close();tipsMenu()};
 }
 function bindTc(){
@@ -2731,6 +2786,7 @@ function lookSwipe(td){const w=$('.lkjw',td);let st=null;
   const end=e=>{if(!st)return;const go=st.on&&st.dx<-70&&e.type==='pointerup';st=null;w.style.transform='';td.classList.remove('swp','swgo');if(go)lookRemoveJob(td.dataset.rmj)};
   td.onpointerup=td.onpointercancel=end}
 function bindLook(){$('#lkBack').onclick=closeLook;if(!$('#lkPrev'))return;
+  clearTimeout(S.tipT);S.tipT=setTimeout(()=>{if(S.view==='look'&&LK.loaded&&!LK.sel.length)tipsFor(LK.mode==='jobs'?'lookaheadJobs':'lookahead')},900);
   const nav=n=>{LK.start=n==null?lookMonday(tcToday()):isoAddD(LK.start,7*n);LK.sel=[];LK.sx=0;loadLook()};
   $('#lkPrev').onclick=()=>nav(-1);$('#lkNext').onclick=()=>nav(1);$('#lkNow').onclick=()=>nav(null);
   $$('[data-lkm]').forEach(b=>b.onclick=()=>{LK.mode=b.dataset.lkm;LK.multi=false;LK.sel=[];LK.sx=0;render()});
@@ -2940,7 +2996,7 @@ function renderJobs(){
   return h+'</main>';
 }
 function bindJobs(){
-  setTimeout(()=>{if(S.view!=='job'&&S.view!=='tc'){if(a2hsWant())a2hsShow(()=>tipsFor('home'));else tipsFor('home')}},900);
+  setTimeout(()=>{if(S.view!=='job'&&S.view!=='tc'&&S.view!=='look'&&S.view!=='dash'){const k=homeTabs()&&homeSec()==='bids'&&$('[data-bpane]')?'bids':'home';if(a2hsWant())a2hsShow(()=>tipsFor(k));else tipsFor(k)}},900);
   if($('#newJob'))$('#newJob').onclick=async()=>{
     const v=await formBox('New job',[{k:'name',label:'Job name',req:true,ph:'e.g. Riverside Medical Office'},{k:'addr',label:'Address or GC (optional)',ph:'e.g. 120 Main St / Turner'},{k:'pm',label:'PM',type:'select',value:S.myOfficeId||'',options:(S.office||[]).map(o=>[o.id,o.name]).concat([['','No PM']])}],'Create job');
     if(!v)return;const d=await run(sb.from('jobs').insert({name:v.name.slice(0,120),addr:v.addr.slice(0,160),pm:v.pm||null}).select().single());
@@ -5710,7 +5766,10 @@ async function tkOpen(sid){
   tkvBind();tkvTools();tkvSide();
   const [u]=await urlsFor([sh.path]);if(TKV&&TKV.id===sid){if(u)TKV.img.src=u;else TKV.img.onerror()}
   tkLoad(TK.job,true).then(()=>{if(TKV&&TKV.id===sid){tkAutoApply();tkvSide();tkvPaint();tkScBan()}});
+  setTimeout(()=>{if(TKV&&TKV.id===sid&&tkTipOk())tipsFor('takeoff')},1400);
 }
+/* takeoff tips only start while the viewer is idle: not mid-drawing, no menu, pop-up or right-click menu open */
+function tkTipOk(){return !!(TKV&&$('#tkv')&&!(TKV.draft&&TKV.draft.length)&&!TKV.drag&&!TKV.box&&!TKV.cont&&!TKV.gpick&&!TKV.scb&&!$('#tkMenu')&&!$('#tkCtx')&&!$('#tkPal')&&!$('.vpop'))}
 /* ---- sheet tabs: one per open sheet, order + active kept per job on this device ('acv.tkTabs.'+job); zoom / pan per tab in memory ---- */
 let TKT=null;/* {job, ids, act, t:{sid:{x,y,s}}} */
 function tkTabOpen(ids,sid){const n=(ids||[]).slice();if(sid&&n.indexOf(sid)<0)n.push(sid);return n}
@@ -5807,7 +5866,7 @@ function tkvTools(){
   const ob=$('#tkOrtho');if(ob){ob.classList.toggle('on',!!TKV.ortho);ob.setAttribute('aria-pressed',String(!!TKV.ortho))}
   if(TKV.stage){const cs=tkdrGet().cur;TKV.stage.classList.toggle('tkxh',draw&&cs!=='arrow');TKV.stage.classList.toggle('tkar',draw&&cs==='arrow');TKV.stage.dataset.m=TKV.gpick?'gpick':TKV.mode;if(TKV.mode!=='select')TKV.stage.dataset.h=''}
   $$('#tkv [data-lm]').forEach(b=>b.classList.toggle('on',TKV.mode==='draw'&&!!it&&b.dataset.lm===(it.unit==='EA'?'count':it.fr||it.unit==='SF'?'area':TKV.lm==='seg'?'seg':'run')));
-  {const ls=$('#tkLay');if(ls){const on=TKV.mode==='draw'&&!!it&&(!!it.fr||it.unit==='SF');ls.hidden=!on;ls.value=it&&it.fr?tkLayPre(it.fr):'';ls.classList.toggle('on',!!(it&&it.fr))}}
+  {const ls=$('#tkLay');if(ls){const on=TKV.mode==='draw'&&!!it&&(!!it.fr||it.unit==='SF');ls.hidden=!on;ls.value=it&&it.fr?tkLayPre(it.fr):'';ls.classList.toggle('on',!!(it&&it.fr));if(on&&!lsGet('acv.tipSeen.takeoffLayout')){clearTimeout(TKV.tipT);TKV.tipT=setTimeout(()=>{if(tkTipOk()&&!$('#tkLay').hidden)tipsFor('takeoffLayout')},1500)}}}
   tkScBan();const h=$('#tkHint');if(!h||!TKV.W)return;
   h.textContent=TKV.mode==='draw'&&TKV.cont?'Continuing the linear: click each next corner · Enter or right-click ■ Stop to finish · Esc cancels (the mark stays as it was)':
     TKV.mode==='draw'?(it?(it.fr?(TKV.dNext||TKV.dDraft?'Opening: click its corners inside a layout area (or drag a rectangle) · ✓ Finish':'Layout ('+TK_LAY_NAME[tkLayPre(it.fr)]+'): click the area\'s corners (click the first one or ✓ Finish to close) or drag a rectangle · Alt+drag = opening · right-click a layout area to turn the '+TK_LAY_RUN[tkLayPre(it.fr)]+' or edit'):it.unit==='LF'?(TKV.lm==='seg'?'Segments: click both ends of each wall piece · right-click for more · drag to move':'Click each corner along the wall · double-click or ✓ Finish to end the linear · Shift = level/plumb · right-click for more · drag to move'):it.unit==='SF'?(TKV.dNext?'Deduct: click the corners of the cut-out (or drag a rectangle) · ✓ Finish':'Area: click the corners (click the first one or ✓ Finish to close) or drag a rectangle · Alt+drag/click = deduct · space+drag to move'):'Click each item to count it · drag to move'):'Pick a takeoff item on the right'):
