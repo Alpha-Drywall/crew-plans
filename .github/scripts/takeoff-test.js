@@ -851,4 +851,15 @@ t('index.html wires the duplicate warning into every sheet open', () => {
   assert.ok(/tkShCarry\(TKV\.id,n\.id\)/.test(html) && /TKANC=tkAnch/.test(html), 'sheet list keeps its place when a sheet opens');
   assert.ok(/id="tkPdf"/.test(html) && /id="tkSend"/.test(html), 'Send to bid sheet and Markup PDF stay in the menu');
 });
+t('items panel: By sheet lists every current sheet, even with no items or marks', () => {
+  const html = fs.readFileSync('index.html', 'utf8');
+  assert.ok(/if\(!d\.items\.length&&tkpBy\(\)!=='sheet'\)return/.test(html), 'the no-items early return must not apply to By sheet');
+  assert.ok(/const order=c\.sheets\.slice\(\)/.test(html), 'By sheet walks every sheet in plan order');
+  assert.ok(/sheets:async jid=>\(await q\(sb\.from\('sheets'\)[^\n]*\.order\('sort'\)\)\)\.filter\(s=>s\.is_current!==false\)/.test(html), 'alphaTakeoff.sheets filter unchanged');
+  assert.ok(/W\.sheets=\(rows\|\|\[\]\)\.filter\(s=>s\.is_current!==false\)/.test(html), 'pop-out fallback uses the same current-sheet filter');
+  const T2 = vm.runInNewContext(['tkSheetQty', 'tkShapeQty'].map(grab).join('\n') + '\n;({tkSheetQty})', { Math, Object, Array, isFinite, Number, NaN });
+  const sh = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+  const Q = T2.tkSheetQty({ items: [{ id: 'i', unit: 'EA' }], shapes: [{ id: 'm', item: 'i', sheet: 'b', k: 'pt', p: [.1, .1] }], scales: {} }, sh);
+  assert.deepStrictEqual(Object.keys(Q.sheets), ['b']);
+});
 console.log(n + ' takeoff tests passed.');
