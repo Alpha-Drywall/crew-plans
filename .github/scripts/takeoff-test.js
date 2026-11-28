@@ -14,7 +14,7 @@ function grab(name) {
 }
 const names = ['tkDupText', 'tkOffsetLine', 'tkSideOff', 'TK_SECS', 'TK_PAPER', 'TK_SCALES', 'tkFeet', 'tkFtIn', 'tkLenPx', 'tkAreaPx', 'tkShapeQty', 'tkPresetFpp', 'tkGuessPaper', 'tkEvenUp', 'tkCodeHeight', 'tkCodeWidth', 'tkItemWidthIn', 'tkInches', 'tkInStr', 'tkParseScales',
   'tkApply', 'tkTotals', 'tkSheetQty', 'tkHeightSplits', 'tkRows', 'tkCopyShapes', 'tkSplitLine', 'tkInsertCorner', 'tkMoveCorner', 'tkDeleteCorner', 'tkCoincident', 'tkArcGeo', 'tkArcPx', 'tkArcFlat', 'tkFlat', 'tkSegPoly', 'tkArcD', 'tkArcCanvas', 'tkArcClean', 'tkArcMake', 'tkArcInsert', 'tkArcDelete', 'tkArcSplitLine', 'tkOffsetShapes',
-  'tkSnapVerts', 'tkNearVertex', 'tkOrtho', 'tkSnapPick', 'tkEnds', 'tkEndMark', 'tkReadout',
+  'tkSnapVerts', 'tkSideShape', 'tkSideInv', 'tkSideVerts', 'tkNearVertex', 'tkOrtho', 'tkSnapPick', 'tkEnds', 'tkEndMark', 'tkReadout',
   'TK_FR_DEF', 'tkFrRot', 'tkFrUn', 'tkFrIv', 'tkFrUnion', 'tkFrClip', 'tkFrSwap', 'tkFrExt', 'tkFrAuto', 'tkFrAngle', 'tkFrPc', 'tkFrame', 'tkFrSum', 'tkFrameOf', 'tkFrRows', 'tkFrItem',
   'TK_LAY_DEF', 'TK_LAY_NAME', 'tkLayPre', 'tkLayF', 'tkLayArea', 'tkLayPos', 'tkLayCut', 'tkLayWires', 'tkLayAct', 'tkLayCrc', 'tkLayRc', 'tkLayDwg', 'tkLayAt', 'tkLayOrg', 'tkEdNear', 'tkEdRuns', 'tkEdAt',
   'tkInPoly', 'tkMemFlangeIn', 'tkBulkLayOps', 'tkEndCol', 'tkTabOpen', 'tkTabClose', 'tkTabMove', 'tkTabStep', 'tkTabsClean', 'tkHideBulk', 'tkHideAnyOn', 'TK_PAL', 'TK_COLORS', 'tkNextColor', 'tkColorName', 'tkColorOpts'];
@@ -1017,5 +1017,34 @@ t('items panel: By sheet lists every current sheet, even with no items or marks'
   const sh = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
   const Q = T2.tkSheetQty({ items: [{ id: 'i', unit: 'EA' }], shapes: [{ id: 'm', item: 'i', sheet: 'b', k: 'pt', p: [.1, .1] }], scales: {} }, sh);
   assert.deepStrictEqual(Object.keys(Q.sheets), ['b']);
+});
+t('wall side while drawing: the cursor/preview points are the offset line, mitred at corners; stored centers untouched', () => {
+  const P = [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }];
+  const L = plain(T.tkSideShape(P, 200, 200, T.tkSideOff('L', 10)));
+  assert.deepStrictEqual(L.map(p => [Math.round(p.x * 1e6) / 1e6, Math.round(p.y * 1e6) / 1e6]), [[0, 5], [95, 5], [95, 100]], 'Left: same offset the finished mark draws, mitred corner');
+  const R = plain(T.tkSideShape(P, 200, 200, T.tkSideOff('R', 10)));
+  near(R[1].x, 105); near(R[1].y, -5); near(R[0].y, -5);
+  const C = T.tkSideShape(P, 200, 200, 0); assert.deepStrictEqual(plain(C), plain(P), 'Center: as today');
+  assert.deepStrictEqual(plain(T.tkSideShape([P[0]], 200, 200, 5)), [{ x: 0, y: 0 }], 'first point alone: no direction yet');
+  const fin = T.tkOffsetLine([0, 0, .5, 0, .5, .5], 200, 200, 5).map((v, i) => v * 200); near(fin[2], T.tkSideShape(P, 200, 200, 5)[1].x, 'preview == final');
+  assert.strictEqual(P[1].x, 100, 'input not changed');
+});
+
+t('tkSideInv: the click point whose offset end lands exactly on a displayed corner', () => {
+  const a = { x: 10, y: 20 }, c = { x: 80, y: 60 };
+  [6, -6].forEach(d => {
+    const V = T.tkSideShape([a, c], 200, 200, d)[1], c2 = T.tkSideInv(V, a, d);
+    const back = T.tkSideShape([a, c2], 200, 200, d)[1];
+    assert(Math.hypot(back.x - V.x, back.y - V.y) < 1e-3, 'offset of the worked-back point is V');
+  });
+  assert.deepStrictEqual(plain(T.tkSideInv({ x: 3, y: 4 }, null, 5)), { x: 3, y: 4 }, 'no previous point: unchanged');
+});
+
+t('tkSideVerts: other marks\' corners as drawn (offset for L/R marks, raw for center), skipping hidden and counts', () => {
+  const sh = [{ id: 'a', sheet: 's', item: 'i', k: 'line', al: 'L', p: [0, 0, .5, 0] }, { id: 'b', sheet: 's', item: 'i', k: 'line', p: [0, .5, .5, .5] }, { id: 'c', sheet: 's', item: 'i', k: 'count', p: [.1, .1] }, { id: 'd', sheet: 'x', item: 'i', k: 'line', p: [0, 0, 1, 1] }];
+  const v = plain(T.tkSideVerts(sh, 's', 200, 200, {}, null, () => 10));
+  assert.strictEqual(v.length, 4);
+  near(v[0].y, 5); near(v[1].x, 100); near(v[1].y, 5); near(v[2].y, 100); assert(v.every(x => x.disp));
+  assert.strictEqual(T.tkSideVerts(sh, 's', 200, 200, { i: true }, null, () => 10).length, 0, 'hidden items');
 });
 console.log(n + ' takeoff tests passed.');
