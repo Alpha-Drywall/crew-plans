@@ -6082,7 +6082,7 @@ function tkpFoot(c){const d=c.d,its=d.items;if(!its.length)return '';const cur=t
 function tkpHtml(c){
   const sc=c.sid&&(c.d.scales||{})[c.sid],by=tkpBy();
   return '<div class="tkhd"><b>Items</b><span class="tkhdb">'+(c.pop?'':'<button class="btn sm tkpob" id="tkPop" title="Open this list in its own window: drag it to a second monitor">⧉ Pop out</button>')+(c.d.items.length?(()=>{const on=tkHideAnyOn(c.hide,c.d.items.map(i=>i.id));return '<button class="btn sm tkalle'+(on?'':' off')+'" id="tkAllEye" data-on="'+(on?0:1)+'" title="'+(on?'Hide every item on the plans':'Show every item on the plans')+'">💡 All '+(on?'off':'on')+'</button>'})():'')+'<button class="btn sm tkxa" id="tkXAll" title="Expand all" aria-label="Expand all">▾▾</button><button class="btn sm tkxa" id="tkCAll" title="Collapse all" aria-label="Collapse all">▸▸</button><button class="btn sm" id="tkNew">+ Item</button></span></div>'+
-    (c.sid?'<div class="small muted" style="margin:0 0 8px">'+(sc?'Scale '+esc(tkScaleTag(sc))+' · <a href="#" id="tkSc">change</a>':'<span style="color:#c62828">No scale</span> · <a href="#" id="tkSc">set scale</a>')+'</div>':'<div class="small muted" style="margin:0 0 8px">No sheet open · pick an item or open a sheet</div>')+
+    (c.sid?'<div class="small muted" style="margin:0 0 8px">'+(sc?'Scale '+esc(tkScaleTag(sc))+' · <a href="#" id="tkSc">change</a>':'<span style="color:#c62828">No scale</span> · <a href="#" data-autosc="this" title="Read the printed scale off this sheet">Auto scale</a> · <a href="#" data-autosc="all" title="Read the printed scale off every sheet that has none">All sheets</a> · <a href="#" id="tkSc">Set by hand</a>')+'</div>':'<div class="small muted" style="margin:0 0 8px">No sheet open · pick an item or open a sheet</div>')+
     '<div class="hseg sm tkpseg" role="group" aria-label="List items">'+[['item','By item'],['sheet','By sheet']].map(x=>'<button type="button" data-by="'+x[0]+'"'+(by===x[0]?' class="on" aria-pressed="true"':' aria-pressed="false"')+'>'+x[1]+'</button>').join('')+'</div>'+
     '<input class="tkq" id="tkQ" type="search" placeholder="Search items or sheets" aria-label="Search items or sheets" value="'+esc(TKQ)+'" autocomplete="off">'+
     '<div id="tkpL">'+tkpList(c)+'</div>'+tkpFoot(c);
@@ -6103,7 +6103,7 @@ function tkpRender(root,c,act){
   const redraw=()=>tkpRender(root,c,act);
   qi.oninput=()=>{TKQ=qi.value;const l=$('#tkpL',root);l.innerHTML=tkpList(c);tkpBindList(l,c,act,redraw)};
   qi.onkeydown=e=>{if(e.key==='Escape'&&qi.value){e.stopPropagation();qi.value='';qi.oninput()}};
-  $('#tkNew',root).onclick=()=>act({t:'new'});{const xa=$('#tkXAll',root),ca=$('#tkCAll',root),rd=()=>tkpRender(root,c,act);if(xa)xa.onclick=()=>{tkpCollAll(c,true);rd()};if(ca)ca.onclick=()=>{tkpCollAll(c,false);rd()}}const ae=$('#tkAllEye',root);if(ae)ae.onclick=()=>act({t:'eyes',on:ae.dataset.on==='1'});const sc=$('#tkSc',root);if(sc)sc.onclick=e=>{e.preventDefault();act({t:'scale'})};
+  $('#tkNew',root).onclick=()=>act({t:'new'});{const xa=$('#tkXAll',root),ca=$('#tkCAll',root),rd=()=>tkpRender(root,c,act);if(xa)xa.onclick=()=>{tkpCollAll(c,true);rd()};if(ca)ca.onclick=()=>{tkpCollAll(c,false);rd()}}const ae=$('#tkAllEye',root);if(ae)ae.onclick=()=>act({t:'eyes',on:ae.dataset.on==='1'});const sc=$('#tkSc',root);if(sc)sc.onclick=e=>{e.preventDefault();act({t:'scale'})};$$('[data-autosc]',root).forEach(a=>a.onclick=e=>{e.preventDefault();act({t:'autoscale',all:a.dataset.autosc==='all'})});
   const pb=$('#tkPop',root);if(pb){pb.hidden=!tkpCan();pb.onclick=()=>act({t:'pop'})}
   $$('[data-by]',root).forEach(b=>b.onclick=()=>{viewSet('takeoff',{by:b.dataset.by},TKVW_DEF);act({t:'by',v:b.dataset.by});redraw()});
   tkpBindList($('#tkpL',root),c,act,redraw);
@@ -6154,6 +6154,7 @@ function tkpDo(a){
   if(a.t==='open'){const s=tkSheets().find(x=>x.id===a.sid);if(!s)return;if(TKV&&TKV.id)tkGo(s);else{TKV=null;tkOpen(s.id)}return}
   if(!TKV){if(a.t==='pick'&&it){if(a.sheet&&tkSheets().some(s=>s.id===a.sheet)){TKV={item:it.id,hl:it.id};tkOpen(a.sheet)}else tkShowItem(it.id)}return}
   if(a.t==='scale'){tkScaleBox();return}
+  if(a.t==='autoscale'){tkScAuto(!!a.all);return}
   if(a.t==='all'){TKV.hl=null;tkvPaint();return}
   if(a.t==='eyes'){const all=(TK.data.items||[]).map(x=>x.id),ids=a.sheet?all.filter(id=>TK.data.shapes.some(d=>d.sheet===a.sheet&&d.item===id)):a.keep?all.filter(id=>a.keep.indexOf(id)<0):all;
     TKV.hide=tkHideBulk(TKV.hide,ids,!!a.on);if(a.keep)TKV.hide=tkHideBulk(TKV.hide,a.keep,true);tkHideSave();tkvSide();tkvPaint();return}
@@ -6895,6 +6896,20 @@ function tkScUi(){
   ['#tkScBan','#tkScBar'].forEach(k=>{const el=$(k,st);['pointerdown','pointerup','pointermove','dblclick','contextmenu','click'].forEach(t=>el.addEventListener(t,e=>e.stopPropagation()))});
   tkScBan();
 }
+/* Auto scale from the banner / items panel: this sheet (read its printed scale text, running the OCR first if it has not been read) or every sheet (Read scales). Success shows the scale with the usual Looks right / Check with a dimension step; if it can't be read, say so and open Set scale. */
+async function tkScAuto(all){
+  if(!TKV||TKV.scAuto)return;const id=TKV.id,sh=TKV.sh;TKV.scAuto=1;tkScBan();
+  const done=()=>{if(TKV){TKV.scAuto=0;tkScBan();tkvSide()}};
+  try{
+    if(all){await tkReadScales();if(TKV&&TKV.id===id&&!tkScaleOf(id)){toast('No scale could be read on this sheet: set it by hand.');done();tkScaleBox();return}done();return}
+    if(!tkScaleRead(sh.scale_text).best){toast('Reading the scale on '+(sh.name||'this sheet')+'…');try{await tkScaleOcr(sh)}catch(e){}}
+    if(!TKV||TKV.id!==id)return;
+    if(tkScaleOf(id)){done();return}
+    const v=tkAutoScale(sh);
+    if(v){tkDo({t:'scale',sheet:id,v});toast('Scale set from the sheet: '+v.label+(v.multi?' (more than one scale printed)':'')+'. Check it with a dimension to be sure.');done();return}
+    const r=tkScaleRead(sh.scale_text);toast(r.best?'Found '+r.best.label+' on the sheet but not the paper size: set the scale by hand.':r.nts?'This sheet says NTS / AS NOTED: set the scale by hand.':'Could not read a scale on this sheet: set it by hand.');done();tkScaleBox();
+  }catch(e){toast('Auto scale failed: '+errMsg(e)+'. Set it by hand.');done();tkScaleBox()}
+}
 /* write a scale and say so; also on same-size sheets with no scale when asked */
 function tkScSet(v,all){
   if(!TKV)return;const sh=TKV.sh,W=TKV.W||sh.w;const ops=[{t:'scale',sheet:sh.id,v}];
@@ -6907,11 +6922,12 @@ function tkScBan(){
   const sc=tkScaleOf(TKV.id),sh=TKV.sh,r=tkScaleRead(sh.scale_text),bar=!!TKV.scb;let h='',warn=false;
   if(bar||(sc&&(sc.src!=='auto'||sc.ok)))h='';
   else if(sc){warn=!!sc.multi;h='<span>Scale <b>'+esc(sc.label)+'</b> — read from sheet'+(sc.multi?' · <span title="'+esc(sc.text||'')+'">more than one scale on this sheet</span>':'')+'</span><button data-scb="ok" title="The scale matches the drawing you take off">✓ Looks right</button><button data-scb="chk" title="Click both ends of a printed dimension to check the scale">Check with a dimension</button><button data-scb="set">Change</button>'}
-  else{warn=true;h='<span>No scale yet'+(r.best?' — sheet says <b>'+esc(r.best.label)+'</b>'+(sh.pw?'':', paper size unknown'):r.nts?' — sheet says NTS / AS NOTED':'')+'</span><button data-scb="set" class="go">Set scale ▸</button>'}
+  else if(TKV.scAuto){warn=true;h='<span>Reading the scale off the sheet…</span>'}
+  else{warn=true;h='<span>No scale yet'+(r.best?' — sheet says <b>'+esc(r.best.label)+'</b>'+(sh.pw?'':', paper size unknown'):r.nts?' — sheet says NTS / AS NOTED':'')+'</span><button data-scb="auto" class="go" title="Read the printed scale off this sheet">Auto scale (this sheet)</button><button data-scb="autoall" title="Read the printed scale off every sheet that has none (same as ☰ Takeoff menu → Read scales)">Auto scale all sheets</button><button data-scb="set" title="Pick a printed scale or measure a known length">Set scale by hand</button>'}
   b.innerHTML=h;b.hidden=!h;b.classList.toggle('warn',warn);if(st){st.classList.toggle('tkscon',!!h);st.classList.toggle('tkbaron',bar)}
   $$('[data-scb]',b).forEach(x=>x.onclick=()=>{const k=x.dataset.scb;
     if(k==='ok'){tkDo({t:'scale',sheet:TKV.id,v:{...tkScaleOf(TKV.id),ok:true}});toast('Scale confirmed.');tkScBan();if(TK&&$('#tkBody'))tkRenderBody()}
-    else if(k==='chk')tkScPick(true);else tkScaleBox()});
+    else if(k==='chk')tkScPick(true);else if(k==='auto')tkScAuto(false);else if(k==='autoall')tkScAuto(true);else tkScaleBox()});
 }
 /* the docked bar: state TKV.scb = {k:'set'} pick a printed scale | {k:'pick',chk} click two points (mode 'scale') | {k:'len',px} type the length | {k:'chk',px} type the printed dimension | {k:'res',px,ft,r} check result */
 function tkScBar(){
@@ -6977,6 +6993,7 @@ async function tkReadScales(){
   const k=tkAutoApply(),left=tkSheets().filter(s=>!tkScaleOf(s.id)),noPaper=left.filter(s=>tkScaleRead(s.scale_text).best).length;
   toast((k?'Scale set from the sheet on '+k+' sheet'+(k===1?'':'s')+'. ':need.length?'No new scales set. ':'')+(need.length?'Read '+got+' of '+need.length+'. ':'')+(noPaper?noPaper+' show a scale but no paper size: open them and set or check it. ':'')+(left.length?left.length+' still need a scale.':'Every sheet has a scale.'));
   if(S.tab==='takeoff'&&!TKV)tkRenderBody();
+  if(TKV){tkScBan();tkvSide()}
 }
 async function tkvCopy(){
   if(!TKV)return;const mine=TK.data.shapes.filter(s=>s.sheet===TKV.id);if(!mine.length){toast('Nothing to copy on this sheet yet.');return}
