@@ -5871,7 +5871,7 @@ function tkpList(c){
   const d=c.d,q=TKQ.trim().toLowerCase(),SQ=tkSheetQty(d,c.sheets),all=tkTotals(d,c.sheets),cur=SQ.sheets[c.sid]||{};let h='';
   if(!d.items.length)return '<div class="small muted">No items yet. Tap + Item.</div>';
   if(tkpBy()==='sheet'){
-    const its={};d.items.forEach(it=>its[it.id]=it);const order=c.sheets.filter(s=>s.id===c.sid).concat(c.sheets.filter(s=>s.id!==c.sid));
+    const its={};d.items.forEach(it=>its[it.id]=it);/* keep plan order so rows don't jump under your cursor when the sheet changes (the open sheet is highlighted, not moved) */const order=c.sheets.slice();
     order.forEach(s=>{const m=SQ.sheets[s.id]||{},nmHit=q&&(s.name||'').toLowerCase().includes(q);let ids=Object.keys(m).filter(k=>its[k]).sort((a,b)=>(its[a].n||0)-(its[b].n||0));const n=ids.length;
       if(q&&!nmHit){ids=ids.filter(k=>tkpMatch(its[k],q));if(!ids.length)return}
       const open=q?true:tkpShOpen(c,s.id),un=ids.some(k=>m[k].unscaled);
